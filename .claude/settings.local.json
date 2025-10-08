@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build)",
+      "Bash(taskkill:*)",
+      "Bash(powershell:*)",
+      "Bash(dotnet run:*)",
+      "Bash(dotnet add package:*)",
+      "Bash(dotnet ef migrations add:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet build:*)",
+      "Bash(touch:*)",
+      "Bash(dotnet ef database update:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(dotnet add:*)",
+      "Bash(find:*)",
+      "Bash(dotnet new:*)",
+      "Bash(dotnet sln add:*)",
+      "Bash(dotnet sln:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

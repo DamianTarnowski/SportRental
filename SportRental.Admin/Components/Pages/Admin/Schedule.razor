@@ -1,0 +1,291 @@
+@page "/admin/schedule"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SuperAdmin")]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+
+<PageTitle>Kalendarz Rezerwacji</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <!-- Modern Header with Gradient -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 32px; margin-bottom: 24px; color: white;">
+        <MudStack Row="true" Class="mud-space-between mud-align-center">
+            <div>
+                <MudText Typo="Typo.h3" Class="fw-bold">📅 Kalendarz Rezerwacji</MudText>
+                <MudText Typo="Typo.body1" Style="opacity: 0.9;">Zarządzaj terminami i rezerwacjami klientów</MudText>
+            </div>
+            <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Large" Style="opacity: 0.3; font-size: 4rem;" />
+        </MudStack>
+    </div>
+
+    <!-- Modern Controls Panel -->
+    <MudCard Elevation="2" Class="mb-4">
+        <MudCardContent>
+            <MudStack Row="true" Spacing="3" Class="mud-space-between mud-align-center flex-wrap">
+                <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                    <MudIcon Icon="@Icons.Material.Filled.DateRange" Color="Color.Primary" />
+                    <MudDateRangePicker @bind-DateRange="range" 
+                                      Label="Wybierz zakres dat" 
+                                      Variant="Variant.Outlined"
+                                      Class="flex-grow-1" />
+                </MudStack>
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled" 
+                             Color="Color.Primary" 
+                             StartIcon="@Icons.Material.Filled.Refresh"
+                             OnClick="Reload"
+                             Class="px-6">
+                        Odśwież
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" 
+                             Color="Color.Secondary"
+                             StartIcon="@Icons.Material.Filled.Today"
+                             OnClick="SetToday"
+                             Class="px-4">
+                        Dzisiaj
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        </MudCardContent>
+    </MudCard>
+
+    <!-- Statistics Cards -->
+    @if (grouped.Any())
+    {
+        <MudGrid Class="mb-4" Spacing="2">
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.EventNote" Color="Color.Primary" Size="Size.Large" />
+                        <MudText Typo="Typo.h4" Color="Color.Primary" Class="mt-2">@grouped.Values.SelectMany(x => x).Count()</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Łączne rezerwacje</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Color="Color.Success" Size="Size.Large" />
+                        <MudText Typo="Typo.h4" Color="Color.Success" Class="mt-2">@grouped.Count</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Dni z rezerwacjami</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.People" Color="Color.Info" Size="Size.Large" />
+                        <MudText Typo="Typo.h4" Color="Color.Info" Class="mt-2">@grouped.Values.SelectMany(x => x).Select(x => x.CustomerName).Distinct().Count()</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Różni klienci</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+            <MudItem xs="12" sm="6" md="3">
+                <MudCard Elevation="2" Style="height: 100%;">
+                    <MudCardContent Class="text-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Color="Color.Warning" Size="Size.Large" />
+                        <MudText Typo="Typo.h4" Color="Color.Warning" Class="mt-2">@grouped.Values.SelectMany(x => x).Sum(x => ExtractItemCount(x.ItemsSummary))</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Default">Łącznie przedmiotów</MudText>
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+        </MudGrid>
+    }
+
+    <!-- Calendar Grid -->
+    @if (!grouped.Any())
+    {
+        <MudCard Elevation="2" Class="text-center py-8">
+            <MudCardContent>
+                <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" Color="Color.Surface" />
+                <MudText Typo="Typo.h6" Class="mt-4" Color="Color.Default">Brak rezerwacji w wybranym okresie</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Wybierz inny zakres dat lub dodaj nowe rezerwacje</MudText>
+            </MudCardContent>
+        </MudCard>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var group in grouped.OrderBy(x => x.Key))
+            {
+                <MudItem xs="12" lg="6" xl="4">
+                    <MudCard Elevation="3" Style="height: 100%; transition: transform 0.2s; border-radius: 12px;">
+                        <!-- Day Header -->
+                        <div style="@GetHeaderStyle(group.Key)" class="pa-4">
+                            <MudStack Row="true" Class="mud-space-between mud-align-center">
+                                <div>
+                                    <MudText Typo="Typo.h6" Class="white-text fw-bold">@GetDayName(group.Key)</MudText>
+                                    <MudText Typo="Typo.body2" Class="white-text" Style="opacity: 0.9;">@group.Key.ToString("dd MMMM yyyy")</MudText>
+                                </div>
+                                <MudChip T="string" Color="Color.Default" Size="Size.Small" Style="background-color: rgba(255,255,255,0.2); color: white;">
+                                    @group.Value.Count rezerwacji
+                                </MudChip>
+                            </MudStack>
+                        </div>
+                        
+                        <!-- Reservations List -->
+                        <MudCardContent Class="pa-0">
+                            @foreach (var item in group.Value.OrderBy(x => x.StartLocal))
+                            {
+                                <div class="pa-4 border-bottom" style="@GetReservationStyle()">
+                                    <MudStack Row="true" Class="mud-space-between mud-align-center">
+                                        <div class="flex-grow-1">
+                                            <MudStack Row="true" Spacing="2" Class="mud-align-center mb-2">
+                                                <MudAvatar Size="Size.Small" Color="Color.Primary">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Person" />
+                                                </MudAvatar>
+                                                <MudText Typo="Typo.subtitle2" Class="fw-bold">@item.CustomerName</MudText>
+                                            </MudStack>
+                                            <MudStack Row="true" Spacing="4">
+                                                <MudStack Row="true" Spacing="1" Class="mud-align-center">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Color="Color.Success" />
+                                                    <MudText Typo="Typo.body2" Color="Color.Default">@item.StartLocal.ToString("HH:mm")</MudText>
+                                                </MudStack>
+                                                <MudStack Row="true" Spacing="1" Class="mud-align-center">
+                                                    <MudIcon Icon="@Icons.Material.Filled.AccessTime" Size="Size.Small" Color="Color.Error" />
+                                                    <MudText Typo="Typo.body2" Color="Color.Default">@item.EndLocal.ToString("HH:mm")</MudText>
+                                                </MudStack>
+                                                <MudStack Row="true" Spacing="1" Class="mud-align-center">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" Color="Color.Info" />
+                                                    <MudText Typo="Typo.body2" Color="Color.Default">@item.ItemsSummary</MudText>
+                                                </MudStack>
+                                            </MudStack>
+                                        </div>
+                                        <MudChip T="string" 
+                                               Color="@GetTimeChipColor(item.StartLocal, item.EndLocal)" 
+                                               Size="Size.Small"
+                                               Variant="Variant.Text">
+                                            @GetDurationText(item.StartLocal, item.EndLocal)
+                                        </MudChip>
+                                    </MudStack>
+                                </div>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private MudBlazor.DateRange range = new(DateTime.Today, DateTime.Today.AddDays(7));
+    private Dictionary<DateTime, List<ItemVm>> grouped = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Reload() => await Load();
+    
+    private async Task SetToday()
+    {
+        range = new MudBlazor.DateRange(DateTime.Today, DateTime.Today.AddDays(7));
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        await using var Db = await DbFactory.CreateDbContextAsync();
+        Db.SetTenant(TenantProvider.GetCurrentTenantId());
+
+        // Konwersja na UTC – PostgreSQL z "timestamp with time zone" wymaga UTC
+        var startLocal = (range.Start ?? DateTime.Today).Date;
+        var endLocal = (range.End ?? startLocal.AddDays(7)).Date.AddDays(1).AddTicks(-1);
+        var start = DateTime.SpecifyKind(startLocal, DateTimeKind.Local).ToUniversalTime();
+        var end = DateTime.SpecifyKind(endLocal, DateTimeKind.Local).ToUniversalTime();
+
+        var tid = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        var baseQuery = await Db.Rentals.AsNoTracking()
+            .Where(r => r.TenantId == tid && r.EndDateUtc >= start && r.StartDateUtc <= end)
+            .Select(r => new { r.Id, r.CustomerId, r.StartDateUtc, r.EndDateUtc })
+            .ToListAsync();
+
+        var customerMap = await Db.Customers.AsNoTracking()
+            .Where(c => c.TenantId == tid && baseQuery.Select(b => b.CustomerId).Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.FullName);
+
+        var itemsMap = await Db.RentalItems.AsNoTracking()
+            .Where(ri => baseQuery.Select(b => b.Id).Contains(ri.RentalId))
+            .GroupBy(ri => ri.RentalId)
+            .ToDictionaryAsync(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        var list = baseQuery.Select(b => new ItemVm
+        {
+            Day = b.StartDateUtc.ToLocalTime().Date,
+            CustomerName = customerMap.GetValueOrDefault(b.CustomerId) ?? b.CustomerId.ToString(),
+            StartLocal = b.StartDateUtc.ToLocalTime(),
+            EndLocal = b.EndDateUtc.ToLocalTime(),
+            ItemsSummary = $"{itemsMap.GetValueOrDefault(b.Id, 0)} szt."
+        }).OrderBy(x => x.Day).ThenBy(x => x.StartLocal).ToList();
+
+        grouped = list
+            .GroupBy(x => x.Day)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+    
+    private string GetHeaderStyle(DateTime date)
+    {
+        var today = DateTime.Today;
+        if (date.Date == today)
+            return "background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); border-radius: 8px 8px 0 0;";
+        if (date.Date > today)
+            return "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px 8px 0 0;";
+        return "background: linear-gradient(135deg, #bdc3c7 0%, #2c3e50 100%); border-radius: 8px 8px 0 0;";
+    }
+    
+    private string GetDayName(DateTime date)
+    {
+        var today = DateTime.Today;
+        if (date.Date == today) return "Dzisiaj";
+        if (date.Date == today.AddDays(1)) return "Jutro";
+        if (date.Date == today.AddDays(-1)) return "Wczoraj";
+        return date.ToString("dddd", new System.Globalization.CultureInfo("pl-PL"));
+    }
+    
+    private string GetReservationStyle()
+    {
+        return "transition: background-color 0.2s; cursor: pointer;" +
+               "background-color: var(--mud-palette-background);" +
+               "border-bottom: 1px solid var(--mud-palette-divider);";
+    }
+    
+    private Color GetTimeChipColor(DateTime start, DateTime end)
+    {
+        var duration = end - start;
+        if (duration.TotalHours >= 8) return Color.Success;
+        if (duration.TotalHours >= 4) return Color.Info;
+        if (duration.TotalHours >= 2) return Color.Warning;
+        return Color.Error;
+    }
+    
+    private string GetDurationText(DateTime start, DateTime end)
+    {
+        var duration = end - start;
+        if (duration.TotalDays >= 1)
+            return $"{Math.Floor(duration.TotalDays)}d {duration.Hours}h";
+        if (duration.TotalHours >= 1)
+            return $"{Math.Floor(duration.TotalHours)}h {duration.Minutes}min";
+        return $"{duration.Minutes}min";
+    }
+    
+    private int ExtractItemCount(string itemsSummary)
+    {
+        if (string.IsNullOrEmpty(itemsSummary)) return 0;
+        var parts = itemsSummary.Split(' ');
+        if (parts.Length > 0 && int.TryParse(parts[0], out int count))
+            return count;
+        return 0;
+    }
+
+    private sealed class ItemVm
+    {
+        public DateTime Day { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public DateTime StartLocal { get; set; }
+        public DateTime EndLocal { get; set; }
+        public string ItemsSummary { get; set; } = string.Empty;
+    }
+}
+

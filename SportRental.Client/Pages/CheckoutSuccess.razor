@@ -1,0 +1,56 @@
+@page "/checkout/success"
+@inject NavigationManager NavigationManager
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+    <MudPaper Elevation="4" Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mb-4" Style="font-size: 80px;" />
+        
+        <MudText Typo="Typo.h4" Class="mb-4">Płatność zakończona sukcesem! 🎉</MudText>
+        
+        <MudText Typo="Typo.body1" Class="mb-6">
+            Dziękujemy za wypożyczenie sprzętu. Twoja rezerwacja została potwierdzona.
+        </MudText>
+
+        @if (!string.IsNullOrEmpty(SessionId))
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                <MudText Typo="Typo.body2">
+                    ID sesji płatności: <code>@SessionId</code>
+                </MudText>
+            </MudAlert>
+        }
+
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            Szczegóły rezerwacji zostały wysłane na Twój adres email. <br />
+            Możesz teraz odebrać sprzęt w naszym punkcie.
+        </MudText>
+
+        <MudStack Row="true" Spacing="2" Justify="Justify.Center">
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       Href="/my-rentals"
+                       StartIcon="@Icons.Material.Filled.Receipt">
+                Moje wypożyczenia
+            </MudButton>
+            
+            <MudButton Variant="Variant.Outlined" 
+                       Color="Color.Primary" 
+                       Href="/"
+                       StartIcon="@Icons.Material.Filled.Home">
+                Strona główna
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "session_id")]
+    public string? SessionId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // TODO: Pobierz szczegóły płatności z API używając SessionId
+        // TODO: Wyświetl szczegóły rezerwacji
+    }
+}

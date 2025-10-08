@@ -1,0 +1,45 @@
+@using SportRental.Client.Services
+@inject TenantService TenantService
+@inject NavigationManager Navigation
+
+<div class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+    @if (!string.IsNullOrEmpty(currentTenantName))
+    {
+        <div class="flex items-center gap-2">
+            <span class="text-2xl">🏢</span>
+            <div class="flex flex-col">
+                <span class="text-xs text-gray-500 dark:text-gray-400">Wypożyczalnia:</span>
+                <span class="font-semibold text-sm">@currentTenantName</span>
+            </div>
+        </div>
+        <button @onclick="ChangeTenant" class="ml-2 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition">
+            Zmień
+        </button>
+    }
+    else
+    {
+        <button @onclick="SelectTenant" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition">
+            Wybierz wypożyczalnię
+        </button>
+    }
+</div>
+
+@code {
+    private string? currentTenantName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentTenantName = await TenantService.GetSelectedTenantNameAsync();
+    }
+
+    private void SelectTenant()
+    {
+        Navigation.NavigateTo("/select-tenant");
+    }
+
+    private async Task ChangeTenant()
+    {
+        await TenantService.ClearSelectedTenantAsync();
+        Navigation.NavigateTo("/select-tenant", forceLoad: true);
+    }
+}

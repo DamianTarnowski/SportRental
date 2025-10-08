@@ -1,0 +1,15 @@
+namespace SportRental.Shared.Models;
+
+public record CreateCheckoutSessionRequest(
+    DateTime StartDateUtc,
+    DateTime EndDateUtc,
+    List<CheckoutItem> Items,
+    string CustomerEmail,
+    Guid? CustomerId = null);
+
+public record CheckoutItem(Guid ProductId, int Quantity);
+
+public record CheckoutSessionResponse(
+    string SessionId,
+    string Url,
+    DateTime ExpiresAt);

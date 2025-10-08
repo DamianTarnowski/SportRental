@@ -1,0 +1,22 @@
+@page "/"
+@rendermode InteractiveServer
+
+<PageTitle>Home</PageTitle>
+
+<MudContainer Class="mt-10">
+    <MudText Typo="Typo.h2" Class="mb-1">SportRental</MudText>
+    <MudText Typo="Typo.subtitle1" Class="mb-4">Wypożyczalnia sprzętu sportowego – panel administracyjny.</MudText>
+    <AuthorizeView>
+        <Authorized>
+            <MudStack Row="true" Spacing="2">
+                <MudButton Href="/dashboard" Color="Color.Primary" Variant="Variant.Filled">Przejdź do panelu</MudButton>
+                <MudButton Href="/admin/products" Variant="Variant.Outlined">Produkty</MudButton>
+                <MudButton Href="/admin/rentals" Variant="Variant.Outlined">Wynajmy</MudButton>
+            </MudStack>
+        </Authorized>
+        <NotAuthorized>
+            <MudText Typo="Typo.subtitle1">Zaloguj się, aby korzystać z panelu.</MudText>
+            <MudButton Href="/Account/Login" Color="Color.Primary" Variant="Variant.Filled">Zaloguj</MudButton>
+        </NotAuthorized>
+    </AuthorizeView>
+</MudContainer>

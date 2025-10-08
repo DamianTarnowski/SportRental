@@ -1,0 +1,65 @@
+@page "/admin/contract-template"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+
+<MudContainer Class="mt-4">
+    <MudText Typo="Typo.h5">Szablon umowy</MudText>
+    <MudPaper Class="p-3 mt-3">
+        <MudText Typo="Typo.caption">Możesz użyć prostych zmiennych: {{CustomerName}}, {{StartDate}}, {{EndDate}}, {{ItemsTable}}, {{Total}}</MudText>
+        <MudTextField @bind-Value="content" Lines="20" FullWidth="true" Label="Treść szablonu" />
+        <MudStack Row="true" Spacing="2" Class="mt-2">
+            <MudButton Color="Color.Primary" OnClick="Save">Zapisz</MudButton>
+            <MudButton Variant="Variant.Outlined" OnClick="ResetDefault">Przywróć domyślny</MudButton>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private string content = "";
+    private Guid TenantId => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var Db = await DbFactory.CreateDbContextAsync();
+        Db.SetTenant(TenantId);
+        var tpl = await Db.ContractTemplates.FirstOrDefaultAsync(ct => ct.TenantId == TenantId);
+        if (tpl == null)
+        {
+            content = DefaultTemplate();
+        }
+        else
+        {
+            content = tpl.Content;
+        }
+    }
+
+    private async Task Save()
+    {
+        await using var Db = await DbFactory.CreateDbContextAsync();
+        Db.SetTenant(TenantId);
+        var tpl = await Db.ContractTemplates.FirstOrDefaultAsync(ct => ct.TenantId == TenantId);
+        if (tpl == null)
+        {
+            tpl = new ContractTemplate { Id = Guid.NewGuid(), TenantId = TenantId, Content = content };
+            await Db.ContractTemplates.AddAsync(tpl);
+        }
+        else
+        {
+            tpl.Content = content;
+            tpl.UpdatedAtUtc = DateTime.UtcNow;
+            Db.ContractTemplates.Update(tpl);
+        }
+        await Db.SaveChangesAsync();
+    }
+
+    private void ResetDefault()
+    {
+        content = DefaultTemplate();
+    }
+
+    private static string DefaultTemplate() => "Umowa wynajmu\nKlient: {{CustomerName}}\nOkres: {{StartDate}} - {{EndDate}}\n{{ItemsTable}}\nSuma: {{Total}} zł";
+}
+
+

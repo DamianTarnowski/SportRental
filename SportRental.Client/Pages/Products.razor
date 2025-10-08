@@ -1,0 +1,490 @@
+﻿@page "/products"
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Web
+@using SportRental.Shared.Models
+@inject IApiService ApiService
+@inject ICartService CartService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<PageTitle>SportRental - Product Catalog</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="py-4">
+    <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 16px; background: linear-gradient(135deg, #2563eb 0%, #60a5fa 100%); color: white;">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <div>
+                <MudText Typo="Typo.h4" Class="fw-bold">Find your next adventure</MudText>
+                <MudText Typo="Typo.subtitle1">Browse sports equipment that is ready for rental.</MudText>
+            </div>
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Style="color: white;">Total: @products.Count</MudChip>
+                <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Style="color: white;">Ready: @availableCount</MudChip>
+                <MudChip T="string" Color="Color.Info" Variant="Variant.Filled" Style="color: white;">Avg price: @averagePrice.ToString("C")</MudChip>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
+
+    <MudPaper Elevation="1" Class="pa-4 mb-4" Style="border-radius: 16px;">
+        <MudGrid Spacing="3" AlignItems="AlignItems.Center">
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="searchText"
+                              Placeholder="Search products"
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              OnKeyDown="OnSearchKeyDown" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect T="string" Label="Category" @bind-Value="SelectedCategory" Variant="Variant.Outlined" Clearable="true">
+                    <MudSelectItem Value="@string.Empty">All categories</MudSelectItem>
+                    @foreach (var category in categories)
+                    {
+                        <MudSelectItem Value="@category">@category</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudSelect T="string" Label="Sort by" @bind-Value="SelectedSort" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("featured")">Featured</MudSelectItem>
+                    <MudSelectItem Value="@("price-asc")">Lowest price</MudSelectItem>
+                    <MudSelectItem Value="@("price-desc")">Highest price</MudSelectItem>
+                    <MudSelectItem Value="@("name")">Name</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="2">
+                <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="Only available" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudNumericField T="decimal"
+                                 Label="Min price"
+                                 Variant="Variant.Outlined"
+                                 Value="selectedMinPrice"
+                                 ValueChanged="OnMinPriceChanged"
+                                 Immediate="true"
+                                 Min="@minPrice"
+                                 Max="@selectedMaxPrice" />
+            </MudItem>
+            <MudItem xs="12" md="3">
+                <MudNumericField T="decimal"
+                                 Label="Max price"
+                                 Variant="Variant.Outlined"
+                                 Value="selectedMaxPrice"
+                                 ValueChanged="OnMaxPriceChanged"
+                                 Immediate="true"
+                                 Min="@selectedMinPrice"
+                                 Max="@maxPrice" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchProducts">Search</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ClearFilters">Clear filters</MudButton>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    @if (isLoading)
+    {
+        <MudGrid Spacing="3">
+            @for (int i = 0; i < 8; i++)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="2">
+                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
+                        <MudCardContent>
+                            <MudSkeleton SkeletonType="SkeletonType.Text" />
+                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="60%" />
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+    else if (!filteredProducts.Any())
+    {
+        <MudPaper Elevation="1" Class="pa-6 text-center" Style="border-radius: 16px;">
+            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" />
+            <MudText Typo="Typo.h6">No products match your filters</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Adjust the filters or reset them to browse all equipment.</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3" OnClick="ClearFilters">Reset filters</MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudGrid Spacing="3">
+            @foreach (var product in filteredProducts)
+            {
+                <MudItem xs="12" sm="6" md="4" lg="3">
+                    <MudCard Elevation="4" Class="h-100" Style="border-radius: 16px; transition: transform 0.2s; cursor: pointer;"
+                             @onclick="@(() => ViewProduct(product))">
+                        @{
+                            // Use smaller image for grid - w400 for mobile, w800 for larger screens
+                            var imageUrl = product.GetImageUrl(400);
+                            var imageSrcSet = product.GetImageSrcSet();
+                        }
+                        @if (!string.IsNullOrEmpty(imageUrl))
+                        {
+                            @if (!string.IsNullOrEmpty(imageSrcSet))
+                            {
+                                <img src="@imageUrl" 
+                                     srcset="@imageSrcSet" 
+                                     sizes="(max-width: 600px) 400px, (max-width: 900px) 400px, 800px"
+                                     alt="@product.Name" 
+                                     style="height: 200px; width: 100%; object-fit: cover; border-radius: 16px 16px 0 0;" />
+                            }
+                            else
+                            {
+                                <MudCardMedia Image="@imageUrl" Height="200" Style="border-radius: 16px 16px 0 0;" />
+                            }
+                        }
+                        else
+                        {
+                            <div style="height: 200px; background: linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%); display: flex; align-items: center; justify-center: center;">
+                                <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Surface" />
+                            </div>
+                        }
+
+                        <MudCardContent>
+                            <MudStack Spacing="2">
+                                <MudText Typo="Typo.h6" Class="fw-bold">@product.Name</MudText>
+
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                    <MudText Typo="Typo.h6" Color="Color.Primary">@product.DailyPrice.ToString("C") / day</MudText>
+                                    @if (product.IsAvailable && product.AvailableQuantity > 0)
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">In stock</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Unavailable</MudChip>
+                                    }
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                                        @product.AvailableQuantity pcs
+                                    </MudChip>
+                                </MudStack>
+
+                                @if (!string.IsNullOrEmpty(product.Category))
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Category">
+                                        @product.Category
+                                    </MudChip>
+                                }
+
+                                @if (!string.IsNullOrEmpty(product.Description))
+                                {
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="line-clamp-3">
+                                        @product.Description
+                                    </MudText>
+                                }
+                            </MudStack>
+                        </MudCardContent>
+
+                        <MudCardActions Class="pa-3 pt-0">
+                        <MudStack Spacing="1">
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.AddShoppingCart"
+                                       FullWidth="true"
+                                       Disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
+                                       OnClick="@(async () => await AddToCart(product))">
+                                Add to cart
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       FullWidth="true"
+                                       OnClick="@(() => NavigateToProduct(product.Id))">
+                                View details
+                            </MudButton>
+                        </MudStack>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+            }
+        </MudGrid>
+
+        @if (totalPages > 1)
+        {
+            <MudStack AlignItems="AlignItems.Center" Class="mt-6">
+                <MudPagination Count="totalPages"
+                               @bind-Selected="CurrentPage"
+                               Color="Color.Primary"
+                               ShowFirstButton="true"
+                               ShowLastButton="true" />
+            </MudStack>
+        }
+    }
+</MudContainer>
+
+@code {
+    private readonly List<ProductDto> products = new();
+    private List<ProductDto> filteredProducts = new();
+    private List<string> categories = new();
+    private bool isLoading = true;
+
+    private string searchText = string.Empty;
+    private string selectedCategory = string.Empty;
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private const int PageSize = 12;
+
+    private bool showOnlyAvailable;
+    private string selectedSort = "featured";
+    private decimal minPrice;
+    private decimal maxPrice;
+    private decimal selectedMinPrice;
+    private decimal selectedMaxPrice;
+
+    private int availableCount => products.Count(p => p.IsAvailable && p.AvailableQuantity > 0);
+    private decimal averagePrice => products.Any() ? Math.Round(products.Average(p => p.DailyPrice), 2) : 0m;
+
+    private string SelectedCategory
+    {
+        get => selectedCategory;
+        set
+        {
+            var newValue = value ?? string.Empty;
+            if (selectedCategory != newValue)
+            {
+                selectedCategory = newValue;
+                currentPage = 1;
+                ApplyFilters();
+            }
+        }
+    }
+
+    private string SelectedSort
+    {
+        get => selectedSort;
+        set
+        {
+            var newValue = value ?? "featured";
+            if (selectedSort != newValue)
+            {
+                selectedSort = newValue;
+                currentPage = 1;
+                ApplyFilters();
+            }
+        }
+    }
+
+    private bool ShowOnlyAvailable
+    {
+        get => showOnlyAvailable;
+        set
+        {
+            if (showOnlyAvailable != value)
+            {
+                showOnlyAvailable = value;
+                currentPage = 1;
+                ApplyFilters();
+            }
+        }
+    }
+
+    private int CurrentPage
+    {
+        get => currentPage;
+        set
+        {
+            var clamped = Math.Clamp(value, 1, Math.Max(1, totalPages));
+            if (currentPage != clamped)
+            {
+                currentPage = clamped;
+                ApplyFilters();
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        try
+        {
+            var loaded = await ApiService.GetProductsAsync(1, 200);
+            products.Clear();
+            products.AddRange(loaded);
+
+            categories = products
+                .Where(p => !string.IsNullOrWhiteSpace(p.Category))
+                .Select(p => p.Category!)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+
+            if (products.Any())
+            {
+                minPrice = products.Min(p => p.DailyPrice);
+                maxPrice = products.Max(p => p.DailyPrice);
+                selectedMinPrice = minPrice;
+                selectedMaxPrice = maxPrice;
+            }
+
+            ApplyFilters();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Could not load products: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyFilters()
+    {
+        IEnumerable<ProductDto> query = products;
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            query = query.Where(p =>
+                p.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
+                (p.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+
+        if (!string.IsNullOrWhiteSpace(selectedCategory))
+        {
+            query = query.Where(p => string.Equals(p.Category, selectedCategory, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (ShowOnlyAvailable)
+        {
+            query = query.Where(p => p.IsAvailable && p.AvailableQuantity > 0);
+        }
+
+        if (products.Any())
+        {
+            var min = Math.Min(selectedMinPrice, selectedMaxPrice);
+            var max = Math.Max(selectedMinPrice, selectedMaxPrice);
+            query = query.Where(p => p.DailyPrice >= min && p.DailyPrice <= max);
+        }
+
+        query = SortProducts(query);
+
+        var list = query.ToList();
+        totalPages = list.Count == 0 ? 1 : (int)Math.Ceiling(list.Count / (double)PageSize);
+        currentPage = Math.Clamp(currentPage, 1, totalPages);
+        filteredProducts = list
+            .Skip((currentPage - 1) * PageSize)
+            .Take(PageSize)
+            .ToList();
+    }
+
+    private IEnumerable<ProductDto> SortProducts(IEnumerable<ProductDto> source) => SelectedSort switch
+    {
+        "price-asc" => source.OrderBy(p => p.DailyPrice),
+        "price-desc" => source.OrderByDescending(p => p.DailyPrice),
+        "name" => source.OrderBy(p => p.Name),
+        _ => source.OrderByDescending(p => p.IsAvailable).ThenBy(p => p.Name)
+    };
+
+    private void SearchProducts()
+    {
+        currentPage = 1;
+        ApplyFilters();
+    }
+
+    private void ClearFilters()
+    {
+        searchText = string.Empty;
+        selectedCategory = string.Empty;
+        SelectedSort = "featured";
+        ShowOnlyAvailable = false;
+        currentPage = 1;
+
+        if (products.Any())
+        {
+            selectedMinPrice = minPrice;
+            selectedMaxPrice = maxPrice;
+        }
+
+        ApplyFilters();
+    }
+
+    private void OnMinPriceChanged(decimal value)
+    {
+        selectedMinPrice = ClampPrice(value);
+        currentPage = 1;
+        ApplyFilters();
+    }
+
+    private void OnMaxPriceChanged(decimal value)
+    {
+        selectedMaxPrice = ClampPrice(value);
+        currentPage = 1;
+        ApplyFilters();
+    }
+
+    private decimal ClampPrice(decimal value)
+    {
+        if (!products.Any())
+        {
+            return value;
+        }
+
+        var min = minPrice;
+        var max = maxPrice;
+        if (value < min)
+        {
+            return min;
+        }
+
+        if (value > max)
+        {
+            return max;
+        }
+
+        return value;
+    }
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            SearchProducts();
+            await Task.CompletedTask;
+        }
+    }
+
+    private async Task AddToCart(ProductDto product)
+    {
+        await CartService.AddToCartAsync(product);
+        Snackbar.Add($"Product {product.Name} added to cart.", Severity.Success);
+    }
+
+    private Task AddToCartFromDialog(ProductDto product) => AddToCart(product);
+
+    private void ViewProduct(ProductDto product)
+    {
+        var parameters = new DialogParameters
+        {
+            ["Product"] = product,
+            ["AddToCart"] = EventCallback.Factory.Create<ProductDto>(this, AddToCartFromDialog)
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true
+        };
+
+        DialogService.Show<ProductDetailsDialog>("Product details", parameters, options);
+    }
+
+    private void NavigateToProduct(Guid id)
+    {
+        Navigation.NavigateTo($"/products/{id}");
+    }
+}
+
+
+
+
+

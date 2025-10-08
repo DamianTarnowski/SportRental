@@ -1,0 +1,95 @@
+@page "/select-tenant"
+@using SportRental.Client.Services
+@inject TenantService TenantService
+@inject NavigationManager Navigation
+
+<PageTitle>Wybierz wypożyczalnię</PageTitle>
+
+<div class="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
+    <div class="max-w-4xl w-full">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">🎿 SportRental</h1>
+            <p class="text-xl text-white/90">Wybierz wypożyczalnię</p>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="bg-white rounded-lg shadow-xl p-8 text-center">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <p class="text-gray-600">Ładowanie wypożyczalni...</p>
+            </div>
+        }
+        else if (tenants.Count == 0)
+        {
+            <div class="bg-white rounded-lg shadow-xl p-8 text-center">
+                <div class="text-6xl mb-4">❌</div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Brak dostępnych wypożyczalni</h2>
+                <p class="text-gray-600">Sprawdź połączenie z serwerem API.</p>
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                @foreach (var tenant in tenants)
+                {
+                    <div class="bg-white rounded-lg shadow-xl overflow-hidden transform transition hover:scale-105 cursor-pointer"
+                         @onclick="@(() => SelectTenantAsync(tenant))">
+                        <div class="h-32 bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center"
+                             style="@GetTenantGradient(tenant)">
+                            @if (!string.IsNullOrEmpty(tenant.LogoUrl))
+                            {
+                                <img src="@tenant.LogoUrl" alt="@tenant.Name" class="h-20 w-20 object-contain" />
+                            }
+                            else
+                            {
+                                <div class="text-white text-5xl">🏢</div>
+                            }
+                        </div>
+                        
+                        <div class="p-6">
+                            <h3 class="text-xl font-bold text-gray-800 mb-2">@tenant.Name</h3>
+                            <button class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded transition">
+                                Wybierz →
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<TenantInfo> tenants = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if tenant already selected - redirect to home
+        var selectedTenant = await TenantService.GetSelectedTenantIdAsync();
+        if (!string.IsNullOrEmpty(selectedTenant))
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        // Load available tenants
+        tenants = await TenantService.GetAvailableTenantsAsync();
+        isLoading = false;
+    }
+
+    private async Task SelectTenantAsync(TenantInfo tenant)
+    {
+        await TenantService.SetSelectedTenantAsync(tenant.Id.ToString(), tenant.Name);
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    private string GetTenantGradient(TenantInfo tenant)
+    {
+        if (!string.IsNullOrEmpty(tenant.PrimaryColor) && !string.IsNullOrEmpty(tenant.SecondaryColor))
+        {
+            return $"background: linear-gradient(135deg, {tenant.PrimaryColor} 0%, {tenant.SecondaryColor} 100%);";
+        }
+        return "";
+    }
+}

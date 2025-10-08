@@ -1,0 +1,394 @@
+@page "/admin/reports"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+
+<MudContainer Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">Raporty</MudText>
+    
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="6" lg="3">
+            <MudDateRangePicker @bind-DateRange="dateRange" Label="Zakres dat" />
+        </MudItem>
+        <MudItem xs="12" md="6" lg="3">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="LoadReports">
+                Wygeneruj raporty
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+
+    @if (isLoading)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mt-4" />
+    }
+    else if (reportData != null)
+    {
+        <MudGrid Spacing="3" Class="mt-4">
+            <!-- Statystyki ogólne -->
+            <MudItem xs="12">
+                <MudPaper Class="p-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Statystyki ogólne (@dateRange?.Start?.ToString("yyyy-MM-dd") - @dateRange?.End?.ToString("yyyy-MM-dd"))</MudText>
+                    <MudGrid>
+                        <MudItem xs="6" md="3">
+                            <MudStack Class="mud-align-center">
+                                <MudText Typo="Typo.h4" Color="Color.Primary">@reportData.TotalRentals</MudText>
+                                <MudText Typo="Typo.caption">Wynajmów</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudStack Class="mud-align-center">
+                                <MudText Typo="Typo.h4" Color="Color.Success">@reportData.TotalRevenue.ToString("0.00") zł</MudText>
+                                <MudText Typo="Typo.caption">Przychody</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudStack Class="mud-align-center">
+                                <MudText Typo="Typo.h4" Color="Color.Info">@reportData.UniqueCustomers</MudText>
+                                <MudText Typo="Typo.caption">Unikalnych klientów</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudStack Class="mud-align-center">
+                                <MudText Typo="Typo.h4" Color="Color.Warning">@reportData.AverageRentalValue.ToString("0.00") zł</MudText>
+                                <MudText Typo="Typo.caption">Średnia wartość</MudText>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Wykres wynajmów w czasie -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="p-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Wynajmy w czasie</MudText>
+                    <MudChart ChartType="MudBlazor.ChartType.Line" 
+                              XAxisLabels="@rentalsOverTimeLabels" 
+                              ChartSeries="@rentalsOverTimeData" 
+                              Width="100%" Height="300px" />
+                </MudPaper>
+            </MudItem>
+
+            <!-- Wykres przychodów w czasie -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="p-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Przychody w czasie</MudText>
+                    <MudChart ChartType="MudBlazor.ChartType.Line" 
+                              XAxisLabels="@revenueOverTimeLabels" 
+                              ChartSeries="@revenueOverTimeData" 
+                              Width="100%" Height="300px" />
+                </MudPaper>
+            </MudItem>
+
+            <!-- Top produkty -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="p-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Najpopularniejsze produkty</MudText>
+                    <MudTable Items="reportData.TopProducts" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Produkt</MudTh>
+                            <MudTh>Wynajmy</MudTh>
+                            <MudTh>Przychód</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.ProductName</MudTd>
+                            <MudTd>@context.RentalsCount</MudTd>
+                            <MudTd>@context.Revenue.ToString("0.00") zł</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Top klienci -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="p-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Najlepsi klienci</MudText>
+                    <MudTable Items="reportData.TopCustomers" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Klient</MudTh>
+                            <MudTh>Wynajmy</MudTh>
+                            <MudTh>Przychód</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.CustomerName</MudTd>
+                            <MudTd>@context.RentalsCount</MudTd>
+                            <MudTd>@context.Revenue.ToString("0.00") zł</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Statusy wynajmów -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="p-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Statusy wynajmów</MudText>
+                    <MudChart ChartType="MudBlazor.ChartType.Pie" 
+                              ChartSeries="@statusData" 
+                              Width="100%" Height="300px" />
+                </MudPaper>
+            </MudItem>
+
+            <!-- Wykorzystanie produktów -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="p-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">Wykorzystanie produktów (%)</MudText>
+                    <MudTable Items="reportData.ProductUtilization" Dense="true">
+                        <HeaderContent>
+                            <MudTh>Produkt</MudTh>
+                            <MudTh>Dni wypożyczone</MudTh>
+                            <MudTh>Wykorzystanie</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.ProductName</MudTd>
+                            <MudTd>@context.DaysRented</MudTd>
+                            <MudTd>
+                                <MudProgressLinear Value="@context.UtilizationPercent" Color="@GetUtilizationColor(context.UtilizationPercent)" />
+                                <MudText Typo="Typo.caption">@context.UtilizationPercent.ToString("0.0")%</MudText>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    private MudBlazor.DateRange? dateRange = new(DateTime.Today.AddDays(-30), DateTime.Today);
+    private bool isLoading = false;
+    private ReportData? reportData;
+
+    // Chart data
+    private string[] rentalsOverTimeLabels = Array.Empty<string>();
+    private List<MudBlazor.ChartSeries> rentalsOverTimeData = new();
+    private string[] revenueOverTimeLabels = Array.Empty<string>();
+    private List<MudBlazor.ChartSeries> revenueOverTimeData = new();
+    private List<MudBlazor.ChartSeries> statusData = new();
+
+    private Guid TenantId => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReports();
+    }
+
+    private async Task LoadReports()
+    {
+        if (dateRange?.Start == null || dateRange.End == null) return;
+
+        isLoading = true;
+        try
+        {
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(TenantId);
+
+            var startDate = DateTime.SpecifyKind(dateRange.Start.Value.Date, DateTimeKind.Local).ToUniversalTime();
+            var endDate = DateTime.SpecifyKind(dateRange.End.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Local).ToUniversalTime();
+
+            // Basic stats
+            var allRentals = await Db.Rentals
+                .Where(r => r.CreatedAtUtc >= startDate && r.CreatedAtUtc <= endDate)
+                .ToListAsync();
+
+            var totalRentals = allRentals.Count;
+            var totalRevenue = allRentals.Sum(r => r.TotalAmount);
+            var uniqueCustomers = allRentals.Select(r => r.CustomerId).Distinct().Count();
+            var averageRentalValue = totalRentals > 0 ? totalRevenue / totalRentals : 0;
+
+            // Top products
+            var topProducts = await Db.RentalItems
+                .Where(ri => Db.Rentals.Any(r => r.Id == ri.RentalId && r.CreatedAtUtc >= startDate && r.CreatedAtUtc <= endDate))
+                .GroupBy(ri => ri.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    RentalsCount = g.Count(),
+                    Revenue = g.Sum(x => x.Subtotal)
+                })
+                .OrderByDescending(x => x.Revenue)
+                .Take(10)
+                .ToListAsync();
+
+            var productIds = topProducts.Select(tp => tp.ProductId).ToList();
+            var productNames = await Db.Products
+                .Where(p => productIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+            var topProductsReport = topProducts.Select(tp => new TopProductReport
+            {
+                ProductName = productNames.GetValueOrDefault(tp.ProductId) ?? "Nieznany",
+                RentalsCount = tp.RentalsCount,
+                Revenue = tp.Revenue
+            }).ToList();
+
+            // Top customers
+            var topCustomers = allRentals
+                .GroupBy(r => r.CustomerId)
+                .Select(g => new
+                {
+                    CustomerId = g.Key,
+                    RentalsCount = g.Count(),
+                    Revenue = g.Sum(x => x.TotalAmount)
+                })
+                .OrderByDescending(x => x.Revenue)
+                .Take(10)
+                .ToList();
+
+            var customerIds = topCustomers.Select(tc => tc.CustomerId).ToList();
+            var customerNames = await Db.Customers
+                .Where(c => customerIds.Contains(c.Id))
+                .ToDictionaryAsync(c => c.Id, c => c.FullName);
+
+            var topCustomersReport = topCustomers.Select(tc => new TopCustomerReport
+            {
+                CustomerName = customerNames.GetValueOrDefault(tc.CustomerId) ?? "Nieznany",
+                RentalsCount = tc.RentalsCount,
+                Revenue = tc.Revenue
+            }).ToList();
+
+            // Status distribution
+            var statusDistribution = allRentals
+                .GroupBy(r => r.Status)
+                .ToDictionary(g => g.Key, g => g.Count());
+
+            // Product utilization (simplified - days in period)
+            var totalDaysInPeriod = (endDate - startDate).Days;
+            var productUtilization = await Db.RentalItems
+                .Where(ri => Db.Rentals.Any(r => r.Id == ri.RentalId && r.StartDateUtc <= endDate && r.EndDateUtc >= startDate))
+                .GroupBy(ri => ri.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    DaysRented = g.Sum(ri => (int)(
+                        Db.Rentals.Where(r => r.Id == ri.RentalId).Select(r => r.EndDateUtc).First() -
+                        Db.Rentals.Where(r => r.Id == ri.RentalId).Select(r => r.StartDateUtc).First()).TotalDays + 1)
+                })
+                .OrderByDescending(x => x.DaysRented)
+                .Take(10)
+                .ToListAsync();
+
+            var utilizationProductNames = await Db.Products
+                .Where(p => productUtilization.Select(pu => pu.ProductId).Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+            var productUtilizationReport = productUtilization.Select(pu => new ProductUtilizationReport
+            {
+                ProductName = utilizationProductNames.GetValueOrDefault(pu.ProductId) ?? "Nieznany",
+                DaysRented = pu.DaysRented,
+                UtilizationPercent = totalDaysInPeriod > 0 ? (double)pu.DaysRented / totalDaysInPeriod * 100 : 0
+            }).ToList();
+
+            // Time series data
+            var dailyRentals = new List<int>();
+            var dailyRevenue = new List<double>();
+            var labels = new List<string>();
+
+            for (var date = dateRange.Start.Value.Date; date <= dateRange.End.Value.Date; date = date.AddDays(1))
+            {
+                var dayStart = DateTime.SpecifyKind(date, DateTimeKind.Local).ToUniversalTime();
+                var dayEnd = dayStart.AddDays(1).AddTicks(-1);
+                
+                var dayRentals = allRentals.Count(r => r.CreatedAtUtc >= dayStart && r.CreatedAtUtc <= dayEnd);
+                var dayRevenue = allRentals.Where(r => r.CreatedAtUtc >= dayStart && r.CreatedAtUtc <= dayEnd).Sum(r => (double)r.TotalAmount);
+                
+                dailyRentals.Add(dayRentals);
+                dailyRevenue.Add(dayRevenue);
+                labels.Add(date.ToString("MM-dd"));
+            }
+
+            // Prepare chart data
+            rentalsOverTimeLabels = labels.ToArray();
+            rentalsOverTimeData = new List<MudBlazor.ChartSeries>
+            {
+                new MudBlazor.ChartSeries { Name = "Wynajmy", Data = dailyRentals.Select(x => (double)x).ToArray() }
+            };
+
+            revenueOverTimeLabels = labels.ToArray();
+            revenueOverTimeData = new List<MudBlazor.ChartSeries>
+            {
+                new MudBlazor.ChartSeries { Name = "Przychody (zł)", Data = dailyRevenue.ToArray() }
+            };
+
+            statusData = statusDistribution
+                .Select(kvp => new MudBlazor.ChartSeries
+                {
+                    Name = GetStatusText(kvp.Key),
+                    Data = new[] { (double)kvp.Value }
+                })
+                .ToList();
+
+            reportData = new ReportData
+            {
+                TotalRentals = totalRentals,
+                TotalRevenue = totalRevenue,
+                UniqueCustomers = uniqueCustomers,
+                AverageRentalValue = averageRentalValue,
+                TopProducts = topProductsReport,
+                TopCustomers = topCustomersReport,
+                ProductUtilization = productUtilizationReport
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd podczas generowania raportów: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private Color GetUtilizationColor(double percent)
+    {
+        return percent switch
+        {
+            >= 80 => Color.Success,
+            >= 60 => Color.Warning,
+            >= 40 => Color.Info,
+            _ => Color.Default
+        };
+    }
+
+    private string GetStatusText(RentalStatus status) => status switch
+    {
+        RentalStatus.Draft => "Szkic",
+        RentalStatus.Confirmed => "Potwierdzony",
+        RentalStatus.Active => "Aktywny",
+        RentalStatus.Completed => "Zakończony",
+        RentalStatus.Cancelled => "Anulowany",
+        _ => status.ToString()
+    };
+
+    private class ReportData
+    {
+        public int TotalRentals { get; set; }
+        public decimal TotalRevenue { get; set; }
+        public int UniqueCustomers { get; set; }
+        public decimal AverageRentalValue { get; set; }
+        public List<TopProductReport> TopProducts { get; set; } = new();
+        public List<TopCustomerReport> TopCustomers { get; set; } = new();
+        public List<ProductUtilizationReport> ProductUtilization { get; set; } = new();
+    }
+
+    private class TopProductReport
+    {
+        public string ProductName { get; set; } = string.Empty;
+        public int RentalsCount { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    private class TopCustomerReport
+    {
+        public string CustomerName { get; set; } = string.Empty;
+        public int RentalsCount { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    private class ProductUtilizationReport
+    {
+        public string ProductName { get; set; } = string.Empty;
+        public int DaysRented { get; set; }
+        public double UtilizationPercent { get; set; }
+    }
+}

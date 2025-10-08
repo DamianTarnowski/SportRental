@@ -1,0 +1,44 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using SportRental.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<AuthorizeView>
+    <Authorized>
+        <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit" AnchorOrigin="Origin.BottomRight">
+            <MudMenuItem>
+                <div class="px-4 py-2">
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">Zalogowany jako:</MudText>
+                    <MudText Typo="Typo.body1">@context.User.Identity?.Name</MudText>
+                </div>
+            </MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Href="/account" Icon="@Icons.Material.Filled.Person">
+                Moje konto
+            </MudMenuItem>
+            <MudMenuItem Href="/my-rentals" Icon="@Icons.Material.Filled.ShoppingBag">
+                Moje wypożyczenia
+            </MudMenuItem>
+            <MudDivider />
+            <MudMenuItem OnClick="HandleLogout" Icon="@Icons.Material.Filled.Logout">
+                Wyloguj się
+            </MudMenuItem>
+        </MudMenu>
+    </Authorized>
+    <NotAuthorized>
+        <MudButton Href="/login" Variant="Variant.Text" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login">
+            Zaloguj się
+        </MudButton>
+        <MudButton Href="/register" Variant="Variant.Filled" Color="Color.Primary">
+            Zarejestruj się
+        </MudButton>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private async Task HandleLogout()
+    {
+        await AuthService.LogoutAsync();
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
+}

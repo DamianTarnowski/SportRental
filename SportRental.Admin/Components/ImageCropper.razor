@@ -1,0 +1,266 @@
+@inject IJSRuntime JS
+@inject ISnackbar Snackbar
+
+<MudStack Spacing="3">
+    @if (!_imageSelected)
+    {
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Spacing="2" AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.h6">Wybierz zdjęcie</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Maksymalny rozmiar: @MaxSizeMB MB | Formaty: JPEG, PNG, WebP
+                </MudText>
+                <InputFile id="imageInput" OnChange="OnFileSelected" accept="image/jpeg,image/jpg,image/png,image/webp" style="display: none;" />
+                <MudButton HtmlTag="label" 
+                           for="imageInput"
+                           Variant="Variant.Filled" 
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.AddPhotoAlternate">
+                    Wybierz plik
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Elevation="2" Class="pa-4">
+            <MudStack Spacing="2">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <MudText Typo="Typo.h6">Edytuj zdjęcie</MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Close" 
+                                   Color="Color.Error" 
+                                   Size="Size.Small" 
+                                   OnClick="CancelSelection" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(_selectedFileName))
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        <strong>@_selectedFileName</strong> (@_selectedFileSize)
+                    </MudAlert>
+                }
+
+                @* Cropper Container *@
+                <div id="cropperContainer" style="width: 100%; max-width: 500px; margin: 0 auto;">
+                    <!-- Croppie will be initialized here -->
+                </div>
+
+                @* Controls *@
+                <MudStack Row="true" Justify="Justify.Center" Spacing="1">
+                    <MudIconButton Icon="@Icons.Material.Filled.RotateLeft" 
+                                   Color="Color.Primary" 
+                                   OnClick="() => RotateImage(-90)"
+                                   Title="Obróć w lewo" />
+                    <MudIconButton Icon="@Icons.Material.Filled.RotateRight" 
+                                   Color="Color.Primary" 
+                                   OnClick="() => RotateImage(90)"
+                                   Title="Obróć w prawo" />
+                </MudStack>
+
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">
+                    💡 Wskazówka: Użyj Ctrl + scroll aby zoom
+                </MudText>
+
+                @* Action Buttons *@
+                <MudStack Row="true" Justify="Justify.Center" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Secondary"
+                               OnClick="SkipCrop"
+                               StartIcon="@Icons.Material.Filled.FastForward">
+                        Pomiń obcinanie
+                    </MudButton>
+                    @if (_isProcessing)
+                    {
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary"
+                                   Disabled="true">
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                            <span style="margin-left: 8px;">Przetwarzanie...</span>
+                        </MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary"
+                                   OnClick="CropAndUpload"
+                                   StartIcon="@Icons.Material.Filled.Check">
+                            Przytnij i zapisz
+                        </MudButton>
+                    }
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    }
+</MudStack>
+
+@code {
+    [Parameter]
+    public int MaxSizeMB { get; set; } = 8;
+
+    [Parameter]
+    public EventCallback<IBrowserFile> OnImageReady { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnBase64ImageReady { get; set; }
+
+    private bool _imageSelected;
+    private bool _isProcessing;
+    private string? _selectedFileName;
+    private string? _selectedFileSize;
+    private IBrowserFile? _originalFile;
+    private string? _imageDataUrl;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        // Validate file size
+        var maxBytes = MaxSizeMB * 1024 * 1024;
+        if (file.Size > maxBytes)
+        {
+            Snackbar.Add($"Plik jest za duży! Maksymalny rozmiar: {MaxSizeMB}MB (Twój: {FormatFileSize(file.Size)})", Severity.Error);
+            return;
+        }
+
+        // Validate file type
+        var validTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/webp" };
+        if (!validTypes.Contains(file.ContentType.ToLower()))
+        {
+            Snackbar.Add("Nieprawidłowy format pliku! Dozwolone: JPEG, PNG, WebP", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            _originalFile = file;
+            _selectedFileName = file.Name;
+            _selectedFileSize = FormatFileSize(file.Size);
+            _imageSelected = true;
+
+            // Read file as base64
+            using var stream = file.OpenReadStream(maxBytes);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            var bytes = ms.ToArray();
+            _imageDataUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(bytes)}";
+
+            StateHasChanged();
+
+            // Initialize cropper
+            await Task.Delay(100); // Wait for DOM update
+            await JS.InvokeVoidAsync("imageCropper.init", _imageDataUrl, "cropperContainer");
+
+            Snackbar.Add("Zdjęcie załadowane! Teraz możesz je przyciąć i obrócić.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd podczas ładowania zdjęcia: {ex.Message}", Severity.Error);
+            CancelSelection();
+        }
+    }
+
+    private async Task RotateImage(int degrees)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("imageCropper.rotate", degrees);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd podczas obracania: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task CropAndUpload()
+    {
+        if (_originalFile == null) return;
+
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            // Get cropped image as base64
+            var croppedBase64 = await JS.InvokeAsync<string>("imageCropper.getCroppedImage", "jpeg", 0.85);
+            
+            if (string.IsNullOrEmpty(croppedBase64))
+            {
+                Snackbar.Add("Błąd podczas przycinania zdjęcia", Severity.Error);
+                return;
+            }
+
+            // Notify parent
+            await OnBase64ImageReady.InvokeAsync(croppedBase64);
+            
+            Snackbar.Add("Zdjęcie przycięte pomyślnie!", Severity.Success);
+            
+            // Clean up
+            await CleanUp();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SkipCrop()
+    {
+        if (_originalFile == null) return;
+
+        try
+        {
+            // Use original file without cropping
+            await OnImageReady.InvokeAsync(_originalFile);
+            
+            Snackbar.Add("Zdjęcie gotowe do uploadu (bez obcinania)", Severity.Info);
+            
+            // Clean up
+            await CleanUp();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void CancelSelection()
+    {
+        _ = CleanUp();
+    }
+
+    private async Task CleanUp()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("imageCropper.destroy");
+        }
+        catch { /* Ignore errors during cleanup */ }
+
+        _imageSelected = false;
+        _originalFile = null;
+        _selectedFileName = null;
+        _selectedFileSize = null;
+        _imageDataUrl = null;
+        _isProcessing = false;
+        
+        StateHasChanged();
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes == 0) return "0 Bytes";
+        
+        var k = 1024.0;
+        var sizes = new[] { "Bytes", "KB", "MB", "GB" };
+        var i = (int)Math.Floor(Math.Log(bytes) / Math.Log(k));
+        
+        return $"{Math.Round(bytes / Math.Pow(k, i), 2)} {sizes[i]}";
+    }
+}

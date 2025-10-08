@@ -1,0 +1,108 @@
+@page "/setup"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@using Microsoft.AspNetCore.Identity
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+@inject MudBlazor.ISnackbar Snackbar
+@using SportRental.Shared.Identity
+
+<MudContainer Class="mt-6">
+    <MudText Typo="Typo.h5">Konfiguracja wstępna</MudText>
+    @if (!hasOwners)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mt-2">Nie wykryto właścicieli. Możesz uczynić swoje konto właścicielem (Owner) domyślnego tenanta.</MudAlert>
+        <MudButton OnClick="MakeMeOwner" Disabled="@isBusy" Color="Color.Primary" Class="mt-2">
+            @(isBusy ? (MarkupString)"Przetwarzanie..." : (MarkupString)"Utwórz mnie jako Owner")
+        </MudButton>
+    }
+    else
+    {
+        <MudText Typo="Typo.body1" Class="mt-2">System skonfigurowany. Przejdź do panelu.</MudText>
+        <MudButton Href="/dashboard" Color="Color.Primary" Class="mt-2">Panel</MudButton>
+    }
+</MudContainer>
+
+@code {
+    private bool hasOwners;
+    private bool isBusy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var Db = await DbFactory.CreateDbContextAsync();
+        Db.SetTenant(null); // na stronie setup sprawdzamy globalnie
+        hasOwners = await Db.TenantUsers.AnyAsync(tu => tu.Role == "Owner");
+    }
+
+    private async Task MakeMeOwner()
+    {
+        if (isBusy) return;
+        isBusy = true;
+        StateHasChanged();
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = await UserManager.GetUserAsync(authState.User);
+            if (user == null)
+            {
+                Snackbar.Add("Brak zalogowanego użytkownika.", MudBlazor.Severity.Error);
+                return;
+            }
+            // Ensure tenant
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(null);
+            var tenant = await Db.Tenants.FirstOrDefaultAsync();
+            if (tenant == null)
+            {
+                tenant = new Tenant { Id = Guid.NewGuid(), Name = "Default" };
+                Db.Tenants.Add(tenant);
+                await Db.SaveChangesAsync();
+            }
+            // Add tenant user
+            if (!await Db.TenantUsers.AnyAsync(tu => tu.UserId == user.Id && tu.TenantId == tenant.Id))
+            {
+                Db.TenantUsers.Add(new TenantUser
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenant.Id,
+                    UserId = user.Id,
+                    DisplayName = user.Email,
+                    Role = "Owner"
+                });
+                await Db.SaveChangesAsync();
+            }
+            // Add Identity role
+            if (!await UserManager.IsInRoleAsync(user, RoleNames.Owner))
+                await UserManager.AddToRoleAsync(user, RoleNames.Owner);
+            if (!await UserManager.IsInRoleAsync(user, RoleNames.Client))
+                await UserManager.AddToRoleAsync(user, RoleNames.Client);
+            // Add tenant-id claim
+            var claims = await UserManager.GetClaimsAsync(user);
+            var tenantClaim = claims.FirstOrDefault(c => c.Type == "tenant-id");
+            if (tenantClaim == null)
+                await UserManager.AddClaimAsync(user, new System.Security.Claims.Claim("tenant-id", tenant.Id.ToString()));
+            else if (tenantClaim.Value != tenant.Id.ToString())
+            {
+                await UserManager.ReplaceClaimAsync(user, tenantClaim, new System.Security.Claims.Claim("tenant-id", tenant.Id.ToString()));
+            }
+            await SignInManager.RefreshSignInAsync(user);
+            Snackbar.Add("Przyznano uprawnienia Owner i przypisano tenanta.", MudBlazor.Severity.Success);
+            Nav.NavigateTo("/dashboard", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd konfiguracji: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            isBusy = false;
+            StateHasChanged();
+        }
+    }
+}
+
+

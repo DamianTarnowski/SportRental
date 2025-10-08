@@ -1,0 +1,219 @@
+/* Modern UI Enhancements for SportRental */
+
+/* Card hover effects */
+.hover-card:hover,
+.rental-card:hover,
+.product-card:hover,
+.customer-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 768px) {
+    .rental-card .mud-grid-item:nth-child(2) {
+        order: -1;
+    }
+    
+    .product-card .mud-card-media {
+        height: 150px !important;
+    }
+    
+    .customer-card .d-flex {
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    
+    .customer-card .mud-avatar {
+        margin-bottom: 8px;
+    }
+}
+
+/* Button group responsive behavior */
+@media (max-width: 576px) {
+    .mud-button-group {
+        flex-direction: column !important;
+    }
+    
+    .mud-button-group .mud-button {
+        border-radius: 8px !important;
+        margin-bottom: 4px;
+    }
+}
+
+/* Enhanced text truncation */
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.text-truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Status indicators */
+.status-active::before {
+    content: "●";
+    color: #4caf50;
+    margin-right: 4px;
+}
+
+.status-inactive::before {
+    content: "●";
+    color: #f44336;
+    margin-right: 4px;
+}
+
+.status-pending::before {
+    content: "●";
+    color: #ff9800;
+    margin-right: 4px;
+}
+
+/* Smooth transitions for all interactive elements */
+.mud-button,
+.mud-icon-button,
+.mud-card,
+.mud-paper,
+.mud-chip {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Enhanced focus states for accessibility */
+.mud-button:focus,
+.mud-icon-button:focus,
+.mud-text-field input:focus {
+    outline: 2px solid #2196f3;
+    outline-offset: 2px;
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+    .product-card,
+    .rental-card,
+    .customer-card {
+        background: rgba(18, 18, 18, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .hover-card:hover,
+    .rental-card:hover,
+    .product-card:hover,
+    .customer-card:hover {
+        background: rgba(24, 24, 24, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+}
+
+/* Loading states */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Enhanced spacing for mobile */
+@media (max-width: 768px) {
+    .mud-container {
+        padding-left: 8px !important;
+        padding-right: 8px !important;
+    }
+    
+    .mud-grid .mud-grid-item {
+        padding: 4px !important;
+    }
+}
+
+/* Improved contrast for better readability */
+.mud-text-secondary {
+    opacity: 0.8 !important;
+}
+
+.mud-align-center {
+    display: flex;
+    align-items: center;
+}
+
+.mud-space-between {
+    display: flex;
+    justify-content: space-between;
+}
+
+.mud-align-center .mud-stack-inner,
+.mud-align-center .mud-grid-item {
+    display: flex;
+    align-items: center;
+}
+
+.mud-align-end {
+    display: flex;
+    align-items: flex-end;
+}
+
+.mud-justify-end {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Enhanced gradient backgrounds */
+.gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-secondary {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.gradient-success {
+    background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%);
+}
+
+.gradient-info {
+    background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);
+}
+
+.gradient-warning {
+    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+}
+
+/* Icon enhancement */
+.mud-icon {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+}
+
+/* Enhanced card animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.5s ease-out;
+}
+
+/* Stagger animation for cards */
+.rental-card:nth-child(1) { animation-delay: 0.1s; }
+.rental-card:nth-child(2) { animation-delay: 0.2s; }
+.rental-card:nth-child(3) { animation-delay: 0.3s; }
+.rental-card:nth-child(4) { animation-delay: 0.4s; }
+.rental-card:nth-child(5) { animation-delay: 0.5s; }

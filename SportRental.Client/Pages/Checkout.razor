@@ -1,0 +1,560 @@
+@page "/checkout"
+@implements IDisposable
+@using System.ComponentModel.DataAnnotations
+@using SportRental.Shared.Models
+@using CartModel = SportRental.Shared.Models.Cart
+@using SportRental.Shared.Services
+@using SportRental.Client.Services
+@inject ICartService CartService
+@inject IApiService Api
+@inject ICustomerSessionService Session
+@inject NavigationManager Nav
+@inject ISnackbar Snackbar
+
+<PageTitle>Finalizacja</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+    <MudPaper Class="pa-4" Elevation="2">
+        <MudText Typo="Typo.h5" Class="mb-3">Finalizacja zamowienia</MudText>
+
+        @if (_cart.Items.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">Koszyk jest pusty. <MudLink Href="/products">Wroc do produktow</MudLink>.</MudAlert>
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="8">
+                    <MudTable Items="_cart.Items" Dense="true" Hover="true">
+                        <HeaderContent>
+                            <MudTh>Produkt</MudTh>
+                            <MudTh>Ilosc</MudTh>
+                            <MudTh>Od</MudTh>
+                            <MudTh>Do</MudTh>
+                            <MudTh>Cena / dzien</MudTh>
+                            <MudTh>Razem</MudTh>
+                            <MudTh>Hold</MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="item">
+                            <MudTd DataLabel="Produkt">@item.ProductName</MudTd>
+                            <MudTd DataLabel="Ilosc">@item.Quantity</MudTd>
+                            <MudTd DataLabel="Od">@item.StartDate.ToShortDateString()</MudTd>
+                            <MudTd DataLabel="Do">@item.EndDate.ToShortDateString()</MudTd>
+                            <MudTd DataLabel="Cena / dzien">@item.DailyPrice.ToString("C")</MudTd>
+                            <MudTd DataLabel="Razem">@item.TotalPrice.ToString("C")</MudTd>
+                            <MudTd DataLabel="Hold">
+                                @if (item.HoldId is not null)
+                                {
+                                    <MudChip T="string" Color="Color.Info" Variant="Variant.Filled" Size="Size.Small">
+                                        @($"do {item.HoldExpiresAtUtc?.ToLocalTime():HH:mm:ss}")
+                                    </MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined" Size="Size.Small">brak</MudChip>
+                                }
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudItem>
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="1">
+                        <MudText Typo="Typo.h6" Class="mb-2">Dane do rezerwacji</MudText>
+
+                        <MudForm @ref="_customerForm" Model="_customer" Class="mb-3">
+                            <MudStack Spacing="2">
+                                <MudTextField T="string" For="@(() => _customer.FullName)" Label="Imie i nazwisko" Variant="Variant.Outlined" Dense="true" Required="true" />
+                                <MudTextField T="string"
+                                              For="@(() => _customer.Email)"
+                                              Label="Email"
+                                              Variant="Variant.Outlined"
+                                              Dense="true"
+                                              Required="true"
+                                              @bind-Value="_customer.Email"
+                                              Immediate="true"
+                                              OnBlur="HandleEmailBlur" />
+                                <MudTextField T="string" For="@(() => _customer.PhoneNumber)" Label="Telefon" Variant="Variant.Outlined" Dense="true" Required="true" />
+                                <MudTextField T="string" For="@(() => _customer.Address)" Label="Adres (opcjonalnie)" Variant="Variant.Outlined" Lines="2" />
+                                <MudTextField T="string" For="@(() => _customer.DocumentNumber)" Label="Dokument tozsamosci (opcjonalnie)" Variant="Variant.Outlined" Dense="true" />
+                                <MudTextField T="string" For="@(() => _customer.Notes)" Label="Notatka klienta (opcjonalnie)" Variant="Variant.Outlined" Lines="2" />
+                                <MudButton Variant="Variant.Outlined"
+                                           Color="Color.Secondary"
+                                           OnClick="LookupCustomerButtonAsync"
+                                           Disabled="@(!CanSearchExisting || _isLookupInProgress)"
+                                           Loading="_isLookupInProgress">
+                                    Wyszukaj klienta po emailu
+                                </MudButton>
+                            </MudStack>
+                        </MudForm>
+
+                        <MudTextField @bind-Value="_notes" Label="Uwagi do rezerwacji (opcjonalnie)" Variant="Variant.Outlined" Lines="3" Class="mb-2" />
+
+                        <MudDivider Class="my-2" />
+
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.subtitle2">Podsumowanie platnosci</MudText>
+
+                            @if (_quoteError is not null)
+                            {
+                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-1">
+                                    @_quoteError
+                                    <MudButton Variant="Variant.Text"
+                                               Color="Color.Warning"
+                                               Size="Size.Small"
+                                               OnClick="RefreshPaymentSummaryAsync">
+                                        Odswiez
+                                    </MudButton>
+                                </MudAlert>
+                            }
+                            else if (_quote is null)
+                            {
+                                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="my-2" />
+                                <MudText Typo="Typo.caption">Liczymy kwote...</MudText>
+                            }
+                            else
+                            {
+                                <MudStack Row Justify="Justify.SpaceBetween">
+                                    <MudText>Lacznie:</MudText>
+                                    <MudText Color="Color.Primary">@_quote.TotalAmount.ToString("C")</MudText>
+                                </MudStack>
+                                <MudStack Row Justify="Justify.SpaceBetween">
+                                    <MudText>Depozyt (platne teraz):</MudText>
+                                    <MudText Color="Color.Secondary">@_quote.DepositAmount.ToString("C")</MudText>
+                                </MudStack>
+                                <MudStack Row Justify="Justify.SpaceBetween">
+                                    <MudText>Pozostalo przy odbiorze:</MudText>
+                                    <MudText>@(_quote.TotalAmount - _quote.DepositAmount).ToString("C")</MudText>
+                                </MudStack>
+                            }
+                        </MudStack>
+
+                        @if (_hasMixedDates)
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                                Pozycje w koszyku maja rozne daty. Ujednolic daty przed finalizacja.
+                            </MudAlert>
+                        }
+
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" Class="mt-3" Disabled="@(_isSubmitting || _isPaymentInProgress || _cart.Items.Count == 0 || _hasMixedDates || _quote is null || _quoteError is not null)" OnClick="SubmitAsync" StartIcon="@Icons.Material.Filled.CheckCircle">
+                            @(_isSubmitting ? "Przetwarzanie..." : "Potwierdz rezerwacje")
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private CartModel _cart = new();
+    private bool _isSubmitting;
+    private CheckoutCustomerModel _customer = new();
+    private MudForm? _customerForm;
+    private string? _notes;
+    private bool _hasMixedDates;
+    private Guid? _existingCustomerId;
+    private string? _lastLookupEmail;
+    private bool _isLookupInProgress;
+    private CancellationTokenSource? _refreshCts;
+    private Task? _refreshLoop;
+    private PaymentQuoteResponse? _quote;
+    private PaymentIntentDto? _paymentIntent;
+    private string? _quoteError;
+    private bool _isPaymentInProgress;
+
+    private bool CanSearchExisting => !string.IsNullOrWhiteSpace(_customer.Email);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _cart = CartService.GetCart();
+        _hasMixedDates = HasMixedDates(_cart);
+        CartService.CartChanged += OnCartChanged;
+        await PrefillFromSessionAsync();
+        _ = RefreshPaymentSummaryAsync();
+        StartRefreshLoop();
+    }
+
+    private async Task PrefillFromSessionAsync()
+    {
+        try
+        {
+            var customer = await Session.GetCustomerAsync();
+            if (customer is null)
+            {
+                return;
+            }
+
+            _existingCustomerId = customer.Id;
+            _customer.FullName = customer.FullName ?? string.Empty;
+            _customer.Email = customer.Email ?? string.Empty;
+            _customer.PhoneNumber = customer.PhoneNumber ?? string.Empty;
+            _customer.Address = customer.Address;
+            _customer.DocumentNumber = customer.DocumentNumber;
+            _customer.Notes = customer.Notes;
+            _lastLookupEmail = _customer.Email;
+
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[Checkout] Failed to prefill customer session: {0}", ex);
+        }
+    }
+    private void OnCartChanged(object? sender, EventArgs e)
+    {
+        _cart = CartService.GetCart();
+        _hasMixedDates = HasMixedDates(_cart);
+        _ = RefreshPaymentSummaryAsync();
+    }
+
+    private static bool HasMixedDates(CartModel cart)
+    {
+        if (cart.Items.Count == 0) return false;
+        var start = cart.Items[0].StartDate;
+        var end = cart.Items[0].EndDate;
+        return cart.Items.Any(i => i.StartDate != start || i.EndDate != end);
+    }
+
+    private async Task RefreshPaymentSummaryAsync()
+    {
+        if (_cart.Items.Count == 0)
+        {
+            _quote = null;
+            _quoteError = null;
+            _paymentIntent = null;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        var first = _cart.Items[0];
+        var request = new PaymentQuoteRequest
+        {
+            StartDateUtc = first.StartDate.ToUniversalTime(),
+            EndDateUtc = first.EndDate.ToUniversalTime(),
+            Items = BuildCartItemsPayload()
+        };
+
+        try
+        {
+            _quote = await Api.GetPaymentQuoteAsync(request);
+            _quoteError = null;
+        }
+        catch (Exception ex)
+        {
+            _quote = null;
+            _quoteError = $"Nie udalo sie obliczyc kosztu: {ex.Message}";
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private List<CreateRentalItem> BuildCartItemsPayload()
+    {
+        return _cart.Items.Select(i => new CreateRentalItem
+        {
+            ProductId = i.ProductId,
+            Quantity = i.Quantity
+        }).ToList();
+    }
+
+    private async Task HandleEmailBlur(FocusEventArgs _)
+    {
+        await LookupCustomerAsync(showFeedback: false);
+    }
+
+    private async Task LookupCustomerButtonAsync()
+    {
+        await LookupCustomerAsync(showFeedback: true);
+    }
+
+    private async Task LookupCustomerAsync(bool showFeedback)
+    {
+        if (_isLookupInProgress)
+        {
+            return;
+        }
+
+        var email = _customer.Email?.Trim();
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            _existingCustomerId = null;
+            _lastLookupEmail = null;
+            return;
+        }
+
+        if (string.Equals(email, _lastLookupEmail, StringComparison.OrdinalIgnoreCase) && _existingCustomerId.HasValue && !showFeedback)
+        {
+            return;
+        }
+
+        _isLookupInProgress = true;
+        try
+        {
+            var existing = await Api.FindCustomerByEmailAsync(email);
+            if (existing is null)
+            {
+                _existingCustomerId = null;
+                _lastLookupEmail = email;
+                if (showFeedback)
+                {
+                    Snackbar.Add("Nie znaleziono klienta z podanym adresem email.", Severity.Info);
+                }
+                return;
+            }
+
+            _existingCustomerId = existing.Id;
+            _lastLookupEmail = existing.Email;
+            _customer.FullName = existing.FullName;
+            _customer.Email = existing.Email;
+            _customer.PhoneNumber = existing.PhoneNumber;
+            _customer.Address = existing.Address;
+            _customer.DocumentNumber = existing.DocumentNumber;
+            _customer.Notes = existing.Notes;
+            _customerForm?.ResetValidation();
+            await InvokeAsync(StateHasChanged);
+
+            if (showFeedback)
+            {
+                Snackbar.Add("Zaladowano dane istniejacego klienta.", Severity.Success);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (showFeedback)
+            {
+                Snackbar.Add($"Blad podczas wyszukiwania klienta: {ex.Message}", Severity.Error);
+            }
+        }
+        finally
+        {
+            _isLookupInProgress = false;
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_isSubmitting) return;
+        _isSubmitting = true;
+        try
+        {
+            if (_cart.Items.Count == 0)
+            {
+                Snackbar.Add("Koszyk jest pusty", Severity.Warning);
+                return;
+            }
+
+            if (_hasMixedDates)
+            {
+                Snackbar.Add("Rozne daty w pozycjach koszyka - ustaw te same daty dla wszystkich pozycji.", Severity.Error);
+                return;
+            }
+
+            if (_customerForm is not null)
+            {
+                await _customerForm.Validate();
+                if (!_customerForm.IsValid)
+                {
+                    Snackbar.Add("Uzupelnij poprawnie dane klienta.", Severity.Error);
+                    return;
+                }
+            }
+
+            await CartService.RefreshHoldsIfNeededAsync();
+            var holdsOk = await CartService.EnsureHoldsAsync();
+            if (!holdsOk)
+            {
+                Snackbar.Add("Nie udalo sie odswiezyc/utworzyc holdow. Sprobuj ponownie.", Severity.Error);
+                return;
+            }
+
+            var normalizedEmail = _customer.Email?.Trim();
+            CustomerDto? customer = null;
+
+            if (!string.IsNullOrWhiteSpace(normalizedEmail) &&
+                _existingCustomerId.HasValue &&
+                string.Equals(normalizedEmail, _lastLookupEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    customer = await Api.UpdateCustomerAsync(_existingCustomerId.Value, new CreateCustomerRequest
+                    {
+                        FullName = _customer.FullName,
+                        Email = _customer.Email,
+                        PhoneNumber = _customer.PhoneNumber,
+                        Address = _customer.Address,
+                        DocumentNumber = _customer.DocumentNumber,
+                        Notes = _customer.Notes
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Nie udalo sie zaktualizowac danych klienta: {ex.Message}", Severity.Error);
+                    return;
+                }
+
+                if (customer is null)
+                {
+                    _existingCustomerId = null;
+                    _lastLookupEmail = null;
+                }
+            }
+
+            if (customer is null)
+            {
+                try
+                {
+                    customer = await Api.CreateCustomerAsync(new CreateCustomerRequest
+                    {
+                        FullName = _customer.FullName,
+                        Email = _customer.Email,
+                        PhoneNumber = _customer.PhoneNumber,
+                        Address = _customer.Address,
+                        DocumentNumber = _customer.DocumentNumber,
+                        Notes = _customer.Notes
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Nie udalo sie zapisac danych klienta: {ex.Message}", Severity.Error);
+                    return;
+                }
+            }
+
+            if (customer is null)
+            {
+                Snackbar.Add("Nie udalo sie otrzymac danych klienta.", Severity.Error);
+                return;
+            }
+
+            var customerId = customer.Id;
+            _existingCustomerId = customer.Id;
+            _lastLookupEmail = customer.Email;
+            _customer.FullName = customer.FullName;
+            _customer.Email = customer.Email;
+            _customer.PhoneNumber = customer.PhoneNumber;
+            _customer.Address = customer.Address;
+            _customer.DocumentNumber = customer.DocumentNumber;
+            _customer.Notes = customer.Notes;
+
+            await Session.SetCustomerAsync(customer);
+
+            var itemsPayload = BuildCartItemsPayload();
+            var first = _cart.Items[0];
+            var startUtc = first.StartDate.ToUniversalTime();
+            var endUtc = first.EndDate.ToUniversalTime();
+
+            PaymentQuoteResponse quote;
+            try
+            {
+                quote = await Api.GetPaymentQuoteAsync(new PaymentQuoteRequest
+                {
+                    StartDateUtc = startUtc,
+                    EndDateUtc = endUtc,
+                    Items = itemsPayload
+                });
+                _quote = quote;
+                _quoteError = null;
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Nie udalo sie obliczyc platnosci: {ex.Message}", Severity.Error);
+                return;
+            }
+
+            // Utwórz Stripe Checkout Session
+            CheckoutSessionResponse session;
+            try
+            {
+                _isPaymentInProgress = true;
+                
+                var customerEmail = _customer?.Email ?? "";
+                
+                session = await Api.CreateCheckoutSessionAsync(new CreateCheckoutSessionRequest(
+                    StartDateUtc: startUtc,
+                    EndDateUtc: endUtc,
+                    Items: itemsPayload.Select(i => new CheckoutItem(i.ProductId, i.Quantity)).ToList(),
+                    CustomerEmail: customerEmail,
+                    CustomerId: customerId
+                ));
+                
+                Snackbar.Add("Przekierowanie do Stripe...", Severity.Info);
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Błąd płatności: {ex.Message}", Severity.Error);
+                _isPaymentInProgress = false;
+                return;
+            }
+
+            // Release holds - user idzie do Stripe
+            await CartService.ReleaseAllHoldsAsync();
+            await CartService.ClearCartAsync();
+            
+            // Redirect do Stripe Checkout (BEZ JavaScript!)
+            Nav.NavigateTo(session.Url, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Blad podczas finalizacji: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private void StartRefreshLoop()
+    {
+        _refreshCts = new CancellationTokenSource();
+        var token = _refreshCts.Token;
+        _refreshLoop = Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await CartService.RefreshHoldsIfNeededAsync();
+                    await RefreshPaymentSummaryAsync();
+                    await Task.Delay(TimeSpan.FromSeconds(60), token);
+                }
+            }
+            catch (TaskCanceledException)
+            {
+            }
+        }, token);
+    }
+
+    public void Dispose()
+    {
+        CartService.CartChanged -= OnCartChanged;
+        _refreshCts?.Cancel();
+    }
+
+    private class CheckoutCustomerModel
+    {
+        [Required(ErrorMessage = "Imie i nazwisko jest wymagane.")]
+        [StringLength(100)]
+        public string FullName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Email jest wymagany.")]
+        [EmailAddress(ErrorMessage = "Podaj poprawny adres email.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Telefon jest wymagany.")]
+        [Phone(ErrorMessage = "Podaj poprawny numer telefonu.")]
+        public string PhoneNumber { get; set; } = string.Empty;
+
+        [StringLength(200)]
+        public string? Address { get; set; }
+
+        [StringLength(50)]
+        public string? DocumentNumber { get; set; }
+
+        public string? Notes { get; set; }
+    }
+}
+
+
+
+
+

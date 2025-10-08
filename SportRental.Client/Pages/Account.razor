@@ -1,0 +1,73 @@
+@page "/account"
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject AuthenticationStateProvider AuthStateProvider
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
+    <MudPaper Elevation="4" Class="pa-8">
+        <MudText Typo="Typo.h4" Class="mb-6">Moje konto</MudText>
+
+        <AuthorizeView>
+            <Authorized>
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="Email"
+                                      Value="@context.User.Identity?.Name"
+                                      ReadOnly="true"
+                                      Variant="Variant.Outlined"
+                                      Class="mb-4" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField Label="Tenant ID"
+                                      Value="@GetTenantId(context)"
+                                      ReadOnly="true"
+                                      Variant="Variant.Outlined"
+                                      Class="mb-4" />
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider Class="my-6" />
+
+                <MudText Typo="Typo.h6" Class="mb-4">Zarządzaj kontem</MudText>
+
+                <MudStack Spacing="2">
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Primary" 
+                               StartIcon="@Icons.Material.Filled.Edit"
+                               Disabled="true">
+                        Zmień dane osobowe (wkrótce)
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Primary" 
+                               StartIcon="@Icons.Material.Filled.Lock"
+                               Disabled="true">
+                        Zmień hasło (wkrótce)
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Primary" 
+                               StartIcon="@Icons.Material.Filled.Receipt"
+                               Href="/my-rentals">
+                        Moje wypożyczenia
+                    </MudButton>
+
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Error" 
+                               StartIcon="@Icons.Material.Filled.Delete"
+                               Disabled="true">
+                        Usuń konto (wkrótce)
+                    </MudButton>
+                </MudStack>
+            </Authorized>
+        </AuthorizeView>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private string GetTenantId(AuthenticationState state)
+    {
+        var claim = state.User.FindFirst("tenant-id");
+        return claim?.Value ?? "N/A";
+    }
+}

@@ -1,0 +1,119 @@
+@page "/register"
+@using SportRental.Client.Services
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+    <MudPaper Elevation="4" Class="pa-8">
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-4">
+            Rejestracja
+        </MudText>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+        }
+
+        <EditForm Model="@_model" OnValidSubmit="HandleRegisterAsync">
+            <DataAnnotationsValidator />
+
+            <MudTextField @bind-Value="_model.FullName"
+                          Label="Imię i nazwisko"
+                          Variant="Variant.Outlined"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_model.Email"
+                          Label="Email"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Email"
+                          Required="true"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_model.Password"
+                          Label="Hasło"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Password"
+                          Required="true"
+                          HelperText="Min. 8 znaków, wielka litera, mała litera, cyfra"
+                          Class="mb-4" />
+
+            <MudTextField @bind-Value="_model.ConfirmPassword"
+                          Label="Potwierdź hasło"
+                          Variant="Variant.Outlined"
+                          InputType="InputType.Password"
+                          Required="true"
+                          Class="mb-4" />
+
+            <MudButton ButtonType="ButtonType.Submit"
+                       Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       FullWidth="true"
+                       Disabled="@_isProcessing"
+                       Class="mb-4">
+                @if (_isProcessing)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Rejestracja...</span>
+                }
+                else
+                {
+                    <span>Zarejestruj się</span>
+                }
+            </MudButton>
+        </EditForm>
+
+        <MudDivider Class="my-4" />
+
+        <MudText Align="Align.Center">
+            Masz już konto?
+            <MudLink Href="/login" Color="Color.Primary">Zaloguj się</MudLink>
+        </MudText>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private RegisterModel _model = new();
+    private string? _errorMessage;
+    private bool _isProcessing;
+
+    private async Task HandleRegisterAsync()
+    {
+        _isProcessing = true;
+        _errorMessage = null;
+
+        if (_model.Password != _model.ConfirmPassword)
+        {
+            _errorMessage = "Hasła nie są identyczne";
+            _isProcessing = false;
+            return;
+        }
+
+        try
+        {
+            var result = await AuthService.RegisterAsync(_model.Email, _model.Password, _model.FullName);
+
+            if (result.Succeeded)
+            {
+                Snackbar.Add("Konto utworzono pomyślnie!", Severity.Success);
+                NavigationManager.NavigateTo("/");
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+            }
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private class RegisterModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}

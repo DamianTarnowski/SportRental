@@ -1,0 +1,293 @@
+@page "/cart"
+@using SportRental.Shared.Models
+@using SportRental.Shared.Services
+@inject ICartService CartService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@implements IDisposable
+
+<PageTitle>Koszyk - SportRental</PageTitle>
+
+<section class="mt-6 sm:mt-8 lg:mt-10">
+<MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    <MudPaper Class="pa-6" Elevation="2">
+        <MudText Typo="Typo.h4" Class="mb-4" Color="Color.Primary">
+            <MudIcon Icon="Icons.Material.Filled.ShoppingCart" Class="mr-3" />
+            Twój Koszyk
+        </MudText>
+
+        @if (_cart.Items.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4">
+                <MudText Typo="Typo.body1">
+                    Twój koszyk jest pusty. <MudLink Href="/products" Color="Color.Primary">Przejdź do katalogu</MudLink> aby dodać produkty.
+                </MudText>
+            </MudAlert>
+        }
+        else
+        {
+            <MudGrid>
+                <!-- Cart Items -->
+                <MudItem xs="12" md="8">
+                    @foreach (var item in _cart.Items)
+                    {
+                        <MudCard Class="mb-4" Elevation="1">
+                            <MudCardContent>
+                                <MudGrid AlignItems="Center">
+                                    <!-- Product Image -->
+                                    <MudItem xs="12" sm="3">
+                                        @if (!string.IsNullOrEmpty(item.ProductImageUrl))
+                                        {
+                                            <MudImage Src="@item.ProductImageUrl" 
+                                                    Alt="@item.ProductName"
+                                                    Class="rounded"
+                                                    Height="120"
+                                                    ObjectFit="ObjectFit.Cover" />
+                                        }
+                                        else
+                                        {
+                                            <MudPaper Height="120px" Class="d-flex align-center justify-center rounded" 
+                                                    Style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
+                                                <MudIcon Icon="Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Inherit" />
+                                            </MudPaper>
+                                        }
+                                    </MudItem>
+
+                                    <!-- Product Details -->
+                                    <MudItem xs="12" sm="5">
+                                        <MudText Typo="Typo.h6" Class="mb-2">@item.ProductName</MudText>
+                                        <MudText Typo="Typo.body2" Color="Color.Primary" Class="mb-2">
+                                            @item.DailyPrice.ToString("C") / dzień
+                                        </MudText>
+                                        
+                                        <!-- Date Selection -->
+                                        <MudGrid Class="mt-2">
+                                            <MudItem xs="6">
+                                                <MudDatePicker Date="item.StartDate" 
+                                                             DateChanged="@((DateTime? date) => OnStartDateChanged(item, date))"
+                                                             Label="Od" 
+                                                             MinDate="DateTime.Today"
+                                                             Variant="Variant.Outlined"
+                                                             Margin="Margin.Dense" />
+                                            </MudItem>
+                                            <MudItem xs="6">
+                                                <MudDatePicker Date="item.EndDate" 
+                                                             DateChanged="@((DateTime? date) => OnEndDateChanged(item, date))"
+                                                             Label="Do" 
+                                                             MinDate="item.StartDate.AddDays(1)"
+                                                             Variant="Variant.Outlined"
+                                                             Margin="Margin.Dense" />
+                                            </MudItem>
+                                        </MudGrid>
+                                        
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-1">
+                                            @item.TotalDays dni wynajmu
+                                        </MudText>
+
+                                        @if (item.HoldId is not null)
+                                        {
+                                            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                                                Rezerwacja tymczasowa aktywna (wygasa: @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm:ss"))
+                                            </MudAlert>
+                                        }
+                                    </MudItem>
+
+                                    <!-- Quantity & Price -->
+                                    <MudItem xs="12" sm="4">
+                                        <MudStack AlignItems="AlignItems.End" Spacing="2">
+                                            <!-- Quantity Controls -->
+                                            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                                <MudIconButton Icon="Icons.Material.Filled.Remove" 
+                                                             Color="Color.Primary"
+                                                             Size="Size.Small"
+                                                             OnClick="@(() => UpdateQuantity(item, item.Quantity - 1))" />
+                                                <MudText Typo="Typo.body1" Class="px-3">@item.Quantity</MudText>
+                                                <MudIconButton Icon="Icons.Material.Filled.Add" 
+                                                             Color="Color.Primary"
+                                                             Size="Size.Small"
+                                                             OnClick="@(() => UpdateQuantity(item, item.Quantity + 1))" />
+                                            </MudStack>
+                                            
+                                            <!-- Price -->
+                                            <MudText Typo="Typo.h6" Color="Color.Primary">
+                                                @item.TotalPrice.ToString("C")
+                                            </MudText>
+                                            
+                                            <!-- Remove Button -->
+                                            <MudButton Variant="Variant.Text" 
+                                                     Color="Color.Error" 
+                                                     Size="Size.Small"
+                                                     StartIcon="Icons.Material.Filled.Delete"
+                                                     OnClick="@(() => RemoveFromCart(item.ProductId))">
+                                                Usuń
+                                            </MudButton>
+                                        </MudStack>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </MudItem>
+
+                <!-- Order Summary -->
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-4" Elevation="1" Style="position: sticky; top: 20px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">Podsumowanie</MudText>
+                        
+                        <MudStack Spacing="2">
+                            <MudStack Row Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.body2">Produkty (@_cart.TotalItems):</MudText>
+                                <MudText Typo="Typo.body2">@_cart.TotalAmount.ToString("C")</MudText>
+                            </MudStack>
+                            
+                            <MudDivider />
+                            
+                            <MudStack Row Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.h6">Łącznie:</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Primary">@_cart.TotalAmount.ToString("C")</MudText>
+                            </MudStack>
+                        </MudStack>
+
+                        <MudButton Variant="Variant.Filled" 
+                                 Color="Color.Primary" 
+                                 FullWidth="true"
+                                 Class="mt-4"
+                                 Size="Size.Large"
+                                 StartIcon="Icons.Material.Filled.Payment"
+                                 OnClick="ProceedToCheckout">
+                            Przejdź do płatności
+                        </MudButton>
+                        
+                        <MudButton Variant="Variant.Text" 
+                                 Color="Color.Secondary" 
+                                 FullWidth="true"
+                                 Class="mt-2"
+                                 StartIcon="Icons.Material.Filled.ShoppingBag"
+                                 OnClick="@(() => Navigation.NavigateTo("/products"))">
+                            Kontynuuj zakupy
+                        </MudButton>
+                    </MudPaper>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudPaper>
+</MudContainer>
+</section>
+
+@code {
+    private SportRental.Shared.Models.Cart _cart = new();
+
+    private CancellationTokenSource? _refreshCts;
+    private Task? _refreshLoop;
+
+    protected override void OnInitialized()
+    {
+        _cart = CartService.GetCart();
+        CartService.CartChanged += OnCartChanged;
+        StartRefreshLoop();
+    }
+
+    private void OnCartChanged(object? sender, EventArgs e)
+    {
+        _cart = CartService.GetCart();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task UpdateQuantity(CartItem item, int newQuantity)
+    {
+        await CartService.UpdateQuantityAsync(item.ProductId, newQuantity);
+    }
+
+    private async Task RemoveFromCart(Guid productId)
+    {
+        await CartService.RemoveFromCartAsync(productId);
+        Snackbar.Add("Produkt został usunięty z koszyka", Severity.Success);
+    }
+
+    private async Task OnStartDateChanged(CartItem item, DateTime? newDate)
+    {
+        if (newDate.HasValue)
+        {
+            item.StartDate = newDate.Value;
+            
+            // Ensure end date is after start date
+            if (item.EndDate <= item.StartDate)
+            {
+                item.EndDate = item.StartDate.AddDays(1);
+            }
+            
+            await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
+        }
+    }
+
+    private async Task OnEndDateChanged(CartItem item, DateTime? newDate)
+    {
+        if (newDate.HasValue && newDate.Value > item.StartDate)
+        {
+            item.EndDate = newDate.Value;
+            await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
+        }
+    }
+
+    private async Task ProceedToCheckout()
+    {
+        if (_cart.Items.Count == 0)
+        {
+            Snackbar.Add("Koszyk jest pusty", Severity.Warning);
+            return;
+        }
+
+        // Utwórz/odśwież holdy na wszystkie pozycje
+        await CartService.RefreshHoldsIfNeededAsync();
+        var holdsOk = await CartService.EnsureHoldsAsync();
+        if (!holdsOk)
+        {
+            Snackbar.Add("Nie udało się zarezerwować wybranych produktów. Zaktualizuj koszyk i spróbuj ponownie.", Severity.Error);
+            return;
+        }
+
+        // Validate availability
+        var isAvailable = await CartService.ValidateAvailabilityAsync();
+        if (!isAvailable)
+        {
+            var unavailableNames = _cart.Items
+                .Where(i => CartService.LastUnavailableProductIds.Contains(i.ProductId))
+                .Select(i => i.ProductName)
+                .Distinct()
+                .ToList();
+
+            var message = unavailableNames.Count > 0
+                ? $"Produkty niedostępne: {string.Join(", ", unavailableNames)}"
+                : "Nie udało się potwierdzić dostępności produktów. Spróbuj ponownie.";
+
+            Snackbar.Add(message, Severity.Error);
+            return;
+        }
+
+        Navigation.NavigateTo("/checkout");
+    }
+
+    private void StartRefreshLoop()
+    {
+        _refreshCts = new CancellationTokenSource();
+        var token = _refreshCts.Token;
+        _refreshLoop = Task.Run(async () =>
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await CartService.RefreshHoldsIfNeededAsync();
+                    await Task.Delay(TimeSpan.FromSeconds(60), token);
+                }
+            }
+            catch (TaskCanceledException) { }
+        }, token);
+    }
+
+    public void Dispose()
+    {
+        CartService.CartChanged -= OnCartChanged;
+        _refreshCts?.Cancel();
+    }
+}

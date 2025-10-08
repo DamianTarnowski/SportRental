@@ -1,0 +1,239 @@
+@page "/admin/owner"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px;">
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">Panel właściciela</MudText>
+                <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj ustawieniami i konfiguracją wypożyczalni</MudText>
+            </div>
+        </MudStack>
+    </MudPaper>
+
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Business" Size="Size.Large" Class="mr-3" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Ustawienia firmy</MudText>
+                        </div>
+                        <MudText Typo="Typo.body1" Style="opacity: 0.9;">
+                            Skonfiguruj podstawowe informacje o firmie, szablony SMS i Email
+                        </MudText>
+                        <MudButton Href="/admin/company-settings" 
+                                   Variant="Variant.Filled" 
+                                   Color="Color.Surface"
+                                   StartIcon="@Icons.Material.Filled.Settings"
+                                   FullWidth="true"
+                                   Class="rounded-pill">
+                            Zarządzaj ustawieniami
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" Class="mr-3" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Szablon umowy</MudText>
+                        </div>
+                        <MudText Typo="Typo.body1" Style="opacity: 0.9;">
+                            Dostosuj szablon umów wypożyczenia do potrzeb swojej firmy
+                        </MudText>
+                        <MudButton Href="/admin/contract-template" 
+                                   Variant="Variant.Filled" 
+                                   Color="Color.Surface"
+                                   StartIcon="@Icons.Material.Filled.Article"
+                                   FullWidth="true"
+                                   Class="rounded-pill">
+                            Edytuj szablon
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #4ecdc4 0%, #44a08d 100%); color: white;">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Palette" Size="Size.Large" Class="mr-3" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Branding</MudText>
+                        </div>
+                        <MudText Typo="Typo.body1" Style="opacity: 0.9;">
+                            Ustaw kolory i logo swojej wypożyczalni
+                        </MudText>
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Surface"
+                                   StartIcon="@Icons.Material.Filled.ColorLens"
+                                   OnClick="() => brandingDialog=true"
+                                   FullWidth="true"
+                                   Class="rounded-pill">
+                            Ustaw branding
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.BarChart" Size="Size.Large" Class="mr-3" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600; color: #2c3e50;">Raporty i statystyki</MudText>
+                        </div>
+                        <MudText Typo="Typo.body1" Style="color: #2c3e50;">
+                            Analizuj wydajność wypożyczalni i generuj raporty
+                        </MudText>
+                        <MudButton Href="/admin/reports" 
+                                   Variant="Variant.Filled" 
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Analytics"
+                                   FullWidth="true"
+                                   Class="rounded-pill">
+                            Zobacz raporty
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Large" Class="mr-3" Color="Color.Info" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600; color: #2c3e50;">Kalendarz</MudText>
+                        </div>
+                        <MudText Typo="Typo.body1" Style="color: #2c3e50;">
+                            Zarządzaj terminami i rezerwacjami w kalendarzu
+                        </MudText>
+                        <MudButton Href="/admin/schedule" 
+                                   Variant="Variant.Filled" 
+                                   Color="Color.Info"
+                                   StartIcon="@Icons.Material.Filled.CalendarToday"
+                                   FullWidth="true"
+                                   Class="rounded-pill">
+                            Otwórz kalendarz
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="6" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Large" Class="mr-3" Color="Color.Warning" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600; color: #2c3e50;">Bezpieczeństwo</MudText>
+                        </div>
+                        <MudText Typo="Typo.body1" Style="color: #2c3e50;">
+                            Zarządzaj pracownikami i uprawnieniami
+                        </MudText>
+                        <MudButton Href="/admin/employees" 
+                                   Variant="Variant.Filled" 
+                                   Color="Color.Warning"
+                                   StartIcon="@Icons.Material.Filled.People"
+                                   FullWidth="true"
+                                   Class="rounded-pill">
+                            Zarządzaj zespołem
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudDialog @bind-Visible="brandingDialog" Options="@brandingDialogOptions">
+        <DialogContent>
+            <MudStack Spacing="2">
+                <MudText Typo="Typo.h6">Branding</MudText>
+                <MudTextField @bind-Value="primaryHex" Label="Primary color (#RRGGBB)" />
+                <MudTextField @bind-Value="secondaryHex" Label="Secondary color (#RRGGBB)" />
+                <MudText Typo="Typo.caption">Logo (PNG/SVG)</MudText>
+                <InputFile OnChange="OnLogoSelected" accept="image/*" />
+            </MudStack>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Text" OnClick="() => brandingDialog=false">Anuluj</MudButton>
+            <MudButton Color="Color.Primary" OnClick="SaveBranding">Zapisz</MudButton>
+        </DialogActions>
+    </MudDialog>
+
+    @if (!string.IsNullOrWhiteSpace(currentLogo))
+    {
+        <MudPaper Class="p-3 mt-3">
+            <MudText Typo="Typo.subtitle2">Podgląd</MudText>
+            <img src="@currentLogo" style="height:48px" />
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    [Inject] private ApplicationDbContext Db { get; set; } = default!;
+    [Inject] private NavigationManager Nav { get; set; } = default!;
+    [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
+    private bool brandingDialog;
+    private readonly DialogOptions brandingDialogOptions = new() { MaxWidth = MaxWidth.Small };
+    private string? primaryHex;
+    private string? secondaryHex;
+    private IBrowserFile? _logoFile;
+    private string? currentLogo;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        var t = await Db.Tenants.FirstOrDefaultAsync(x => x.Id == tenantId);
+        if (t != null)
+        {
+            primaryHex = t.PrimaryColorHex;
+            secondaryHex = t.SecondaryColorHex;
+            currentLogo = t.LogoUrl;
+        }
+    }
+
+    private void OnLogoSelected(InputFileChangeEventArgs e) => _logoFile = e.File;
+
+    private async Task SaveBranding()
+    {
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        var t = await Db.Tenants.FirstOrDefaultAsync(x => x.Id == tenantId);
+        if (t == null) return;
+        t.PrimaryColorHex = primaryHex;
+        t.SecondaryColorHex = secondaryHex;
+        if (_logoFile is not null)
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StreamContent(_logoFile.OpenReadStream(5 * 1024 * 1024)), "file", _logoFile.Name);
+            var client = new HttpClient { BaseAddress = new Uri(Nav.ToAbsoluteUri("/").ToString()) };
+            var res = await client.PostAsync($"api/tenants/{tenantId}/logo", content);
+            if (res.IsSuccessStatusCode)
+            {
+                var json = await res.Content.ReadFromJsonAsync<LogoResponse>();
+                t.LogoUrl = json?.logoUrl;
+            }
+        }
+        Db.Tenants.Update(t);
+        await Db.SaveChangesAsync();
+        currentLogo = t.LogoUrl;
+        brandingDialog = false;
+        StateHasChanged();
+    }
+
+    private class LogoResponse { public string? logoUrl { get; set; } }
+}

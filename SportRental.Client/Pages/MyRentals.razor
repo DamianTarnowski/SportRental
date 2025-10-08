@@ -1,0 +1,158 @@
+@page "/my-rentals"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using SportRental.Shared.Models
+@using SportRental.Shared.Services
+@inject IApiService Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
+    <MudPaper Elevation="4" Class="pa-8">
+        <MudText Typo="Typo.h4" Class="mb-6">Moje wypożyczenia</MudText>
+
+        @if (_isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Class="my-8" />
+        }
+        else if (_rentals == null || !_rentals.Any())
+        {
+            <MudAlert Severity="Severity.Info" Class="my-4">
+                <MudText>Nie masz jeszcze żadnych wypożyczeń.</MudText>
+            </MudAlert>
+
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       Href="/"
+                       StartIcon="@Icons.Material.Filled.ShoppingCart"
+                       Class="mt-4">
+                Zacznij wypożyczać
+            </MudButton>
+        }
+        else
+        {
+            <MudTable Items="@_rentals" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
+                <HeaderContent>
+                    <MudTh>Data wypożyczenia</MudTh>
+                    <MudTh>Klient</MudTh>
+                    <MudTh>Produkty</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Kwota</MudTh>
+                    <MudTh>Depozyt</MudTh>
+                    <MudTh>Akcje</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Data">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.body2"><strong>Od:</strong> @context.StartDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+                            <MudText Typo="Typo.body2"><strong>Do:</strong> @context.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Klient">
+                        <MudText Typo="Typo.body2">@context.CustomerName</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Produkty">
+                        <MudStack Spacing="1">
+                            @foreach (var item in context.Items.Take(3))
+                            {
+                                <MudText Typo="Typo.body2">@item.ProductName (x@item.Quantity)</MudText>
+                            }
+                            @if (context.Items.Count > 3)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">+@(context.Items.Count - 3) więcej...</MudText>
+                            }
+                        </MudStack>
+                    </MudTd>
+                    <MudTd DataLabel="Status">
+                        <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small" Variant="Variant.Filled">
+                            @context.Status
+                        </MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Kwota">
+                        <MudText Typo="Typo.body1" Color="Color.Primary"><strong>@context.TotalAmount.ToString("C")</strong></MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Depozyt">
+                        <MudText Typo="Typo.body2">@context.DepositAmount.ToString("C")</MudText>
+                    </MudTd>
+                    <MudTd DataLabel="Akcje">
+                        <MudStack Row="true" Spacing="1">
+                            <MudButton Size="Size.Small" 
+                                       Variant="Variant.Outlined" 
+                                       Color="Color.Primary"
+                                       OnClick="@(() => ViewDetails(context.Id))"
+                                       StartIcon="@Icons.Material.Filled.Info">
+                                Szczegóły
+                            </MudButton>
+                            @if (context.ContractUrl != null)
+                            {
+                                <MudButton Size="Size.Small" 
+                                           Variant="Variant.Outlined" 
+                                           Color="Color.Secondary"
+                                           Href="@context.ContractUrl"
+                                           Target="_blank"
+                                           StartIcon="@Icons.Material.Filled.Description">
+                                    Umowa
+                                </MudButton>
+                            }
+                        </MudStack>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private bool _isLoading = true;
+    private List<MyRentalDto>? _rentals;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRentalsAsync();
+    }
+
+    private async Task LoadRentalsAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            // Pobierz wszystkie rentals użytkownika (API sprawdzi JWT i zwróci tylko jego)
+            _rentals = await Api.GetMyRentalsAsync();
+            
+            if (_rentals == null || !_rentals.Any())
+            {
+                Snackbar.Add("Nie masz jeszcze żadnych wypożyczeń.", Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd podczas ładowania wypożyczeń: {ex.Message}", Severity.Error);
+            _rentals = new List<MyRentalDto>();
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Reserved" or "Confirmed" => Color.Primary,
+            "Active" or "OnRent" => Color.Success,
+            "Returned" or "Completed" => Color.Info,
+            "Cancelled" => Color.Error,
+            "Overdue" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private void ViewDetails(Guid rentalId)
+    {
+        // TODO: Navigate to rental details page
+        Snackbar.Add($"Szczegóły wypożyczenia {rentalId} - coming soon!", Severity.Info);
+    }
+}

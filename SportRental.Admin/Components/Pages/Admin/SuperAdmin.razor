@@ -1,0 +1,14 @@
+@page "/admin/super"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SuperAdmin")]
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
+    <MudText Typo="Typo.h4">Panel SuperAdministratora</MudText>
+    <MudPaper Class="mt-4 p-4">
+        <MudText>Tu dodamy zarządzanie wypożyczalniami, placówkami, uprawnieniami.</MudText>
+    </MudPaper>
+</MudContainer>
+
+
+
+

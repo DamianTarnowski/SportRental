@@ -1,0 +1,12 @@
+{
+  "KeyVault": {
+    "Url": "https://your-keyvault-name.vault.azure.net/"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Information"
+    }
+  }
+}
+

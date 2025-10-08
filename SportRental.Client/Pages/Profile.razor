@@ -1,0 +1,204 @@
+@page "/profile"
+@using System.ComponentModel.DataAnnotations
+@inject NavigationManager Navigation
+@inject IApiService Api
+@inject SportRental.Client.Services.ICustomerSessionService Session
+@inject ISnackbar Snackbar
+
+<PageTitle>Moje dane - SportRental</PageTitle>
+
+<div class="min-h-[calc(100vh-7rem)] px-4 py-8 bg-gray-50">
+  <div class="mx-auto max-w-3xl">
+    <div class="mb-6 flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-gray-900">Moje dane</h1>
+        <p class="mt-1 text-sm text-gray-600">Aktualizuj informacje kontaktowe wykorzystywane przy rezerwacjach.</p>
+      </div>
+      @if (!_loading && _customerId.HasValue)
+      {
+        <button class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 h-10 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                @onclick="LogoutAsync">
+          Wyloguj siê
+        </button>
+      }
+    </div>
+
+    @if (_loading)
+    {
+      <div class="flex items-center justify-center py-20">
+        <div class="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600"></div>
+        <span class="ml-3 text-sm text-gray-600">£adowanie profilu...</span>
+      </div>
+    }
+    else if (!_customerId.HasValue)
+    {
+      <div class="rounded-2xl border border-dashed bg-white p-10 text-center">
+        <h2 class="text-lg font-medium text-gray-900">Brak zalogowanego u¿ytkownika</h2>
+        <p class="mt-2 text-sm text-gray-600">Zaloguj siê lub za³ó¿ konto, aby zarz¹dzaæ swoimi danymi.</p>
+        <div class="mt-6 flex justify-center gap-3">
+          <a class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 h-11 text-white font-medium shadow-sm hover:bg-indigo-700" href="/login">Zaloguj siê</a>
+          <a class="inline-flex items-center justify-center rounded-lg border px-4 h-11 text-gray-700 hover:bg-gray-50" href="/register">Zarejestruj siê</a>
+        </div>
+      </div>
+    }
+    else if (_model is not null)
+    {
+      <EditForm Model="_model" OnValidSubmit="SaveAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary class="mb-4 text-sm text-red-600" />
+
+        <div class="space-y-4 rounded-2xl bg-white p-6 shadow">
+          <div>
+            <label for="fullName" class="block text-sm font-medium text-gray-700">Imiê i nazwisko</label>
+            <input id="fullName" @bind="_model.FullName" type="text"
+                   class="mt-1 block w-full rounded-lg border border-gray-300 px-3 h-11 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+            <ValidationMessage For="() => _model.FullName" class="mt-1 text-sm text-red-600" />
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+              <input id="email" @bind="_model.Email" type="email"
+                     class="mt-1 block w-full rounded-lg border border-gray-300 px-3 h-11 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+              <ValidationMessage For="() => _model.Email" class="mt-1 text-sm text-red-600" />
+            </div>
+            <div>
+              <label for="phone" class="block text-sm font-medium text-gray-700">Telefon</label>
+              <input id="phone" @bind="_model.PhoneNumber" type="tel"
+                     class="mt-1 block w-full rounded-lg border border-gray-300 px-3 h-11 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+              <ValidationMessage For="() => _model.PhoneNumber" class="mt-1 text-sm text-red-600" />
+            </div>
+          </div>
+
+          <div>
+            <label for="address" class="block text-sm font-medium text-gray-700">Adres (opcjonalnie)</label>
+            <textarea id="address" @bind="_model.Address" rows="2"
+                      class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+          </div>
+
+          <div>
+            <label for="document" class="block text-sm font-medium text-gray-700">Dokument to¿samoœci (opcjonalnie)</label>
+            <input id="document" @bind="_model.DocumentNumber" type="text"
+                   class="mt-1 block w-full rounded-lg border border-gray-300 px-3 h-11 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+          </div>
+
+          <div class="flex justify-end">
+            <button type="submit"
+                    class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 h-11 text-white font-medium shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled="@_isSaving">
+              @(_isSaving ? "Zapisywanie..." : "Zapisz zmiany")
+            </button>
+          </div>
+        </div>
+      </EditForm>
+    }
+  </div>
+</div>
+
+@code {
+  private Guid? _customerId;
+  private ProfileModel? _model;
+  private bool _loading = true;
+  private bool _isSaving;
+
+  protected override async Task OnInitializedAsync()
+  {
+    await LoadProfileAsync();
+  }
+
+  private async Task LoadProfileAsync()
+  {
+    _loading = true;
+    try
+    {
+      var customer = await Session.GetCustomerAsync();
+      if (customer is null)
+      {
+        _customerId = null;
+        _model = null;
+        return;
+      }
+
+      _customerId = customer.Id;
+      _model = new ProfileModel
+      {
+        FullName = customer.FullName,
+        Email = customer.Email,
+        PhoneNumber = customer.PhoneNumber,
+        Address = customer.Address,
+        DocumentNumber = customer.DocumentNumber
+      };
+    }
+    finally
+    {
+      _loading = false;
+    }
+  }
+
+  private async Task SaveAsync()
+  {
+    if (_model is null || !_customerId.HasValue)
+    {
+      return;
+    }
+
+    _isSaving = true;
+    try
+    {
+      var request = new CreateCustomerRequest
+      {
+        FullName = _model.FullName.Trim(),
+        Email = _model.Email.Trim(),
+        PhoneNumber = _model.PhoneNumber.Trim(),
+        Address = string.IsNullOrWhiteSpace(_model.Address) ? null : _model.Address.Trim(),
+        DocumentNumber = string.IsNullOrWhiteSpace(_model.DocumentNumber) ? null : _model.DocumentNumber.Trim()
+      };
+
+      var updated = await Api.UpdateCustomerAsync(_customerId.Value, request);
+      if (updated is null)
+      {
+        Snackbar.Add("Nie uda³o siê zaktualizowaæ danych (konto nie istnieje).", Severity.Error);
+        return;
+      }
+
+      await Session.SetCustomerAsync(updated);
+      Snackbar.Add("Dane zosta³y zaktualizowane.", Severity.Success);
+    }
+    catch (Exception ex)
+    {
+      Snackbar.Add($"Wyst¹pi³ b³¹d podczas zapisu danych: {ex.Message}", Severity.Error);
+    }
+    finally
+    {
+      _isSaving = false;
+    }
+  }
+
+  private async Task LogoutAsync()
+  {
+    await Session.ClearAsync();
+    Snackbar.Add("Wylogowano.", Severity.Info);
+    Navigation.NavigateTo("/", true);
+  }
+
+  private class ProfileModel
+  {
+    [Required(ErrorMessage = "Imiê i nazwisko jest wymagane.")]
+    [StringLength(100)]
+    public string FullName { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Email jest wymagany.")]
+    [EmailAddress(ErrorMessage = "Podaj poprawny adres email.")]
+    public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Telefon jest wymagany.")]
+    [Phone(ErrorMessage = "Podaj poprawny numer telefonu.")]
+    public string PhoneNumber { get; set; } = string.Empty;
+
+    [StringLength(200)]
+    public string? Address { get; set; }
+
+    [StringLength(50)]
+    public string? DocumentNumber { get; set; }
+  }
+}

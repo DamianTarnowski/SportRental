@@ -1,0 +1,370 @@
+@page "/admin/employees"
+@rendermode InteractiveServer
+@using SportRental.Infrastructure.Domain
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@attribute [Authorize(Roles = "SuperAdmin")]
+
+<PageTitle>ZarzÄ…dzanie Pracownikami</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-4">ZarzÄ…dzanie Pracownikami</MudText>
+
+    <MudGrid>
+        <MudItem xs="12" Class="d-flex justify-end mb-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">
+                Dodaj Pracownika
+            </MudButton>
+        </MudItem>
+
+        @if (employees == null)
+        {
+            <MudItem xs="12">
+                <MudProgressLinear Indeterminate="true" />
+            </MudItem>
+        }
+        else
+        {
+            <MudItem xs="12">
+                @foreach (var employee in employees)
+                {
+                    <MudExpansionPanel Class="mb-2">
+                        <TitleContent>
+                            <div style="display: flex; align-items: center">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" class="mr-3"></MudIcon>
+                                <div>
+                                    <MudText Typo="Typo.body1"><strong>@employee.FullName</strong></MudText>
+                                    <MudText Typo="Typo.caption">@employee.Position (@employee.Role)</MudText>
+                                </div>
+                            </div>
+                        </TitleContent>
+                        <ChildContent>
+                            <MudGrid>
+                                <MudItem xs="12" sm="6" md="4">
+                                    <MudText Typo="Typo.body2"><strong>Email:</strong> @employee.Email</MudText>
+                                    <MudText Typo="Typo.body2"><strong>Telefon:</strong> @employee.Telephone</MudText>
+                                    <MudText Typo="Typo.body2"><strong>Miasto:</strong> @employee.City</MudText>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="4">
+                                    <MudText Typo="Typo.body2"><strong>Pozycja:</strong> @employee.Position</MudText>
+                                    <MudText Typo="Typo.body2"><strong>Rola:</strong> @employee.Role</MudText>
+                                    <MudText Typo="Typo.body2"><strong>WypoĹĽyczenia:</strong> @employee.AllRentalsNumber</MudText>
+                                </MudItem>
+                                <MudItem xs="12" sm="6" md="4">
+                                    <MudText Typo="Typo.body2"><strong>Dodano:</strong> @employee.CreatedAtUtc.ToString("dd.MM.yyyy HH:mm")</MudText>
+                                    <MudText Typo="Typo.body2"><strong>Uprawnienia:</strong> @(employee.HasPermissions ? "Skonfigurowane" : "Brak")</MudText>
+                                </MudItem>
+                                @if (!string.IsNullOrEmpty(employee.Comment))
+                                {
+                                    <MudItem xs="12">
+                                        <MudText Typo="Typo.body2"><strong>Komentarz:</strong> @employee.Comment</MudText>
+                                    </MudItem>
+                                }
+                                <MudItem xs="12" Class="d-flex gap-2 mt-3">
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small" 
+                                               StartIcon="@Icons.Material.Filled.Edit" OnClick="() => OpenEditDialog(employee)">
+                                        Edytuj
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Size="Size.Small" 
+                                               StartIcon="@Icons.Material.Filled.Security" OnClick="() => OpenPermissionsDialog(employee.Id)">
+                                        Uprawnienia
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" Color="Color.Error" Size="Size.Small" 
+                                               StartIcon="@Icons.Material.Filled.Delete" OnClick="() => DeleteEmployee(employee.Id)">
+                                        UsuĹ„
+                                    </MudButton>
+                                </MudItem>
+                            </MudGrid>
+                        </ChildContent>
+                    </MudExpansionPanel>
+                }
+            </MudItem>
+        }
+    </MudGrid>
+</MudContainer>
+
+<!-- Add/Edit Employee Dialog -->
+<MudDialog @bind-Visible="showDialog" Options="@(new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true })">
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">@(isEditing ? "Edytuj Pracownika" : "Dodaj Pracownika")</MudText>
+        
+        <MudGrid>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="dialogEmployee.FullName" Label="ImiÄ™ i nazwisko" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="dialogEmployee.Email" Label="Email" Required="true" InputType="InputType.Email" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="dialogEmployee.Telephone" Label="Telefon" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="dialogEmployee.City" Label="Miasto" Required="true" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudTextField @bind-Value="dialogEmployee.Position" Label="Pozycja" />
+            </MudItem>
+            <MudItem xs="12" sm="6">
+                <MudSelect @bind-Value="dialogEmployee.Role" Label="Rola">
+                    <MudSelectItem Value="EmployeeRole.Pracownik">Pracownik</MudSelectItem>
+                    <MudSelectItem Value="EmployeeRole.Kierownik">Kierownik</MudSelectItem>
+                    <MudSelectItem Value="EmployeeRole.Manager">Manager</MudSelectItem>
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12">
+                <MudTextField @bind-Value="dialogEmployee.Comment" Label="Komentarz" Lines="3" />
+            </MudItem>
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog">Anuluj</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveEmployee" Disabled="@isSaving">
+            @if (isSaving)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+            else
+            {
+                @(isEditing ? "Zapisz" : "Dodaj")
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<EmployeeDto>? employees;
+    private bool showDialog = false;
+    private bool isEditing = false;
+    private bool isSaving = false;
+    private EmployeeDialogDto dialogEmployee = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEmployees();
+    }
+
+    private async Task LoadEmployees()
+    {
+        try
+        {
+            var tenantId = TenantProvider.GetCurrentTenantId();
+            if (tenantId == null)
+            {
+                Snackbar.Add("BĹ‚Ä…d: Brak dostÄ™pu do danych tenant", Severity.Error);
+                employees = new List<EmployeeDto>();
+                return;
+            }
+
+            await using var context = await DbFactory.CreateDbContextAsync();
+            if (context == null)
+            {
+                Snackbar.Add("Blad: Nie udalo sie utworzyc kontekstu danych", Severity.Error);
+                employees = new List<EmployeeDto>();
+                return;
+            }
+            context.SetTenant(tenantId);
+            
+            var employeesList = await context.Employees
+                .Include(e => e.Permissions)
+                .Where(e => !e.IsDeleted)
+                .OrderBy(e => e.FullName)
+                .Select(e => new EmployeeDto
+                {
+                    Id = e.Id,
+                    FullName = e.FullName,
+                    Email = e.Email,
+                    City = e.City,
+                    Telephone = e.Telephone,
+                    Position = e.Position,
+                    Role = e.Role,
+                    Comment = e.Comment
+                })
+                .ToListAsync();
+                
+            employees = employeesList;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"BĹ‚Ä…d: {ex.Message}", Severity.Error);
+            employees = new List<EmployeeDto>();
+        }
+    }
+
+    private void OpenAddDialog()
+    {
+        isEditing = false;
+        dialogEmployee = new EmployeeDialogDto();
+        showDialog = true;
+    }
+
+    private void OpenEditDialog(EmployeeDto employee)
+    {
+        isEditing = true;
+        dialogEmployee = new EmployeeDialogDto
+        {
+            Id = employee.Id,
+            FullName = employee.FullName,
+            Email = employee.Email,
+            City = employee.City,
+            Telephone = employee.Telephone,
+            Position = employee.Position,
+            Role = employee.Role,
+            Comment = employee.Comment
+        };
+        showDialog = true;
+    }
+
+    private void CloseDialog()
+    {
+        showDialog = false;
+        dialogEmployee = new();
+    }
+
+    private async Task SaveEmployee()
+    {
+        isSaving = true;
+
+        try
+        {
+            var tenantId = TenantProvider.GetCurrentTenantId();
+            if (tenantId == null)
+            {
+                Snackbar.Add("BĹ‚Ä…d: Brak dostÄ™pu do danych tenant", Severity.Error);
+                return;
+            }
+
+            await using var context = await DbFactory.CreateDbContextAsync();
+            if (context == null)
+            {
+                Snackbar.Add("Blad: Nie udalo sie utworzyc kontekstu danych", Severity.Error);
+                employees = new List<EmployeeDto>();
+                return;
+            }
+            context.SetTenant(tenantId);
+            
+            if (isEditing)
+            {
+                var employee = await context.Employees.FirstOrDefaultAsync(e => e.Id == dialogEmployee.Id && !e.IsDeleted);
+                if (employee == null)
+                {
+                    Snackbar.Add("Pracownik nie zostaĹ‚ znaleziony", Severity.Error);
+                    return;
+                }
+
+                employee.FullName = dialogEmployee.FullName;
+                employee.Email = dialogEmployee.Email;
+                employee.City = dialogEmployee.City;
+                employee.Telephone = dialogEmployee.Telephone;
+                employee.Position = dialogEmployee.Position ?? employee.Position;
+                employee.Role = dialogEmployee.Role;
+                employee.Comment = dialogEmployee.Comment;
+                employee.UpdatedAtUtc = DateTime.UtcNow;
+            }
+            else
+            {
+                var employee = new Employee
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId.Value,
+                    FullName = dialogEmployee.FullName,
+                    Email = dialogEmployee.Email,
+                    City = dialogEmployee.City,
+                    Telephone = dialogEmployee.Telephone,
+                    Position = dialogEmployee.Position ?? "Pracownik",
+                    Role = dialogEmployee.Role,
+                    Comment = dialogEmployee.Comment,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+                context.Employees.Add(employee);
+            }
+
+            await context.SaveChangesAsync();
+            Snackbar.Add(isEditing ? "Pracownik zostaĹ‚ zaktualizowany" : "Pracownik zostaĹ‚ dodany", Severity.Success);
+            CloseDialog();
+            await LoadEmployees();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"BĹ‚Ä…d: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteEmployee(Guid id)
+    {
+        try
+        {
+            var tenantId = TenantProvider.GetCurrentTenantId();
+            if (tenantId == null)
+            {
+                Snackbar.Add("BĹ‚Ä…d: Brak dostÄ™pu do danych tenant", Severity.Error);
+                return;
+            }
+
+            await using var context = await DbFactory.CreateDbContextAsync();
+            if (context == null)
+            {
+                Snackbar.Add("Blad: Nie udalo sie utworzyc kontekstu danych", Severity.Error);
+                employees = new List<EmployeeDto>();
+                return;
+            }
+            context.SetTenant(tenantId);
+            
+            var employee = await context.Employees.FirstOrDefaultAsync(e => e.Id == id);
+            if (employee == null)
+            {
+                Snackbar.Add("Pracownik nie zostaĹ‚ znaleziony", Severity.Error);
+                return;
+            }
+
+            employee.IsDeleted = true;
+            employee.UpdatedAtUtc = DateTime.UtcNow;
+            await context.SaveChangesAsync();
+            
+            Snackbar.Add("Pracownik zostaĹ‚ usuniÄ™ty", Severity.Success);
+            await LoadEmployees();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"BĹ‚Ä…d: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OpenPermissionsDialog(Guid employeeId)
+    {
+        Navigation.NavigateTo($"/admin/employees/{employeeId}/permissions");
+    }
+
+    public class EmployeeDto
+    {
+        public Guid Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string Telephone { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public EmployeeRole Role { get; set; }
+        public string? Comment { get; set; }
+        public int AllRentalsNumber { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+        public bool HasPermissions { get; set; }
+    }
+
+    public class EmployeeDialogDto
+    {
+        public Guid Id { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string Telephone { get; set; } = string.Empty;
+        public string Position { get; set; } = "Pracownik";
+        public EmployeeRole Role { get; set; } = EmployeeRole.Pracownik;
+        public string? Comment { get; set; }
+    }
+}

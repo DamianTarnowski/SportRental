@@ -1,0 +1,43 @@
+@page "/checkout/cancel"
+@inject NavigationManager NavigationManager
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
+    <MudPaper Elevation="4" Class="pa-8 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.Cancel" Color="Color.Warning" Size="Size.Large" Class="mb-4" Style="font-size: 80px;" />
+        
+        <MudText Typo="Typo.h4" Class="mb-4">Płatność anulowana</MudText>
+        
+        <MudText Typo="Typo.body1" Class="mb-6">
+            Proces płatności został przerwany. Twoja rezerwacja nie została utworzona.
+        </MudText>
+
+        <MudAlert Severity="Severity.Info" Class="mb-4">
+            <MudText Typo="Typo.body2">
+                Nie martw się - żadne środki nie zostały pobrane z Twojego konta.
+            </MudText>
+        </MudAlert>
+
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-6">
+            Możesz wrócić do koszyka i spróbować ponownie, lub kontynuować przeglądanie produktów.
+        </MudText>
+
+        <MudStack Row="true" Spacing="2" Justify="Justify.Center">
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       Href="/cart"
+                       StartIcon="@Icons.Material.Filled.ShoppingCart">
+                Wróć do koszyka
+            </MudButton>
+            
+            <MudButton Variant="Variant.Outlined" 
+                       Color="Color.Primary" 
+                       Href="/"
+                       StartIcon="@Icons.Material.Filled.Home">
+                Strona główna
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+}

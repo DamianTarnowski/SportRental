@@ -1,0 +1,468 @@
+@page "/dashboard"
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+<PageTitle>SportRental - Panel</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudPaper Class="pa-6 ma-2" Elevation="3" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.12);">
+        <MudGrid Class="mud-align-center" Spacing="3">
+            <MudItem xs="12" md="8" lg="9">
+                <MudStack Spacing="3">
+                    <div>
+                        <MudText Typo="Typo.h3" Class="mb-2" Style="font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <MudIcon Icon="@Icons.Material.Filled.WbSunny" Class="mr-3" />
+                            Witaj w SportRental
+                        </MudText>
+                        <MudText Typo="Typo.h6" Style="opacity: 0.9; font-weight: 300;">
+                            Zarządzaj wypożyczalnią sportową w nowoczesny sposób
+                        </MudText>
+                    </div>
+                    <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                        <MudButton Href="/admin/rentals" 
+                                   Color="Color.Surface" 
+                                   Variant="Variant.Filled" 
+                                   StartIcon="@Icons.Material.Filled.Add"
+                                   Size="Size.Large"
+                                   Class="rounded-pill px-6 py-3">
+                            Nowy wynajem
+                        </MudButton>
+                        <MudButton Href="/admin/products" 
+                                   Variant="Variant.Outlined" 
+                                   StartIcon="@Icons.Material.Filled.Inventory2"
+                                   Style="border-color: white; color: white; border-width: 2px;"
+                                   Class="rounded-pill px-4">
+                            Produkty
+                        </MudButton>
+                        <MudButton Href="/admin/customers" 
+                                   Variant="Variant.Outlined" 
+                                   StartIcon="@Icons.Material.Filled.Groups"
+                                   Style="border-color: white; color: white; border-width: 2px;"
+                                   Class="rounded-pill px-4">
+                            Klienci
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudItem>
+            <MudItem xs="12" md="4" lg="3" Class="text-center">
+                <MudIcon Icon="@Icons.Material.Filled.SportsTennis" 
+                         Style="font-size: 120px; opacity: 0.8; transform: rotate(-15deg);" />
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudGrid Class="mt-4" Spacing="3">
+        <MudItem xs="12" md="8">
+            <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                <MudText Typo="Typo.subtitle2">Placówka:</MudText>
+                <MudSelect T="string" @bind-Value="selectedBranch" Style="max-width:260px">
+                    @foreach (var b in branches)
+                    {
+                        <MudSelectItem Value="@b">@b</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudText Typo="Typo.caption">(na razie tylko „Wszystkie” – multi-placówki wkrótce)</MudText>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4" Spacing="3">
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4" Class="rounded-lg hover-card" Style="border-radius: 16px; transition: all 0.3s ease;">
+                <MudCardContent Class="pa-4">
+                    <MudStack Row="true" Spacing="3" Class="mud-align-center">
+                        <MudAvatar Color="Color.Primary" Size="Size.Large">
+                            <MudIcon Icon="@Icons.Material.Filled.PlayArrow" />
+                        </MudAvatar>
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@todayIssues</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Dziś do wydania</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4" Class="rounded-lg hover-card" Style="border-radius: 16px; transition: all 0.3s ease;">
+                <MudCardContent Class="pa-4">
+                    <MudStack Row="true" Spacing="3" Class="mud-align-center">
+                        <MudAvatar Color="Color.Warning" Size="Size.Large">
+                            <MudIcon Icon="@Icons.Material.Filled.AssignmentReturn" />
+                        </MudAvatar>
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@todayReturns</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Dziś do zwrotu</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4" Class="rounded-lg hover-card" Style="border-radius: 16px; transition: all 0.3s ease;">
+                <MudCardContent Class="pa-4">
+                    <MudStack Row="true" Spacing="3" Class="mud-align-center">
+                        <MudAvatar Color="Color.Success" Size="Size.Large">
+                            <MudIcon Icon="@Icons.Material.Filled.TrendingUp" />
+                        </MudAvatar>
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@activeRentals</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Aktywne wynajmy</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <MudCard Elevation="4" Class="rounded-lg hover-card" Style="border-radius: 16px; transition: all 0.3s ease;">
+                <MudCardContent Class="pa-4">
+                    <MudStack Row="true" Spacing="3" Class="mud-align-center">
+                        <MudAvatar Color="Color.Info" Size="Size.Large">
+                            <MudIcon Icon="@Icons.Material.Filled.People" />
+                        </MudAvatar>
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@customersCount</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Default">Klientów</MudText>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4" Spacing="3">
+        <MudItem xs="12" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Bolt" Size="Size.Large" Class="mr-3" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Szybkie akcje</MudText>
+                        </div>
+                        <MudStack Spacing="2">
+                            <MudButton Href="/admin/rentals" 
+                                       Variant="Variant.Filled" 
+                                       StartIcon="@Icons.Material.Filled.RocketLaunch"
+                                       Style="background: rgba(255,255,255,0.2); color: white; border: none;"
+                                       FullWidth="true"
+                                       Class="rounded-pill py-3">
+                                Utwórz wynajem
+                            </MudButton>
+                            <MudButton Href="/admin/products" 
+                                       Variant="Variant.Outlined" 
+                                       StartIcon="@Icons.Material.Filled.Add"
+                                       Style="border-color: white; color: white; border-width: 2px;"
+                                       FullWidth="true"
+                                       Class="rounded-pill">
+                                Dodaj produkt
+                            </MudButton>
+                            <MudButton Href="/admin/customers" 
+                                       Variant="Variant.Outlined" 
+                                       StartIcon="@Icons.Material.Filled.PersonAddAlt"
+                                       Style="border-color: white; color: white; border-width: 2px;"
+                                       FullWidth="true"
+                                       Class="rounded-pill">
+                                Dodaj klienta
+                            </MudButton>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" Class="mr-3" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Zarządzanie</MudText>
+                        </div>
+                        <MudText Typo="Typo.body1" Style="opacity: 0.9;">
+                            Konfiguruj ustawienia wypożyczalni
+                        </MudText>
+                        <MudStack Spacing="2">
+                            <MudButton Href="/admin/contract-template" 
+                                       Variant="Variant.Filled" 
+                                       StartIcon="@Icons.Material.Filled.Article"
+                                       Style="background: rgba(255,255,255,0.2); color: white;"
+                                       FullWidth="true"
+                                       Class="rounded-pill">
+                                Szablon umowy
+                            </MudButton>
+                            <MudButton Href="/admin/company-settings" 
+                                       Variant="Variant.Outlined" 
+                                       StartIcon="@Icons.Material.Filled.Settings"
+                                       Style="border-color: white; color: white; border-width: 2px;"
+                                       FullWidth="true"
+                                       Class="rounded-pill">
+                                Ustawienia
+                            </MudButton>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        <MudItem xs="12" lg="4">
+            <MudCard Elevation="6" Class="h-100" Style="border-radius: 16px; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="3">
+                        <div Class="d-flex align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Large" Class="mr-3" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600; color: #2c3e50;">Przegląd danych</MudText>
+                        </div>
+                        <MudGrid Spacing="2">
+                            <MudItem xs="6">
+                                <MudStack Class="mud-align-center" Spacing="1">
+                                    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #2c3e50;">@productsCount</MudText>
+                                    <MudText Typo="Typo.caption" Style="color: #7f8c8d;">Produkty</MudText>
+                                </MudStack>
+                            </MudItem>
+                            <MudItem xs="6">
+                                <MudStack Class="mud-align-center" Spacing="1">
+                                    <MudText Typo="Typo.h5" Style="font-weight: 700; color: #2c3e50;">@customersCount</MudText>
+                                    <MudText Typo="Typo.caption" Style="color: #7f8c8d;">Klienci</MudText>
+                                </MudStack>
+                            </MudItem>
+                        </MudGrid>
+                        <MudButton Href="/admin/reports" 
+                                   Variant="Variant.Filled" 
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.BarChart"
+                                   FullWidth="true"
+                                   Class="rounded-pill">
+                            Zobacz raporty
+                        </MudButton>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudCard Elevation="6" Class="mt-4" Style="border-radius: 16px;">
+        <MudCardContent Class="pa-5">
+            <div Class="d-flex align-center mb-4">
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
+                <MudText Typo="Typo.h6" Style="font-weight: 600;">Wynajmy w ostatnich 7 dniach</MudText>
+            </div>
+            <MudChart ChartType="MudBlazor.ChartType.Line" 
+                      XAxisLabels="@weekLabels" 
+                      ChartSeries="@weekData" 
+                      Width="100%" 
+                      Height="280px"
+                      ChartOptions="chartOptions" />
+        </MudCardContent>
+    </MudCard>
+
+    <AuthorizeView Roles="SuperAdmin">
+        <MudAlert Severity="Severity.Info" Class="mt-4">Widok SuperAdmina: zarządzanie wypożyczalniami i placówkami – do wdrożenia.</MudAlert>
+    </AuthorizeView>
+
+    <MudGrid Class="mt-4" Spacing="3">
+        <MudItem xs="12" lg="6">
+            <MudCard Elevation="6" Style="border-radius: 16px;">
+                <MudCardContent Class="pa-5">
+                    <div Class="d-flex align-center mb-4">
+                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Warning" Size="Size.Large" Class="mr-3" />
+                        <MudText Typo="Typo.h6" Style="font-weight: 600;">Najbliższe zwroty</MudText>
+                    </div>
+                    <MudTable Items="upcomingReturns" Dense="true" Hover="true" Elevation="0" Class="rounded-lg">
+                        <HeaderContent>
+                            <MudTh Style="font-weight: 600;">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-2" />
+                                Klient
+                            </MudTh>
+                            <MudTh Style="font-weight: 600;">
+                                <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-2" />
+                                Data
+                            </MudTh>
+                            <MudTh Style="font-weight: 600;">
+                                <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Small" Class="mr-2" />
+                                Pozycje
+                            </MudTh>
+                            <MudTh Style="font-weight: 600;">
+                                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Class="mr-2" />
+                                Kwota
+                            </MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Default">
+                                    @context.CustomerName
+                                </MudChip>
+                            </MudTd>
+                            <MudTd>
+                                <MudChip T="string" Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Color="Color.Warning">
+                                    @context.EndDateLocal.ToString("MM-dd")
+                                </MudChip>
+                            </MudTd>
+                            <MudTd>@context.ItemsSummary</MudTd>
+                            <MudTd>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600; color: var(--mud-palette-success);">
+                                    @context.TotalAmount.ToString("0.00") zł
+                                </MudText>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+        
+        <MudItem xs="12" lg="6">
+            <MudCard Elevation="6" Style="border-radius: 16px;">
+                <MudCardContent Class="pa-5">
+                    <div Class="d-flex align-center mb-4">
+                        <MudIcon Icon="@Icons.Material.Filled.PlayCircle" Color="Color.Success" Size="Size.Large" Class="mr-3" />
+                        <MudText Typo="Typo.h6" Style="font-weight: 600;">Aktywne wynajmy</MudText>
+                    </div>
+                    <MudTable Items="activeNow" Dense="true" Hover="true" Elevation="0" Class="rounded-lg">
+                        <HeaderContent>
+                            <MudTh Style="font-weight: 600;">
+                                <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-2" />
+                                Klient
+                            </MudTh>
+                            <MudTh Style="font-weight: 600;">
+                                <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Size="Size.Small" Class="mr-2" />
+                                Od
+                            </MudTh>
+                            <MudTh Style="font-weight: 600;">
+                                <MudIcon Icon="@Icons.Material.Filled.Stop" Size="Size.Small" Class="mr-2" />
+                                Do
+                            </MudTh>
+                            <MudTh Style="font-weight: 600;">
+                                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" Class="mr-2" />
+                                Kwota
+                            </MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudChip T="string" Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Default">
+                                    @context.CustomerName
+                                </MudChip>
+                            </MudTd>
+                            <MudTd>@context.StartDateLocal.ToString("MM-dd")</MudTd>
+                            <MudTd>@context.EndDateLocal.ToString("MM-dd")</MudTd>
+                            <MudTd>
+                                <MudText Typo="Typo.body2" Style="font-weight: 600; color: var(--mud-palette-success);">
+                                    @context.TotalAmount.ToString("0.00") zł
+                                </MudText>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    [Inject] private IDbContextFactory<ApplicationDbContext> DbFactory { get; set; } = default!;
+    [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
+
+    private int productsCount;
+    private int customersCount;
+    private int activeRentals;
+    private int todayReturns;
+    private int todayIssues;
+
+    private List<UpcomingReturnVm> upcomingReturns = new();
+    private List<ActiveVm> activeNow = new();
+    private string selectedBranch = "Wszystkie";
+    private List<string> branches = new() { "Wszystkie" };
+    private string[] weekLabels = Array.Empty<string>();
+    private List<MudBlazor.ChartSeries> weekData = new();
+    private ChartOptions chartOptions = new()
+    {
+        LineStrokeWidth = 3,
+        ChartPalette = new[] { "#667eea", "#764ba2" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await using var Db = await DbFactory.CreateDbContextAsync();
+        Db.SetTenant(TenantProvider.GetCurrentTenantId());
+        productsCount = await Db.Products.AsNoTracking().CountAsync();
+        customersCount = await Db.Customers.AsNoTracking().CountAsync();
+        activeRentals = await Db.Rentals.AsNoTracking().CountAsync(r => r.Status == RentalStatus.Active || r.Status == RentalStatus.Confirmed);
+        var today = DateTime.UtcNow.Date;
+        todayReturns = await Db.Rentals.AsNoTracking().CountAsync(r => r.EndDateUtc.Date == today);
+
+        var utcToday = DateTime.UtcNow.Date;
+        var next7 = utcToday.AddDays(7);
+        todayIssues = await Db.Rentals.CountAsync(r => r.StartDateUtc >= utcToday && r.StartDateUtc < utcToday.AddDays(1));
+        var data = await Db.Rentals.AsNoTracking()
+            .OrderBy(r => r.EndDateUtc)
+            .Where(r => r.EndDateUtc >= utcToday && r.EndDateUtc <= next7)
+            .Select(r => new
+            {
+                r.Id,
+                r.CustomerId,
+                r.EndDateUtc,
+                r.TotalAmount
+            })
+            .ToListAsync();
+
+        var customerMap = await Db.Customers.AsNoTracking()
+            .Where(c => data.Select(d => d.CustomerId).Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.FullName);
+
+        var itemsMap = await Db.RentalItems.AsNoTracking()
+            .Where(ri => data.Select(d => d.Id).Contains(ri.RentalId))
+            .GroupBy(ri => ri.RentalId)
+            .ToDictionaryAsync(g => g.Key, g => g.Sum(x => x.Quantity));
+
+        upcomingReturns = data.Select(d => new UpcomingReturnVm
+        {
+            CustomerName = customerMap.GetValueOrDefault(d.CustomerId) ?? d.CustomerId.ToString(),
+            EndDateLocal = d.EndDateUtc.ToLocalTime(),
+            ItemsSummary = $"{itemsMap.GetValueOrDefault(d.Id, 0)} szt.",
+            TotalAmount = d.TotalAmount
+        }).ToList();
+
+        // Wykres: ostatnie 7 dni wg startu wynajmu
+        var labels = new List<string>();
+        var values = new List<double>();
+        for (int i = 6; i >= 0; i--)
+        {
+            var day = utcToday.AddDays(-i);
+            var count = await Db.Rentals.AsNoTracking().CountAsync(r => r.StartDateUtc >= day && r.StartDateUtc < day.AddDays(1));
+            labels.Add(day.ToLocalTime().ToString("MM-dd"));
+            values.Add(count);
+        }
+        weekLabels = labels.ToArray();
+        weekData = new List<MudBlazor.ChartSeries>
+        {
+            new MudBlazor.ChartSeries { Name = "Wynajmy", Data = values.ToArray() }
+        };
+
+        // Aktywne teraz
+        var now = DateTime.UtcNow;
+        var actives = await Db.Rentals.AsNoTracking()
+            .Where(r => r.StartDateUtc <= now && r.EndDateUtc >= now && r.Status != RentalStatus.Cancelled)
+            .Select(r => new { r.Id, r.CustomerId, r.StartDateUtc, r.EndDateUtc, r.TotalAmount })
+            .OrderBy(r => r.EndDateUtc)
+            .Take(20)
+            .ToListAsync();
+        activeNow = actives.Select(a => new ActiveVm
+        {
+            CustomerName = customerMap.GetValueOrDefault(a.CustomerId) ?? a.CustomerId.ToString(),
+            StartDateLocal = a.StartDateUtc.ToLocalTime(),
+            EndDateLocal = a.EndDateUtc.ToLocalTime(),
+            TotalAmount = a.TotalAmount
+        }).ToList();
+    }
+
+    private sealed class UpcomingReturnVm
+    {
+        public string CustomerName { get; set; } = string.Empty;
+        public DateTime EndDateLocal { get; set; }
+        public string ItemsSummary { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+    }
+
+    private sealed class ActiveVm
+    {
+        public string CustomerName { get; set; } = string.Empty;
+        public DateTime StartDateLocal { get; set; }
+        public DateTime EndDateLocal { get; set; }
+        public decimal TotalAmount { get; set; }
+    }
+}

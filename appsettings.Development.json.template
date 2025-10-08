@@ -1,0 +1,48 @@
+{
+  "KeyVault": {
+    "Url": "https://YOUR_VAULT_NAME.vault.azure.net/"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=5432;Database=sportrental_dev;Username=YOUR_USER;Password=YOUR_PASSWORD"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.EntityFrameworkCore": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "Stripe": {
+    "SecretKey": "sk_test_YOUR_TEST_KEY",
+    "PublishableKey": "pk_test_YOUR_TEST_KEY",
+    "WebhookSecret": "whsec_YOUR_WEBHOOK_SECRET",
+    "Currency": "pln"
+  },
+  "Email": {
+    "Smtp": {
+      "Host": "smtp.example.com",
+      "Port": 465,
+      "EnableSsl": true,
+      "Username": "your-email@example.com",
+      "Password": "YOUR_EMAIL_PASSWORD",
+      "SenderEmail": "your-email@example.com",
+      "SenderName": "SportRental",
+      "Enabled": true
+    }
+  },
+  "Jwt": {
+    "SigningKey": "YOUR_SECRET_KEY_MIN_32_CHARACTERS_LONG",
+    "Issuer": "SportRentalApi",
+    "Audience": "SportRentalClient",
+    "AccessTokenLifetimeMinutes": 60,
+    "RefreshTokenLifetimeDays": 7
+  },
+  "Storage": {
+    "Provider": "AzureBlob",
+    "AzureBlob": {
+      "ConnectionString": "DefaultEndpointsProtocol=https;AccountName=YOUR_ACCOUNT;AccountKey=YOUR_KEY;EndpointSuffix=core.windows.net",
+      "ContainerName": "media"
+    }
+  }
+}

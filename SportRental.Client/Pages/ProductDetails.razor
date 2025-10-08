@@ -1,0 +1,316 @@
+@page "/products/{id:guid}"
+@using MudBlazor
+@using SportRental.Shared.Models
+@inject IApiService ApiService
+@inject ICartService CartService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>SportRental - Product details</PageTitle>
+
+@if (isLoading)
+{
+    <MudContainer Class="py-6">
+        <MudSkeleton Height="320px" SkeletonType="SkeletonType.Rectangle" Class="mb-4" />
+        <MudSkeleton SkeletonType="SkeletonType.Text" Width="60%" Class="mb-2" />
+        <MudSkeleton SkeletonType="SkeletonType.Text" Width="40%" />
+    </MudContainer>
+}
+else if (notFound || product is null)
+{
+    <MudContainer Class="py-10 text-center">
+        <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" />
+        <MudText Typo="Typo.h5" Class="mt-2">Product not found</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">The item may have been removed or is temporarily unavailable.</MudText>
+        <MudButton Class="mt-4" Variant="Variant.Filled" Color="Color.Primary" OnClick="GoBack">
+            Back to catalog
+        </MudButton>
+    </MudContainer>
+}
+else
+{
+    <MudContainer MaxWidth="MaxWidth.Large" Class="py-4">
+        <MudGrid Spacing="4">
+            <MudItem xs="12" md="6">
+                @{
+                    var imageUrl = product.GetImageUrl(1280);
+                    var imageSrcSet = product.GetImageSrcSet();
+                    var originalUrl = product.GetOriginalImageUrl();
+                }
+                @if (!string.IsNullOrWhiteSpace(imageUrl))
+                {
+                    <div style="position: relative; cursor: zoom-in;" @onclick="@(() => ShowImageLightbox(originalUrl, product.Name))">
+                        @if (!string.IsNullOrEmpty(imageSrcSet))
+                        {
+                            <img src="@imageUrl"
+                                 srcset="@imageSrcSet"
+                                 sizes="(max-width: 600px) 400px, (max-width: 900px) 800px, 1280px"
+                                 alt="@product.Name"
+                                 style="width: 100%; border-radius: 16px; object-fit: cover; max-height: 420px; transition: transform 0.2s;"
+                                 class="hover:scale-105" />
+                        }
+                        else
+                        {
+                            <img src="@imageUrl"
+                                 alt="@product.Name"
+                                 style="width: 100%; border-radius: 16px; object-fit: cover; max-height: 420px; transition: transform 0.2s;"
+                                 class="hover:scale-105" />
+                        }
+                        <div style="position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.6); padding: 8px 12px; border-radius: 8px; color: white; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                            <MudIcon Icon="@Icons.Material.Filled.ZoomIn" Size="Size.Small" Style="color: white;" />
+                            Kliknij aby powiększyć
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <MudPaper Class="pa-8 text-center" Elevation="1" Style="border-radius: 16px; background: #f8fafc;">
+                        <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Default" />
+                        <MudText Typo="Typo.body1" Class="mt-2" Color="Color.Secondary">Image coming soon</MudText>
+                    </MudPaper>
+                }
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudStack Spacing="2">
+                    <MudText Typo="Typo.h4" Class="fw-bold">@product.Name</MudText>
+                    @if (!string.IsNullOrWhiteSpace(product.Category))
+                    {
+                        <MudChip T="string" Color="Color.Secondary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Category">
+                            @product.Category
+                        </MudChip>
+                    }
+
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                        <MudText Typo="Typo.h5" Color="Color.Primary">@product.DailyPrice.ToString("C") / day</MudText>
+                        @if (product.IsAvailable && product.AvailableQuantity > 0)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Available</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error">Currently unavailable</MudChip>
+                        }
+                        <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
+                            @product.AvailableQuantity pc
+                        </MudChip>
+                    </MudStack>
+
+                    <MudPaper Elevation="0" Class="pa-3" Style="background: #f8fafc; border-radius: 12px;">
+                        <MudStack Spacing="1">
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Rental window</MudText>
+                            <MudStack Row="true" Spacing="2">
+                                <MudDatePicker Label="Start date"
+                                                @bind-Date="startDate"
+                                                DisableToolbar="true"
+                                                Variant="Variant.Outlined"
+                                                MaxDate="@endDate"
+                                                MinDate="DateTime.Today"
+                                                Required="true"
+                                                Class="w-100" />
+                                <MudDatePicker Label="End date"
+                                                @bind-Date="endDate"
+                                                DisableToolbar="true"
+                                                Variant="Variant.Outlined"
+                                                MinDate="startDate"
+                                                Required="true"
+                                                Class="w-100" />
+                            </MudStack>
+                        </MudStack>
+                    </MudPaper>
+
+                    @if (!string.IsNullOrWhiteSpace(product.Description))
+                    {
+                        <MudText Typo="Typo.body1">@product.Description</MudText>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Detailed description will be available soon.</MudText>
+                    }
+
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.AddShoppingCart"
+                                   Disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
+                                   OnClick="AddToCart">
+                            Add to cart
+                        </MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="GoBack">Back</MudButton>
+                    </MudStack>
+                </MudStack>
+            </MudItem>
+        </MudGrid>
+
+        @if (relatedProducts.Any())
+        {
+            <MudDivider Class="my-6" />
+            <MudText Typo="Typo.h5" Class="mb-3">You may also like</MudText>
+            <MudGrid Spacing="2">
+                @foreach (var related in relatedProducts)
+                {
+                    <MudItem xs="12" sm="6" md="4" lg="3">
+                        <MudCard Elevation="2" Class="h-100" Style="border-radius: 12px; cursor: pointer;" @onclick="@(() => NavigateToProduct(related.Id))">
+                            @{ var relatedImage = related.FullImageUrl ?? related.ImageUrl; }
+                            @if (!string.IsNullOrWhiteSpace(relatedImage))
+                            {
+                                <MudCardMedia Image="@relatedImage" Height="160" Style="border-radius: 12px 12px 0 0;" />
+                            }
+                            <MudCardContent>
+                                <MudText Typo="Typo.subtitle1" Class="fw-bold">@related.Name</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Primary">@related.DailyPrice.ToString("C") / day</MudText>
+                            </MudCardContent>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </MudContainer>
+
+    @* Image Lightbox Dialog *@
+    <MudDialog @bind-Visible="_showLightbox" Options="@(new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.ExtraExtraLarge, CloseButton = true, CloseOnEscapeKey = true })">
+        <DialogContent>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 16px;">
+                <MudText Typo="Typo.h6" Align="Align.Center">@_lightboxImageTitle</MudText>
+                <img src="@_lightboxImageUrl" 
+                     alt="@_lightboxImageTitle" 
+                     style="max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px;" />
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">
+                    Pełny rozmiar - Original quality
+                </MudText>
+            </div>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="@CloseLightbox" Color="Color.Primary" Variant="Variant.Text">Zamknij</MudButton>
+            <MudButton Href="@_lightboxImageUrl" Target="_blank" Color="Color.Secondary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Download">
+                Pobierz
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private ProductDto? product;
+    private List<ProductDto> relatedProducts = new();
+    private bool isLoading = true;
+    private bool notFound;
+    private DateTime? startDate;
+    private DateTime? endDate;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        isLoading = true;
+        notFound = false;
+        product = null;
+        relatedProducts.Clear();
+
+        try
+        {
+            product = await ApiService.GetProductAsync(Id);
+            if (product is null)
+            {
+                notFound = true;
+                return;
+            }
+
+            startDate ??= DateTime.Today;
+            endDate ??= DateTime.Today.AddDays(1);
+
+            await LoadRelatedProductsAsync(product);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Could not load product: {ex.Message}", Severity.Error);
+            notFound = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadRelatedProductsAsync(ProductDto current)
+    {
+        try
+        {
+            var catalog = await ApiService.GetProductsAsync(1, 200);
+            IEnumerable<ProductDto> candidates = catalog.Where(p => p.Id != current.Id);
+
+            if (!string.IsNullOrWhiteSpace(current.Category))
+            {
+                var sameCategory = candidates.Where(p => string.Equals(p.Category, current.Category, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (sameCategory.Count >= 4)
+                {
+                    candidates = sameCategory;
+                }
+                else if (sameCategory.Any())
+                {
+                    var remainder = candidates.Except(sameCategory).OrderByDescending(p => p.IsAvailable).ThenBy(p => p.Name);
+                    candidates = sameCategory.Concat(remainder);
+                }
+            }
+
+            relatedProducts = candidates
+                .OrderByDescending(p => p.IsAvailable)
+                .ThenBy(p => Math.Abs(p.DailyPrice - current.DailyPrice))
+                .Take(4)
+                .ToList();
+        }
+        catch
+        {
+            // Swallow silently – recommendations are optional
+        }
+    }
+
+    private async Task AddToCart()
+    {
+        if (product is null)
+        {
+            return;
+        }
+
+        if (!startDate.HasValue || !endDate.HasValue || endDate <= startDate)
+        {
+            Snackbar.Add("Select a valid rental window.", Severity.Warning);
+            return;
+        }
+
+        await CartService.AddToCartAsync(product, 1, startDate, endDate);
+        var holdSecured = await CartService.EnsureHoldsAsync();
+        if (!holdSecured)
+        {
+            Snackbar.Add("Could not reserve the selected product. Please adjust dates or try again.", Severity.Warning);
+            return;
+        }
+
+        Snackbar.Add($"Product {product.Name} added to cart.", Severity.Success);
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/products");
+    }
+
+    private void NavigateToProduct(Guid id)
+    {
+        Navigation.NavigateTo($"/products/{id}");
+    }
+
+    // Image Lightbox
+    private bool _showLightbox = false;
+    private string _lightboxImageUrl = string.Empty;
+    private string _lightboxImageTitle = string.Empty;
+
+    private void ShowImageLightbox(string imageUrl, string title)
+    {
+        _lightboxImageUrl = imageUrl;
+        _lightboxImageTitle = title;
+        _showLightbox = true;
+    }
+
+    private void CloseLightbox()
+    {
+        _showLightbox = false;
+    }
+}

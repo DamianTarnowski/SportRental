@@ -1,0 +1,74 @@
+@page "/"
+
+<PageTitle>SportRental - Wypożyczalnia sprzętu sportowego</PageTitle>
+
+<!-- Hero -->
+<section class="relative isolate overflow-hidden bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 text-white">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="py-16 sm:py-20 lg:py-28 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div class="lg:col-span-7">
+                <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-4">
+                    🏂 Twoja przygoda zaczyna się tutaj!
+                </h1>
+                <p class="text-base sm:text-lg/7 text-white/90 max-w-2xl">
+                    Wypożycz profesjonalny sprzęt sportowy i przeżyj niezapomniane chwile na stoku, szlaku czy wodzie.
+                </p>
+                <div class="mt-8 flex items-center gap-4">
+                    <a href="/products" class="inline-flex items-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-indigo-700 shadow hover:bg-gray-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
+                            <path d="M11.25 3.75a.75.75 0 0 0-1.5 0V6h-2.25a.75.75 0 0 0 0 1.5H9.75v2.25a.75.75 0 0 0 1.5 0V7.5h2.25a.75.75 0 0 0 0-1.5H11.25V3.75Z" />
+                            <path d="M3.75 6A2.25 2.25 0 0 1 6 3.75h12A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6Z" />
+                        </svg>
+                        Przeglądaj sprzęt
+                    </a>
+                    <a href="/contact" class="inline-flex items-center gap-2 rounded-md border border-white/30 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
+                        Kontakt
+                    </a>
+                </div>
+            </div>
+            <div class="lg:col-span-5">
+                <div class="relative mx-auto max-w-sm">
+                    <div class="absolute -inset-6 -z-10 rounded-3xl bg-white/10 blur-2xl"></div>
+                    <div class="aspect-square rounded-3xl bg-white/10 flex items-center justify-center text-white/50 text-[6rem] select-none">
+                        ⛷️
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(70%_50%_at_50%_0%,rgba(255,255,255,0.25),rgba(255,255,255,0))]"></div>
+</section>
+
+<!-- Features -->
+<section class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+    <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-10">Dlaczego warto wybrać nas?</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="rounded-xl border bg-white p-6 text-center shadow-sm">
+            <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                    <path fill-rule="evenodd" d="M8.485 3.515a6 6 0 1 1 8.485 8.485l-6.364 6.364a3 3 0 0 1-4.243-4.243l6.364-6.364a1.5 1.5 0 1 1 2.121 2.121L8.485 16.243a.75.75 0 0 0 1.06 1.06l6.364-6.364a3 3 0 1 0-4.243-4.243l-6.364 6.364a4.5 4.5 0 1 0 6.364 6.364l6.364-6.364a6 6 0 1 0-8.485-8.485l-6.364 6.364a7.5 7.5 0 1 0 10.607 10.607l6.364-6.364a9 9 0 1 0-12.728-12.728l-6.364 6.364" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">Najwyższa jakość</h3>
+            <p class="text-gray-600">Tylko sprawdzony i serwisowany sprzęt od renomowanych marek.</p>
+        </div>
+        <div class="rounded-xl border bg-white p-6 text-center shadow-sm">
+            <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                    <path d="M12 3.75a8.25 8.25 0 1 0 8.25 8.25A8.25 8.25 0 0 0 12 3.75Zm.75 4.5a.75.75 0 0 0-1.5 0v3.75a.75.75 0 0 0 .75.75H15a.75.75 0 0 0 0-1.5h-2.25V8.25Z" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">Szybka realizacja</h3>
+            <p class="text-gray-600">Zarezerwuj online i odbierz w kilka minut.</p>
+        </div>
+        <div class="rounded-xl border bg-white p-6 text-center shadow-sm">
+            <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-50 text-yellow-600">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+                    <path d="M12 3.75a8.25 8.25 0 1 0 8.25 8.25A8.25 8.25 0 0 0 12 3.75Zm.75 4.5a.75.75 0 0 0-1.5 0v3.75a.75.75 0 0 0 .75.75H15a.75.75 0 0 0 0-1.5h-2.25V8.25Z" />
+                </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-1">Atrakcyjne ceny</h3>
+            <p class="text-gray-600">Konkurencyjne ceny i promocje dla stałych klientów.</p>
+        </div>
+    </div>
+</section>
