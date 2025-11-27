@@ -46,12 +46,13 @@ if (string.IsNullOrWhiteSpace(baseUrl))
 }
 apiService.SetBaseUrl(baseUrl);
 
-// Try to get tenant from TenantService (LocalStorage)
+// Opcjonalnie: załaduj wybraną wypożyczalnię z LocalStorage (jeśli użytkownik wybrał)
 var selectedTenantId = await tenantService.GetSelectedTenantIdAsync();
 if (!string.IsNullOrEmpty(selectedTenantId) && Guid.TryParse(selectedTenantId, out var tenantId))
 {
     apiService.SetTenantId(tenantId);
 }
+// NIE ustawiamy domyślnego tenant - użytkownik widzi wszystkie produkty ze wszystkich wypożyczalni
 
 await host.RunAsync();
 

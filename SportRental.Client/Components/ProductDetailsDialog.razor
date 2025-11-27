@@ -2,7 +2,7 @@
 @using SportRental.Shared.Models
 @using System.ComponentModel.DataAnnotations
 
-<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true">
+<MudDialog MaxWidth="MaxWidth.Medium" FullWidth="true" DisableFocusTrap="true">
     <DialogContent>
         <MudStack Spacing="3">
             @{ var imageUrl = Product.FullImageUrl ?? Product.ImageUrl; }
@@ -14,7 +14,7 @@
             {
                 <MudPaper Class="pa-6 text-center" Elevation="0" Style="border-radius: 12px; background: #f1f5f9;">
                     <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Default" />
-                    <MudText Typo="Typo.body1" Color="Color.Secondary">Image coming soon</MudText>
+                    <MudText Typo="Typo.body1" Color="Color.Secondary">Zdjęcie wkrótce dostępne</MudText>
                 </MudPaper>
             }
 
@@ -25,16 +25,16 @@
                     <MudText Typo="Typo.subtitle2" Color="Color.Secondary">@Product.Category</MudText>
                 }
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                    <MudText Typo="Typo.h6" Color="Color.Primary">@Product.DailyPrice.ToString("C") / day</MudText>
+                    <MudText Typo="Typo.h6" Color="Color.Primary">@Product.DailyPrice.ToString("C") / dzień</MudText>
                     @if (Product.IsAvailable && Product.AvailableQuantity > 0)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success">In stock</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Dostępny</MudChip>
                     }
                     else
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Unavailable</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Niedostępny</MudChip>
                     }
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@Product.AvailableQuantity pcs</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@Product.AvailableQuantity szt.</MudChip>
                 </MudStack>
             </MudStack>
 
@@ -44,18 +44,18 @@
             }
             else
             {
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Description will be provided soon.</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Opis będzie dostępny wkrótce.</MudText>
             }
         </MudStack>
     </DialogContent>
     <DialogActions>
-        <MudButton Variant="Variant.Text" OnClick="Cancel">Close</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="Cancel">Zamknij</MudButton>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    Disabled="@(Product.AvailableQuantity <= 0 || !Product.IsAvailable)"
                    OnClick="AddToCartClicked"
                    StartIcon="@Icons.Material.Filled.AddShoppingCart">
-            Add to cart
+            Dodaj do koszyka
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -74,9 +74,11 @@
             await AddToCart.InvokeAsync(Product);
         }
 
-        DialogReference.Close(DialogResult.Ok(true));
+        if (DialogReference != null)
+        {
+            DialogReference.Close(DialogResult.Ok(true));
+        }
     }
 }
-
 
 

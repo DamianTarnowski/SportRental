@@ -8,6 +8,7 @@ using SportRental.Admin.Services.Sms;
 using SportRental.Admin.Services.Storage;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using Microsoft.AspNetCore.Identity;
 
 namespace SportRental.Admin.Api
 {
@@ -15,7 +16,11 @@ namespace SportRental.Admin.Api
     {
         public static IEndpointRouteBuilder MapSportRentalApi(this IEndpointRouteBuilder app)
         {
-            var api = app.MapGroup("/api");
+            var api = app.MapGroup("/api")
+                .RequireCors(); // Enable CORS for all API endpoints
+            
+            // Auth endpoints
+            MapAuthEndpoints(api);
 
             api.MapGet("/products", [AllowAnonymous] async (IDbContextFactory<ApplicationDbContext> dbFactory, ITenantProvider tenantProvider, int? page, int? pageSize) =>
             {
@@ -24,14 +29,19 @@ namespace SportRental.Admin.Api
                 var query = db.Products
                     .AsNoTracking()
                     .Where(p => tid == null || p.TenantId == tid)
-                    .Select(p => new ProductDto
+                    .Select(p => new
                     {
                         Id = p.Id,
                         Name = p.Name,
                         Sku = p.Sku,
                         Category = p.Category,
+                        Description = p.Description,
                         ImageUrl = p.ImageUrl,
-                        DailyPrice = p.DailyPrice
+                        PricePerDay = p.DailyPrice,
+                        DailyPrice = p.DailyPrice,
+                        Quantity = p.AvailableQuantity,
+                        AvailableQuantity = p.AvailableQuantity,
+                        IsAvailable = p.Available && p.IsActive && p.AvailableQuantity > 0
                     });
 
                 var p = Math.Max(1, page ?? 1);
@@ -312,17 +322,20 @@ namespace SportRental.Admin.Api
             });
 
             // Utworzenie krótkotrwałego holda na produkt
-            api.MapPost("/holds", [Authorize] async (CreateHoldRequest req, IDbContextFactory<ApplicationDbContext> dbFactory, ITenantProvider tenantProvider) =>
+            api.MapPost("/holds", [AllowAnonymous] async (CreateHoldRequest req, IDbContextFactory<ApplicationDbContext> dbFactory, ITenantProvider tenantProvider) =>
             {
                 if (req == null) return Results.BadRequest("Brak danych");
                 if (req.Quantity <= 0) return Results.BadRequest("Ilość musi być > 0");
                 if (req.StartDateUtc >= req.EndDateUtc) return Results.BadRequest("Zakres dat niepoprawny");
 
                 await using var db = await dbFactory.CreateDbContextAsync();
-                var tid = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
-
-                var product = await db.Products.FirstOrDefaultAsync(p => p.Id == req.ProductId && (tid == Guid.Empty || p.TenantId == tid));
+                
+                // Pobierz produkt (bez filtrowania po tenant - pokazujemy wszystkie)
+                var product = await db.Products.FirstOrDefaultAsync(p => p.Id == req.ProductId);
                 if (product == null) return Results.NotFound("Nie znaleziono produktu");
+
+                // Tenant bierzemy Z PRODUKTU, nie z headera!
+                var tid = product.TenantId;
 
                 var ttl = Math.Clamp(req.TtlMinutes ?? 10, 5, 30);
                 var nowUtc = DateTime.UtcNow;
@@ -351,7 +364,7 @@ namespace SportRental.Admin.Api
                 var hold = new ReservationHold
                 {
                     Id = Guid.NewGuid(),
-                    TenantId = tid,
+                    TenantId = tid, // tenant Z PRODUKTU
                     ProductId = req.ProductId,
                     Quantity = req.Quantity,
                     StartDateUtc = req.StartDateUtc,
@@ -368,7 +381,7 @@ namespace SportRental.Admin.Api
             });
 
             // Usunięcie (zwolnienie) holda
-            api.MapDelete("/holds/{id:guid}", [Authorize] async (Guid id, IDbContextFactory<ApplicationDbContext> dbFactory, ITenantProvider tenantProvider) =>
+            api.MapDelete("/holds/{id:guid}", [AllowAnonymous] async (Guid id, IDbContextFactory<ApplicationDbContext> dbFactory, ITenantProvider tenantProvider) =>
             {
                 await using var db = await dbFactory.CreateDbContextAsync();
                 var tid = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
@@ -381,6 +394,145 @@ namespace SportRental.Admin.Api
 
             return app;
         }
+
+        private static void MapAuthEndpoints(RouteGroupBuilder api)
+        {
+            var auth = api.MapGroup("/auth");
+
+            // Register endpoint (cookie-based, no JWT needed)
+            auth.MapPost("/register", [AllowAnonymous] async (
+                RegisterRequest request,
+                UserManager<ApplicationUser> userManager,
+                SignInManager<ApplicationUser> signInManager,
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ITenantProvider tenantProvider,
+                HttpContext httpContext) =>
+            {
+                if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+                {
+                    return Results.BadRequest(new { error = "Email i hasło są wymagane" });
+                }
+
+                // Get tenant from header
+                var tenantIdHeader = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+                if (string.IsNullOrWhiteSpace(tenantIdHeader) || !Guid.TryParse(tenantIdHeader, out var tenantId))
+                {
+                    return Results.BadRequest(new { error = "Header X-Tenant-Id jest wymagany" });
+                }
+
+                // Verify tenant exists
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var tenantExists = await db.Tenants.AnyAsync(t => t.Id == tenantId);
+                if (!tenantExists)
+                {
+                    return Results.BadRequest(new { error = "Nieprawidłowy Tenant ID" });
+                }
+
+                // Check if email already exists
+                var existingUser = await userManager.FindByEmailAsync(request.Email);
+                if (existingUser != null)
+                {
+                    return Results.BadRequest(new { error = "Email już jest zarejestrowany" });
+                }
+
+                var user = new ApplicationUser
+                {
+                    UserName = request.Email,
+                    Email = request.Email,
+                    TenantId = tenantId,
+                    EmailConfirmed = true // Auto-confirm in development
+                };
+
+                var result = await userManager.CreateAsync(user, request.Password);
+                if (!result.Succeeded)
+                {
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    return Results.BadRequest(new { error = errors });
+                }
+
+                // Assign Client role
+                await userManager.AddToRoleAsync(user, "Client");
+
+                // Automatically create Customer record
+                var customer = new Customer
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    FullName = request.FullName ?? request.Email.Split('@')[0],
+                    Email = request.Email,
+                    PhoneNumber = request.PhoneNumber,
+                    DocumentNumber = request.DocumentNumber,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+
+                db.Customers.Add(customer);
+                await db.SaveChangesAsync();
+
+                // Sign in the user (cookie-based)
+                await signInManager.SignInAsync(user, isPersistent: false);
+
+                // Return response (mock JWT format for compatibility)
+                return Results.Ok(new
+                {
+                    AccessToken = "cookie-based-auth",
+                    RefreshToken = "not-used",
+                    ExpiresIn = 3600,
+                    TokenType = "Cookie",
+                    User = new
+                    {
+                        Id = user.Id,
+                        Email = user.Email,
+                        TenantId = tenantId
+                    }
+                });
+            });
+
+            // Login endpoint
+            auth.MapPost("/login", [AllowAnonymous] async (
+                LoginRequest request,
+                UserManager<ApplicationUser> userManager,
+                SignInManager<ApplicationUser> signInManager,
+                HttpContext httpContext) =>
+            {
+                if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+                {
+                    return Results.BadRequest(new { error = "Email i hasło są wymagane" });
+                }
+
+                var user = await userManager.FindByEmailAsync(request.Email);
+                if (user == null)
+                {
+                    return Results.BadRequest(new { error = "Nieprawidłowy email lub hasło" });
+                }
+
+                var result = await signInManager.PasswordSignInAsync(user, request.Password, isPersistent: false, lockoutOnFailure: true);
+                if (!result.Succeeded)
+                {
+                    if (result.IsLockedOut)
+                        return Results.BadRequest(new { error = "Konto zablokowane" });
+                    
+                    return Results.BadRequest(new { error = "Nieprawidłowy email lub hasło" });
+                }
+
+                return Results.Ok(new
+                {
+                    AccessToken = "cookie-based-auth",
+                    RefreshToken = "not-used",
+                    ExpiresIn = 3600,
+                    TokenType = "Cookie",
+                    User = new
+                    {
+                        Id = user.Id,
+                        Email = user.Email,
+                        TenantId = user.TenantId
+                    }
+                });
+            });
+        }
     }
+
+    // DTOs for auth endpoints
+    public record RegisterRequest(string Email, string Password, string? FullName, string? PhoneNumber, string? DocumentNumber);
+    public record LoginRequest(string Email, string Password);
 }
 

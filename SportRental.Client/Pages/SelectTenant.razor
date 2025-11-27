@@ -65,15 +65,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Check if tenant already selected - redirect to home
-        var selectedTenant = await TenantService.GetSelectedTenantIdAsync();
-        if (!string.IsNullOrEmpty(selectedTenant))
-        {
-            Navigation.NavigateTo("/");
-            return;
-        }
-
-        // Load available tenants
+        // Załaduj dostępne wypożyczalnie
+        // Nie przekierowuj jeśli tenant już wybrany - pozwól użytkownikowi zmienić wybór
         tenants = await TenantService.GetAvailableTenantsAsync();
         isLoading = false;
     }

@@ -152,7 +152,6 @@
 
     private void ViewDetails(Guid rentalId)
     {
-        // TODO: Navigate to rental details page
-        Snackbar.Add($"Szczegóły wypożyczenia {rentalId} - coming soon!", Severity.Info);
+        Nav.NavigateTo($"/my-rentals/{rentalId}");
     }
 }

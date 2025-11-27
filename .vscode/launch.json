@@ -1,0 +1,104 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Admin API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-admin",
+      "program": "${workspaceFolder}/SportRental.Admin/bin/Debug/net9.0/SportRental.Admin.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/SportRental.Admin",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch Public API",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-api",
+      "program": "${workspaceFolder}/SportRental.Api/bin/Debug/net9.0/SportRental.Api.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/SportRental.Api",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch WASM Client",
+      "type": "blazorwasm",
+      "request": "launch",
+      "preLaunchTask": "build-client",
+      "cwd": "${workspaceFolder}/SportRental.Client",
+      "url": "http://localhost:5014"
+    },
+    {
+      "name": "🚀 Launch Full Stack (Admin + Client)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-all",
+      "program": "${workspaceFolder}/SportRental.Admin/bin/Debug/net9.0/SportRental.Admin.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/SportRental.Admin",
+      "stopAtEntry": false,
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "http://localhost:5014"
+      },
+      "postDebugTask": "start-wasm-client"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "🎯 Full Stack Development",
+      "configurations": [
+        "Launch Admin API",
+        "Launch WASM Client"
+      ],
+      "stopAll": true,
+      "preLaunchTask": "build-all"
+    },
+    {
+      "name": "🎯 API Only",
+      "configurations": [
+        "Launch Public API"
+      ],
+      "stopAll": true,
+      "preLaunchTask": "build-api"
+    }
+  ]
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

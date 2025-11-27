@@ -1,5 +1,9 @@
 @inherits LayoutComponentBase
+@using SportRental.Shared.Models
+@using SportRental.Shared.Services
 @inject NavigationManager Navigation
+@inject ICartService CartService
+@implements IDisposable
 
 <div class="lg:pl-64">
     <!-- Header -->
@@ -20,6 +24,12 @@
                         <path d="M2.25 3a.75.75 0 0 0 0 1.5h1.386c.2 0 .374.133.428.326l2.201 7.705A2.25 2.25 0 0 0 8.45 13.5H17.25a2.25 2.25 0 0 0 2.154-1.59l1.563-5.26A.75.75 0 0 0 20.25 5.25H6.654l-.36-1.26A1.875 1.875 0 0 0 3.636 3H2.25Z" />
                         <path d="M9 21a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
                     </svg>
+                    @if (_cart.TotalItems > 0)
+                    {
+                        <span class="absolute -top-1 -right-1 inline-flex items-center justify-center rounded-full bg-red-600 px-2 py-1 text-xs font-bold text-white min-w-[20px] h-5">
+                            @_cart.TotalItems
+                        </span>
+                    }
                 </a>
                 <a href="/login" class="inline-flex items-center justify-center rounded-md p-2 text-gray-700 hover:bg-gray-100" aria-label="Account">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
@@ -55,13 +65,47 @@
     <main class="pt-4 p-4">
         @Body
     </main>
+
+    <!-- Back to top button -->
+    <MudFab Color="Color.Primary" 
+            StartIcon="@Icons.Material.Filled.KeyboardArrowUp" 
+            Class="back-to-top"
+            OnClick="ScrollToTop"
+            aria-label="Przewiń do góry"
+            Style="position: fixed; bottom: 2rem; right: 2rem; z-index: 1000;" />
 </div>
 
+@inject IJSRuntime JS
+
 @code {
+    private async Task ScrollToTop()
+    {
+        await JS.InvokeVoidAsync("eval", "window.scrollTo({ top: 0, behavior: 'smooth' })");
+    }
+
     private bool _drawerOpen = false;
+    private Cart _cart = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _cart = CartService.GetCart();
+        CartService.CartChanged += OnCartChanged;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OnCartChanged(object? sender, EventArgs e)
+    {
+        _cart = CartService.GetCart();
+        InvokeAsync(StateHasChanged);
+    }
 
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
+    }
+
+    public void Dispose()
+    {
+        CartService.CartChanged -= OnCartChanged;
     }
 }

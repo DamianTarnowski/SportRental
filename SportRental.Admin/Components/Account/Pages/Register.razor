@@ -6,6 +6,9 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using SportRental.Admin.Data
+@using SportRental.Shared.Identity
+@using SportRental.Infrastructure.Tenancy
+@using MudBlazor
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
@@ -14,45 +17,54 @@
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject IConfiguration Configuration
+@inject ITenantProvider TenantProvider
 
-<PageTitle>Register</PageTitle>
+<PageTitle>Rejestracja</PageTitle>
 
-<h1>Register</h1>
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Class="pa-5" Elevation="2">
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.h5" Class="mb-2">Załóż konto właściciela</MudText>
+            <StatusMessage Message="@Message" />
+            <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="text-danger" role="alert" />
 
-<div class="row">
-    <div class="col-lg-6">
-        <StatusMessage Message="@Message" />
-        <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
-            <DataAnnotationsValidator />
-            <h2>Create a new account.</h2>
-            <hr />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
-                <label for="Input.Email">Email</label>
-                <ValidationMessage For="() => Input.Email" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="Input.Password">Password</label>
-                <ValidationMessage For="() => Input.Password" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="Input.ConfirmPassword">Confirm Password</label>
-                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
-            </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
-        </EditForm>
-    </div>
-    <div class="col-lg-4 col-lg-offset-2">
-        <section>
-            <h3>Use another service to register.</h3>
-            <hr />
-            <ExternalLoginPicker />
-        </section>
-    </div>
-</div>
+                <MudTextField @bind-Value="Input.Email"
+                              Label="Email"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Required="true"
+                              InputType="InputType.Email"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Email" />
+
+                <MudTextField @bind-Value="Input.Password"
+                              Label="Hasło"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Required="true"
+                              InputType="InputType.Password"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Lock" />
+
+                <MudTextField @bind-Value="Input.ConfirmPassword"
+                              Label="Powtórz hasło"
+                              Variant="Variant.Outlined"
+                              FullWidth="true"
+                              Required="true"
+                              InputType="InputType.Password"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.LockReset" />
+
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" ButtonType="ButtonType.Submit" Class="mt-2">
+                    Zarejestruj
+                </MudButton>
+            </EditForm>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
 
 @code {
     private IEnumerable<IdentityError>? identityErrors;
@@ -63,7 +75,7 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    private string? Message => identityErrors is null ? null : $"Błąd: {string.Join(", ", identityErrors.Select(error => error.Description))}";
 
     public async Task RegisterUser(EditContext editContext)
     {
@@ -78,6 +90,26 @@
         {
             identityErrors = result.Errors;
             return;
+        }
+
+        // Przypnij tenant i role właściciela/klienta
+        var tenantId = TenantProvider.GetCurrentTenantId()
+            ?? (Guid.TryParse(Configuration["Tenant:Id"], out var cfgTenant) ? cfgTenant : Guid.Empty);
+        if (tenantId == Guid.Empty)
+        {
+            tenantId = Guid.NewGuid();
+        }
+
+        user.TenantId = tenantId;
+        await UserManager.UpdateAsync(user);
+
+        if (!await UserManager.IsInRoleAsync(user, RoleNames.Owner))
+        {
+            await UserManager.AddToRoleAsync(user, RoleNames.Owner);
+        }
+        if (!await UserManager.IsInRoleAsync(user, RoleNames.Client))
+        {
+            await UserManager.AddToRoleAsync(user, RoleNames.Client);
         }
 
         Logger.LogInformation("User created a new account with password.");
@@ -132,14 +164,14 @@
         public string Email { get; set; } = "";
 
         [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [StringLength(100, ErrorMessage = "{0} musi mieć od {2} do {1} znaków.", MinimumLength = 6)]
         [DataType(DataType.Password)]
-        [Display(Name = "Password")]
+        [Display(Name = "Hasło")]
         public string Password { get; set; } = "";
 
         [DataType(DataType.Password)]
-        [Display(Name = "Confirm password")]
-        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        [Display(Name = "Powtórz hasło")]
+        [Compare("Password", ErrorMessage = "Hasła muszą być takie same.")]
         public string ConfirmPassword { get; set; } = "";
     }
 }

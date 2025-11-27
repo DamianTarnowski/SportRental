@@ -42,7 +42,7 @@ A commercial license grants you the following rights:
 ### 🥉 **Starter License**
 **Perfect for small rental shops**
 
-**€2,999** one-time + €499/year support
+**€5,999** one-time + €499/year support
 
 - ✅ Single instance deployment
 - ✅ Up to 5 tenant accounts
@@ -58,7 +58,7 @@ A commercial license grants you the following rights:
 ### 🥈 **Professional License**
 **Ideal for growing businesses**
 
-**€7,999** one-time + €1,299/year support
+**€9,999** one-time + €1,299/year support
 
 - ✅ Up to 3 instance deployments
 - ✅ Up to 50 tenant accounts
@@ -111,7 +111,6 @@ Need additional features or integrations?
 
 ### **Hourly Rates**
 - 💻 **Development:** €150/hour
-- 🎨 **UI/UX Design:** €120/hour
 - 🏗️ **Architecture Consulting:** €200/hour
 - 📚 **Training/Documentation:** €100/hour
 
@@ -156,12 +155,6 @@ Email us with your requirements:
 
 ## ❓ **Frequently Asked Questions**
 
-### **Q: Can I try before buying?**
-**A:** Yes! Contact us for a 30-day evaluation license with full features.
-
-### **Q: Is there a free trial?**
-**A:** We offer a sandbox demo environment. Contact us for access.
-
 ### **Q: What payment methods do you accept?**
 **A:** Bank transfer, credit card, PayPal, or company purchase orders.
 
@@ -191,10 +184,7 @@ Email us with your requirements:
 ## 🎁 **Special Offers**
 
 ### **🚀 Early Adopter Discount**
-**30% OFF** for the first 10 customers!
-
-### **🤝 Startup Program**
-**50% OFF** for startups less than 2 years old with less than €500k funding.
+**30% OFF** for the first 3 customers!
 
 ### **🌍 Non-Profit Discount**
 **40% OFF** for registered non-profit organizations.

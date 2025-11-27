@@ -1,0 +1,82 @@
+@page "/not-found"
+@inject NavigationManager Navigation
+
+<PageTitle>404 - Nie znaleziono - SportRental</PageTitle>
+
+<div class="min-h-[70vh] flex items-center justify-center px-4">
+    <div class="max-w-2xl mx-auto text-center">
+        <!-- Emoji Icon -->
+        <div class="mb-8 text-8xl sm:text-9xl">
+            🤷‍♂️
+        </div>
+
+        <!-- Error Code -->
+        <h1 class="text-4xl sm:text-6xl font-bold text-gray-900 mb-4">
+            404
+        </h1>
+
+        <!-- Message -->
+        <h2 class="text-2xl sm:text-3xl font-semibold text-gray-700 mb-4">
+            Strona nie znaleziona
+        </h2>
+
+        <p class="text-lg text-gray-600 mb-8 max-w-lg mx-auto">
+            Przepraszamy, ale strona której szukasz nie istnieje lub została przeniesiona.
+            Wróć do strony głównej aby kontynuować przeglądanie.
+        </p>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <button @onclick="GoHome"
+                    class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                </svg>
+                Strona główna
+            </button>
+
+            <button @onclick="GoBack"
+                    class="inline-flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                </svg>
+                Wróć
+            </button>
+        </div>
+
+        <!-- Popular Links -->
+        <div class="mt-12 pt-8 border-t border-gray-200">
+            <p class="text-sm text-gray-500 mb-4">Popularne strony:</p>
+            <div class="flex flex-wrap justify-center gap-3">
+                <a href="/products" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                    Katalog produktów
+                </a>
+                <span class="text-gray-300">|</span>
+                <a href="/cart" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                    Koszyk
+                </a>
+                <span class="text-gray-300">|</span>
+                <a href="/my-rentals" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                    Moje wypożyczenia
+                </a>
+                <span class="text-gray-300">|</span>
+                <a href="/contact" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                    Kontakt
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private void GoHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/", forceLoad: false);
+    }
+}
+

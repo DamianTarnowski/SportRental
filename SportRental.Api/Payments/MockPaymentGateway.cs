@@ -5,7 +5,7 @@ namespace SportRental.Api.Payments;
 
 public class MockPaymentGateway : IPaymentGateway
 {
-    private readonly ConcurrentDictionary<Guid, PaymentIntentState> _intents = new();
+    private readonly ConcurrentDictionary<string, PaymentIntentState> _intents = new();
     private readonly TimeSpan _defaultTtl = TimeSpan.FromMinutes(30);
 
     // IPaymentGateway implementation
@@ -14,19 +14,19 @@ public class MockPaymentGateway : IPaymentGateway
         return Task.FromResult(Create(tenantId, amount, depositAmount, currency));
     }
 
-    public Task<PaymentIntentDto?> GetPaymentIntentAsync(Guid tenantId, Guid id)
+    public Task<PaymentIntentDto?> GetPaymentIntentAsync(Guid tenantId, string id)
     {
         return Task.FromResult(Get(tenantId, id));
     }
 
-    public Task<bool> CapturePaymentAsync(Guid tenantId, Guid id)
+    public Task<bool> CapturePaymentAsync(Guid tenantId, string id)
     {
         return Task.FromResult(TryMarkAsCaptured(tenantId, id));
     }
 
-    public Task<bool> CancelPaymentAsync(Guid tenantId, Guid id)
+    public Task<bool> CancelPaymentAsync(Guid tenantId, string id)
     {
-        if (_intents.TryGetValue(id, out var state) && state.TenantId == tenantId)
+        if (_intents.TryGetValue(id, out var state) && HasAccess(state.TenantId, tenantId))
         {
             state.Status = PaymentIntentStatus.Canceled;
             return Task.FromResult(true);
@@ -34,7 +34,7 @@ public class MockPaymentGateway : IPaymentGateway
         return Task.FromResult(false);
     }
 
-    public Task<bool> RefundPaymentAsync(Guid tenantId, Guid id, decimal? amount = null, string? reason = null)
+    public Task<bool> RefundPaymentAsync(Guid tenantId, string id, decimal? amount = null, string? reason = null)
     {
         // Mock refund - just mark as canceled for tests
         return CancelPaymentAsync(tenantId, id);
@@ -46,7 +46,7 @@ public class MockPaymentGateway : IPaymentGateway
         var now = DateTime.UtcNow;
         var state = new PaymentIntentState
         {
-            Id = Guid.NewGuid(),
+            Id = $"pi_mock_{Guid.NewGuid():N}",
             TenantId = tenantId,
             Amount = amount,
             DepositAmount = depositAmount,
@@ -60,14 +60,14 @@ public class MockPaymentGateway : IPaymentGateway
         return ToDto(state);
     }
 
-    public PaymentIntentDto? Get(Guid tenantId, Guid id)
+    public PaymentIntentDto? Get(Guid tenantId, string id)
     {
         if (!_intents.TryGetValue(id, out var state))
         {
             return null;
         }
 
-        if (state.TenantId != tenantId)
+        if (!HasAccess(state.TenantId, tenantId))
         {
             return null;
         }
@@ -81,14 +81,14 @@ public class MockPaymentGateway : IPaymentGateway
         return ToDto(state);
     }
 
-    public bool TryMarkAsCaptured(Guid tenantId, Guid id)
+    public bool TryMarkAsCaptured(Guid tenantId, string id)
     {
         if (!_intents.TryGetValue(id, out var state))
         {
             return false;
         }
 
-        if (state.TenantId != tenantId)
+        if (!HasAccess(state.TenantId, tenantId))
         {
             return false;
         }
@@ -118,9 +118,14 @@ public class MockPaymentGateway : IPaymentGateway
         };
     }
 
+    private static bool HasAccess(Guid intentTenantId, Guid requestedTenantId)
+    {
+        return requestedTenantId == Guid.Empty || intentTenantId == Guid.Empty || intentTenantId == requestedTenantId;
+    }
+
     private sealed class PaymentIntentState
     {
-        public Guid Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public Guid TenantId { get; set; }
         public decimal Amount { get; set; }
         public decimal DepositAmount { get; set; }

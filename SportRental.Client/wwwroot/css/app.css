@@ -112,3 +112,53 @@ code {
 .form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
     text-align: start;
 }
+
+/* ========== CUSTOM UI IMPROVEMENTS ========== */
+
+/* Hover effect for product cards */
+.mud-card-hover:hover {
+    transform: translateY(-4px) !important;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+}
+
+/* Focus states for accessibility */
+.mud-button-root:focus-visible,
+.mud-input-root:focus-within {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+/* Smooth scroll */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Back to top button */
+.back-to-top {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 1000;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 0;
+    transform: translateY(100px);
+    pointer-events: none;
+}
+
+/* Show button when scrolled */
+.back-to-top.show,
+body.scrolled .back-to-top {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+/* Animation for adding to cart */
+@keyframes cart-bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+}
+
+.cart-badge-bounce {
+    animation: cart-bounce 0.3s ease;
+}

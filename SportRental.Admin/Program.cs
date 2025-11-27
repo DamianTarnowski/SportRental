@@ -33,12 +33,22 @@ var builder = WebApplication.CreateBuilder(args);
 var keyVaultUrl = builder.Configuration["KeyVault:Url"];
 if (!string.IsNullOrWhiteSpace(keyVaultUrl))
 {
-    var secretClient = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential());
-    builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretManager());
-    builder.Services.AddSingleton(_ => secretClient);
-    
-    var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
-    logger.LogInformation("🔐 Azure Key Vault configured: {KeyVaultUrl}", keyVaultUrl);
+    try
+    {
+        var secretClient = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential());
+        builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretManager());
+        builder.Services.AddSingleton(_ => secretClient);
+        
+        var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
+        logger.LogInformation("🔐 Azure Key Vault configured: {KeyVaultUrl}", keyVaultUrl);
+    }
+    catch (Exception ex)
+    {
+        // Key Vault not available (local development without Azure credentials)
+        var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
+        logger.LogWarning("⚠️  Azure Key Vault not available: {Message}. Using local configuration only.", ex.Message);
+        logger.LogInformation("💡 For local development, secrets should be in appsettings.Development.json or user secrets");
+    }
 }
 
 // Add services to the container.
@@ -55,6 +65,23 @@ builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
 
 builder.Services.AddMudServices();
 builder.Services.AddControllers();
+
+// Configure CORS for WASM Client
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins(
+            "http://localhost:5014",
+            "https://localhost:7083",
+            "http://localhost:5015"  // dodatkowy port dla backupu
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
+    });
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -270,6 +297,7 @@ app.UseSwaggerUI();
 
 app.UseRateLimiter();
 
+app.UseCors(); // Enable CORS before authentication
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
@@ -381,9 +409,63 @@ using (var scope = app.Services.CreateScope())
             }
         }
     }
+
+    // Uporządkuj użytkowników bez tenant/roli właściciela
+    var unassignedUsers = userManager.Users.Where(u => u.TenantId == null || u.TenantId == Guid.Empty).ToList();
+    foreach (var user in unassignedUsers)
+    {
+        user.TenantId = tenantId;
+        await userManager.UpdateAsync(user);
+
+        if (!await userManager.IsInRoleAsync(user, RoleNames.Owner))
+        {
+            await userManager.AddToRoleAsync(user, RoleNames.Owner);
+        }
+        if (!await userManager.IsInRoleAsync(user, RoleNames.Client))
+        {
+            await userManager.AddToRoleAsync(user, RoleNames.Client);
+        }
+    }
+
+    // Podnieś hdtdtr@gmail.com do SuperAdmin + Owner
+    var hdUser = await userManager.FindByEmailAsync("hdtdtr@gmail.com");
+    if (hdUser != null)
+    {
+        if (hdUser.TenantId == null || hdUser.TenantId == Guid.Empty)
+        {
+            hdUser.TenantId = tenantId;
+            await userManager.UpdateAsync(hdUser);
+        }
+        if (!await userManager.IsInRoleAsync(hdUser, RoleNames.SuperAdmin))
+            await userManager.AddToRoleAsync(hdUser, RoleNames.SuperAdmin);
+        if (!await userManager.IsInRoleAsync(hdUser, RoleNames.Owner))
+            await userManager.AddToRoleAsync(hdUser, RoleNames.Owner);
+        if (!await userManager.IsInRoleAsync(hdUser, RoleNames.Client))
+            await userManager.AddToRoleAsync(hdUser, RoleNames.Client);
+    }
+
+    // Dodaj konto testowe właściciela, jeśli nie istnieje
+    var testOwnerEmail = "owner@test.local";
+    var testOwnerPass = "Owner123!";
+    var testOwner = await userManager.FindByEmailAsync(testOwnerEmail);
+    if (testOwner == null)
+    {
+        testOwner = new ApplicationUser
+        {
+            UserName = testOwnerEmail,
+            Email = testOwnerEmail,
+            EmailConfirmed = true,
+            TenantId = tenantId
+        };
+        var createResult = await userManager.CreateAsync(testOwner, testOwnerPass);
+        if (createResult.Succeeded)
+        {
+            await userManager.AddToRoleAsync(testOwner, RoleNames.Owner);
+            await userManager.AddToRoleAsync(testOwner, RoleNames.Client);
+        }
+    }
 }
 
 app.Run();
 
 public partial class Program { }
-

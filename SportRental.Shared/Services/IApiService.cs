@@ -21,7 +21,7 @@ public interface IApiService
     // Platnosci
     Task<PaymentQuoteResponse> GetPaymentQuoteAsync(PaymentQuoteRequest request);
     Task<PaymentIntentDto> CreatePaymentIntentAsync(CreatePaymentIntentRequest request);
-    Task<PaymentIntentDto?> GetPaymentIntentAsync(Guid id);
+    Task<PaymentIntentDto?> GetPaymentIntentAsync(string id);
     Task<CheckoutSessionResponse> CreateCheckoutSessionAsync(CreateCheckoutSessionRequest request);
 
     // Wynajmy

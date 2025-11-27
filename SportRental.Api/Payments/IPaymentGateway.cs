@@ -15,20 +15,20 @@ public interface IPaymentGateway
     /// <summary>
     /// Retrieves an existing payment intent
     /// </summary>
-    Task<PaymentIntentDto?> GetPaymentIntentAsync(Guid tenantId, Guid id);
+    Task<PaymentIntentDto?> GetPaymentIntentAsync(Guid tenantId, string id);
     
     /// <summary>
     /// Confirms/captures a payment intent
     /// </summary>
-    Task<bool> CapturePaymentAsync(Guid tenantId, Guid id);
+    Task<bool> CapturePaymentAsync(Guid tenantId, string id);
     
     /// <summary>
     /// Cancels a payment intent
     /// </summary>
-    Task<bool> CancelPaymentAsync(Guid tenantId, Guid id);
+    Task<bool> CancelPaymentAsync(Guid tenantId, string id);
     
     /// <summary>
     /// Creates a refund for a captured payment
     /// </summary>
-    Task<bool> RefundPaymentAsync(Guid tenantId, Guid id, decimal? amount = null, string? reason = null);
+    Task<bool> RefundPaymentAsync(Guid tenantId, string id, decimal? amount = null, string? reason = null);
 }

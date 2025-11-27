@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -6,8 +7,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using SportRental.Api.Payments;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 using SportRental.Shared.Models;
@@ -25,6 +28,28 @@ public class StripeCheckoutTests : IClassFixture<WebApplicationFactory<Program>>
         _databasePath = Path.Combine(Path.GetTempPath(), $"checkout-tests-{Guid.NewGuid():N}.db");
         _factory = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseEnvironment("Test");
+            builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={_databasePath}");
+            builder.UseSetting("Jwt:SigningKey", "TestSigningKey_12345678901234567890");
+            builder.UseSetting("Jwt:Issuer", "SportRentalTests");
+            builder.UseSetting("Jwt:Audience", "SportRentalTests");
+            builder.ConfigureAppConfiguration((context, config) =>
+            {
+                var stripe = StripeTestHelper.GetStripeOptions();
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:DefaultConnection"] = $"Data Source={_databasePath}",
+                    ["Jwt:SigningKey"] = "TestSigningKey_12345678901234567890",
+                    ["Jwt:Issuer"] = "SportRentalTests",
+                    ["Jwt:Audience"] = "SportRentalTests",
+                    ["Stripe:SecretKey"] = stripe.SecretKey,
+                    ["Stripe:PublishableKey"] = stripe.PublishableKey,
+                    ["Stripe:WebhookSecret"] = stripe.WebhookSecret,
+                    ["Stripe:Currency"] = stripe.Currency,
+                    ["Stripe:SuccessUrl"] = stripe.SuccessUrl ?? "https://localhost:5014/checkout/success?session_id={CHECKOUT_SESSION_ID}",
+                    ["Stripe:CancelUrl"] = stripe.CancelUrl ?? "https://localhost:5014/checkout/cancel"
+                });
+            });
             builder.ConfigureServices(services =>
             {
                 // Remove all EF Core related services (including DbContextPool)
@@ -43,14 +68,15 @@ public class StripeCheckoutTests : IClassFixture<WebApplicationFactory<Program>>
 
                 // Add SQLite DbContext for testing (not pooled)
                 services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite($"Data Source={_databasePath}"));
+            });
 
-                // Replace real Stripe with Mock for tests
-                var stripeDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IPaymentGateway));
-                if (stripeDescriptor != null)
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddAuthentication(options =>
                 {
-                    services.Remove(stripeDescriptor);
-                }
-                services.AddSingleton<IPaymentGateway, MockPaymentGateway>();
+                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                }).AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
             });
         });
     }
@@ -61,6 +87,7 @@ public class StripeCheckoutTests : IClassFixture<WebApplicationFactory<Program>>
         // Arrange
         var tenantId = Guid.NewGuid();
         var productId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
 
         // Seed database
         using (var scope = _factory.Services.CreateScope())
@@ -100,30 +127,40 @@ public class StripeCheckoutTests : IClassFixture<WebApplicationFactory<Program>>
                 PhoneNumber = "+48123456789"
             });
 
+            db.Customers.Add(new Customer
+            {
+                Id = customerId,
+                TenantId = tenantId,
+                FullName = "Checkout Tester",
+                Email = "test@example.com",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
             await db.SaveChangesAsync();
         }
 
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Tenant-Id", tenantId.ToString());
+        using var client = _factory.CreateClient();
+        TestApiClientHelper.AuthenticateClient(client, tenantId);
 
         var request = new CreateCheckoutSessionRequest(
             StartDateUtc: DateTime.UtcNow.AddDays(1),
             EndDateUtc: DateTime.UtcNow.AddDays(3),
             Items: new List<CheckoutItem> { new(productId, 2) },
             CustomerEmail: "test@example.com",
-            CustomerId: Guid.NewGuid()
+            CustomerId: customerId
         );
 
         // Act
         var response = await client.PostAsJsonAsync("/api/checkout/create-session", request);
+        var responseBody = await response.Content.ReadAsStringAsync();
 
         // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, $"Response: {responseBody}");
         
         var result = await response.Content.ReadFromJsonAsync<CheckoutSessionResponse>();
         result.Should().NotBeNull();
         result!.SessionId.Should().NotBeEmpty();
-        result.Url.Should().NotBeEmpty();
+        result.Url.Should().NotBeNullOrWhiteSpace();
         result.Url.Should().StartWith("https://checkout.stripe.com/");
         result.ExpiresAt.Should().BeAfter(DateTime.UtcNow);
     }
@@ -132,14 +169,15 @@ public class StripeCheckoutTests : IClassFixture<WebApplicationFactory<Program>>
     public async Task CreateCheckoutSession_EmptyItems_ReturnsBadRequest()
     {
         // Arrange
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Tenant-Id", Guid.NewGuid().ToString());
+        using var client = _factory.CreateClient();
+        TestApiClientHelper.AuthenticateClient(client, Guid.NewGuid());
 
         var request = new CreateCheckoutSessionRequest(
             StartDateUtc: DateTime.UtcNow.AddDays(1),
             EndDateUtc: DateTime.UtcNow.AddDays(3),
             Items: new List<CheckoutItem>(), // Empty!
-            CustomerEmail: "test@example.com"
+            CustomerEmail: "test@example.com",
+            CustomerId: Guid.NewGuid()
         );
 
         // Act
@@ -198,14 +236,15 @@ public class StripeCheckoutTests : IClassFixture<WebApplicationFactory<Program>>
             await db.SaveChangesAsync();
         }
 
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Tenant-Id", tenantId.ToString());
+        using var client = _factory.CreateClient();
+        TestApiClientHelper.AuthenticateClient(client, tenantId);
 
         var request = new CreateCheckoutSessionRequest(
             StartDateUtc: DateTime.UtcNow.AddDays(5), // End before start!
             EndDateUtc: DateTime.UtcNow.AddDays(3),
             Items: new List<CheckoutItem> { new(productId, 1) },
-            CustomerEmail: "test@example.com"
+            CustomerEmail: "test@example.com",
+            CustomerId: Guid.NewGuid()
         );
 
         // Act
@@ -216,24 +255,63 @@ public class StripeCheckoutTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task CreateCheckoutSession_NoTenantId_ReturnsBadRequest()
+    public async Task CreateCheckoutSession_MixedTenants_ReturnsSessionUrl()
     {
         // Arrange
-        var client = _factory.CreateClient();
-        // No X-Tenant-Id header!
+        var tenantA = Guid.NewGuid();
+        var tenantB = Guid.NewGuid();
+        var productA = Guid.NewGuid();
+        var productB = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
 
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await db.Database.EnsureDeletedAsync();
+            await db.Database.EnsureCreatedAsync();
+
+            db.Tenants.AddRange(
+                new Tenant { Id = tenantA, Name = "Rental A", CreatedAtUtc = DateTime.UtcNow },
+                new Tenant { Id = tenantB, Name = "Rental B", CreatedAtUtc = DateTime.UtcNow });
+
+            db.Products.AddRange(
+                new Product { Id = productA, TenantId = tenantA, Name = "Narty A", Sku = "SKU-A", DailyPrice = 50m, AvailableQuantity = 5, Type = 1, CreatedAtUtc = DateTime.UtcNow },
+                new Product { Id = productB, TenantId = tenantB, Name = "Deska B", Sku = "SKU-B", DailyPrice = 80m, AvailableQuantity = 5, Type = 1, CreatedAtUtc = DateTime.UtcNow });
+
+            db.Customers.Add(new Customer
+            {
+                Id = customerId,
+                TenantId = tenantA,
+                FullName = "Multi Tenant Klient",
+                Email = "multi@test.pl",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+
+            await db.SaveChangesAsync();
+        }
+
+        using var client = _factory.CreateClient();
         var request = new CreateCheckoutSessionRequest(
             StartDateUtc: DateTime.UtcNow.AddDays(1),
-            EndDateUtc: DateTime.UtcNow.AddDays(3),
-            Items: new List<CheckoutItem> { new(Guid.NewGuid(), 1) },
-            CustomerEmail: "test@example.com"
+            EndDateUtc: DateTime.UtcNow.AddDays(2),
+            Items: new List<CheckoutItem>
+            {
+                new(productA, 1),
+                new(productB, 2)
+            },
+            CustomerEmail: "multi@test.pl",
+            CustomerId: customerId
         );
 
         // Act
         var response = await client.PostAsJsonAsync("/api/checkout/create-session", request);
+        var body = await response.Content.ReadAsStringAsync();
 
         // Assert
-        // Auth endpoints are exempt, but checkout is not
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized);
+        response.StatusCode.Should().Be(HttpStatusCode.OK, $"Response: {body}");
+        var result = await response.Content.ReadFromJsonAsync<CheckoutSessionResponse>();
+        result.Should().NotBeNull();
+        result!.SessionId.Should().NotBeNullOrWhiteSpace();
+        result.Url.Should().StartWith("https://checkout.stripe.com/");
     }
 }

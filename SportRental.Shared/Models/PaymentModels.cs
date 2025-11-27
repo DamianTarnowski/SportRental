@@ -21,6 +21,14 @@ public class PaymentQuoteResponse
     public decimal DepositAmount { get; set; }
     public string Currency { get; set; } = "PLN";
     public int RentalDays { get; set; }
+    public List<TenantQuoteBreakdown> Tenants { get; set; } = new();
+}
+
+public class TenantQuoteBreakdown
+{
+    public Guid TenantId { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal DepositAmount { get; set; }
 }
 
 public class CreatePaymentIntentRequest
@@ -40,7 +48,7 @@ public class CreatePaymentIntentRequest
 
 public class PaymentIntentDto
 {
-    public Guid Id { get; set; }
+    public string Id { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public decimal DepositAmount { get; set; }
     public string Currency { get; set; } = "PLN";

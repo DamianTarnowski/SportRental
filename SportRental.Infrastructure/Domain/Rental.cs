@@ -25,7 +25,7 @@ namespace SportRental.Infrastructure.Domain
 
         public decimal TotalAmount { get; set; }
         public decimal DepositAmount { get; set; }
-        public Guid? PaymentIntentId { get; set; }
+        public string? PaymentIntentId { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
         public string? ContractUrl { get; set; }
         public string? Notes { get; set; }

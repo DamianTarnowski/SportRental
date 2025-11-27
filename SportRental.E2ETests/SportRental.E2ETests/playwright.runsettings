@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <Playwright>
+    <BrowserName>chromium</BrowserName>
+    <LaunchOptions>
+      <Headless>false</Headless>
+      <SlowMo>100</SlowMo>
+    </LaunchOptions>
+    <ExpectTimeout>5000</ExpectTimeout>
+    <Timeout>30000</Timeout>
+  </Playwright>
+  <TestRunParameters>
+    <Parameter name="BaseUrl" value="http://localhost:5014" />
+    <Parameter name="ApiBaseUrl" value="http://localhost:5242" />
+  </TestRunParameters>
+</RunSettings>
+

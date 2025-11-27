@@ -10,6 +10,7 @@
 
 <section class="mt-6 sm:mt-8 lg:mt-10">
 <MudContainer MaxWidth="MaxWidth.Large" Class="pa-4">
+    <Breadcrumbs />
     <MudPaper Class="pa-6" Elevation="2">
         <MudText Typo="Typo.h4" Class="mb-4" Color="Color.Primary">
             <MudIcon Icon="Icons.Material.Filled.ShoppingCart" Class="mr-3" />
@@ -32,10 +33,10 @@
                     @foreach (var item in _cart.Items)
                     {
                         <MudCard Class="mb-4" Elevation="1">
-                            <MudCardContent>
-                                <MudGrid AlignItems="Center">
+                            <MudCardContent Class="pa-4 pa-sm-6">
+                                <MudGrid>
                                     <!-- Product Image -->
-                                    <MudItem xs="12" sm="3">
+                                    <MudItem xs="12" sm="3" Class="mb-3 mb-sm-0">
                                         @if (!string.IsNullOrEmpty(item.ProductImageUrl))
                                         {
                                             <MudImage Src="@item.ProductImageUrl" 
@@ -54,7 +55,7 @@
                                     </MudItem>
 
                                     <!-- Product Details -->
-                                    <MudItem xs="12" sm="5">
+                                    <MudItem xs="12" sm="5" Class="mb-3 mb-sm-0">
                                         <MudText Typo="Typo.h6" Class="mb-2">@item.ProductName</MudText>
                                         <MudText Typo="Typo.body2" Color="Color.Primary" Class="mb-2">
                                             @item.DailyPrice.ToString("C") / dzień
@@ -94,9 +95,9 @@
 
                                     <!-- Quantity & Price -->
                                     <MudItem xs="12" sm="4">
-                                        <MudStack AlignItems="AlignItems.End" Spacing="2">
+                                        <MudStack Spacing="2" Class="items-end">
                                             <!-- Quantity Controls -->
-                                            <MudStack Row AlignItems="AlignItems.Center" Spacing="1">
+                                            <MudStack Row Spacing="1" Class="items-center">
                                                 <MudIconButton Icon="Icons.Material.Filled.Remove" 
                                                              Color="Color.Primary"
                                                              Size="Size.Small"
@@ -206,27 +207,55 @@
 
     private async Task OnStartDateChanged(CartItem item, DateTime? newDate)
     {
-        if (newDate.HasValue)
+        if (!newDate.HasValue)
         {
-            item.StartDate = newDate.Value;
-            
-            // Ensure end date is after start date
-            if (item.EndDate <= item.StartDate)
-            {
-                item.EndDate = item.StartDate.AddDays(1);
-            }
-            
-            await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
+            Snackbar.Add("Wybierz prawidłową datę rozpoczęcia", Severity.Warning);
+            return;
         }
+
+        if (newDate.Value < DateTime.Today)
+        {
+            Snackbar.Add("Data rozpoczęcia nie może być z przeszłości", Severity.Warning);
+            item.StartDate = DateTime.Today;
+            return;
+        }
+
+        item.StartDate = newDate.Value;
+        
+        // Ensure end date is after start date
+        if (item.EndDate <= item.StartDate)
+        {
+            item.EndDate = item.StartDate.AddDays(1);
+            Snackbar.Add("Data zakończenia została dostosowana", Severity.Info);
+        }
+        
+        await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
     }
 
     private async Task OnEndDateChanged(CartItem item, DateTime? newDate)
     {
-        if (newDate.HasValue && newDate.Value > item.StartDate)
+        if (!newDate.HasValue)
         {
-            item.EndDate = newDate.Value;
-            await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
+            Snackbar.Add("Wybierz prawidłową datę zakończenia", Severity.Warning);
+            return;
         }
+
+        if (newDate.Value <= item.StartDate)
+        {
+            Snackbar.Add("Data zakończenia musi być późniejsza niż data rozpoczęcia", Severity.Warning);
+            return;
+        }
+
+        var maxRentalDays = 365;
+        var daysDiff = (newDate.Value - item.StartDate).Days;
+        if (daysDiff > maxRentalDays)
+        {
+            Snackbar.Add($"Maksymalny okres wypożyczenia to {maxRentalDays} dni", Severity.Warning);
+            return;
+        }
+
+        item.EndDate = newDate.Value;
+        await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
     }
 
     private async Task ProceedToCheckout()
@@ -235,6 +264,22 @@
         {
             Snackbar.Add("Koszyk jest pusty", Severity.Warning);
             return;
+        }
+
+        // Walidacja dat przed przejściem do checkout
+        foreach (var item in _cart.Items)
+        {
+            if (item.StartDate < DateTime.Today)
+            {
+                Snackbar.Add($"Data rozpoczęcia dla {item.ProductName} jest nieprawidłowa", Severity.Error);
+                return;
+            }
+
+            if (item.EndDate <= item.StartDate)
+            {
+                Snackbar.Add($"Daty wypożyczenia dla {item.ProductName} są nieprawidłowe", Severity.Error);
+                return;
+            }
         }
 
         // Utwórz/odśwież holdy na wszystkie pozycje
@@ -291,3 +336,4 @@
         _refreshCts?.Cancel();
     }
 }
+

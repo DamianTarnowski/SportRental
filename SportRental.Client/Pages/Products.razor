@@ -8,19 +8,20 @@
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 
-<PageTitle>SportRental - Product Catalog</PageTitle>
+<PageTitle>SportRental - Katalog produktów</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="py-4">
+    <Breadcrumbs />
     <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 16px; background: linear-gradient(135deg, #2563eb 0%, #60a5fa 100%); color: white;">
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
             <div>
-                <MudText Typo="Typo.h4" Class="fw-bold">Find your next adventure</MudText>
-                <MudText Typo="Typo.subtitle1">Browse sports equipment that is ready for rental.</MudText>
+                <MudText Typo="Typo.h4" Class="fw-bold">Znajdź swoją następną przygodę</MudText>
+                <MudText Typo="Typo.subtitle1">Przeglądaj sprzęt sportowy gotowy do wypożyczenia.</MudText>
             </div>
             <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Style="color: white;">Total: @products.Count</MudChip>
-                <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Style="color: white;">Ready: @availableCount</MudChip>
-                <MudChip T="string" Color="Color.Info" Variant="Variant.Filled" Style="color: white;">Avg price: @averagePrice.ToString("C")</MudChip>
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Style="color: white;">Łącznie: @products.Count</MudChip>
+                <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Style="color: white;">Dostępnych: @availableCount</MudChip>
+                <MudChip T="string" Color="Color.Info" Variant="Variant.Filled" Style="color: white;">Średnia cena: @averagePrice.ToString("C")</MudChip>
             </MudStack>
         </MudStack>
     </MudPaper>
@@ -29,15 +30,21 @@
         <MudGrid Spacing="3" AlignItems="AlignItems.Center">
             <MudItem xs="12" md="4">
                 <MudTextField @bind-Value="searchText"
-                              Placeholder="Search products"
+                              Label="Szukaj produktów"
+                              Placeholder="Wpisz nazwę produktu..."
                               Variant="Variant.Outlined"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
                               OnKeyDown="OnSearchKeyDown" />
             </MudItem>
             <MudItem xs="12" md="3">
-                <MudSelect T="string" Label="Category" @bind-Value="SelectedCategory" Variant="Variant.Outlined" Clearable="true">
-                    <MudSelectItem Value="@string.Empty">All categories</MudSelectItem>
+                <MudSelect T="string" 
+                           Label="Kategoria" 
+                           @bind-Value="SelectedCategory" 
+                           Variant="Variant.Outlined" 
+                           Clearable="true"
+                           Placeholder="Wybierz kategorię">
+                    <MudSelectItem Value="@string.Empty">Wszystkie kategorie</MudSelectItem>
                     @foreach (var category in categories)
                     {
                         <MudSelectItem Value="@category">@category</MudSelectItem>
@@ -45,19 +52,19 @@
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" md="3">
-                <MudSelect T="string" Label="Sort by" @bind-Value="SelectedSort" Variant="Variant.Outlined">
-                    <MudSelectItem Value="@("featured")">Featured</MudSelectItem>
-                    <MudSelectItem Value="@("price-asc")">Lowest price</MudSelectItem>
-                    <MudSelectItem Value="@("price-desc")">Highest price</MudSelectItem>
-                    <MudSelectItem Value="@("name")">Name</MudSelectItem>
+                <MudSelect T="string" Label="Sortuj według" @bind-Value="SelectedSort" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("featured")">Polecane</MudSelectItem>
+                    <MudSelectItem Value="@("price-asc")">Najniższa cena</MudSelectItem>
+                    <MudSelectItem Value="@("price-desc")">Najwyższa cena</MudSelectItem>
+                    <MudSelectItem Value="@("name")">Nazwa</MudSelectItem>
                 </MudSelect>
             </MudItem>
             <MudItem xs="12" md="2">
-                <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="Only available" />
+                <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="Tylko dostępne" />
             </MudItem>
             <MudItem xs="12" md="3">
                 <MudNumericField T="decimal"
-                                 Label="Min price"
+                                 Label="Cena min"
                                  Variant="Variant.Outlined"
                                  Value="selectedMinPrice"
                                  ValueChanged="OnMinPriceChanged"
@@ -67,7 +74,7 @@
             </MudItem>
             <MudItem xs="12" md="3">
                 <MudNumericField T="decimal"
-                                 Label="Max price"
+                                 Label="Cena max"
                                  Variant="Variant.Outlined"
                                  Value="selectedMaxPrice"
                                  ValueChanged="OnMaxPriceChanged"
@@ -77,8 +84,8 @@
             </MudItem>
             <MudItem xs="12" md="6">
                 <MudStack Row="true" Spacing="2">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchProducts">Search</MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ClearFilters">Clear filters</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchProducts">Szukaj</MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ClearFilters">Wyczyść filtry</MudButton>
                 </MudStack>
             </MudItem>
         </MudGrid>
@@ -105,9 +112,9 @@
     {
         <MudPaper Elevation="1" Class="pa-6 text-center" Style="border-radius: 16px;">
             <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" />
-            <MudText Typo="Typo.h6">No products match your filters</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Adjust the filters or reset them to browse all equipment.</MudText>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3" OnClick="ClearFilters">Reset filters</MudButton>
+            <MudText Typo="Typo.h6">Brak produktów spełniających filtry</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">Dostosuj filtry lub zresetuj je, aby zobaczyć cały sprzęt.</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3" OnClick="ClearFilters">Resetuj filtry</MudButton>
         </MudPaper>
     }
     else
@@ -116,7 +123,7 @@
             @foreach (var product in filteredProducts)
             {
                 <MudItem xs="12" sm="6" md="4" lg="3">
-                    <MudCard Elevation="4" Class="h-100" Style="border-radius: 16px; transition: transform 0.2s; cursor: pointer;"
+                    <MudCard Elevation="4" Class="h-100 mud-card-hover" Style="border-radius: 16px; transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer;"
                              @onclick="@(() => ViewProduct(product))">
                         @{
                             // Use smaller image for grid - w400 for mobile, w800 for larger screens
@@ -150,17 +157,17 @@
                                 <MudText Typo="Typo.h6" Class="fw-bold">@product.Name</MudText>
 
                                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudText Typo="Typo.h6" Color="Color.Primary">@product.DailyPrice.ToString("C") / day</MudText>
+                                    <MudText Typo="Typo.h6" Color="Color.Primary">@product.DailyPrice.ToString("C") / dzień</MudText>
                                     @if (product.IsAvailable && product.AvailableQuantity > 0)
                                     {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">In stock</MudChip>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Dostępny</MudChip>
                                     }
                                     else
                                     {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Unavailable</MudChip>
+                                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Niedostępny</MudChip>
                                     }
                                     <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
-                                        @product.AvailableQuantity pcs
+                                        @product.AvailableQuantity szt.
                                     </MudChip>
                                 </MudStack>
 
@@ -188,13 +195,14 @@
                                        FullWidth="true"
                                        Disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
                                        OnClick="@(async () => await AddToCart(product))">
-                                Add to cart
+                                Dodaj do koszyka
                             </MudButton>
                             <MudButton Variant="Variant.Outlined"
                                        Color="Color.Primary"
                                        FullWidth="true"
-                                       OnClick="@(() => NavigateToProduct(product.Id))">
-                                View details
+                                       Href="@($"/products/{product.Id}")"
+                                       aria-label="@($"Zobacz szczegóły produktu: {product.Name}")">
+                                Zobacz szczegóły
                             </MudButton>
                         </MudStack>
                     </MudCardActions>
@@ -329,7 +337,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Could not load products: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Nie udało się załadować produktów: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -455,7 +463,7 @@
     private async Task AddToCart(ProductDto product)
     {
         await CartService.AddToCartAsync(product);
-        Snackbar.Add($"Product {product.Name} added to cart.", Severity.Success);
+        Snackbar.Add($"Produkt {product.Name} dodany do koszyka.", Severity.Success);
     }
 
     private Task AddToCartFromDialog(ProductDto product) => AddToCart(product);
@@ -483,8 +491,3 @@
         Navigation.NavigateTo($"/products/{id}");
     }
 }
-
-
-
-
-

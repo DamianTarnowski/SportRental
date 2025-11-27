@@ -130,10 +130,15 @@ public class ApiService : IApiService
             ?? throw new InvalidOperationException("Failed to create payment intent");
     }
 
-    public async Task<PaymentIntentDto?> GetPaymentIntentAsync(Guid id)
+    public async Task<PaymentIntentDto?> GetPaymentIntentAsync(string id)
     {
         try
         {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                return null;
+            }
+
             var response = await _httpClient.GetAsync($"/api/payments/intents/{id}");
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
@@ -222,13 +227,16 @@ public class ApiService : IApiService
             var response = await _httpClient.PostAsJsonAsync("/api/holds", request);
             if (!response.IsSuccessStatusCode)
             {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"❌ CreateHold failed ({response.StatusCode}): {errorBody}");
                 return null;
             }
 
             return await response.Content.ReadFromJsonAsync<CreateHoldResponse>();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"❌ CreateHold exception: {ex.Message}");
             return null;
         }
     }
@@ -246,4 +254,3 @@ public class ApiService : IApiService
         }
     }
 }
-

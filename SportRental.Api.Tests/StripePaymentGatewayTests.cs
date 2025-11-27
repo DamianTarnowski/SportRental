@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using SportRental.Api.Payments;
+using SportRental.Shared.Models;
 using Xunit;
 
 namespace SportRental.Api.Tests;
@@ -8,120 +9,83 @@ namespace SportRental.Api.Tests;
 public class StripePaymentGatewayTests
 {
     [Fact]
-    public async Task CreatePaymentIntent_ValidRequest_ReturnsIntent()
+    public async Task CreatePaymentIntent_WithStripeSandbox_ReturnsIntent()
     {
-        // Arrange
-        var options = Options.Create(new StripeOptions
-        {
-            SecretKey = "sk_test_fake_key_for_unit_tests",
-            Currency = "pln"
-        });
-
-        var gateway = new StripePaymentGateway(options);
+        var gateway = CreateGateway();
         var tenantId = Guid.NewGuid();
 
-        // Act & Assert
-        // Real Stripe calls will fail in unit tests without valid API key
-        // This test demonstrates the interface contract
-        await Assert.ThrowsAsync<Stripe.StripeException>(async () =>
-        {
-            await gateway.CreatePaymentIntentAsync(
-                tenantId: tenantId,
-                amount: 100m,
-                depositAmount: 30m,
-                currency: "pln",
-                metadata: new Dictionary<string, string>
-                {
-                    ["rental_id"] = Guid.NewGuid().ToString()
-                }
-            );
-        });
-    }
-
-    [Fact]
-    public async Task GetPaymentIntent_InvalidId_ReturnsNull()
-    {
-        // Arrange
-        var options = Options.Create(new StripeOptions
-        {
-            SecretKey = "sk_test_fake_key_for_unit_tests",
-            Currency = "pln"
-        });
-
-        var gateway = new StripePaymentGateway(options);
-        var tenantId = Guid.NewGuid();
-        var invalidId = Guid.NewGuid();
-
-        // Act
-        var result = await gateway.GetPaymentIntentAsync(tenantId, invalidId);
-
-        // Assert
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public void StripeOptions_DefaultCurrency_IsPln()
-    {
-        // Arrange & Act
-        var options = new StripeOptions();
-
-        // Assert
-        options.Currency.Should().Be("pln");
-    }
-
-    [Fact]
-    public void MockPaymentGateway_CreatePaymentIntent_ReturnsRequiresPaymentMethod()
-    {
-        // Arrange
-        var mock = new MockPaymentGateway();
-        var tenantId = Guid.NewGuid();
-
-        // Act
-        var result = mock.CreatePaymentIntentAsync(
+        var intent = await gateway.CreatePaymentIntentAsync(
             tenantId: tenantId,
-            amount: 100m,
-            depositAmount: 30m,
-            currency: "pln"
-        ).GetAwaiter().GetResult();
+            amount: 150m,
+            depositAmount: 45m,
+            currency: "pln");
 
-        // Assert
-        result.Should().NotBeNull();
-        result.Status.Should().Be(Shared.Models.PaymentIntentStatus.RequiresPaymentMethod);
-        result.Amount.Should().Be(100m);
-        result.DepositAmount.Should().Be(30m);
-        result.Currency.Should().Be("pln");
-        result.ClientSecret.Should().NotBeNullOrEmpty();
+        intent.Should().NotBeNull();
+        intent.Id.Should().StartWith("pi_");
+        intent.Amount.Should().Be(150m);
+        intent.DepositAmount.Should().Be(45m);
     }
 
     [Fact]
-    public async Task MockPaymentGateway_CapturePayment_ReturnsTrue()
+    public async Task CapturePaymentIntent_WithConfirmedIntent_Succeeds()
     {
-        // Arrange
-        var mock = new MockPaymentGateway();
+        var gateway = CreateGateway();
         var tenantId = Guid.NewGuid();
 
-        var intent = await mock.CreatePaymentIntentAsync(tenantId, 100m, 30m, "pln");
+        var intent = await gateway.CreatePaymentIntentAsync(tenantId, 120m, 36m, "pln");
+        await StripeTestHelper.ConfirmPaymentIntentAsync(intent.Id);
 
-        // Act
-        var result = await mock.CapturePaymentAsync(tenantId, intent.Id);
-
-        // Assert
-        result.Should().BeTrue();
+        var captured = await gateway.CapturePaymentAsync(tenantId, intent.Id);
+        captured.Should().BeTrue();
     }
 
     [Fact]
-    public async Task MockPaymentGateway_RefundPayment_ReturnsTrue()
+    public async Task CancelPaymentIntent_BeforeConfirmation_Succeeds()
     {
-        // Arrange
-        var mock = new MockPaymentGateway();
+        var gateway = CreateGateway();
         var tenantId = Guid.NewGuid();
 
-        var intent = await mock.CreatePaymentIntentAsync(tenantId, 100m, 30m, "pln");
+        var intent = await gateway.CreatePaymentIntentAsync(tenantId, 80m, 24m, "pln");
 
-        // Act
-        var result = await mock.RefundPaymentAsync(tenantId, intent.Id, amount: 50m, reason: "customer_request");
+        var cancelled = await gateway.CancelPaymentAsync(tenantId, intent.Id);
+        cancelled.Should().BeTrue();
+    }
 
-        // Assert
-        result.Should().BeTrue();
+    [Fact]
+    public async Task GetPaymentIntent_AfterCreation_ReturnsDetails()
+    {
+        var gateway = CreateGateway();
+        var tenantId = Guid.NewGuid();
+
+        var created = await gateway.CreatePaymentIntentAsync(tenantId, 90m, 27m, "pln");
+        var fetched = await gateway.GetPaymentIntentAsync(tenantId, created.Id);
+
+        fetched.Should().NotBeNull();
+        fetched!.Id.Should().Be(created.Id);
+    }
+
+    [Fact]
+    public async Task CreatePaymentIntent_WithMixedTenants_AllowsEmptyTenant()
+    {
+        var gateway = CreateGateway();
+        var tenantId = Guid.Empty; // multi-tenant checkout uses empty tenant on intent
+
+        var intent = await gateway.CreatePaymentIntentAsync(tenantId, 200m, 60m, "pln");
+        intent.Should().NotBeNull();
+        intent.Id.Should().StartWith("pi_");
+
+        await StripeTestHelper.ConfirmPaymentIntentAsync(intent.Id);
+        var captured = await gateway.CapturePaymentAsync(tenantId, intent.Id);
+        captured.Should().BeTrue();
+
+        var fetched = await gateway.GetPaymentIntentAsync(tenantId, intent.Id);
+        fetched.Should().NotBeNull();
+        fetched!.Status.Should().BeOneOf(PaymentIntentStatus.Succeeded, PaymentIntentStatus.RequiresCapture, PaymentIntentStatus.Processing);
+    }
+
+    private static StripePaymentGateway CreateGateway()
+    {
+        var options = StripeTestHelper.GetStripeOptions();
+        return new StripePaymentGateway(Options.Create(options));
     }
 }

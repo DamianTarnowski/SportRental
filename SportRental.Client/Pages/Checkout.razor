@@ -14,6 +14,19 @@
 <PageTitle>Finalizacja</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
+    <Breadcrumbs />
+    
+    @if (_isPaymentInProgress)
+    {
+        <MudOverlay Visible="true" DarkBackground="true" Absolute="false">
+            <MudPaper Class="pa-8 text-center" Elevation="8">
+                <MudProgressCircular Indeterminate="true" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
+                <MudText Typo="Typo.h6" Class="mb-2">Przekierowanie do płatności...</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">Proszę czekać, nie zamykaj okna</MudText>
+            </MudPaper>
+        </MudOverlay>
+    }
+    
     <MudPaper Class="pa-4" Elevation="2">
         <MudText Typo="Typo.h5" Class="mb-3">Finalizacja zamowienia</MudText>
 

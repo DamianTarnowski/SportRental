@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -7,7 +8,10 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.TestHost;
 using SportRental.Infrastructure.Data;
+using SportRental.Infrastructure.Domain;
 using SportRental.Shared.Models;
 using Xunit;
 using Xunit.Abstractions;
@@ -48,22 +52,26 @@ public class CustomersEndpointsTests : IClassFixture<WebApplicationFactory<Progr
                 services.AddDbContext<ApplicationDbContext>(options =>
                     options.UseSqlite($"Data Source={_databasePath}"));
             });
+
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                }).AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+            });
         });
     }
 
     [Fact]
     public async Task CustomerCrudFlow_Works()
     {
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            await db.Database.EnsureDeletedAsync();
-            await db.Database.EnsureCreatedAsync();
-        }
+        var tenantId = Guid.NewGuid();
+        await PrepareDatabaseAsync(tenantId);
 
         using var client = _factory.CreateClient();
-        var tenantId = Guid.NewGuid();
-        client.DefaultRequestHeaders.Add("X-Tenant-Id", tenantId.ToString());
+        TestApiClientHelper.AuthenticateClient(client, tenantId);
 
         var createRequest = new CreateCustomerRequest
         {
@@ -129,5 +137,45 @@ public class CustomersEndpointsTests : IClassFixture<WebApplicationFactory<Progr
         byId.Should().NotBeNull();
         byId!.PhoneNumber.Should().Be(updateRequest.PhoneNumber);
         byId.Notes.Should().Be(updateRequest.Notes);
+    }
+
+    [Fact]
+    public async Task CustomerEndpoints_WorkWithoutAuthentication()
+    {
+        var tenantId = Guid.NewGuid();
+        await PrepareDatabaseAsync(tenantId);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Tenant-Id", tenantId.ToString());
+
+        var response = await client.PostAsJsonAsync("/api/customers", new CreateCustomerRequest
+        {
+            FullName = "Anon",
+            Email = "anon@example.com"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await response.Content.ReadFromJsonAsync<CustomerDto>();
+        created.Should().NotBeNull();
+        created!.Email.Should().Be("anon@example.com");
+    }
+
+    private async Task PrepareDatabaseAsync(Guid tenantId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        await db.Database.EnsureDeletedAsync();
+        await db.Database.EnsureCreatedAsync();
+
+        if (!await db.Tenants.AnyAsync(t => t.Id == tenantId))
+        {
+            db.Tenants.Add(new Tenant
+            {
+                Id = tenantId,
+                Name = "Test Tenant",
+                CreatedAtUtc = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
     }
 }

@@ -35,4 +35,10 @@
     <ProjectReference Include="..\SportRental.Infrastructure\SportRental.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="test-data.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

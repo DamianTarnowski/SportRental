@@ -8,18 +8,28 @@
         <div class="flex items-center gap-2">
             <span class="text-2xl">🏢</span>
             <div class="flex flex-col">
-                <span class="text-xs text-gray-500 dark:text-gray-400">Wypożyczalnia:</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">Filtr wypożyczalni:</span>
                 <span class="font-semibold text-sm">@currentTenantName</span>
             </div>
         </div>
         <button @onclick="ChangeTenant" class="ml-2 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition">
             Zmień
         </button>
+        <button @onclick="ClearFilter" class="ml-1 px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition">
+            Wszystkie
+        </button>
     }
     else
     {
-        <button @onclick="SelectTenant" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded transition">
-            Wybierz wypożyczalnię
+        <div class="flex items-center gap-2">
+            <span class="text-2xl">🌍</span>
+            <div class="flex flex-col">
+                <span class="text-xs text-gray-500 dark:text-gray-400">Wyświetlanie:</span>
+                <span class="font-semibold text-sm">Wszystkie wypożyczalnie</span>
+            </div>
+        </div>
+        <button @onclick="SelectTenant" class="ml-2 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition">
+            Filtruj
         </button>
     }
 </div>
@@ -39,7 +49,12 @@
 
     private async Task ChangeTenant()
     {
+        Navigation.NavigateTo("/select-tenant");
+    }
+
+    private async Task ClearFilter()
+    {
         await TenantService.ClearSelectedTenantAsync();
-        Navigation.NavigateTo("/select-tenant", forceLoad: true);
+        Navigation.NavigateTo("/", forceLoad: true);
     }
 }

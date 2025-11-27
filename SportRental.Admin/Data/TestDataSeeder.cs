@@ -56,10 +56,18 @@ public class TestDataSeeder
 
             await using var db = await _dbFactory.CreateDbContextAsync();
 
-            // Check if already seeded
-            if (await db.Tenants.AnyAsync())
+            // Log connection info
+            var connectionString = db.Database.GetConnectionString();
+            _logger.LogInformation($"🔗 Connection: {connectionString}");
+
+            // Check if already seeded by looking for products (ignore query filters to check actual DB state)
+            // We check Products instead of Tenants because Program.cs may create a default tenant
+            var productCount = await db.Products.IgnoreQueryFilters().CountAsync();
+            _logger.LogInformation($"📦 Current products in DB: {productCount}");
+            
+            if (productCount > 0)
             {
-                _logger.LogInformation("ℹ️  Database already contains data, skipping seeding");
+                _logger.LogInformation("ℹ️  Database already contains products, skipping seeding");
                 return;
             }
 
@@ -67,10 +75,14 @@ public class TestDataSeeder
 
             foreach (var tenantData in testData.Tenants ?? [])
             {
-                // Create Tenant
+                // Create Tenant with ID from JSON or generate new
+                var tenantId = string.IsNullOrWhiteSpace(tenantData.Id) 
+                    ? Guid.NewGuid() 
+                    : Guid.Parse(tenantData.Id);
+                
                 var tenant = new Tenant
                 {
-                    Id = Guid.NewGuid(),
+                    Id = tenantId,
                     Name = tenantData.Name ?? "Unknown Tenant",
                     PrimaryColorHex = tenantData.PrimaryColor,
                     SecondaryColorHex = tenantData.SecondaryColor,
@@ -115,6 +127,7 @@ public class TestDataSeeder
                             Name = productData.Name ?? "Unknown Product",
                             Sku = productData.Sku ?? Guid.NewGuid().ToString()[..8],
                             Category = productData.Category,
+                            Description = productData.Description,
                             DailyPrice = productData.DailyPrice ?? 50m,
                             AvailableQuantity = productData.AvailableQuantity ?? 1,
                             IsActive = true,
@@ -184,6 +197,7 @@ public class TestDataSeeder
 
     private class TenantData
     {
+        public string? Id { get; set; }
         public string? Name { get; set; }
         public string? PrimaryColor { get; set; }
         public string? SecondaryColor { get; set; }
@@ -210,6 +224,7 @@ public class TestDataSeeder
         public decimal? DailyPrice { get; set; }
         public string? Category { get; set; }
         public int? AvailableQuantity { get; set; }
+        public string? Description { get; set; }
     }
 
     private class CustomerData

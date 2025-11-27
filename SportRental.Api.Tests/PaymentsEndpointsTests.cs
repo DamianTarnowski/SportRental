@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Net.Http.Json;
 using System.Linq;
 using FluentAssertions;
@@ -5,8 +6,12 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Data;
 using SportRental.Shared.Models;
@@ -24,6 +29,28 @@ public class PaymentsEndpointsTests : IClassFixture<WebApplicationFactory<Progra
         _databasePath = Path.Combine(Path.GetTempPath(), $"payments-tests-{Guid.NewGuid():N}.db");
         _factory = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseEnvironment("Test");
+            builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={_databasePath}");
+            builder.UseSetting("Jwt:SigningKey", "TestSigningKey_12345678901234567890");
+            builder.UseSetting("Jwt:Issuer", "SportRentalTests");
+            builder.UseSetting("Jwt:Audience", "SportRentalTests");
+            builder.ConfigureAppConfiguration((context, config) =>
+            {
+                var stripe = StripeTestHelper.GetStripeOptions();
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["ConnectionStrings:DefaultConnection"] = $"Data Source={_databasePath}",
+                    ["Jwt:SigningKey"] = "TestSigningKey_12345678901234567890",
+                    ["Jwt:Issuer"] = "SportRentalTests",
+                    ["Jwt:Audience"] = "SportRentalTests",
+                    ["Stripe:SecretKey"] = stripe.SecretKey,
+                    ["Stripe:PublishableKey"] = stripe.PublishableKey,
+                    ["Stripe:WebhookSecret"] = stripe.WebhookSecret,
+                    ["Stripe:Currency"] = stripe.Currency,
+                    ["Stripe:SuccessUrl"] = stripe.SuccessUrl ?? "https://localhost:5014/checkout/success?session_id={CHECKOUT_SESSION_ID}",
+                    ["Stripe:CancelUrl"] = stripe.CancelUrl ?? "https://localhost:5014/checkout/cancel"
+                });
+            });
             builder.ConfigureServices(services =>
             {
                 // Remove all EF Core related services (including DbContextPool)
@@ -42,10 +69,15 @@ public class PaymentsEndpointsTests : IClassFixture<WebApplicationFactory<Progra
 
                 // Add SQLite DbContext for testing (not pooled)
                 services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite($"Data Source={_databasePath}"));
+            });
 
-                // Replace IPaymentGateway with MockPaymentGateway for testing
-                services.RemoveAll<SportRental.Api.Payments.IPaymentGateway>();
-                services.AddSingleton<SportRental.Api.Payments.IPaymentGateway, SportRental.Api.Payments.MockPaymentGateway>();
+            builder.ConfigureTestServices(services =>
+            {
+                services.AddAuthentication(options =>
+                {
+                    options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
+                    options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
+                }).AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
             });
         });
     }
@@ -108,8 +140,23 @@ public class PaymentsEndpointsTests : IClassFixture<WebApplicationFactory<Progra
             await db.SaveChangesAsync();
         }
 
+        using var publicClient = _factory.CreateClient();
+
+        var catalogResponse = await publicClient.GetAsync("/api/products");
+        catalogResponse.EnsureSuccessStatusCode();
+        var catalog = await catalogResponse.Content.ReadFromJsonAsync<List<ProductDto>>();
+        catalog.Should().NotBeNull();
+        catalog!.Should().ContainSingle(p => p.Id == productId && p.TenantId == tenantId);
+
+        var productResponse = await publicClient.GetAsync($"/api/products/{productId}");
+        productResponse.EnsureSuccessStatusCode();
+        var productDetails = await productResponse.Content.ReadFromJsonAsync<ProductDto>();
+        productDetails.Should().NotBeNull();
+        productDetails!.Id.Should().Be(productId);
+        productDetails.TenantId.Should().Be(tenantId);
+
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Tenant-Id", tenantId.ToString());
+        TestApiClientHelper.AuthenticateClient(client, tenantId);
 
         var start = new DateTime(2025, 1, 10, 9, 0, 0, DateTimeKind.Utc);
         var end = start.AddDays(3);
@@ -145,6 +192,10 @@ public class PaymentsEndpointsTests : IClassFixture<WebApplicationFactory<Progra
         intent!.Status.Should().Be(PaymentIntentStatus.RequiresPaymentMethod);
         intent.Amount.Should().Be(quote.TotalAmount);
         intent.ClientSecret.Should().NotBeNullOrEmpty(); // Needed for frontend Stripe.js
+
+        // Confirm PaymentIntent using Stripe sandbox test card
+        StripeTestHelper.GetStripeOptions();
+        await StripeTestHelper.ConfirmPaymentIntentAsync(intent.Id);
 
         var rentalResponse = await client.PostAsJsonAsync("/api/rentals", new CreateRentalRequest
         {

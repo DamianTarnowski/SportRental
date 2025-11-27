@@ -13,7 +13,15 @@ public class HttpContextTenantProvider(IHttpContextAccessor httpContextAccessor,
         var ctx = _http.HttpContext;
         if (ctx == null) return null;
 
-        // Przykład: z nagłówka, subdomeny lub roszczeń użytkownika
+        // Priority 1: X-Tenant-Id header (for API calls from client apps)
+        if (ctx.Request.Headers.TryGetValue("X-Tenant-Id", out var headerValue))
+        {
+            var headerStr = headerValue.ToString();
+            if (!string.IsNullOrWhiteSpace(headerStr) && Guid.TryParse(headerStr, out var headerTenantId))
+                return headerTenantId;
+        }
+
+        // Priority 2: Authenticated user claim (for logged-in users)
         if (ctx.User?.Identity?.IsAuthenticated == true)
         {
             var claim = ctx.User.FindFirst("tenant-id");
@@ -21,12 +29,12 @@ public class HttpContextTenantProvider(IHttpContextAccessor httpContextAccessor,
                 return tenantId;
         }
 
-        // Fallback: z konfiguracji (np. User Secrets) Tenant:Id
+        // Priority 3: Configuration fallback (for development/testing)
         var configuredId = _configuration["Tenant:Id"];
         if (!string.IsNullOrWhiteSpace(configuredId) && Guid.TryParse(configuredId, out var cfgTenant))
             return cfgTenant;
 
-        // Fallback: null
+        // Fallback: null (will return all data if endpoint allows it)
         return null;
     }
 }

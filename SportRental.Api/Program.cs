@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using System.Reflection;
+using System.Security.Claims;
 using System.Text;
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
@@ -22,12 +23,22 @@ var builder = WebApplication.CreateBuilder(args);
 var keyVaultUrl = builder.Configuration["KeyVault:Url"];
 if (!string.IsNullOrWhiteSpace(keyVaultUrl))
 {
-    var secretClient = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential());
-    builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretManager());
-    builder.Services.AddSingleton(_ => secretClient);
-    
-    var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
-    logger.LogInformation("🔐 Azure Key Vault configured: {KeyVaultUrl}", keyVaultUrl);
+    try
+    {
+        var secretClient = new SecretClient(new Uri(keyVaultUrl), new DefaultAzureCredential());
+        builder.Configuration.AddAzureKeyVault(secretClient, new KeyVaultSecretManager());
+        builder.Services.AddSingleton(_ => secretClient);
+        
+        var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
+        logger.LogInformation("🔐 Azure Key Vault configured: {KeyVaultUrl}", keyVaultUrl);
+    }
+    catch (Exception ex)
+    {
+        // Key Vault not available (local development without Azure credentials)
+        var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
+        logger.LogWarning("⚠️  Azure Key Vault not available: {Message}. Using local configuration only.", ex.Message);
+        logger.LogInformation("💡 For local development, secrets should be in appsettings.Development.json or user secrets");
+    }
 }
 
 // DbContext (PostgreSQL) - używamy DbContextPool dla lepszej performance!
@@ -93,6 +104,7 @@ builder.Services.AddSingleton<IPaymentGateway, StripePaymentGateway>();
 
 // Keep Mock for tests
 builder.Services.AddSingleton<MockPaymentGateway>();
+builder.Services.AddSingleton<ICheckoutSessionService, StripeCheckoutSessionService>();
 
 // Email Services
 builder.Services.AddScoped<SportRental.Api.Services.Email.IEmailSender>(sp =>
@@ -158,22 +170,53 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// CORS (dla lokalnego klienta Blazor/WASM)
+// CORS (dla lokalnego klienta Blazor/WASM i produkcji)
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins("http://localhost:5002", "https://localhost:5002", "http://localhost:5173", "https://localhost:7083", "http://localhost:5014")
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+    {
+        var isDevelopment = builder.Environment.IsDevelopment();
+        
+        if (isDevelopment)
+        {
+            // Development: Allow localhost
+            policy.WithOrigins(
+                "http://localhost:5002", 
+                "https://localhost:5002", 
+                "http://localhost:5173", 
+                "https://localhost:7083", 
+                "http://localhost:5014",
+                "http://localhost:5004")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+        else
+        {
+            // Production: Allow same-origin (nginx proxy) and specific domains if needed
+            policy.AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+    });
 });
 
 var app = builder.Build();
 
 Guid GetTenantId(HttpRequest request)
 {
+    var user = request.HttpContext.User;
+    if (user?.Identity?.IsAuthenticated == true)
+    {
+        var claim = user.FindFirst("tenant-id");
+        if (claim != null && Guid.TryParse(claim.Value, out var tenantClaimId))
+        {
+            return tenantClaimId;
+        }
+    }
+
     if (request.Headers.TryGetValue("X-Tenant-Id", out var values) && Guid.TryParse(values.FirstOrDefault(), out var tenantId))
         return tenantId;
-    // Fallback (not recommended for prod). Consider enforcing header.
+
     return Guid.Empty;
 }
 
@@ -198,28 +241,6 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Wymagaj nagłówka X-Tenant-Id lub JWT (400 jeśli brak) — z wyjątkiem Swaggera, ROOT, auth endpoints i preflightów
-app.Use(async (context, next) =>
-{
-    var path = context.Request.Path.Value ?? string.Empty;
-    if (string.Equals(context.Request.Method, HttpMethods.Options, StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/swagger", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/api/auth", StringComparison.OrdinalIgnoreCase) ||
-        path.StartsWith("/api/tenants", StringComparison.OrdinalIgnoreCase) ||
-        path == "/")
-    {
-        await next();
-        return;
-    }
-
-    if (!context.Request.Headers.TryGetValue("X-Tenant-Id", out var values) || !Guid.TryParse(values.FirstOrDefault(), out _))
-    {
-        context.Response.StatusCode = StatusCodes.Status400BadRequest;
-        await context.Response.WriteAsJsonAsync(new { error = "Missing or invalid X-Tenant-Id header" });
-        return;
-    }
-    await next();
-});
 
 app.MapGet("/", () => "SportRental API").WithName("Root").WithTags("System");
 
@@ -227,8 +248,15 @@ app.MapGet("/", () => "SportRental API").WithName("Root").WithTags("System");
 app.MapGet("/api/products", async (HttpRequest http, ApplicationDbContext db, CancellationToken ct) =>
 {
     var tenantId = GetTenantId(http);
-    var products = await db.Products
-        .Where(p => p.TenantId == tenantId)
+    
+    // Jeśli brak tenant-id (Guid.Empty), zwróć produkty ze wszystkich wypożyczalni
+    var query = db.Products.AsQueryable();
+    if (tenantId != Guid.Empty)
+    {
+        query = query.Where(p => p.TenantId == tenantId);
+    }
+    
+    var products = await query
         .Select(p => new ProductDto
         {
             Id = p.Id,
@@ -241,7 +269,8 @@ app.MapGet("/api/products", async (HttpRequest http, ApplicationDbContext db, Ca
             Description = p.Description,
             FullImageUrl = p.ImageUrl,
             IsAvailable = p.Available && !p.Disabled,
-            AvailableQuantity = p.AvailableQuantity
+            AvailableQuantity = p.AvailableQuantity,
+            TenantId = p.TenantId // Dodaj TenantId do DTO, żeby klient wiedział z jakiej wypożyczalni jest produkt
         })
         .ToListAsync(ct);
     return Results.Ok(products);
@@ -249,18 +278,25 @@ app.MapGet("/api/products", async (HttpRequest http, ApplicationDbContext db, Ca
 .WithName("GetProducts")
 .WithTags("Products")
 .WithSummary("Lista produktów")
-.WithDescription("Zwraca listę produktów dostępnych dla danego tenanta. Wymaga nagłówka X-Tenant-Id.")
+.WithDescription("Zwraca listę produktów. Bez nagłówka X-Tenant-Id zwraca produkty ze wszystkich wypożyczalni. Z nagłówkiem - tylko z danej wypożyczalni.")
 .Produces<List<ProductDto>>(StatusCodes.Status200OK);
 
 // Product by Id
 app.MapGet("/api/products/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CancellationToken ct) =>
 {
     var tenantId = GetTenantId(http);
-    var p = await db.Products
-        .Where(x => x.TenantId == tenantId && x.Id == id)
+    var query = db.Products.AsQueryable();
+    if (tenantId != Guid.Empty)
+    {
+        query = query.Where(x => x.TenantId == tenantId);
+    }
+
+    var product = await query
+        .Where(x => x.Id == id)
         .Select(x => new ProductDto
         {
             Id = x.Id,
+            TenantId = x.TenantId,
             Name = x.Name,
             Sku = x.Sku,
             Category = x.Category,
@@ -273,24 +309,29 @@ app.MapGet("/api/products/{id:guid}", async (HttpRequest http, ApplicationDbCont
             AvailableQuantity = x.AvailableQuantity
         })
         .FirstOrDefaultAsync(ct);
-    return p is null ? Results.NotFound() : Results.Ok(p);
+    return product is null ? Results.NotFound() : Results.Ok(product);
 })
 .WithName("GetProductById")
 .WithTags("Products")
-.WithSummary("Szczegóły produktu")
-.WithDescription("Zwraca pojedynczy produkt po Id, ograniczony do tenanta z nagłówka X-Tenant-Id.")
+.WithSummary("Szczegoly produktu")
+.WithDescription("Zwraca pojedynczy produkt po Id. Bez naglowka X-Tenant-Id zwraca dowolny produkt, z naglowkiem ogranicza do wskazanej wypozyczalni.")
 .Produces<ProductDto>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound);
 
 // Holds
 app.MapPost("/api/holds", async (HttpRequest http, ApplicationDbContext db, CreateHoldRequest req, CancellationToken ct) =>
 {
-    var tenantId = GetTenantId(http);
+    var product = await db.Products.FirstOrDefaultAsync(p => p.Id == req.ProductId, ct);
+    if (product is null)
+    {
+        return Results.NotFound(new { error = "Produkt nie istnieje." });
+    }
+
     var ttlMinutes = req.TtlMinutes ?? 15;
     var hold = new ReservationHold
     {
         Id = Guid.NewGuid(),
-        TenantId = tenantId,
+        TenantId = product.TenantId,
         ProductId = req.ProductId,
         Quantity = req.Quantity,
         StartDateUtc = req.StartDateUtc,
@@ -311,12 +352,12 @@ app.MapPost("/api/holds", async (HttpRequest http, ApplicationDbContext db, Crea
 .WithSummary("Utwórz rezerwację tymczasową (hold)")
 .WithDescription("Tworzy hold na produkt w określonym przedziale czasu. Hold wygasa automatycznie po TTL.")
 .Accepts<CreateHoldRequest>("application/json")
-.Produces<CreateHoldResponse>(StatusCodes.Status200OK);
+.Produces<CreateHoldResponse>(StatusCodes.Status200OK)
+.AllowAnonymous();
 
 app.MapDelete("/api/holds/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CancellationToken ct) =>
 {
-    var tenantId = GetTenantId(http);
-    var hold = await db.ReservationHolds.FirstOrDefaultAsync(h => h.Id == id && h.TenantId == tenantId, ct);
+    var hold = await db.ReservationHolds.FirstOrDefaultAsync(h => h.Id == id, ct);
     if (hold is null) return Results.NotFound();
     db.ReservationHolds.Remove(hold);
     await db.SaveChangesAsync(ct);
@@ -327,7 +368,8 @@ app.MapDelete("/api/holds/{id:guid}", async (HttpRequest http, ApplicationDbCont
 .WithSummary("Usuń hold")
 .WithDescription("Usuwa istniejący hold. Zwraca 404, gdy nie istnieje.")
 .Produces(StatusCodes.Status204NoContent)
-.Produces(StatusCodes.Status404NotFound);
+.Produces(StatusCodes.Status404NotFound)
+.AllowAnonymous();
 
 // Customers
 app.MapPost("/api/customers", async (HttpRequest http, ApplicationDbContext db, CreateCustomerRequest req, CancellationToken ct) =>
@@ -369,7 +411,8 @@ app.MapPost("/api/customers", async (HttpRequest http, ApplicationDbContext db, 
 .WithDescription("Tworzy nowego klienta w kontekście tenanta.")
 .Accepts<CreateCustomerRequest>("application/json")
 .Produces<CustomerDto>(StatusCodes.Status201Created)
-.Produces(StatusCodes.Status409Conflict);
+.Produces(StatusCodes.Status409Conflict)
+.AllowAnonymous();
 
 app.MapPut("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CreateCustomerRequest req, CancellationToken ct) =>
 {
@@ -409,7 +452,8 @@ app.MapPut("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbCon
 .Accepts<CreateCustomerRequest>("application/json")
 .Produces<CustomerDto>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status409Conflict);
+.Produces(StatusCodes.Status409Conflict)
+.AllowAnonymous();
 
 app.MapGet("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CancellationToken ct) =>
 {
@@ -422,7 +466,8 @@ app.MapGet("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbCon
 .WithSummary("Pobierz klienta")
 .WithDescription("Zwraca klienta po identyfikatorze.")
 .Produces<CustomerDto>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status404NotFound);
+.Produces(StatusCodes.Status404NotFound)
+.AllowAnonymous();
 
 app.MapGet("/api/customers/by-email", async (HttpRequest http, ApplicationDbContext db, string? email, CancellationToken ct) =>
 {
@@ -444,7 +489,8 @@ app.MapGet("/api/customers/by-email", async (HttpRequest http, ApplicationDbCont
 .WithDescription("Zwraca klienta w oparciu o adres email w ramach danego tenanta.")
 .Produces<CustomerDto>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status400BadRequest);
+.Produces(StatusCodes.Status400BadRequest)
+.AllowAnonymous();
 
 // Payments
 app.MapPost("/api/payments/quote", async (HttpRequest http, ApplicationDbContext db, PaymentQuoteRequest req, CancellationToken ct) =>
@@ -452,13 +498,21 @@ app.MapPost("/api/payments/quote", async (HttpRequest http, ApplicationDbContext
     var tenantId = GetTenantId(http);
     try
     {
-        var computation = await ComputePaymentAsync(tenantId, req, db, ct);
+        var computation = await PaymentCalculator.ComputeAsync(tenantId, req, db, ct);
         return Results.Ok(new PaymentQuoteResponse
         {
             TotalAmount = computation.TotalAmount,
             DepositAmount = computation.DepositAmount,
             Currency = "PLN",
-            RentalDays = computation.RentalDays
+            RentalDays = computation.RentalDays,
+            Tenants = computation.Tenants
+                .Select(t => new TenantQuoteBreakdown
+                {
+                    TenantId = t.TenantId,
+                    TotalAmount = t.TotalAmount,
+                    DepositAmount = t.DepositAmount
+                })
+                .ToList()
         });
     }
     catch (InvalidOperationException ex)
@@ -472,7 +526,8 @@ app.MapPost("/api/payments/quote", async (HttpRequest http, ApplicationDbContext
 .WithDescription("Zwraca wyliczoną kwotę i depozyt dla wskazanych produktów i zakresu dat.")
 .Accepts<PaymentQuoteRequest>("application/json")
 .Produces<PaymentQuoteResponse>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest);
+.Produces(StatusCodes.Status400BadRequest)
+.AllowAnonymous();
 
 app.MapPost("/api/payments/intents", async (HttpRequest http, ApplicationDbContext db, IPaymentGateway gateway, CreatePaymentIntentRequest req, CancellationToken ct) =>
 {
@@ -486,19 +541,28 @@ app.MapPost("/api/payments/intents", async (HttpRequest http, ApplicationDbConte
             Items = req.Items
         };
 
-        var computation = await ComputePaymentAsync(tenantId, quoteRequest, db, ct);
+        var computation = await PaymentCalculator.ComputeAsync(tenantId, quoteRequest, db, ct);
+        if (computation.Tenants.Count == 0)
+        {
+            return Results.BadRequest(new { error = "Brak pozycji do wyliczenia platnosci." });
+        }
         var currency = string.IsNullOrWhiteSpace(req.Currency) ? "PLN" : req.Currency;
+        var tenantIds = computation.Tenants.Select(t => t.TenantId).Distinct().ToList();
+        var paymentTenant = tenantIds.Count == 1 ? tenantIds[0] : Guid.Empty;
         
         // Add rental metadata for Stripe
         var metadata = new Dictionary<string, string>
         {
+            ["tenant_id"] = paymentTenant.ToString(),
+            ["tenant_ids"] = string.Join(",", tenantIds),
             ["rental_start"] = req.StartDateUtc.ToString("O"),
             ["rental_end"] = req.EndDateUtc.ToString("O"),
             ["items_count"] = req.Items.Count.ToString(),
-            ["rental_days"] = computation.RentalDays.ToString()
+            ["rental_days"] = computation.RentalDays.ToString(),
+            ["idempotency_key"] = $"pi:{Guid.NewGuid():N}"
         };
         
-        var intent = await gateway.CreatePaymentIntentAsync(tenantId, computation.TotalAmount, computation.DepositAmount, currency, metadata);
+        var intent = await gateway.CreatePaymentIntentAsync(paymentTenant, computation.TotalAmount, computation.DepositAmount, currency, metadata);
         return Results.Ok(intent);
     }
     catch (InvalidOperationException ex)
@@ -512,9 +576,10 @@ app.MapPost("/api/payments/intents", async (HttpRequest http, ApplicationDbConte
 .WithDescription("Tworzy Stripe PaymentIntent dla wskazanej rezerwacji (deposit + total).")
 .Accepts<CreatePaymentIntentRequest>("application/json")
 .Produces<PaymentIntentDto>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest);
+.Produces(StatusCodes.Status400BadRequest)
+.AllowAnonymous();
 
-app.MapGet("/api/payments/intents/{id:guid}", async (HttpRequest http, IPaymentGateway gateway, Guid id) =>
+app.MapGet("/api/payments/intents/{id}", async (HttpRequest http, IPaymentGateway gateway, string id) =>
 {
     var tenantId = GetTenantId(http);
     var intent = await gateway.GetPaymentIntentAsync(tenantId, id);
@@ -525,7 +590,8 @@ app.MapGet("/api/payments/intents/{id:guid}", async (HttpRequest http, IPaymentG
 .WithSummary("Pobierz PaymentIntent")
 .WithDescription("Zwraca szczegóły PaymentIntentu dla danego tenanta.")
 .Produces<PaymentIntentDto>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status404NotFound);
+.Produces(StatusCodes.Status404NotFound)
+.AllowAnonymous();
 
 // My rentals
 app.MapGet("/api/my-rentals", async (HttpRequest http, ApplicationDbContext db, string? status, DateTime? from, DateTime? to, Guid? customerId, CancellationToken ct) =>
@@ -570,7 +636,8 @@ app.MapGet("/api/my-rentals", async (HttpRequest http, ApplicationDbContext db, 
 .WithTags("Rentals")
 .WithSummary("Moje wynajmy")
 .WithDescription("Zwraca listę wynajmów z opcjonalnymi filtrami: status, from (UTC), to (UTC).")
-.Produces<List<MyRentalDto>>(StatusCodes.Status200OK);
+.Produces<List<MyRentalDto>>(StatusCodes.Status200OK)
+.RequireAuthorization();
 
 // Rentals
 app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IPaymentGateway gateway, CreateRentalRequest req, CancellationToken ct) =>
@@ -601,19 +668,19 @@ app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IP
     }
 
     PaymentComputationResult computation;
-    try
-    {
-        computation = await ComputePaymentAsync(tenantId, new PaymentQuoteRequest
+        try
         {
-            StartDateUtc = req.StartDateUtc,
-            EndDateUtc = req.EndDateUtc,
-            Items = req.Items
-        }, db, ct);
-    }
-    catch (InvalidOperationException ex)
-    {
-        return Results.BadRequest(new { error = ex.Message });
-    }
+            computation = await PaymentCalculator.ComputeAsync(tenantId, new PaymentQuoteRequest
+            {
+                StartDateUtc = req.StartDateUtc,
+                EndDateUtc = req.EndDateUtc,
+                Items = req.Items
+            }, db, ct, allowMixedTenants: false);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
 
     if (intent.Amount != computation.TotalAmount)
     {
@@ -674,7 +741,8 @@ app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IP
 .WithDescription("Tworzy nowy wynajem na podstawie pozycji i dat. Kwota wyliczana z DailyPrice x Ilość x Dni.")
 .Accepts<CreateRentalRequest>("application/json")
 .Produces<RentalResponse>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status400BadRequest);
+.Produces(StatusCodes.Status400BadRequest)
+.RequireAuthorization();
 
 app.MapDelete("/api/rentals/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CancellationToken ct) =>
 {
@@ -690,7 +758,8 @@ app.MapDelete("/api/rentals/{id:guid}", async (HttpRequest http, ApplicationDbCo
 .WithSummary("Anuluj wynajem")
 .WithDescription("Ustawia status wynajmu na Cancelled. Zwraca 404, jeśli nie istnieje.")
 .Produces(StatusCodes.Status204NoContent)
-.Produces(StatusCodes.Status404NotFound);
+.Produces(StatusCodes.Status404NotFound)
+.RequireAuthorization();
 
 static CustomerDto ToCustomerDto(Customer customer)
 {
@@ -719,46 +788,6 @@ static RentalResponse ToRentalResponse(Rental rental)
     };
 }
 
-static async Task<PaymentComputationResult> ComputePaymentAsync(Guid tenantId, PaymentQuoteRequest req, ApplicationDbContext db, CancellationToken ct)
-{
-    if (req.EndDateUtc <= req.StartDateUtc)
-    {
-        throw new InvalidOperationException("EndDateUtc must be after StartDateUtc.");
-    }
-
-    if (req.Items.Count == 0)
-    {
-        throw new InvalidOperationException("At least one item is required.");
-    }
-
-    var productIds = req.Items.Select(i => i.ProductId).Distinct().ToList();
-
-    var prices = await db.Products
-        .Where(p => p.TenantId == tenantId && productIds.Contains(p.Id))
-        .Select(p => new { p.Id, p.DailyPrice })
-        .ToDictionaryAsync(p => p.Id, p => p.DailyPrice, ct);
-
-    var missing = productIds.Except(prices.Keys).ToList();
-    if (missing.Count > 0)
-    {
-        throw new InvalidOperationException("One or more products are not available for this tenant.");
-    }
-
-    var rentalDays = Math.Max(1, (int)Math.Ceiling((req.EndDateUtc - req.StartDateUtc).TotalDays));
-    var productPrices = new Dictionary<Guid, decimal>();
-    decimal total = 0m;
-
-    foreach (var item in req.Items)
-    {
-        var pricePerDay = prices[item.ProductId];
-        productPrices[item.ProductId] = pricePerDay;
-        total += pricePerDay * item.Quantity * rentalDays;
-    }
-
-    var deposit = Math.Round(total * 0.3m, 2, MidpointRounding.AwayFromZero);
-    return new PaymentComputationResult(total, deposit, rentalDays, productPrices);
-}
-
 // Map Authentication Endpoints
 app.MapAuthEndpoints();
 
@@ -776,4 +805,3 @@ app.Run();
 public partial class Program
 {
 }
-

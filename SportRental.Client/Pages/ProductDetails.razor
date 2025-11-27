@@ -6,7 +6,11 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 
-<PageTitle>SportRental - Product details</PageTitle>
+<PageTitle>@(product?.Name ?? "Szczegóły produktu") - SportRental</PageTitle>
+
+<div class="container mx-auto px-4 py-2">
+    <Breadcrumbs />
+</div>
 
 @if (isLoading)
 {
@@ -20,10 +24,10 @@ else if (notFound || product is null)
 {
     <MudContainer Class="py-10 text-center">
         <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" />
-        <MudText Typo="Typo.h5" Class="mt-2">Product not found</MudText>
-        <MudText Typo="Typo.body2" Color="Color.Secondary">The item may have been removed or is temporarily unavailable.</MudText>
+        <MudText Typo="Typo.h5" Class="mt-2">Produkt nie został znaleziony</MudText>
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Produkt mógł zostać usunięty lub jest chwilowo niedostępny.</MudText>
         <MudButton Class="mt-4" Variant="Variant.Filled" Color="Color.Primary" OnClick="GoBack">
-            Back to catalog
+            Wróć do katalogu
         </MudButton>
     </MudContainer>
 }
@@ -66,7 +70,7 @@ else
                 {
                     <MudPaper Class="pa-8 text-center" Elevation="1" Style="border-radius: 16px; background: #f8fafc;">
                         <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Default" />
-                        <MudText Typo="Typo.body1" Class="mt-2" Color="Color.Secondary">Image coming soon</MudText>
+                        <MudText Typo="Typo.body1" Class="mt-2" Color="Color.Secondary">Zdjęcie wkrótce dostępne</MudText>
                     </MudPaper>
                 }
             </MudItem>
@@ -81,25 +85,25 @@ else
                     }
 
                     <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-                        <MudText Typo="Typo.h5" Color="Color.Primary">@product.DailyPrice.ToString("C") / day</MudText>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">@product.DailyPrice.ToString("C") / dzień</MudText>
                         @if (product.IsAvailable && product.AvailableQuantity > 0)
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Available</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success">Dostępny</MudChip>
                         }
                         else
                         {
-                            <MudChip T="string" Size="Size.Small" Color="Color.Error">Currently unavailable</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Error">Obecnie niedostępny</MudChip>
                         }
                         <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
-                            @product.AvailableQuantity pc
+                            @product.AvailableQuantity szt.
                         </MudChip>
                     </MudStack>
 
                     <MudPaper Elevation="0" Class="pa-3" Style="background: #f8fafc; border-radius: 12px;">
                         <MudStack Spacing="1">
-                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Rental window</MudText>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Okres wypożyczenia</MudText>
                             <MudStack Row="true" Spacing="2">
-                                <MudDatePicker Label="Start date"
+                                <MudDatePicker Label="Data rozpoczęcia"
                                                 @bind-Date="startDate"
                                                 DisableToolbar="true"
                                                 Variant="Variant.Outlined"
@@ -107,7 +111,7 @@ else
                                                 MinDate="DateTime.Today"
                                                 Required="true"
                                                 Class="w-100" />
-                                <MudDatePicker Label="End date"
+                                <MudDatePicker Label="Data zakończenia"
                                                 @bind-Date="endDate"
                                                 DisableToolbar="true"
                                                 Variant="Variant.Outlined"
@@ -124,7 +128,7 @@ else
                     }
                     else
                     {
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Detailed description will be available soon.</MudText>
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">Szczegółowy opis będzie wkrótce dostępny.</MudText>
                     }
 
                     <MudStack Row="true" Spacing="2">
@@ -133,9 +137,9 @@ else
                                    StartIcon="@Icons.Material.Filled.AddShoppingCart"
                                    Disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
                                    OnClick="AddToCart">
-                            Add to cart
+                            Dodaj do koszyka
                         </MudButton>
-                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="GoBack">Back</MudButton>
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="GoBack">Wróć</MudButton>
                     </MudStack>
                 </MudStack>
             </MudItem>
@@ -144,7 +148,7 @@ else
         @if (relatedProducts.Any())
         {
             <MudDivider Class="my-6" />
-            <MudText Typo="Typo.h5" Class="mb-3">You may also like</MudText>
+            <MudText Typo="Typo.h5" Class="mb-3">Polecane dla Ciebie</MudText>
             <MudGrid Spacing="2">
                 @foreach (var related in relatedProducts)
                 {
@@ -157,7 +161,7 @@ else
                             }
                             <MudCardContent>
                                 <MudText Typo="Typo.subtitle1" Class="fw-bold">@related.Name</MudText>
-                                <MudText Typo="Typo.body2" Color="Color.Primary">@related.DailyPrice.ToString("C") / day</MudText>
+                                <MudText Typo="Typo.body2" Color="Color.Primary">@related.DailyPrice.ToString("C") / dzień</MudText>
                             </MudCardContent>
                         </MudCard>
                     </MudItem>
@@ -175,7 +179,7 @@ else
                      alt="@_lightboxImageTitle" 
                      style="max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 8px;" />
                 <MudText Typo="Typo.caption" Color="Color.Secondary" Align="Align.Center">
-                    Pełny rozmiar - Original quality
+                    Pełny rozmiar - jakość oryginalna
                 </MudText>
             </div>
         </DialogContent>
@@ -221,7 +225,7 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Could not load product: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Nie udało się wczytać produktu: {ex.Message}", Severity.Error);
             notFound = true;
         }
         finally
@@ -272,7 +276,7 @@ else
 
         if (!startDate.HasValue || !endDate.HasValue || endDate <= startDate)
         {
-            Snackbar.Add("Select a valid rental window.", Severity.Warning);
+            Snackbar.Add("Wybierz poprawny okres wypożyczenia.", Severity.Warning);
             return;
         }
 
@@ -280,11 +284,11 @@ else
         var holdSecured = await CartService.EnsureHoldsAsync();
         if (!holdSecured)
         {
-            Snackbar.Add("Could not reserve the selected product. Please adjust dates or try again.", Severity.Warning);
+            Snackbar.Add("Nie udało się zarezerwować wybranego produktu. Zmień daty i spróbuj ponownie.", Severity.Warning);
             return;
         }
 
-        Snackbar.Add($"Product {product.Name} added to cart.", Severity.Success);
+        Snackbar.Add($"Produkt {product.Name} dodany do koszyka.", Severity.Success);
     }
 
     private void GoBack()

@@ -18,7 +18,8 @@ public class CreateRentalRequest
     public List<CreateRentalItem> Items { get; set; } = new();
 
     [Required]
-    public Guid PaymentIntentId { get; set; }
+    [MaxLength(64)]
+    public string PaymentIntentId { get; set; } = string.Empty;
 
     // Dodatkowe informacje od klienta
     public string? Notes { get; set; }

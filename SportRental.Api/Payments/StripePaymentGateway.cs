@@ -60,7 +60,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
         {
             foreach (var (key, value) in metadata)
             {
-                createOptions.Metadata[$"custom_{key}"] = value;
+                createOptions.Metadata[key] = value;
             }
         }
 
@@ -69,23 +69,15 @@ public sealed class StripePaymentGateway : IPaymentGateway
         return MapToDto(paymentIntent, depositAmount);
     }
 
-    public async Task<PaymentIntentDto?> GetPaymentIntentAsync(Guid tenantId, Guid id)
+    public async Task<PaymentIntentDto?> GetPaymentIntentAsync(Guid tenantId, string id)
     {
         try
         {
-            var paymentIntent = await _paymentIntentService.GetAsync(id.ToString());
-            
-            // Verify tenant ownership
-            if (paymentIntent.Metadata.TryGetValue("tenant_id", out var storedTenantId))
+            var paymentIntent = await _paymentIntentService.GetAsync(id);
+
+            if (!VerifyTenantOwnership(paymentIntent, tenantId))
             {
-                if (!Guid.TryParse(storedTenantId, out var parsedTenantId) || parsedTenantId != tenantId)
-                {
-                    return null;
-                }
-            }
-            else
-            {
-                return null; // No tenant metadata = not our payment
+                return null;
             }
 
             var depositAmount = paymentIntent.Metadata.TryGetValue("deposit_amount", out var deposit)
@@ -100,11 +92,11 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
     }
 
-    public async Task<bool> CapturePaymentAsync(Guid tenantId, Guid id)
+    public async Task<bool> CapturePaymentAsync(Guid tenantId, string id)
     {
         try
         {
-            var paymentIntent = await _paymentIntentService.GetAsync(id.ToString());
+            var paymentIntent = await _paymentIntentService.GetAsync(id);
             
             // Verify tenant
             if (!VerifyTenantOwnership(paymentIntent, tenantId))
@@ -115,7 +107,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
             if (paymentIntent.Status == "requires_capture")
             {
                 var captureOptions = new PaymentIntentCaptureOptions();
-                await _paymentIntentService.CaptureAsync(id.ToString(), captureOptions);
+                await _paymentIntentService.CaptureAsync(id, captureOptions);
             }
 
             return true;
@@ -126,11 +118,11 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
     }
 
-    public async Task<bool> CancelPaymentAsync(Guid tenantId, Guid id)
+    public async Task<bool> CancelPaymentAsync(Guid tenantId, string id)
     {
         try
         {
-            var paymentIntent = await _paymentIntentService.GetAsync(id.ToString());
+            var paymentIntent = await _paymentIntentService.GetAsync(id);
             
             // Verify tenant
             if (!VerifyTenantOwnership(paymentIntent, tenantId))
@@ -144,7 +136,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
                 {
                     CancellationReason = "requested_by_customer"
                 };
-                await _paymentIntentService.CancelAsync(id.ToString(), cancelOptions);
+                await _paymentIntentService.CancelAsync(id, cancelOptions);
                 return true;
             }
 
@@ -156,11 +148,11 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
     }
 
-    public async Task<bool> RefundPaymentAsync(Guid tenantId, Guid id, decimal? amount = null, string? reason = null)
+    public async Task<bool> RefundPaymentAsync(Guid tenantId, string id, decimal? amount = null, string? reason = null)
     {
         try
         {
-            var paymentIntent = await _paymentIntentService.GetAsync(id.ToString());
+            var paymentIntent = await _paymentIntentService.GetAsync(id);
             
             // Verify tenant
             if (!VerifyTenantOwnership(paymentIntent, tenantId))
@@ -175,7 +167,7 @@ public sealed class StripePaymentGateway : IPaymentGateway
 
             var refundOptions = new RefundCreateOptions
             {
-                PaymentIntent = id.ToString(),
+                PaymentIntent = id,
                 Reason = reason switch
                 {
                     "duplicate" => "duplicate",
@@ -212,13 +204,9 @@ public sealed class StripePaymentGateway : IPaymentGateway
             _ => PaymentIntentStatus.Pending
         };
 
-        // Stripe uses string IDs like "pi_3ABC...", we need to store it differently
-        // For compatibility with existing GUID-based system, we'll hash the Stripe ID to a deterministic GUID
-        var id = GenerateGuidFromStripeId(paymentIntent.Id);
-
         return new PaymentIntentDto
         {
-            Id = id,
+            Id = paymentIntent.Id,
             Amount = paymentIntent.Amount / 100m,
             DepositAmount = depositAmount,
             Currency = paymentIntent.Currency.ToUpperInvariant(),
@@ -229,23 +217,19 @@ public sealed class StripePaymentGateway : IPaymentGateway
         };
     }
     
-    /// <summary>
-    /// Generates a deterministic GUID from Stripe ID for compatibility with existing system
-    /// </summary>
-    private static Guid GenerateGuidFromStripeId(string stripeId)
-    {
-        using var sha256 = System.Security.Cryptography.SHA256.Create();
-        var hashBytes = sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(stripeId));
-        var guidBytes = new byte[16];
-        Array.Copy(hashBytes, guidBytes, 16);
-        return new Guid(guidBytes);
-    }
-
     private static bool VerifyTenantOwnership(PaymentIntent paymentIntent, Guid tenantId)
     {
+        if (tenantId == Guid.Empty)
+        {
+            return true;
+        }
+
         if (paymentIntent.Metadata.TryGetValue("tenant_id", out var storedTenantId))
         {
-            return Guid.TryParse(storedTenantId, out var parsedTenantId) && parsedTenantId == tenantId;
+            if (Guid.TryParse(storedTenantId, out var parsedTenantId))
+            {
+                return parsedTenantId == tenantId || parsedTenantId == Guid.Empty;
+            }
         }
         return false;
     }

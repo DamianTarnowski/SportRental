@@ -1,0 +1,422 @@
+@page "/my-rentals/{id:guid}"
+@using SportRental.Shared.Models
+@using SportRental.Shared.Services
+@inject IApiService Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<PageTitle>Szczegóły wypożyczenia - SportRental</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
+    @if (_isLoading)
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" Class="mb-4" />
+            <MudText Typo="Typo.h6">Ładowanie szczegółów wypożyczenia...</MudText>
+        </MudPaper>
+    }
+    else if (_rental == null)
+    {
+        <MudPaper Elevation="2" Class="pa-8 text-center">
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Size="Size.Large" Color="Color.Error" Class="mb-4" />
+            <MudText Typo="Typo.h5" Class="mb-2">Wypożyczenie nie znalezione</MudText>
+            <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mb-4">
+                Nie udało się znaleźć wypożyczenia o podanym ID.
+            </MudText>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Primary" 
+                       Href="/my-rentals"
+                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                Powrót do listy wypożyczeń
+            </MudButton>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Elevation="2" Class="pa-6 mb-4">
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.h4">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="mr-2" />
+                        Szczegóły wypożyczenia
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                        ID: @Id
+                    </MudText>
+                </MudStack>
+                <MudChip T="string" Color="@GetStatusColor(_rental.Status)" Size="Size.Large" Variant="Variant.Filled">
+                    @_rental.Status
+                </MudChip>
+            </MudStack>
+
+            <MudButton Variant="Variant.Text" 
+                       Color="Color.Primary" 
+                       Href="/my-rentals"
+                       StartIcon="@Icons.Material.Filled.ArrowBack">
+                Powrót do listy
+            </MudButton>
+        </MudPaper>
+
+        <MudGrid Spacing="3">
+            <!-- Customer Info -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="2" Class="pa-4 h-100">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Class="mr-2" />
+                        Dane klienta
+                    </MudText>
+                    <MudStack Spacing="2">
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Imię i nazwisko</MudText>
+                            <MudText Typo="Typo.body1">@_rental.CustomerName</MudText>
+                        </div>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Rental Period -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="2" Class="pa-4 h-100">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Class="mr-2" />
+                        Okres wynajmu
+                    </MudText>
+                    <MudStack Spacing="2">
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Data rozpoczęcia</MudText>
+                            <MudText Typo="Typo.body1">
+                                @_rental.StartDateUtc.ToLocalTime().ToString("dddd, dd MMMM yyyy, HH:mm")
+                            </MudText>
+                        </div>
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Data zakończenia</MudText>
+                            <MudText Typo="Typo.body1">
+                                @_rental.EndDateUtc.ToLocalTime().ToString("dddd, dd MMMM yyyy, HH:mm")
+                            </MudText>
+                        </div>
+                        <div>
+                            <MudText Typo="Typo.subtitle2" Color="Color.Secondary">Całkowity czas wynajmu</MudText>
+                            <MudText Typo="Typo.body1">
+                                @{
+                                    var duration = _rental.EndDateUtc - _rental.StartDateUtc;
+                                    var days = (int)duration.TotalDays;
+                                    var hours = duration.Hours;
+                                }
+                                @days dni @(hours > 0 ? $"i {hours} godz." : "")
+                            </MudText>
+                        </div>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Payment Info -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="2" Class="pa-4 h-100">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Payment" Class="mr-2" />
+                        Informacje o płatności
+                    </MudText>
+                    <MudStack Spacing="2">
+                        <MudDivider />
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.subtitle2">Kwota całkowita:</MudText>
+                            <MudText Typo="Typo.h6" Color="Color.Primary">@_rental.TotalAmount.ToString("C")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Depozyt (wpłacony):</MudText>
+                            <MudText Typo="Typo.body1">@_rental.DepositAmount.ToString("C")</MudText>
+                        </MudStack>
+                        <MudStack Row="true" Justify="Justify.SpaceBetween">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Pozostało do zapłaty:</MudText>
+                            <MudText Typo="Typo.body1" Color="@((_rental.TotalAmount - _rental.DepositAmount) > 0 ? Color.Warning : Color.Success)">
+                                @((_rental.TotalAmount - _rental.DepositAmount).ToString("C"))
+                            </MudText>
+                        </MudStack>
+                        <MudDivider />
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Contract & Actions -->
+            <MudItem xs="12" md="6">
+                <MudPaper Elevation="2" Class="pa-4 h-100">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Description" Class="mr-2" />
+                        Dokumenty i akcje
+                    </MudText>
+                    <MudStack Spacing="2">
+                        @if (!string.IsNullOrEmpty(_rental.ContractUrl))
+                        {
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Primary" 
+                                       Href="@_rental.ContractUrl" 
+                                       Target="_blank"
+                                       StartIcon="@Icons.Material.Filled.Download"
+                                       FullWidth="true">
+                                Pobierz umowę (PDF)
+                            </MudButton>
+                        }
+                        else
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true">
+                                Umowa nie jest jeszcze dostępna
+                            </MudAlert>
+                        }
+
+                        @if (CanCancelRental(_rental.Status))
+                        {
+                            <MudButton Variant="Variant.Outlined" 
+                                       Color="Color.Error" 
+                                       StartIcon="@Icons.Material.Filled.Cancel"
+                                       FullWidth="true"
+                                       OnClick="CancelRentalAsync"
+                                       Disabled="@_isCancelling">
+                                @(_isCancelling ? "Anulowanie..." : "Anuluj wypożyczenie")
+                            </MudButton>
+                        }
+
+                        <MudButton Variant="Variant.Text" 
+                                   Color="Color.Secondary" 
+                                   Href="/contact"
+                                   StartIcon="@Icons.Material.Filled.ContactSupport"
+                                   FullWidth="true">
+                            Skontaktuj się z nami
+                        </MudButton>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Rented Items -->
+            <MudItem xs="12">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory" Class="mr-2" />
+                        Wypożyczone produkty (@_rental.Items.Count)
+                    </MudText>
+
+                    <MudTable Items="@_rental.Items" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Produkt</MudTh>
+                            <MudTh>Ilość</MudTh>
+                            <MudTh>Cena za dzień</MudTh>
+                            <MudTh class="text-right">Razem</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Produkt">
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.body1" Class="fw-bold">@context.ProductName</MudText>
+                                </MudStack>
+                            </MudTd>
+                            <MudTd DataLabel="Ilość">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info">
+                                    @context.Quantity szt.
+                                </MudChip>
+                            </MudTd>
+                            <MudTd DataLabel="Cena za dzień">
+                                @context.DailyPrice.ToString("C")
+                            </MudTd>
+                            <MudTd DataLabel="Razem" class="text-right">
+                                <MudText Typo="Typo.body1" Class="fw-bold" Color="Color.Primary">
+                                    @context.TotalPrice.ToString("C")
+                                </MudText>
+                            </MudTd>
+                        </RowTemplate>
+                        <FooterContent>
+                            <MudTh colspan="3" class="text-right">
+                                <MudText Typo="Typo.h6">Suma:</MudText>
+                            </MudTh>
+                            <MudTh class="text-right">
+                                <MudText Typo="Typo.h6" Color="Color.Primary">
+                                    @_rental.Items.Sum(i => i.TotalPrice).ToString("C")
+                                </MudText>
+                            </MudTh>
+                        </FooterContent>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Status Timeline -->
+            <MudItem xs="12">
+                <MudPaper Elevation="2" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Timeline" Class="mr-2" />
+                        Status wypożyczenia
+                    </MudText>
+                    
+                    <MudTimeline TimelineOrientation="TimelineOrientation.Vertical" TimelinePosition="TimelinePosition.Start">
+                        <MudTimelineItem Color="@GetTimelineColor("Reserved")" Size="Size.Small">
+                            <MudText Typo="Typo.subtitle2" Class="fw-bold">Zarezerwowane</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Rezerwacja została utworzona</MudText>
+                        </MudTimelineItem>
+                        
+                        <MudTimelineItem Color="@GetTimelineColor("Confirmed")" Size="Size.Small">
+                            <MudText Typo="Typo.subtitle2" Class="fw-bold">Potwierdzone</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Płatność została zrealizowana</MudText>
+                        </MudTimelineItem>
+                        
+                        <MudTimelineItem Color="@GetTimelineColor("Active")" Size="Size.Small">
+                            <MudText Typo="Typo.subtitle2" Class="fw-bold">Aktywne</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Sprzęt został wydany</MudText>
+                        </MudTimelineItem>
+                        
+                        <MudTimelineItem Color="@GetTimelineColor("Returned")" Size="Size.Small">
+                            <MudText Typo="Typo.subtitle2" Class="fw-bold">Zwrócone</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Sprzęt został zwrócony</MudText>
+                        </MudTimelineItem>
+                    </MudTimeline>
+
+                    <MudAlert Severity="@GetStatusSeverity(_rental.Status)" Class="mt-4">
+                        <MudText Typo="Typo.body1">
+                            <strong>Aktualny status:</strong> @GetStatusDescription(_rental.Status)
+                        </MudText>
+                    </MudAlert>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private bool _isLoading = true;
+    private MyRentalDto? _rental;
+    private bool _isCancelling;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRentalAsync();
+    }
+
+    private async Task LoadRentalAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            // Pobierz wszystkie wynajmy i znajdź ten konkretny
+            var rentals = await Api.GetMyRentalsAsync();
+            _rental = rentals?.FirstOrDefault(r => r.Id == Id);
+
+            if (_rental == null)
+            {
+                Snackbar.Add("Nie znaleziono wypożyczenia", Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd podczas ładowania: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task CancelRentalAsync()
+    {
+        if (_rental == null) return;
+
+        var confirmed = await DialogService.ShowMessageBox(
+            "Potwierdź anulowanie",
+            "Czy na pewno chcesz anulować to wypożyczenie?",
+            yesText: "Tak, anuluj",
+            cancelText: "Nie");
+
+        if (confirmed != true) return;
+
+        _isCancelling = true;
+        try
+        {
+            var success = await Api.CancelRentalAsync(Id);
+            if (success)
+            {
+                Snackbar.Add("Wypożyczenie zostało anulowane", Severity.Success);
+                await LoadRentalAsync(); // Odśwież dane
+            }
+            else
+            {
+                Snackbar.Add("Nie udało się anulować wypożyczenia", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isCancelling = false;
+        }
+    }
+
+    private bool CanCancelRental(string status)
+    {
+        return status is "Reserved" or "Confirmed";
+    }
+
+    private Color GetStatusColor(string status)
+    {
+        return status switch
+        {
+            "Reserved" or "Confirmed" => Color.Primary,
+            "Active" or "OnRent" => Color.Success,
+            "Returned" or "Completed" => Color.Info,
+            "Cancelled" => Color.Error,
+            "Overdue" => Color.Warning,
+            _ => Color.Default
+        };
+    }
+
+    private Color GetTimelineColor(string targetStatus)
+    {
+        if (_rental == null) return Color.Default;
+        
+        var currentIndex = GetStatusIndex(_rental.Status);
+        var targetIndex = GetStatusIndex(targetStatus);
+        
+        return targetIndex <= currentIndex ? Color.Success : Color.Default;
+    }
+
+    private int GetStatusIndex(string status)
+    {
+        return status switch
+        {
+            "Reserved" => 1,
+            "Confirmed" => 2,
+            "Active" or "OnRent" => 3,
+            "Returned" or "Completed" => 4,
+            _ => 0
+        };
+    }
+
+    private Severity GetStatusSeverity(string status)
+    {
+        return status switch
+        {
+            "Reserved" or "Confirmed" => Severity.Info,
+            "Active" or "OnRent" => Severity.Success,
+            "Returned" or "Completed" => Severity.Success,
+            "Cancelled" => Severity.Error,
+            "Overdue" => Severity.Warning,
+            _ => Severity.Normal
+        };
+    }
+
+    private string GetStatusDescription(string status)
+    {
+        return status switch
+        {
+            "Reserved" => "Wypożyczenie zostało zarezerwowane i oczekuje na potwierdzenie płatności.",
+            "Confirmed" => "Płatność została zrealizowana. Możesz odebrać sprzęt w wyznaczonym terminie.",
+            "Active" => "Wypożyczenie jest aktywne. Sprzęt został wydany i jest w użyciu.",
+            "OnRent" => "Sprzęt jest obecnie wypożyczony.",
+            "Returned" => "Sprzęt został zwrócony. Wypożyczenie zostało zakończone.",
+            "Completed" => "Wypożyczenie zostało pomyślnie zakończone.",
+            "Cancelled" => "Wypożyczenie zostało anulowane.",
+            "Overdue" => "Termin zwrotu sprzętu minął. Prosimy o kontakt.",
+            _ => "Status nieznany"
+        };
+    }
+}
+

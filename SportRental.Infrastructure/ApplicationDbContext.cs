@@ -85,6 +85,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
         {
             entity.HasKey(r => r.Id);
             entity.Property(r => r.TotalAmount).HasPrecision(18, 2);
+            entity.Property(r => r.PaymentIntentId).HasMaxLength(64);
             entity.HasOne(r => r.Customer)
                 .WithMany()
                 .HasForeignKey(r => r.CustomerId)

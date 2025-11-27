@@ -916,8 +916,9 @@ namespace SportRental.Infrastructure.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("PaymentIntentId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("PaymentIntentId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("PaymentStatus")
                         .IsRequired()

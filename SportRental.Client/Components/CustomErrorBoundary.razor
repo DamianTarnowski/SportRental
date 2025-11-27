@@ -1,0 +1,74 @@
+@using Microsoft.AspNetCore.Components.Web
+@inherits Microsoft.AspNetCore.Components.Web.ErrorBoundary
+
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else
+{
+    <div class="min-h-screen flex items-center justify-center px-4 bg-gray-50">
+        <div class="max-w-2xl w-full bg-white rounded-lg shadow-xl p-8">
+            <!-- Error Icon -->
+            <div class="text-center mb-6">
+                <div class="text-6xl mb-4">⚠️</div>
+                <h1 class="text-3xl font-bold text-red-600 mb-2">Wystąpił nieoczekiwany błąd</h1>
+                <p class="text-gray-600">Przepraszamy za niedogodności. Nasz zespół został powiadomiony o problemie.</p>
+            </div>
+
+            <!-- Error Details (only in Development) -->
+            @if (ShowDetails)
+            {
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                    <div class="flex items-start">
+                        <svg class="h-5 w-5 text-red-400 mt-0.5 mr-2 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                        <div class="flex-1">
+                            <h3 class="text-sm font-medium text-red-800 mb-2">Szczegóły błędu (tryb deweloperski):</h3>
+                            <div class="text-sm text-red-700 font-mono bg-white p-3 rounded border border-red-200 overflow-auto max-h-60">
+                                <strong>@CurrentException.GetType().Name:</strong> @CurrentException.Message
+                                @if (!string.IsNullOrEmpty(CurrentException.StackTrace))
+                                {
+                                    <pre class="mt-2 text-xs">@CurrentException.StackTrace</pre>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Action Buttons -->
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <button @onclick="@(() => base.Recover())"
+                        class="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                    </svg>
+                    Spróbuj ponownie
+                </button>
+
+                <a href="/"
+                   class="inline-flex items-center justify-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                    </svg>
+                    Strona główna
+                </a>
+            </div>
+
+            <!-- Support Info -->
+            <div class="mt-8 pt-6 border-t border-gray-200 text-center">
+                <p class="text-sm text-gray-600">
+                    Jeśli problem się powtarza, <a href="/contact" class="text-blue-600 hover:text-blue-800 underline">skontaktuj się z nami</a>
+                </p>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public bool ShowDetails { get; set; } = true; // Change to false in production
+}
+

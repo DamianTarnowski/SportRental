@@ -17,7 +17,9 @@
     "SecretKey": "sk_test_YOUR_TEST_KEY",
     "PublishableKey": "pk_test_YOUR_TEST_KEY",
     "WebhookSecret": "whsec_YOUR_WEBHOOK_SECRET",
-    "Currency": "pln"
+    "Currency": "pln",
+    "SuccessUrl": "https://localhost:5014/checkout/success?session_id={CHECKOUT_SESSION_ID}",
+    "CancelUrl": "https://localhost:5014/checkout/cancel"
   },
   "Email": {
     "Smtp": {

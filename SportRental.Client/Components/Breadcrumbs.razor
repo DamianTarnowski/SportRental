@@ -1,0 +1,120 @@
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<nav aria-label="Breadcrumb - Nawigacja okruszkowa" class="mb-4">
+    <ol class="flex items-center space-x-2 text-sm text-gray-600">
+        @foreach (var (item, index) in _breadcrumbs.Select((b, i) => (b, i)))
+        {
+            @if (index < _breadcrumbs.Count - 1)
+            {
+                <li class="flex items-center">
+                    <a href="@item.Url" class="hover:text-blue-600 transition-colors">@item.Label</a>
+                    <svg class="h-4 w-4 mx-2 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                </li>
+            }
+            else
+            {
+                <li class="text-gray-900 font-medium" aria-current="page">
+                    @item.Label
+                </li>
+            }
+        }
+    </ol>
+</nav>
+
+@code {
+    private List<BreadcrumbItem> _breadcrumbs = new();
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        UpdateBreadcrumbs();
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        UpdateBreadcrumbs();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void UpdateBreadcrumbs()
+    {
+        _breadcrumbs.Clear();
+
+        var uri = new Uri(Navigation.Uri);
+        var path = uri.AbsolutePath.ToLower().Trim('/');
+
+        // Zawsze dodaj Home
+        _breadcrumbs.Add(new BreadcrumbItem { Label = "Strona główna", Url = "/" });
+
+        if (string.IsNullOrEmpty(path))
+        {
+            return; // Jesteśmy na home
+        }
+
+        // Mapowanie ścieżek na breadcrumbs
+        if (path == "products")
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Katalog produktów", Url = "/products" });
+        }
+        else if (path.StartsWith("products/"))
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Katalog produktów", Url = "/products" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Szczegóły produktu", Url = uri.AbsolutePath });
+        }
+        else if (path == "cart")
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "/cart" });
+        }
+        else if (path == "checkout")
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "/cart" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Płatność", Url = "/checkout" });
+        }
+        else if (path.StartsWith("checkout/"))
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "/cart" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Płatność", Url = "/checkout" });
+            
+            if (path.Contains("success"))
+            {
+                _breadcrumbs.Add(new BreadcrumbItem { Label = "Potwierdzenie", Url = uri.AbsolutePath });
+            }
+        }
+        else if (path == "my-rentals")
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Moje wypożyczenia", Url = "/my-rentals" });
+        }
+        else if (path.StartsWith("my-rentals/"))
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Moje wypożyczenia", Url = "/my-rentals" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Szczegóły", Url = uri.AbsolutePath });
+        }
+        else if (path == "contact")
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Kontakt", Url = "/contact" });
+        }
+        else if (path == "login")
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Logowanie", Url = "/login" });
+        }
+        else if (path == "register")
+        {
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Rejestracja", Url = "/register" });
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+
+    private class BreadcrumbItem
+    {
+        public required string Label { get; set; }
+        public required string Url { get; set; }
+    }
+}
+

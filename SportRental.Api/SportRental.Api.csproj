@@ -16,6 +16,10 @@
     <PackageReference Include="MailKit" Version="4.9.0" />
     <PackageReference Include="MimeKit" Version="4.9.0" />
     <PackageReference Include="QuestPDF" Version="2025.7.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.9">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <PropertyGroup>
