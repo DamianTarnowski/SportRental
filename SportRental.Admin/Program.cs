@@ -274,6 +274,24 @@ if (builder.Environment.IsDevelopment() && mediaAutoStart)
 
 var app = builder.Build();
 
+// Jednorazowe seeding danych demo: dotnet run --project SportRental.Admin -- --seed-demo [--seed-email=hdtdtr@gmail.com]
+if (args.Any(a => a.Equals("--seed-demo", StringComparison.OrdinalIgnoreCase)))
+{
+    using var scope = app.Services.CreateScope();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<DemoDataSeeder>>();
+    var seeder = new DemoDataSeeder(
+        scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>(),
+        scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>(),
+        scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>(),
+        logger);
+
+    var emailArg = args.FirstOrDefault(a => a.StartsWith("--seed-email=", StringComparison.OrdinalIgnoreCase));
+    var seedEmail = emailArg?.Split('=', 2)[1] ?? "hdtdtr@gmail.com";
+    await seeder.SeedAsync(seedEmail);
+    logger.LogInformation("Demo seeding finished. Exiting.");
+    return;
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {

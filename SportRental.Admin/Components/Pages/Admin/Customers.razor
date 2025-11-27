@@ -1,6 +1,7 @@
 @page "/admin/customers"
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@using SportRental.Admin.Components.Dialogs
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IDialogService DialogService
@@ -17,10 +18,10 @@
                     <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj bazą klientów wypożyczalni</MudText>
                 </div>
             </MudStack>
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Surface" 
-                       StartIcon="@Icons.Material.Filled.PersonAdd"
-                       OnClick="CreateNew"
+                       <MudButton Variant="Variant.Filled" 
+                                  Color="Color.Surface" 
+                                  StartIcon="@Icons.Material.Filled.PersonAdd"
+                       OnClick="OpenCreateDialog"
                        Size="Size.Large"
                        Class="rounded-pill px-6">
                 Nowy klient
@@ -150,19 +151,19 @@
                             <MudStack Spacing="1" Class="w-100">
                                 <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" FullWidth="true">
                                     <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                               OnClick="() => Edit(customer)"
+                                               OnClick="async () => await OpenEditDialog(customer)"
                                                Size="Size.Small">
                                         Edytuj
                                     </MudButton>
                                     <MudButton StartIcon="@Icons.Material.Filled.Assignment" 
-                                               OnClick="() => ViewRentals(customer)"
+                                               OnClick="async () => await ViewRentals(customer)"
                                                Color="Color.Info"
                                                Size="Size.Small">
                                         Wynajmy
                                     </MudButton>
                                 </MudButtonGroup>
                                 <MudButton StartIcon="@Icons.Material.Filled.Delete" 
-                                           OnClick="() => Delete(customer)"
+                                           OnClick="async () => await Delete(customer)"
                                            Color="Color.Error"
                                            Variant="Variant.Outlined"
                                            Size="Size.Small"
@@ -177,29 +178,6 @@
         </MudGrid>
     }
 
-    <MudDialog @bind-Visible="dialogOpen" Options="@customerDialogOptions">
-        <TitleContent>
-            <MudText Typo="Typo.h6">
-                @(model.Id == Guid.Empty ? "Dodaj klienta" : "Edytuj klienta")
-            </MudText>
-        </TitleContent>
-        <DialogContent>
-            <MudStack Spacing="3">
-                <MudTextField @bind-Value="model.FullName" Label="Imię i nazwisko:" Required="true" />
-                <MudTextField @bind-Value="model.Address" Label="Adres:" Lines="2" />
-                <MudTextField @bind-Value="model.PhoneNumber" Label="Numer telefonu: (+48 dla Polski)" />
-                <MudTextField @bind-Value="model.Email" Label="Email:" InputType="InputType.Email" />
-                <MudTextField @bind-Value="model.DocumentNumber" Label="Numer dokumentu:" />
-                <MudTextField @bind-Value="model.Notes" Label="Notatki:" Lines="3" />
-            </MudStack>
-        </DialogContent>
-        <DialogActions>
-            <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="() => dialogOpen=false" Class="px-10">Anuluj</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Class="px-10">
-                @(model.Id == Guid.Empty ? "Dodaj" : "Zapisz")
-            </MudButton>
-        </DialogActions>
-    </MudDialog>
 </MudContainer>
 
 @code {
@@ -211,49 +189,84 @@
                              || (c.PhoneNumber?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
 
     private string? search;
-    private bool dialogOpen;
-    private readonly DialogOptions customerDialogOptions = new() { MaxWidth = MaxWidth.Medium };
-    private Customer model = new();
 
     protected override async Task OnInitializedAsync()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(CurrentTenantId());
-        customers = await Db.Customers.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
+        await RefreshCustomers();
     }
 
-    private void CreateNew()
+    private async Task OpenCreateDialog()
     {
-        model = new Customer { Id = Guid.Empty, TenantId = CurrentTenantId() };
-        dialogOpen = true;
+        await OpenCustomerDialog();
     }
 
-    private void Edit(Customer c)
+    private async Task OpenEditDialog(Customer c)
     {
-        model = new Customer
+        await OpenCustomerDialog(c);
+    }
+
+    private async Task OpenCustomerDialog(Customer? existing = null)
+    {
+        var isNew = existing is null || existing.Id == Guid.Empty;
+        var parameters = new DialogParameters
         {
-            Id = c.Id,
-            TenantId = c.TenantId,
-            FullName = c.FullName,
-            Email = c.Email,
-            PhoneNumber = c.PhoneNumber,
-            DocumentNumber = c.DocumentNumber
+            ["Customer"] = isNew ? CreateEmptyCustomer() : CloneCustomer(existing!),
+            ["IsNew"] = isNew
         };
-        dialogOpen = true;
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            NoHeader = false,
+            BackdropClick = false
+        };
+
+        var dialog = await DialogService.ShowAsync<CustomerEditDialog>(
+            isNew ? "Nowy klient" : "Edytuj klienta",
+            parameters,
+            options);
+
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is Customer updatedCustomer)
+        {
+            await SaveCustomerAsync(updatedCustomer, isNew);
+        }
     }
 
-    private async Task Save()
+    private Customer CreateEmptyCustomer() => new()
+    {
+        Id = Guid.Empty,
+        TenantId = CurrentTenantId()
+    };
+
+    private static Customer CloneCustomer(Customer source) => new()
+    {
+        Id = source.Id,
+        TenantId = source.TenantId,
+        FullName = source.FullName,
+        Email = source.Email,
+        PhoneNumber = source.PhoneNumber,
+        DocumentNumber = source.DocumentNumber,
+        Address = source.Address,
+        Notes = source.Notes,
+        CreatedAtUtc = source.CreatedAtUtc
+    };
+
+    private async Task SaveCustomerAsync(Customer model, bool isNew)
     {
         // Walidacja i normalizacja numeru telefonu jak w starym projekcie
-        if (!string.IsNullOrWhiteSpace(model.PhoneNumber) && !model.PhoneNumber.StartsWith("+"))
-        {
-            model.PhoneNumber = "+48" + model.PhoneNumber;
-            Snackbar.Add("Numer telefonu został zmieniony na numer polski (+48). Przykładowy numer: +48654999123", Severity.Info);
-        }
+        model.PhoneNumber = NormalizePhone(model.PhoneNumber);
+        model.FullName = model.FullName?.Trim() ?? string.Empty;
+        model.Email = model.Email?.Trim();
+        model.Address = model.Address?.Trim();
+        model.DocumentNumber = model.DocumentNumber?.Trim();
+        model.Notes = model.Notes?.Trim();
 
         await using var Db = await DbFactory.CreateDbContextAsync();
         Db.SetTenant(CurrentTenantId());
-        if (model.Id == Guid.Empty)
+        if (isNew || model.Id == Guid.Empty)
         {
             model.Id = Guid.NewGuid();
             model.CreatedAtUtc = DateTime.UtcNow;
@@ -263,19 +276,54 @@
         }
         else
         {
-            Db.Customers.Update(model);
+            var existing = await Db.Customers.FirstOrDefaultAsync(x => x.Id == model.Id);
+            if (existing is null)
+            {
+                Snackbar.Add("Nie znaleziono klienta do edycji", Severity.Warning);
+                return;
+            }
+
+            existing.FullName = model.FullName;
+            existing.Email = model.Email;
+            existing.PhoneNumber = model.PhoneNumber;
+            existing.DocumentNumber = model.DocumentNumber;
+            existing.Address = model.Address;
+            existing.Notes = model.Notes;
+            Db.Customers.Update(existing);
             Snackbar.Add("Klient został zaktualizowany", Severity.Success);
         }
         await Db.SaveChangesAsync();
-        customers = await Db.Customers.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
-        dialogOpen = false;
-        StateHasChanged();
+        await RefreshCustomers();
     }
 
-    private void ViewRentals(Customer customer)
+    private async Task ViewRentals(Customer customer)
     {
-        // Przekierowanie do strony wynajmów z filtrem dla klienta
-        Navigation.NavigateTo($"/admin/rentals?customerId={customer.Id}");
+        await using var Db = await DbFactory.CreateDbContextAsync();
+        Db.SetTenant(CurrentTenantId());
+
+        var rentals = await Db.Rentals
+            .Where(r => r.CustomerId == customer.Id)
+            .Include(r => r.Items)
+                .ThenInclude(i => i.Product)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .AsNoTracking()
+            .ToListAsync();
+
+        var parameters = new DialogParameters
+        {
+            ["CustomerName"] = customer.FullName,
+            ["CustomerId"] = customer.Id,
+            ["Rentals"] = rentals
+        };
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            CloseOnEscapeKey = true
+        };
+
+        await DialogService.ShowAsync<CustomerRentalsDialog>("Wynajmy klienta", parameters, options);
     }
 
     [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
@@ -295,10 +343,59 @@
 
     private async Task Delete(Customer c)
     {
+        var confirm = await DialogService.ShowMessageBox(
+            "Usuń klienta",
+            $"Czy na pewno chcesz usunąć klienta \"{c.FullName}\" wraz z jego danymi?",
+            yesText: "Usuń",
+            cancelText: "Anuluj",
+            options: new DialogOptions
+            {
+                CloseOnEscapeKey = true,
+                MaxWidth = MaxWidth.ExtraSmall
+            });
+
+        if (confirm is not true)
+            return;
+
         await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.Customers.Remove(c);
+        Db.SetTenant(CurrentTenantId());
+
+        var existing = await Db.Customers.FirstOrDefaultAsync(x => x.Id == c.Id);
+        if (existing is null)
+        {
+            Snackbar.Add("Klient nie istnieje lub został już usunięty", Severity.Warning);
+            return;
+        }
+
+        Db.Customers.Remove(existing);
         await Db.SaveChangesAsync();
         customers.RemoveAll(x => x.Id == c.Id);
+        Snackbar.Add("Klient został usunięty", Severity.Success);
         StateHasChanged();
+    }
+
+    private async Task RefreshCustomers()
+    {
+        await using var Db = await DbFactory.CreateDbContextAsync();
+        Db.SetTenant(CurrentTenantId());
+        customers = await Db.Customers.AsNoTracking()
+            .OrderByDescending(p => p.CreatedAtUtc)
+            .Take(500)
+            .ToListAsync();
+        StateHasChanged();
+    }
+
+    private string? NormalizePhone(string? phoneNumber)
+    {
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+            return phoneNumber;
+
+        var trimmed = new string(phoneNumber.Where(ch => char.IsDigit(ch) || ch == '+').ToArray());
+        if (!trimmed.StartsWith("+"))
+        {
+            trimmed = "+48" + trimmed.TrimStart('0');
+            Snackbar.Add("Numer telefonu został uzupełniony prefiksem +48.", Severity.Info);
+        }
+        return trimmed;
     }
 }

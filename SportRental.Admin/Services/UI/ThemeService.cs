@@ -7,7 +7,20 @@ namespace SportRental.Admin.Services.UI
         public MudTheme LightTheme { get; } = new MudTheme();
         public MudTheme DarkTheme { get; } = new MudTheme();
 
-        public bool IsDarkMode { get; private set; }
+        private bool _isDarkMode;
+        
+        public bool IsDarkMode 
+        { 
+            get => _isDarkMode;
+            set
+            {
+                if (_isDarkMode != value)
+                {
+                    _isDarkMode = value;
+                    OnChanged?.Invoke();
+                }
+            }
+        }
 
         public MudTheme CurrentTheme => IsDarkMode ? DarkTheme : LightTheme;
 
@@ -16,7 +29,6 @@ namespace SportRental.Admin.Services.UI
         public void Toggle()
         {
             IsDarkMode = !IsDarkMode;
-            OnChanged?.Invoke();
         }
 
         public void SetColors(string? primaryHex, string? secondaryHex)

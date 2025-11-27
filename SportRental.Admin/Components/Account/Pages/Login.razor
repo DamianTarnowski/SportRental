@@ -4,77 +4,134 @@
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using SportRental.Admin.Data
-@using MudBlazor
 
 @inject SignInManager<ApplicationUser> SignInManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Logowanie</PageTitle>
+<PageTitle>Logowanie - SportRental</PageTitle>
 
-@if (isAuthenticated)
-{
-    <MudPaper Class="pa-4">
-        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Dense="true">
-            Jesteś już zalogowany jako <b>@currentUserName</b>.
-        </MudAlert>
-        <MudStack Row Spacing="2" Class="mt-3">
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick='@(() => NavigationManager.NavigateTo("dashboard"))'>Przejdź do panelu</MudButton>
-            <form action="Account/Logout" method="post">
-                <AntiforgeryToken />
-                <input type="hidden" name="ReturnUrl" value="@NavigationManager.Uri" />
-                <MudButton Color="Color.Secondary" Variant="Variant.Outlined" Type="Submit">Wyloguj</MudButton>
-            </form>
-        </MudStack>
-    </MudPaper>
-}
-else
-{
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
-    <MudPaper Class="pa-5" Elevation="2">
-        <MudStack Spacing="1">
-            <MudText Typo="Typo.h5" Class="mb-2">Logowanie do panelu</MudText>
-            <StatusMessage Message="@errorMessage" />
-            <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand-accent"></div>
+        
+        <div class="auth-logo">
+            <div class="auth-logo-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 14v5h2v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/>
+                </svg>
+            </div>
+            <h1 class="auth-title">SportRental</h1>
+            <p class="auth-subtitle">Panel administracyjny</p>
+        </div>
+
+        @if (isAuthenticated)
+        {
+            <div class="auth-logged-in">
+                <div class="auth-logged-in-icon">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                </div>
+                <p class="auth-logged-in-text">
+                    Jesteś zalogowany jako<br/>
+                    <span class="auth-logged-in-user">@currentUserName</span>
+                </p>
+                <div class="auth-button-group">
+                    <a href="dashboard" class="auth-submit" style="text-decoration: none; display: inline-block; text-align: center;">
+                        Przejdź do panelu
+                    </a>
+                    <form action="Account/Logout" method="post" style="margin: 0;">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="@NavigationManager.Uri" />
+                        <button type="submit" class="auth-button-secondary">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                            Wyloguj
+                        </button>
+                    </form>
+                </div>
+            </div>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="auth-alert auth-alert-error">
+                    <svg class="auth-alert-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                    <span>@errorMessage</span>
+                </div>
+            }
+
+            <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login" class="auth-form">
                 <DataAnnotationsValidator />
-                <ValidationSummary class="text-danger" role="alert" />
+                <ValidationSummary class="auth-validation-summary" role="alert" />
 
-                <MudTextField @bind-Value="Input.Email"
-                              Label="Email"
-                              Variant="Variant.Outlined"
-                              FullWidth="true"
-                              Required="true"
-                              InputType="InputType.Email"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Email" />
+                <div class="auth-field">
+                    <label class="auth-label" for="email">Email</label>
+                    <svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                        <polyline points="22,6 12,13 2,6"/>
+                    </svg>
+                    <InputText id="email" @bind-Value="Input.Email" class="auth-input" type="email" 
+                               placeholder="twoj@email.pl" autocomplete="email" required />
+                    <ValidationMessage For="() => Input.Email" />
+                </div>
 
-                <MudTextField @bind-Value="Input.Password"
-                              Label="Hasło"
-                              Variant="Variant.Outlined"
-                              FullWidth="true"
-                              Required="true"
-                              InputType="InputType.Password"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Lock" />
+                <div class="auth-field">
+                    <label class="auth-label" for="password">Hasło</label>
+                    <svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    <InputText id="password" @bind-Value="Input.Password" class="auth-input" type="password" 
+                               placeholder="••••••••" autocomplete="current-password" required />
+                    <ValidationMessage For="() => Input.Password" />
+                </div>
 
-                <MudCheckBox T="bool" @bind-Checked="Input.RememberMe" Color="Color.Primary" Label="Zapamiętaj mnie" />
+                <div class="auth-checkbox-wrapper">
+                    <InputCheckbox @bind-Value="Input.RememberMe" class="auth-checkbox" id="rememberMe" />
+                    <label class="auth-checkbox-label" for="rememberMe">Zapamiętaj mnie na tym urządzeniu</label>
+                </div>
 
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" ButtonType="ButtonType.Submit" Class="mt-2">
-                    Zaloguj
-                </MudButton>
-
-                <MudStack Class="mt-3" Spacing="1">
-                    <MudLink Href="Account/ForgotPassword">Przypomnij hasło</MudLink>
-                    <MudLink Href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Zarejestruj nowe konto</MudLink>
-                    <MudLink Href="Account/ResendEmailConfirmation">Wyślij ponownie potwierdzenie e-mail</MudLink>
-                </MudStack>
+                <button class="auth-submit" type="submit">
+                    Zaloguj się
+                </button>
             </EditForm>
-        </MudStack>
-    </MudPaper>
-</MudContainer>
 
-}
+            <div class="auth-links">
+                <a href="Account/ForgotPassword" class="auth-link">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    Nie pamiętam hasła
+                </a>
+                <a href="@NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl })" 
+                   class="auth-link auth-link-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="8.5" cy="7" r="4"/>
+                        <line x1="20" y1="8" x2="20" y2="14"/>
+                        <line x1="23" y1="11" x2="17" y2="11"/>
+                    </svg>
+                    Utwórz nowe konto
+                </a>
+            </div>
+        }
+        
+        <div class="auth-footer">
+            &copy; @DateTime.Now.Year SportRental. Wszelkie prawa zastrzeżone.
+        </div>
+    </div>
+</div>
 
 @code {
     private string? errorMessage;
@@ -85,7 +142,7 @@ else
     private HttpContext HttpContext { get; set; } = default!;
 
     [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = new();
+    private InputModel Input { get; set; } = default!;
 
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
@@ -94,9 +151,11 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Input ??= new();
+
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
-            // Clear the existing external cookie to ensure a clean login process
+            // Czyścimy zewnętrzne cookie, żeby login był czysty
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
         }
 
@@ -115,7 +174,7 @@ else
             var authState = await AuthenticationStateTask;
             var wasAuthenticated = isAuthenticated;
             isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
-            
+
             if (isAuthenticated && !wasAuthenticated)
             {
                 currentUserName = authState.User.Identity?.Name;
@@ -126,8 +185,6 @@ else
 
     public async Task LoginUser()
     {
-        // This doesn't count login failures towards account lockout
-        // To enable password failures to trigger account lockout, set lockoutOnFailure: true
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
         if (result.Succeeded)
         {
@@ -151,17 +208,17 @@ else
         }
         else
         {
-            errorMessage = "Błędna próba logowania.";
+            errorMessage = "Nieprawidłowy email lub hasło. Spróbuj ponownie.";
         }
     }
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "Email jest wymagany")]
+        [EmailAddress(ErrorMessage = "Nieprawidłowy format adresu email")]
         public string Email { get; set; } = "";
 
-        [Required]
+        [Required(ErrorMessage = "Hasło jest wymagane")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = "";
 

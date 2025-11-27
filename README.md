@@ -1,14 +1,14 @@
-﻿<div align="center">
+<div align="center">
 
 # 🏂 SportRental
 
 ### *Enterprise-Grade Multi-Tenant Sport Equipment Rental Platform*
 
-**Engineered with .NET 9 • Blazor • Azure • Stripe**
+**Engineered with \.NET 10 • Blazor • Azure • Stripe**
 
 ---
 
-[![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![\.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-Server%20%2B%20WASM-512BD4?style=for-the-badge&logo=blazor&logoColor=white)](https://learn.microsoft.com/aspnet/core/blazor/)
 [![Azure](https://img.shields.io/badge/Azure-Key%20Vault%20%2B%20Blob-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
@@ -23,7 +23,7 @@
 
 ## 🚀 **Quick Overview**
 
-> **SportRental** is a **production-ready, enterprise-grade** multi-tenant platform for sport equipment rental businesses. Built with cutting-edge .NET 9 technologies, it features complete **Stripe payment integration**, **Azure cloud services**, **automated PDF contracts**, and a stunning **Blazor UI**.
+> **SportRental** is a **production-ready, enterprise-grade** multi-tenant platform for sport equipment rental businesses. Built with cutting-edge \.NET 10 technologies, it features complete **Stripe payment integration**, **Azure cloud services**, **automated PDF contracts**, and a stunning **Blazor UI**.
 
 ### **🎯 Perfect For:**
 - 🏂 Ski & Snowboard Rental Shops
@@ -149,10 +149,10 @@ flowchart TB
 | Module | Description | Tech Stack | Status |
 |--------|-------------|------------|--------|
 | **🎨 SportRental.Admin** | Blazor Server admin panel with MudBlazor | C# 12, Blazor Server, MudBlazor | ✅ Production |
-| **📡 SportRental.Api** | Public REST API with minimal APIs | ASP.NET Core 9, Minimal APIs | ✅ Production |
+| **📡 SportRental.Api** | Public REST API with minimal APIs | ASP.NET Core 10, Minimal APIs | ✅ Production |
 | **💻 SportRental.Client** | Blazor WebAssembly public client | Blazor WASM, TailwindCSS | ✅ Production |
 | **📸 SportRental.MediaStorage** | Media microservice with chunked uploads | Minimal APIs, SQLite | ✅ Production |
-| **🔧 SportRental.Infrastructure** | EF Core, domain models, migrations | Entity Framework Core 9 | ✅ Production |
+| **🔧 SportRental.Infrastructure** | EF Core, domain models, migrations | Entity Framework Core 10 | ✅ Production |
 | **📦 SportRental.Shared** | Shared DTOs, components, HTTP clients | Razor Class Library | ✅ Production |
 | **🧪 *.Tests** | 356 automated tests (100% pass rate) | xUnit, bUnit, Moq | ✅ Passing |
 
@@ -163,9 +163,9 @@ flowchart TB
 <div align="center">
 
 ### **Backend**
-![.NET](https://img.shields.io/badge/.NET%209-512BD4?style=flat-square&logo=dotnet&logoColor=white)
+![.NET](https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white)
 ![C#](https://img.shields.io/badge/C%23%2012-239120?style=flat-square&logo=c-sharp&logoColor=white)
-![Entity Framework](https://img.shields.io/badge/EF%20Core%209-512BD4?style=flat-square&logo=.net&logoColor=white)
+![Entity Framework](https://img.shields.io/badge/EF%20Core%2010-512BD4?style=flat-square&logo=.net&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=flat-square&logo=sqlite&logoColor=white)
 
@@ -180,6 +180,8 @@ flowchart TB
 ![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 
+> 📝 **Uwagi dev:** na etapie lokalnym budujemy/uruchamiamy ręcznie (na laptopie) bez CI/CD w chmurze, żeby nie generować kosztów GitHub Actions. Pipeline’y CI/CD warto włączyć dopiero po przygotowaniu stałego środowiska serwerowego/budżetu na buildy.
+
 ### **Integrations**
 ![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=flat-square&logo=stripe&logoColor=white)
 ![QuestPDF](https://img.shields.io/badge/QuestPDF-FF6B6B?style=flat-square&logo=adobe-acrobat-reader&logoColor=white)
@@ -193,7 +195,7 @@ flowchart TB
 
 ### **Prerequisites**
 
-- ✅ [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- ✅ [\.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - ✅ [PostgreSQL 14+](https://www.postgresql.org/download/)
 - ✅ [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (for Key Vault)
 - ✅ [Node.js 18+](https://nodejs.org/) (for TailwindCSS)
@@ -417,7 +419,7 @@ Please see [SECURITY.md](SECURITY.md) for security vulnerability reporting.
 
 <div align="center">
 
-**🏂 Built with ❤️ using .NET 9 & Blazor**
+**🏂 Built with ❤️ using \.NET 10 & Blazor**
 
 [![.NET](https://img.shields.io/badge/.NET-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![Blazor](https://img.shields.io/badge/Blazor-512BD4?style=for-the-badge&logo=blazor&logoColor=white)](https://blazor.net/)
@@ -428,3 +430,4 @@ Please see [SECURITY.md](SECURITY.md) for security vulnerability reporting.
 **⭐ If you're interested in licensing SportRental, please get in touch!**
 
 </div>
+

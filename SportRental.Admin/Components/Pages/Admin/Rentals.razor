@@ -5,6 +5,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
 @inject SportRental.Admin.Services.Sms.ISmsConfirmationService SmsConfirmationService
+@inject ILogger<Rentals> Logger
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
     <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px;">
@@ -47,6 +48,13 @@
         </MudAlert>
     }
     
+    @if (!string.IsNullOrEmpty(loadError))
+    {
+        <MudAlert Severity="Severity.Error" Elevation="0" Class="mb-4">
+            @loadError
+        </MudAlert>
+    }
+
     <MudCard Elevation="4" Class="mb-4" Style="border-radius: 16px;">
         <MudCardContent Class="pa-4">
             <MudGrid Class="mud-align-end" Spacing="3">
@@ -385,15 +393,25 @@
     [Inject] private SportRental.Admin.Services.Contracts.IContractGenerator ContractGenerator { get; set; } = default!;
     [Inject] private SportRental.Admin.Services.Email.IEmailSender EmailSender { get; set; } = default!;
 
+    private string? loadError;
+
     protected override async Task OnInitializedAsync()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(CurrentTenantId());
-        products = await Db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
-        customers = await Db.Customers.AsNoTracking().OrderBy(c => c.FullName).ToListAsync();
-        customersDict = customers.ToDictionary(c => c.Id, c => c);
-        rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
-        await UpdateReservedMap();
+        try
+        {
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(CurrentTenantId());
+            products = await Db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+            customers = await Db.Customers.AsNoTracking().OrderBy(c => c.FullName).ToListAsync();
+            customersDict = customers.ToDictionary(c => c.Id, c => c);
+            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            await UpdateReservedMap();
+        }
+        catch (Exception ex)
+        {
+            loadError = "Nie udało się załadować listy wynajmów. Sprawdź logi.";
+            Logger.LogError(ex, "Błąd podczas wczytywania wynajmów (tenant {TenantId})", CurrentTenantId());
+        }
     }
 
     private void CreateNew()

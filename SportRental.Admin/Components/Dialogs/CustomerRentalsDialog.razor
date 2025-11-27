@@ -1,0 +1,154 @@
+@using SportRental.Infrastructure.Domain
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudStack Row="true" Class="mud-align-center mud-justify-space-between">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.h6" Style="font-weight:600;">
+                        Wynajmy klienta: @CustomerName
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Default">
+                        Podgląd historii wypożyczeń wraz z pozycjami.
+                    </MudText>
+                </MudStack>
+                <MudChip T="string" Color="Color.Primary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Assignment">
+                    @Rentals.Count wypożyczeń
+                </MudChip>
+            </MudStack>
+
+            @if (Rentals.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Elevation="0">
+                    Ten klient nie ma jeszcze zapisanych wypożyczeń.
+                </MudAlert>
+            }
+            else
+            {
+                <MudStack Spacing="2">
+                    @foreach (var rental in Rentals.OrderByDescending(r => r.CreatedAtUtc))
+                    {
+                        <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 12px;">
+                            <MudStack Spacing="1">
+                                <MudStack Row="true" Spacing="2" Class="mud-align-center mud-justify-space-between">
+                                    <MudText Typo="Typo.subtitle1" Style="font-weight:600;">
+                                        @rental.StartDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") -
+                                        @rental.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                    </MudText>
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudChip T="string" Color="@StatusColor(rental.Status)" Variant="Variant.Filled" StartIcon="@StatusIcon(rental.Status)">
+                                            @StatusText(rental.Status)
+                                        </MudChip>
+                                        <MudChip T="string" Color="Color.Success" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Payments">
+                                            @rental.TotalAmount.ToString("0.00") zł
+                                        </MudChip>
+                                    </MudStack>
+                                </MudStack>
+
+                                @if (!string.IsNullOrWhiteSpace(rental.PaymentStatus))
+                                {
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        Płatność: @rental.PaymentStatus
+                                    </MudText>
+                                }
+
+                                @if (!string.IsNullOrWhiteSpace(rental.Notes))
+                                {
+                                    <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="mt-1">
+                                        <MudText Typo="Typo.caption">@rental.Notes</MudText>
+                                    </MudAlert>
+                                }
+
+                                <MudDivider Class="my-2" />
+                                <MudText Typo="Typo.body2" Class="mb-1" Style="font-weight:600;">Pozycje</MudText>
+                                <MudGrid Spacing="1">
+                                    @foreach (var item in rental.Items)
+                                    {
+                                        <MudItem xs="12" md="6">
+                                            <MudPaper Class="pa-2" Elevation="0" Style="border-radius: 8px; background-color: var(--mud-palette-background);">
+                                                <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                                                    <MudIcon Icon="@Icons.Material.Filled.SportsSoccer" Color="Color.Primary" />
+                                                    <div>
+                                                        <MudText Typo="Typo.body2" Style="font-weight:600;">
+                                                            @(item.Product?.Name ?? "Produkt")
+                                                        </MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Default">
+                                                            Ilość: @item.Quantity | @item.PricePerDay.ToString("0.00") zł/dzień | Razem: @item.Subtotal.ToString("0.00") zł
+                                                        </MudText>
+                                                    </div>
+                                                </MudStack>
+                                            </MudPaper>
+                                        </MudItem>
+                                    }
+                                </MudGrid>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                </MudStack>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Secondary" OnClick="Close">
+            Zamknij
+        </MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Filled.OpenInNew"
+                   OnClick="GoToRentalsPage">
+            Otwórz w widoku wynajmów
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IDialogReference DialogReference { get; set; } = default!;
+
+    [Parameter] public string CustomerName { get; set; } = string.Empty;
+    [Parameter] public Guid CustomerId { get; set; }
+    [Parameter] public List<Rental> Rentals { get; set; } = new();
+
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private void Close() => DialogReference.Close(DialogResult.Cancel());
+
+    private void GoToRentalsPage()
+    {
+        DialogReference.Close();
+        Navigation.NavigateTo($"/admin/rentals?customerId={CustomerId}");
+    }
+
+    private static string StatusText(RentalStatus status) => status switch
+    {
+        RentalStatus.Draft => "Szkic",
+        RentalStatus.Pending => "Oczekujące",
+        RentalStatus.Confirmed => "Potwierdzone",
+        RentalStatus.Active => "Aktywne",
+        RentalStatus.Completed => "Zakończone",
+        RentalStatus.Cancelled => "Anulowane",
+        _ => status.ToString()
+    };
+
+    private static Color StatusColor(RentalStatus status) => status switch
+    {
+        RentalStatus.Draft => Color.Default,
+        RentalStatus.Pending => Color.Warning,
+        RentalStatus.Confirmed => Color.Primary,
+        RentalStatus.Active => Color.Success,
+        RentalStatus.Completed => Color.Success,
+        RentalStatus.Cancelled => Color.Error,
+        _ => Color.Default
+    };
+
+    private static string StatusIcon(RentalStatus status) => status switch
+    {
+        RentalStatus.Draft => Icons.Material.Filled.EditNote,
+        RentalStatus.Pending => Icons.Material.Filled.Schedule,
+        RentalStatus.Confirmed => Icons.Material.Filled.CheckCircle,
+        RentalStatus.Active => Icons.Material.Filled.PlayArrow,
+        RentalStatus.Completed => Icons.Material.Filled.TaskAlt,
+        RentalStatus.Cancelled => Icons.Material.Filled.Cancel,
+        _ => Icons.Material.Filled.Info
+    };
+}

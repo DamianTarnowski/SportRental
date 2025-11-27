@@ -8,7 +8,6 @@
 @using SportRental.Admin.Data
 @using SportRental.Shared.Identity
 @using SportRental.Infrastructure.Tenancy
-@using MudBlazor
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
@@ -20,51 +19,98 @@
 @inject IConfiguration Configuration
 @inject ITenantProvider TenantProvider
 
-<PageTitle>Rejestracja</PageTitle>
+<PageTitle>Rejestracja - SportRental</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
-    <MudPaper Class="pa-5" Elevation="2">
-        <MudStack Spacing="1">
-            <MudText Typo="Typo.h5" Class="mb-2">Załóż konto właściciela</MudText>
-            <StatusMessage Message="@Message" />
-            <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
-                <DataAnnotationsValidator />
-                <ValidationSummary class="text-danger" role="alert" />
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand-accent"></div>
+        
+        <div class="auth-logo">
+            <div class="auth-logo-icon">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M15.5 5.5c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zM5 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5zm5.8-10l2.4-2.4.8.8c1.3 1.3 3 2.1 5.1 2.1V9c-1.5 0-2.7-.6-3.6-1.5l-1.9-1.9c-.5-.4-1-.6-1.6-.6s-1.1.2-1.4.6L7.8 8.4c-.4.4-.6.9-.6 1.4 0 .6.2 1.1.6 1.4L11 14v5h2v-6.2l-2.2-2.3zM19 12c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8.5c-1.9 0-3.5-1.6-3.5-3.5s1.6-3.5 3.5-3.5 3.5 1.6 3.5 3.5-1.6 3.5-3.5 3.5z"/>
+                </svg>
+            </div>
+            <h1 class="auth-title">Utwórz konto</h1>
+            <p class="auth-subtitle">Rozpocznij zarządzanie swoją wypożyczalnią</p>
+        </div>
 
-                <MudTextField @bind-Value="Input.Email"
-                              Label="Email"
-                              Variant="Variant.Outlined"
-                              FullWidth="true"
-                              Required="true"
-                              InputType="InputType.Email"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Email" />
+        @if (!string.IsNullOrEmpty(Message))
+        {
+            <div class="auth-alert auth-alert-error">
+                <svg class="auth-alert-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                <span>@Message</span>
+            </div>
+        }
 
-                <MudTextField @bind-Value="Input.Password"
-                              Label="Hasło"
-                              Variant="Variant.Outlined"
-                              FullWidth="true"
-                              Required="true"
-                              InputType="InputType.Password"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Lock" />
+        <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register" class="auth-form">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="auth-validation-summary" role="alert" />
 
-                <MudTextField @bind-Value="Input.ConfirmPassword"
-                              Label="Powtórz hasło"
-                              Variant="Variant.Outlined"
-                              FullWidth="true"
-                              Required="true"
-                              InputType="InputType.Password"
-                              Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.LockReset" />
+            <div class="auth-field">
+                <label class="auth-label" for="reg-email">Email</label>
+                <svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                    <polyline points="22,6 12,13 2,6"/>
+                </svg>
+                <InputText id="reg-email" @bind-Value="Input.Email" class="auth-input" type="email" 
+                           placeholder="twoj@email.pl" autocomplete="email" required />
+                <ValidationMessage For="() => Input.Email" />
+            </div>
 
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" ButtonType="ButtonType.Submit" Class="mt-2">
-                    Zarejestruj
-                </MudButton>
-            </EditForm>
-        </MudStack>
-    </MudPaper>
-</MudContainer>
+            <div class="auth-field">
+                <label class="auth-label" for="reg-password">Hasło</label>
+                <svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                <InputText id="reg-password" @bind-Value="Input.Password" class="auth-input" type="password" 
+                           placeholder="Min. 6 znaków" autocomplete="new-password" required />
+                <ValidationMessage For="() => Input.Password" />
+            </div>
+
+            <div class="auth-field">
+                <label class="auth-label" for="reg-confirm">Potwierdź hasło</label>
+                <svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    <path d="M9 12l2 2 4-4"/>
+                </svg>
+                <InputText id="reg-confirm" @bind-Value="Input.ConfirmPassword" class="auth-input" type="password" 
+                           placeholder="Powtórz hasło" autocomplete="new-password" required />
+                <ValidationMessage For="() => Input.ConfirmPassword" />
+            </div>
+
+            <button class="auth-submit" type="submit">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; vertical-align: middle; margin-right: 8px;">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="8.5" cy="7" r="4"/>
+                    <line x1="20" y1="8" x2="20" y2="14"/>
+                    <line x1="23" y1="11" x2="17" y2="11"/>
+                </svg>
+                Zarejestruj się
+            </button>
+        </EditForm>
+
+        <div class="auth-divider">lub</div>
+
+        <div class="auth-links" style="border-top: none; padding-top: 0; margin-top: 0;">
+            <a href="Account/Login" class="auth-link auth-link-primary" style="justify-content: center;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                    <polyline points="10 17 15 12 10 7"/>
+                    <line x1="15" y1="12" x2="3" y2="12"/>
+                </svg>
+                Mam już konto - zaloguj
+            </a>
+        </div>
+        
+        <div class="auth-footer">
+            Rejestrując się, akceptujesz <a href="#">Regulamin</a> oraz <a href="#">Politykę Prywatności</a>.
+        </div>
+    </div>
+</div>
 
 @code {
     private IEnumerable<IdentityError>? identityErrors;
@@ -75,7 +121,7 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Błąd: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    private string? Message => identityErrors is null ? null : string.Join(" ", identityErrors.Select(error => error.Description));
 
     public async Task RegisterUser(EditContext editContext)
     {
@@ -158,20 +204,20 @@
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "Email jest wymagany")]
+        [EmailAddress(ErrorMessage = "Nieprawidłowy format adresu email")]
         [Display(Name = "Email")]
         public string Email { get; set; } = "";
 
-        [Required]
-        [StringLength(100, ErrorMessage = "{0} musi mieć od {2} do {1} znaków.", MinimumLength = 6)]
+        [Required(ErrorMessage = "Hasło jest wymagane")]
+        [StringLength(100, ErrorMessage = "Hasło musi mieć od {2} do {1} znaków.", MinimumLength = 6)]
         [DataType(DataType.Password)]
         [Display(Name = "Hasło")]
         public string Password { get; set; } = "";
 
         [DataType(DataType.Password)]
-        [Display(Name = "Powtórz hasło")]
-        [Compare("Password", ErrorMessage = "Hasła muszą być takie same.")]
+        [Display(Name = "Potwierdź hasło")]
+        [Compare("Password", ErrorMessage = "Hasła muszą być identyczne.")]
         public string ConfirmPassword { get; set; } = "";
     }
 }

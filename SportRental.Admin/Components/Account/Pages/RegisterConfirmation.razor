@@ -10,23 +10,79 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Register confirmation</PageTitle>
+<PageTitle>Potwierdź rejestrację - SportRental</PageTitle>
 
-<h1>Register confirmation</h1>
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand-accent"></div>
+        
+        <div class="auth-logo">
+            <div class="auth-logo-icon" style="background: linear-gradient(135deg, #22c55e, #16a34a);">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10zm-8-7L4 6h16l-8 5z"/>
+                </svg>
+            </div>
+            <h1 class="auth-title">Sprawdź email</h1>
+            <p class="auth-subtitle">Prawie gotowe! Potwierdź swoje konto.</p>
+        </div>
 
-<StatusMessage Message="@statusMessage" />
+        @if (!string.IsNullOrEmpty(statusMessage))
+        {
+            <div class="auth-alert auth-alert-error">
+                <svg class="auth-alert-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                <span>@statusMessage</span>
+            </div>
+        }
 
-@if (emailConfirmationLink is not null)
-{
-    <p>
-        This app does not currently have a real email sender registered, see <a href="https://aka.ms/aspaccountconf">these docs</a> for how to configure a real email sender.
-        Normally this would be emailed: <a href="@emailConfirmationLink">Click here to confirm your account</a>
-    </p>
-}
-else
-{
-    <p role="alert">Please check your email to confirm your account.</p>
-}
+        @if (emailConfirmationLink is not null)
+        {
+            <div class="auth-alert auth-alert-info">
+                <svg class="auth-alert-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                </svg>
+                <div>
+                    <strong>Tryb deweloperski</strong><br/>
+                    Email nie został faktycznie wysłany. Kliknij link poniżej, aby potwierdzić konto.
+                </div>
+            </div>
+            
+            <a href="@emailConfirmationLink" class="auth-submit" style="text-decoration: none; display: block; text-align: center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: inline; vertical-align: middle; margin-right: 8px;">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Potwierdź konto
+            </a>
+        }
+        else
+        {
+            <div class="auth-alert auth-alert-success">
+                <svg class="auth-alert-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                <div>
+                    <strong>Email wysłany!</strong><br/>
+                    Sprawdź swoją skrzynkę pocztową i kliknij link w wiadomości, aby aktywować konto.
+                </div>
+            </div>
+        }
+
+        <div class="auth-links">
+            <a href="Account/Login" class="auth-link auth-link-primary" style="justify-content: center;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"/>
+                    <polyline points="12 19 5 12 12 5"/>
+                </svg>
+                Wróć do logowania
+            </a>
+        </div>
+        
+        <div class="auth-footer">
+            &copy; @DateTime.Now.Year SportRental. Wszelkie prawa zastrzeżone.
+        </div>
+    </div>
+</div>
 
 @code {
     private string? emailConfirmationLink;
@@ -52,7 +108,7 @@ else
         if (user is null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            statusMessage = "Error finding user for unspecified email";
+            statusMessage = "Nie znaleziono użytkownika dla podanego adresu email";
         }
         else if (EmailSender is IdentityNoOpEmailSender)
         {

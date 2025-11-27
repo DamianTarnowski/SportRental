@@ -1,17 +1,30 @@
 @inherits LayoutComponentBase
 @layout SportRental.Admin.Components.Layout.MainLayout
+@using MudBlazor
 
-<h1>Manage your account</h1>
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudPaper Class="pa-4 mb-4" Elevation="2" Style="background: linear-gradient(135deg, #7c3aed 0%, #6366f1 100%); border-radius: 16px;">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3">
+            <MudAvatar Size="Size.Large" Color="Color.Surface">
+                <MudIcon Icon="@Icons.Material.Filled.AccountCircle" Size="Size.Large" />
+            </MudAvatar>
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h5" Style="color: white; font-weight: 600;">Ustawienia konta</MudText>
+                <MudText Typo="Typo.body2" Style="color: rgba(255,255,255,0.8);">Zarządzaj swoim profilem i bezpieczeństwem</MudText>
+            </MudStack>
+        </MudStack>
+    </MudPaper>
 
-<div>
-    <h2>Change your account settings</h2>
-    <hr />
-    <div class="row">
-        <div class="col-lg-3">
-            <ManageNavMenu />
-        </div>
-        <div class="col-lg-9">
-            @Body
-        </div>
-    </div>
-</div>
+    <MudGrid Spacing="3">
+        <MudItem xs="12" md="3">
+            <MudPaper Class="pa-3" Elevation="1" Style="border-radius: 12px;">
+                <ManageNavMenu />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="9">
+            <MudPaper Class="pa-4" Elevation="1" Style="border-radius: 12px;">
+                @Body
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>

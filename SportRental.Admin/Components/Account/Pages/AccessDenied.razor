@@ -1,8 +1,42 @@
 @page "/Account/AccessDenied"
 
-<PageTitle>Access denied</PageTitle>
+<PageTitle>Brak dostępu - SportRental</PageTitle>
 
-<header>
-    <h1 class="text-danger">Access denied</h1>
-    <p class="text-danger">You do not have access to this resource.</p>
-</header>
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand-accent"></div>
+        
+        <div class="auth-logo">
+            <div class="auth-logo-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z"/>
+                </svg>
+            </div>
+            <h1 class="auth-title">Brak dostępu</h1>
+            <p class="auth-subtitle">Nie masz uprawnień do tego zasobu</p>
+        </div>
+
+        <div class="auth-alert auth-alert-error">
+            <svg class="auth-alert-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <div>
+                <strong>Odmowa dostępu</strong><br/>
+                Twoje konto nie ma uprawnień do wyświetlenia tej strony. Skontaktuj się z administratorem, jeśli uważasz, że to błąd.
+            </div>
+        </div>
+
+        <div class="auth-button-group">
+            <a href="dashboard" class="auth-submit" style="text-decoration: none; text-align: center; flex: 1;">
+                Przejdź do panelu
+            </a>
+            <a href="Account/Login" class="auth-button-secondary" style="flex: 1; text-align: center; justify-content: center;">
+                Zaloguj na inne konto
+            </a>
+        </div>
+        
+        <div class="auth-footer">
+            &copy; @DateTime.Now.Year SportRental. Wszelkie prawa zastrzeżone.
+        </div>
+    </div>
+</div>

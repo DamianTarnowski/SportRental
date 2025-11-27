@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\SportRental.Admin\Data\**\*.cs" Exclude="..\SportRental.Admin\Data\Migrations\**\*.cs;..\SportRental.Admin\Data\DesignTimeApplicationDbContextFactory.cs;..\SportRental.Admin\Data\TestDataSeeder.cs" Link="Data\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\SportRental.Admin\Data\**\*.cs" Exclude="..\SportRental.Admin\Data\Migrations\**\*.cs;..\SportRental.Admin\Data\DesignTimeApplicationDbContextFactory.cs;..\SportRental.Admin\Data\TestDataSeeder.cs;..\SportRental.Admin\Data\DemoDataSeeder.cs" Link="Data\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

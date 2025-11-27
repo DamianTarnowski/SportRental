@@ -1,0 +1,38 @@
+@rendermode InteractiveServer
+@implements IDisposable
+
+@inject SportRental.Admin.Services.UI.ThemeService Theme
+
+<MudThemeProvider @bind-IsDarkMode="_isDarkMode" Theme="@Theme.CurrentTheme" />
+<MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
+               Color="Color.Inherit" 
+               OnClick="ToggleTheme" 
+               title="Przełącz motyw" />
+
+@code {
+    private bool _isDarkMode;
+    
+    protected override void OnInitialized()
+    {
+        _isDarkMode = Theme.IsDarkMode;
+        Theme.OnChanged += HandleThemeChanged;
+    }
+    
+    private void HandleThemeChanged()
+    {
+        _isDarkMode = Theme.IsDarkMode;
+        InvokeAsync(StateHasChanged);
+    }
+    
+    private void ToggleTheme()
+    {
+        _isDarkMode = !_isDarkMode;
+        Theme.IsDarkMode = _isDarkMode;
+    }
+    
+    public void Dispose()
+    {
+        Theme.OnChanged -= HandleThemeChanged;
+    }
+}
+

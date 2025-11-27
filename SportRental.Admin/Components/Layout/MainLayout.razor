@@ -5,12 +5,10 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
 
-@* Providers przeniesione do Components/Routes.razor, aby uniknąć konfliktów rendererów *@
-<MudPopoverProvider />
 <MudAppBar Elevation="1" Color="Color.Primary">
     <MudText Class="ms-2" Typo="Typo.h6">SportRental</MudText>
     <MudSpacer />
-    <MudIconButton Icon="@Icons.Material.Filled.DarkMode" Color="Color.Inherit" OnClick="() => Theme.Toggle()" title="Przełącz motyw" />
+    <ThemeSwitcher />
 </MudAppBar>
 
 <div class="page">
@@ -27,17 +25,16 @@
             @Body
         </article>
     </main>
-    </div>
+</div>
 
 @code {
     protected override void OnInitialized()
     {
-        Theme.OnChanged += StateHasChanged;
         _ = LoadBranding();
     }
+    
     public void Dispose()
     {
-        Theme.OnChanged -= StateHasChanged;
     }
 
     private async Task LoadBranding()

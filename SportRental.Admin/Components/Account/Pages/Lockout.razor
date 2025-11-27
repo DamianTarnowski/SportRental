@@ -1,8 +1,51 @@
 @page "/Account/Lockout"
 
-<PageTitle>Locked out</PageTitle>
+<PageTitle>Konto zablokowane - SportRental</PageTitle>
 
-<header>
-    <h1 class="text-danger">Locked out</h1>
-    <p class="text-danger" role="alert">This account has been locked out, please try again later.</p>
-</header>
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-brand-accent"></div>
+        
+        <div class="auth-logo">
+            <div class="auth-logo-icon" style="background: linear-gradient(135deg, #ef4444, #dc2626);">
+                <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                </svg>
+            </div>
+            <h1 class="auth-title">Konto zablokowane</h1>
+            <p class="auth-subtitle">Zbyt wiele nieudanych prób logowania</p>
+        </div>
+
+        <div class="auth-alert auth-alert-error">
+            <svg class="auth-alert-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <div>
+                <strong>Konto tymczasowo zablokowane</strong><br/>
+                Ze względów bezpieczeństwa, Twoje konto zostało zablokowane na 15 minut. Spróbuj ponownie później.
+            </div>
+        </div>
+
+        <div class="auth-links">
+            <a href="Account/ForgotPassword" class="auth-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Nie pamiętam hasła
+            </a>
+            <a href="Account/Login" class="auth-link auth-link-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"/>
+                    <polyline points="12 19 5 12 12 5"/>
+                </svg>
+                Wróć do logowania
+            </a>
+        </div>
+        
+        <div class="auth-footer">
+            &copy; @DateTime.Now.Year SportRental. Wszelkie prawa zastrzeżone.
+        </div>
+    </div>
+</div>
