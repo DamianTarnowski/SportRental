@@ -119,18 +119,11 @@ builder.Services.AddScoped<ITenantProvider, HttpContextTenantProvider>();
 builder.Services.AddScoped<IContractGenerator, QuestPdfContractGenerator>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("MediaStorage");
-// WybĂłr SMS nadawcy: jeĹ›li jest SmsApi:Token to SmsAPI, wpp. konsola
-builder.Services.AddSingleton<ISmsSender>(sp =>
-{
-    var config = sp.GetRequiredService<IConfiguration>();
-    var token = config["SmsApi:Token"];
-    if (!string.IsNullOrWhiteSpace(token))
-    {
-        var factory = sp.GetRequiredService<IHttpClientFactory>();
-        return new SmsApiSender(config, factory);
-    }
-    return new ConsoleSmsSender();
-});
+
+// SMSAPI Configuration - integracja z SMSAPI.pl
+// Dokumentacja: https://www.smsapi.pl/docs
+builder.Services.Configure<SmsApiSettings>(builder.Configuration.GetSection(SmsApiSettings.SectionName));
+builder.Services.AddSingleton<ISmsSender, SmsApiSender>();
 // WewnÄ™trzny blob: domyĹ›lnie App_Data (+ mapowanie StaticFiles), alternatywnie wwwroot
 builder.Services.AddSingleton<IFileStorage>(sp =>
 {
@@ -342,6 +335,7 @@ app.MapAdditionalIdentityEndpoints();
 
 // REST API
 app.MapSportRentalApi();
+app.MapSmsApiCallbacks(); // SMSAPI delivery report callbacks
 app.MapControllers();
 
 // Seed test data in development (from test-data.json)
