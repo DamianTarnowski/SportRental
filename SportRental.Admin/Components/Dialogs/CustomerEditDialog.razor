@@ -83,7 +83,7 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] private IDialogReference DialogReference { get; set; } = default!;
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter]
     public Customer Customer { get; set; } = new();
@@ -102,11 +102,11 @@
                 return;
         }
 
-        DialogReference.Close(DialogResult.Ok(Customer));
+        MudDialog.Close(DialogResult.Ok(Customer));
     }
 
     private void Cancel()
     {
-        DialogReference.Close(DialogResult.Cancel());
+        MudDialog.Cancel();
     }
 }

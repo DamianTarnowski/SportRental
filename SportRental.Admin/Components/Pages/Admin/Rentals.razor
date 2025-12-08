@@ -269,94 +269,310 @@
     </MudGrid>
 
     <MudDialog @bind-Visible="dialogOpen" Options="@rentalDialogOptions">
+        <TitleContent>
+            <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                <MudAvatar Color="Color.Primary" Size="Size.Large" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5" Style="font-weight: 700;">@(editModel.Id == Guid.Empty ? "Nowy wynajem" : "Edytuj wynajem")</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">Wypełnij dane wynajmu sprzętu</MudText>
+                </div>
+            </MudStack>
+        </TitleContent>
         <DialogContent>
-            <MudStack Spacing="2">
-                <MudSelect T="Guid" @bind-Value="editModel.CustomerId" Label="Klient" Dense="true">
-                    @foreach (var c in customers)
-                    {
-                        <MudSelectItem Value="@c.Id">@c.FullName</MudSelectItem>
-                    }
-                </MudSelect>
-                <MudDatePicker Date="@startDate" DateChanged="OnStartDateChanged" Label="Data początkowa" />
-                <MudDatePicker Date="@endDate" DateChanged="OnEndDateChanged" Label="Data końcowa" />
+            <MudStack Spacing="4" Class="pa-2">
+                @* SEKCJA: KLIENT I DATY *@
+                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Dane podstawowe</MudText>
+                        </MudStack>
+                        
+                        <MudAutocomplete T="Customer"
+                                         Label="Wybierz klienta"
+                                         Placeholder="Zacznij pisać imię lub email..."
+                                         Value="@(customers.FirstOrDefault(c => c.Id == editModel.CustomerId))"
+                                         ValueChanged="@(c => { if (c != null) editModel.CustomerId = c.Id; })"
+                                         SearchFunc="@((string s, CancellationToken ct) => Task.FromResult(customers.Where(c => string.IsNullOrWhiteSpace(s) || (c.FullName?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) || (c.Email?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false))))"
+                                         ToStringFunc="@(c => c?.FullName ?? "")"
+                                         Variant="Variant.Outlined"
+                                         Adornment="Adornment.Start"
+                                         AdornmentIcon="@Icons.Material.Filled.PersonSearch"
+                                         Class="rounded-lg">
+                            <ItemTemplate>
+                                <MudStack Row="true" Spacing="2" Class="mud-align-center pa-1">
+                                    <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                    </MudAvatar>
+                                    <div>
+                                        <MudText Typo="Typo.body1">@context.FullName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">
+                                            @(context.Email ?? context.PhoneNumber ?? "brak kontaktu")
+                                        </MudText>
+                                    </div>
+                                </MudStack>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                        
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" md="6">
+                                <MudDatePicker Date="@startDate" 
+                                               DateChanged="OnStartDateChanged" 
+                                               Label="📅 Data rozpoczęcia"
+                                               Variant="Variant.Outlined"
+                                               Editable="true"
+                                               DateFormat="dd.MM.yyyy"
+                                               Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="12" md="6">
+                                <MudDatePicker Date="@endDate" 
+                                               DateChanged="OnEndDateChanged" 
+                                               Label="📅 Data zakończenia"
+                                               Variant="Variant.Outlined"
+                                               Editable="true"
+                                               DateFormat="dd.MM.yyyy"
+                                               Class="rounded-lg" />
+                            </MudItem>
+                        </MudGrid>
+                        
+                        @if (startDate.HasValue && endDate.HasValue)
+                        {
+                            var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
+                            <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="rounded-lg">
+                                <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2">Czas trwania: <strong>@days dni</strong></MudText>
+                                </MudStack>
+                            </MudAlert>
+                        }
+                    </MudStack>
+                </MudPaper>
 
-                <MudDivider Class="my-2" />
-                <MudText Typo="Typo.subtitle1">Pozycje</MudText>
-                <MudStack Row="true" Spacing="2" Class="mud-align-center">
-                    <MudTextField @bind-Value="skuInput" Label="SKU" Placeholder="Wpisz/Skanuj SKU" Immediate="true" />
-                    <MudNumericField T="int" @bind-Value="skuQty" Label="Ilość" Min="1" Immediate="true" />
-                    <MudButton StartIcon="@Icons.Material.Filled.QrCodeScanner" OnClick="AddItemBySku">Dodaj po SKU</MudButton>
-                    <MudText Typo="Typo.caption">Szybkie dodawanie pozycji po kodzie</MudText>
-                </MudStack>
-
-                <MudStack Row="true" Spacing="2" Class="mud-align-center mt-2">
-                    <MudAutocomplete T="Product"
-                                      Label="Wybierz produkt"
-                                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Inventory"
-                                      Dense="true"
-                                      Value="@selectedProduct"
-                                      ValueChanged="@(p => selectedProduct = p)"
-                                      SearchFunc="SearchProducts"
-                                      ToStringFunc="@(p => p is null ? string.Empty : $"{p.Name} ({p.Sku}) – {p.DailyPrice:0.00} zł")">
-                        <ItemTemplate>
-                            <MudStack Row="true" Spacing="2" Class="mud-align-center">
-                                @if (!string.IsNullOrWhiteSpace(context.ImageUrl))
-                                {
-                                    <img src="@context.ImageUrl" alt="@context.Name" style="width:32px;height:32px;object-fit:cover;border-radius:6px" />
-                                }
-                                <div>
-                                    <MudText>@context.Name</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Info">@context.Sku • @context.DailyPrice.ToString("0.00") zł • dostępne: @GetAvail(context.Id)</MudText>
-                                </div>
+                @* SEKCJA: DODAWANIE PRODUKTÓW *@
+                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" Class="mud-align-center mud-justify-space-between">
+                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Success" />
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Dodaj sprzęt</MudText>
                             </MudStack>
-                        </ItemTemplate>
-                    </MudAutocomplete>
-                    <MudNumericField T="int" @bind-Value="selectedQty" Label="Ilość" Min="1" Immediate="true" />
-                    <MudChip T="string" Color="@(CurrentAvail > 0 ? Color.Success : Color.Error)" Variant="Variant.Outlined">Dostępne: @CurrentAvail</MudChip>
-                    <MudButton StartIcon="@Icons.Material.Filled.AddShoppingCart" Color="Color.Primary" Disabled="@(selectedProduct is null || CurrentAvail == 0)" OnClick="AddSelectedProduct">Dodaj z listy</MudButton>
-                </MudStack>
-                <MudStack Class="mb-2 mud-align-center" Row="true" Spacing="2">
-                    <video id="videoScanner" width="240" height="160" autoplay muted playsinline style="border-radius:8px; border:1px solid rgba(0,0,0,0.1)"></video>
-                    <MudButton Variant="Variant.Outlined" OnClick="StartScanner">Start kamera</MudButton>
-                    <MudButton Variant="Variant.Text" OnClick="StopScanner">Stop</MudButton>
-                </MudStack>
-
-                <MudTable Items="editItems" Dense="true">
-                    <HeaderContent>
-                        <MudTh>Produkt</MudTh>
-                        <MudTh>Ilość</MudTh>
-                        <MudTh>Cena/dzień</MudTh>
-                        <MudTh>Razem</MudTh>
-                        <MudTh></MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd>
-                            <MudSelect T="Guid" @bind-Value="context.ProductId" Dense="true">
-                                @foreach (var p in products)
-                                {
-                                    <MudSelectItem Value="@p.Id">
-                                        <MudStack Row="true" Spacing="1" Class="mud-align-center">
-                                            <MudText>@p.Name</MudText>
-                                            <MudText Typo="Typo.caption" Color="Color.Info">@p.DailyPrice.ToString("0.00") zł</MudText>
-                                            <MudChip T="string" Color="@(GetAvail(p.Id) > 0 ? Color.Success : Color.Error)" Variant="Variant.Outlined" Size="Size.Small">@GetAvail(p.Id)</MudChip>
+                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">
+                                @editItems.Count pozycji
+                            </MudChip>
+                        </MudStack>
+                        
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" md="6">
+                                <MudAutocomplete T="Product"
+                                                  Label="Wyszukaj produkt"
+                                                  Placeholder="Nazwa, SKU lub kategoria..."
+                                                  Adornment="Adornment.Start" 
+                                                  AdornmentIcon="@Icons.Material.Filled.Search"
+                                                  Variant="Variant.Outlined"
+                                                  Value="@selectedProduct"
+                                                  ValueChanged="@(p => selectedProduct = p)"
+                                                  SearchFunc="SearchProducts"
+                                                  ToStringFunc="@(p => p is null ? string.Empty : $"{p.Name}")"
+                                                  Class="rounded-lg">
+                                    <ItemTemplate>
+                                        <MudStack Row="true" Spacing="2" Class="mud-align-center pa-1">
+                                            @if (!string.IsNullOrWhiteSpace(context.ImageUrl))
+                                            {
+                                                <MudAvatar Size="Size.Medium" Style="border-radius: 8px;">
+                                                    <MudImage Src="@context.ImageUrl" Alt="@context.Name" />
+                                                </MudAvatar>
+                                            }
+                                            else
+                                            {
+                                                <MudAvatar Color="Color.Default" Size="Size.Medium">
+                                                    <MudIcon Icon="@Icons.Material.Filled.SportsTennis" />
+                                                </MudAvatar>
+                                            }
+                                            <div class="flex-1">
+                                                <MudText Typo="Typo.body1" Style="font-weight: 500;">@context.Name</MudText>
+                                                <MudStack Row="true" Spacing="1" Class="mud-align-center">
+                                                    <MudText Typo="Typo.caption" Color="Color.Default">@context.Sku</MudText>
+                                                    <MudText Typo="Typo.caption">•</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">@context.DailyPrice.ToString("0.00") zł/dzień</MudText>
+                                                    <MudText Typo="Typo.caption">•</MudText>
+                                                    <MudChip T="string" Size="Size.Small" Color="@(GetAvail(context.Id) > 0 ? Color.Success : Color.Error)" Variant="Variant.Text">
+                                                        @GetAvail(context.Id) szt.
+                                                    </MudChip>
+                                                </MudStack>
+                                            </div>
                                         </MudStack>
-                                    </MudSelectItem>
-                                }
-                            </MudSelect>
-                        </MudTd>
-                        <MudTd><MudNumericField T="int" @bind-Value="context.Quantity" Min="1" Immediate="true" /></MudTd>
-                        <MudTd><MudNumericField T="decimal" @bind-Value="context.PricePerDay" Min="0" Immediate="true" /></MudTd>
-                        <MudTd>@(context.Subtotal.ToString("0.00")) zł</MudTd>
-                        <MudTd><MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="() => RemoveItem(context)"/></MudTd>
-                    </RowTemplate>
-                </MudTable>
-                <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Add" OnClick="AddItem">Dodaj pozycję</MudButton>
-                <MudText Typo="Typo.subtitle2" Class="mt-2">Suma: <b>@total.ToString("0.00") zł</b></MudText>
+                                    </ItemTemplate>
+                                </MudAutocomplete>
+                            </MudItem>
+                            <MudItem xs="6" md="2">
+                                <MudNumericField T="int" @bind-Value="selectedQty" 
+                                                  Label="Ilość" 
+                                                  Min="1" 
+                                                  Max="@CurrentAvail"
+                                                  Variant="Variant.Outlined"
+                                                  Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="6" md="2">
+                                <MudStack Class="h-100 mud-justify-center">
+                                    <MudChip T="string" Color="@(CurrentAvail > 0 ? Color.Success : Color.Error)" 
+                                             Variant="Variant.Outlined" 
+                                             Style="height: 40px;">
+                                        <MudIcon Icon="@Icons.Material.Filled.Warehouse" Size="Size.Small" Class="mr-1" />
+                                        @CurrentAvail dostępne
+                                    </MudChip>
+                                </MudStack>
+                            </MudItem>
+                            <MudItem xs="12" md="2">
+                                <MudButton FullWidth="true" 
+                                           Variant="Variant.Filled" 
+                                           Color="Color.Success"
+                                           StartIcon="@Icons.Material.Filled.Add" 
+                                           Disabled="@(selectedProduct is null || CurrentAvail == 0)" 
+                                           OnClick="AddSelectedProduct"
+                                           Style="height: 56px;"
+                                           Class="rounded-lg">
+                                    Dodaj
+                                </MudButton>
+                            </MudItem>
+                        </MudGrid>
+
+                        @* Szybkie dodawanie po SKU *@
+                        <MudExpansionPanels Elevation="0">
+                            <MudExpansionPanel Text="⚡ Szybkie dodawanie po SKU / kamerą" Style="background: transparent;">
+                                <MudGrid Spacing="2">
+                                    <MudItem xs="12" md="5">
+                                        <MudTextField @bind-Value="skuInput" 
+                                                      Label="Kod SKU" 
+                                                      Placeholder="Wpisz lub zeskanuj..." 
+                                                      Variant="Variant.Outlined"
+                                                      Adornment="Adornment.Start"
+                                                      AdornmentIcon="@Icons.Material.Filled.QrCode"
+                                                      Class="rounded-lg" />
+                                    </MudItem>
+                                    <MudItem xs="6" md="2">
+                                        <MudNumericField T="int" @bind-Value="skuQty" Label="Ilość" Min="1" Variant="Variant.Outlined" Class="rounded-lg" />
+                                    </MudItem>
+                                    <MudItem xs="6" md="2">
+                                        <MudButton FullWidth="true" 
+                                                   Variant="Variant.Outlined" 
+                                                   Color="Color.Primary"
+                                                   StartIcon="@Icons.Material.Filled.Add" 
+                                                   OnClick="AddItemBySku"
+                                                   Style="height: 56px;"
+                                                   Class="rounded-lg">
+                                            Dodaj
+                                        </MudButton>
+                                    </MudItem>
+                                    <MudItem xs="12" md="3">
+                                        <MudStack Row="true" Spacing="1">
+                                            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="StartScanner" StartIcon="@Icons.Material.Filled.CameraAlt">Kamera</MudButton>
+                                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="StopScanner">Stop</MudButton>
+                                        </MudStack>
+                                    </MudItem>
+                                </MudGrid>
+                                <video id="videoScanner" width="200" height="120" autoplay muted playsinline style="border-radius:12px; border:2px solid #e0e0e0; margin-top: 12px; display: none;"></video>
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
+                    </MudStack>
+                </MudPaper>
+
+                @* SEKCJA: LISTA PRODUKTÓW *@
+                @if (editItems.Any())
+                {
+                    <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; border: 1px solid #e0e0e0;">
+                        <MudStack Spacing="3">
+                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.ListAlt" Color="Color.Primary" />
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Koszyk (@editItems.Count)</MudText>
+                            </MudStack>
+
+                            <MudTable Items="editItems" Dense="true" Hover="true" Elevation="0" Class="rounded-lg">
+                                <HeaderContent>
+                                    <MudTh Style="font-weight: 600;">Produkt</MudTh>
+                                    <MudTh Style="font-weight: 600; text-align: center;">Ilość</MudTh>
+                                    <MudTh Style="font-weight: 600; text-align: right;">Cena/dzień</MudTh>
+                                    <MudTh Style="font-weight: 600; text-align: right;">Suma</MudTh>
+                                    <MudTh Style="width: 50px;"></MudTh>
+                                </HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>
+                                        <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                                            <MudAvatar Size="Size.Small" Color="Color.Default">
+                                                <MudIcon Icon="@Icons.Material.Filled.SportsTennis" Size="Size.Small" />
+                                            </MudAvatar>
+                                            <MudText>@(products.FirstOrDefault(p => p.Id == context.ProductId)?.Name ?? "—")</MudText>
+                                        </MudStack>
+                                    </MudTd>
+                                    <MudTd Style="text-align: center;">
+                                        <MudNumericField T="int" @bind-Value="context.Quantity" Min="1" Variant="Variant.Text" Style="width: 60px; text-align: center;" />
+                                    </MudTd>
+                                    <MudTd Style="text-align: right;">
+                                        <MudText Color="Color.Default">@context.PricePerDay.ToString("0.00") zł</MudText>
+                                    </MudTd>
+                                    <MudTd Style="text-align: right;">
+                                        <MudText Color="Color.Success" Style="font-weight: 600;">@context.Subtotal.ToString("0.00") zł</MudText>
+                                    </MudTd>
+                                    <MudTd>
+                                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" 
+                                                       Color="Color.Error" 
+                                                       Size="Size.Small"
+                                                       OnClick="() => RemoveItem(context)" />
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+
+                            @* PODSUMOWANIE *@
+                            <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                <MudStack Row="true" Class="mud-justify-space-between mud-align-center">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.body2" Style="opacity: 0.9;">Do zapłaty</MudText>
+                                        <MudText Typo="Typo.h4" Style="font-weight: 700;">@total.ToString("0.00") zł</MudText>
+                                    </MudStack>
+                                    <MudStack Spacing="0" Class="text-right">
+                                        <MudText Typo="Typo.caption" Style="opacity: 0.8;">@editItems.Sum(i => i.Quantity) produktów</MudText>
+                                        @if (startDate.HasValue && endDate.HasValue)
+                                        {
+                                            var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
+                                            <MudText Typo="Typo.caption" Style="opacity: 0.8;">@days dni</MudText>
+                                        }
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        </MudStack>
+                    </MudPaper>
+                }
+                else
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="rounded-lg">
+                        <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" />
+                            <MudText>Dodaj produkty do wynajmu używając wyszukiwarki powyżej</MudText>
+                        </MudStack>
+                    </MudAlert>
+                }
             </MudStack>
         </DialogContent>
         <DialogActions>
-            <MudButton Variant="Variant.Text" OnClick="() => dialogOpen=false">Anuluj</MudButton>
-            <MudButton Color="Color.Primary" OnClick="Save">Zapisz</MudButton>
+            <MudPaper Elevation="0" Class="pa-4 mud-width-full" Style="background: #f5f5f5; border-top: 1px solid #e0e0e0;">
+                <MudStack Row="true" Class="mud-width-full mud-justify-space-between">
+                    <MudButton Variant="Variant.Text" 
+                               Color="Color.Default"
+                               StartIcon="@Icons.Material.Filled.Close"
+                               OnClick="() => dialogOpen=false">
+                        Anuluj
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Disabled="@(editModel.CustomerId == Guid.Empty || !editItems.Any())"
+                               OnClick="Save"
+                               Class="rounded-pill px-6">
+                        @(editModel.Id == Guid.Empty ? "Utwórz wynajem" : "Zapisz zmiany")
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
         </DialogActions>
     </MudDialog>
 </MudContainer>
@@ -748,6 +964,7 @@
             var customer = await Db.Customers.FindAsync(rental.CustomerId);
             var productIds = items.Select(i => i.ProductId).ToList();
             var products = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+            var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             
             if (customer == null)
             {
@@ -755,7 +972,7 @@
                 return;
             }
             
-            var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(rental, items, customer, products);
+            var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(rental, items, customer, products, companyInfo);
             
             // Zapisz URL umowy w bazie
             rental.ContractUrl = contractUrl;
@@ -785,6 +1002,7 @@
             var customer = await Db.Customers.FindAsync(rental.CustomerId);
             var productIds = items.Select(i => i.ProductId).ToList();
             var products = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+            var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             
             if (customer == null)
             {
@@ -798,13 +1016,19 @@
                 return;
             }
             
-            await ContractGenerator.SendRentalContractByEmailAsync(rental, items, customer, products);
+            // Użyj nowej metody która wysyła piękny email z załącznikiem PDF
+            await ContractGenerator.SendRentalConfirmationEmailAsync(rental, items, customer, products, companyInfo);
             
-            Snackbar.Add($"Umowa została wysłana na adres {customer.Email}", MudBlazor.Severity.Success);
+            // Oznacz że email został wysłany
+            rental.IsEmailSent = true;
+            Db.Rentals.Update(rental);
+            await Db.SaveChangesAsync();
+            
+            Snackbar.Add($"📧 Email z umową wysłany do {customer.Email}", MudBlazor.Severity.Success);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Błąd podczas wysyłania umowy: {ex.Message}", MudBlazor.Severity.Error);
+            Snackbar.Add($"Błąd podczas wysyłania emaila: {ex.Message}", MudBlazor.Severity.Error);
         }
     }
 

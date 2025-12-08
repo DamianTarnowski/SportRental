@@ -120,7 +120,7 @@ public class SmtpEmailSender : IEmailSender
         {
             Host = _configuration["Email:Smtp:Host"] ?? "localhost",
             Port = int.Parse(_configuration["Email:Smtp:Port"] ?? "587"),
-            EnableSsl = bool.Parse(_configuration["Email:Smtp:EnableSsl"] ?? "true"),
+            EnableSsl = bool.Parse(_configuration["Email:Smtp:UseSsl"] ?? _configuration["Email:Smtp:EnableSsl"] ?? "true"),
             Username = _configuration["Email:Smtp:Username"],
             Password = _configuration["Email:Smtp:Password"],
             SenderEmail = _configuration["Email:Smtp:SenderEmail"] ?? "sportrental@localhost",

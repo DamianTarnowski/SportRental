@@ -157,8 +157,19 @@
         tenant = await Db.Tenants.FirstOrDefaultAsync(t => t.Id == TenantId);
         if (tenant == null)
         {
-            Snackbar.Add("Nie znaleziono danych firmy", Severity.Error);
-            return;
+            // Utwórz nowy tenant jeśli nie istnieje (dla SuperAdmina)
+            if (TenantId != Guid.Empty)
+            {
+                tenant = new Tenant { Id = TenantId, Name = "Nowa wypożyczalnia" };
+                Db.Tenants.Add(tenant);
+                await Db.SaveChangesAsync();
+                Snackbar.Add("Utworzono nową firmę - uzupełnij dane", Severity.Info);
+            }
+            else
+            {
+                Snackbar.Add("Nie znaleziono danych firmy - zaloguj się ponownie", Severity.Error);
+                return;
+            }
         }
 
         var existingCompanyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == TenantId);

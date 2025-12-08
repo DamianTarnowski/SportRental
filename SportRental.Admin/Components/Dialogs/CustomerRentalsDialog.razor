@@ -103,7 +103,7 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] private IDialogReference DialogReference { get; set; } = default!;
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
 
     [Parameter] public string CustomerName { get; set; } = string.Empty;
     [Parameter] public Guid CustomerId { get; set; }
@@ -111,11 +111,11 @@
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
 
-    private void Close() => DialogReference.Close(DialogResult.Cancel());
+    private void Close() => MudDialog.Cancel();
 
     private void GoToRentalsPage()
     {
-        DialogReference.Close();
+        MudDialog.Close();
         Navigation.NavigateTo($"/admin/rentals?customerId={CustomerId}");
     }
 

@@ -33,6 +33,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
     public DbSet<SmsConfirmation> SmsConfirmations => Set<SmsConfirmation>();
+    public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
     
     // Note: RefreshToken is API-specific, not part of Infrastructure domain
     // It's registered externally via DbContext.Set<T>()
@@ -225,6 +226,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(sc => new { sc.TenantId, sc.RentalId });
             entity.HasIndex(sc => new { sc.Code, sc.RentalId }).IsUnique();
             entity.HasQueryFilter(sc => _tenantId == null || sc.TenantId == _tenantId);
+        });
+
+        modelBuilder.Entity<TenantInvitation>(entity =>
+        {
+            entity.HasKey(ti => ti.Id);
+            entity.Property(ti => ti.Email).HasMaxLength(256).IsRequired();
+            entity.Property(ti => ti.TenantName).HasMaxLength(200);
+            entity.Property(ti => ti.Token).HasMaxLength(128).IsRequired();
+            entity.Property(ti => ti.Notes).HasMaxLength(500);
+            entity.HasIndex(ti => ti.Token).IsUnique();
+            entity.HasIndex(ti => ti.Email);
+            entity.HasIndex(ti => ti.ExpiresAtUtc);
         });
     }
 }

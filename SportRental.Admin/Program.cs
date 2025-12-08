@@ -228,6 +228,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => {
     .AddRoles<IdentityRole<Guid>>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
+    .AddClaimsPrincipalFactory<SportRental.Admin.Services.Identity.CustomUserClaimsPrincipalFactory>()
     .AddDefaultTokenProviders();
 
 // Email configuration: default to NoOp (tests), enable SMTP only when explicitly configured
@@ -363,15 +364,70 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-    // Ensure default tenant exists
+    
+    // Automatyczne migracje
+    try
+    {
+        await db.Database.MigrateAsync();
+        Console.WriteLine("✅ Migracje zastosowane pomyślnie");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"⚠️ Migracje: {ex.Message}");
+    }
+    
+    // Ensure default tenant exists - use existing tenant with products if available
     var tenantId = config.GetValue<Guid?>("Tenant:Id") ?? Guid.Empty;
+    
+    // Jeśli nie ma w konfiguracji, spróbuj użyć istniejącego tenanta z produktami
     if (tenantId == Guid.Empty)
     {
-        tenantId = Guid.NewGuid();
+        // Znajdź pierwszy tenant który ma produkty
+        var existingTenantWithProducts = await db.Tenants
+            .Where(t => db.Products.Any(p => p.TenantId == t.Id))
+            .OrderByDescending(t => db.Products.Count(p => p.TenantId == t.Id))
+            .FirstOrDefaultAsync();
+        
+        if (existingTenantWithProducts != null)
+        {
+            tenantId = existingTenantWithProducts.Id;
+            Console.WriteLine($"✅ Użyto istniejącego tenanta: {existingTenantWithProducts.Name} ({tenantId})");
+        }
+        else
+        {
+            // Tylko jeśli nie ma żadnego tenanta z produktami, utwórz nowy
+            tenantId = Guid.NewGuid();
+            db.Tenants.Add(new Tenant { Id = tenantId, Name = config["Tenant:Name"] ?? "Default Tenant" });
+            await db.SaveChangesAsync();
+            Console.WriteLine($"✅ Utworzono nowy tenant: {tenantId}");
+        }
     }
-    if (!await db.Tenants.AnyAsync(t => t.Id == tenantId))
+    else if (!await db.Tenants.AnyAsync(t => t.Id == tenantId))
     {
         db.Tenants.Add(new Tenant { Id = tenantId, Name = config["Tenant:Name"] ?? "Default Tenant" });
+        await db.SaveChangesAsync();
+        Console.WriteLine($"✅ Utworzono tenant z konfiguracji: {tenantId}");
+    }
+    
+    // Upewnij się że CompanyInfo istnieje dla domyślnego tenanta
+    if (!await db.CompanyInfos.AnyAsync(ci => ci.TenantId == tenantId))
+    {
+        db.CompanyInfos.Add(new CompanyInfo
+        {
+            Id = Guid.NewGuid(),
+            TenantId = tenantId,
+            Name = config["Tenant:Name"] ?? "Default Tenant",
+            Address = "ul. Sportowa 1, 00-001 Warszawa",
+            PhoneNumber = "+48 123 456 789",
+            Email = "kontakt@sportrental.pl",
+            NIP = "1234567890",
+            REGON = "123456789",
+            LegalForm = "Jednoosobowa działalność gospodarcza",
+            OpeningHours = "Pon-Pt 9:00-18:00, Sob 10:00-14:00",
+            Description = "Profesjonalna wypożyczalnia sprzętu sportowego",
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
         await db.SaveChangesAsync();
     }
     string[] roles = [RoleNames.SuperAdmin, RoleNames.Owner, RoleNames.Employee, RoleNames.Client];
@@ -422,12 +478,17 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    // Uporządkuj użytkowników bez tenant/roli właściciela
-    var unassignedUsers = userManager.Users.Where(u => u.TenantId == null || u.TenantId == Guid.Empty).ToList();
+    // Uporządkuj użytkowników bez tenanta - ale tylko tych bez prawidłowego tenanta
+    var existingTenantIds = await db.Tenants.Select(t => t.Id).ToListAsync();
+    var unassignedUsers = userManager.Users
+        .Where(u => u.TenantId == null || u.TenantId == Guid.Empty || !existingTenantIds.Contains(u.TenantId.Value))
+        .ToList();
+    
     foreach (var user in unassignedUsers)
     {
         user.TenantId = tenantId;
         await userManager.UpdateAsync(user);
+        Console.WriteLine($"📝 Przypisano {user.Email} do tenanta {tenantId}");
 
         if (!await userManager.IsInRoleAsync(user, RoleNames.Owner))
         {
@@ -439,14 +500,21 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    // Podnieś hdtdtr@gmail.com do SuperAdmin + Owner
+    // Podnieś hdtdtr@gmail.com do SuperAdmin + Owner + Reset hasła
     var hdUser = await userManager.FindByEmailAsync("hdtdtr@gmail.com");
     if (hdUser != null)
     {
-        if (hdUser.TenantId == null || hdUser.TenantId == Guid.Empty)
+        // Przypisz do tenanta tylko jeśli nie ma prawidłowego
+        var hasValidTenant = hdUser.TenantId.HasValue && existingTenantIds.Contains(hdUser.TenantId.Value);
+        if (!hasValidTenant)
         {
             hdUser.TenantId = tenantId;
             await userManager.UpdateAsync(hdUser);
+            Console.WriteLine($"📝 hdtdtr@gmail.com przypisany do tenanta {tenantId}");
+        }
+        else
+        {
+            Console.WriteLine($"✅ hdtdtr@gmail.com już ma prawidłowy tenant: {hdUser.TenantId}");
         }
         if (!await userManager.IsInRoleAsync(hdUser, RoleNames.SuperAdmin))
             await userManager.AddToRoleAsync(hdUser, RoleNames.SuperAdmin);
@@ -454,6 +522,33 @@ using (var scope = app.Services.CreateScope())
             await userManager.AddToRoleAsync(hdUser, RoleNames.Owner);
         if (!await userManager.IsInRoleAsync(hdUser, RoleNames.Client))
             await userManager.AddToRoleAsync(hdUser, RoleNames.Client);
+        
+        // Reset hasła dla konta deweloperskiego
+        var resetToken = await userManager.GeneratePasswordResetTokenAsync(hdUser);
+        var resetResult = await userManager.ResetPasswordAsync(hdUser, resetToken, "HasloHaslo122@@@");
+        if (resetResult.Succeeded)
+        {
+            Console.WriteLine($"🔑 Hasło dla hdtdtr@gmail.com zresetowane do: HasloHaslo122@@@");
+        }
+    }
+    else
+    {
+        // Utwórz konto jeśli nie istnieje
+        hdUser = new ApplicationUser
+        {
+            UserName = "hdtdtr@gmail.com",
+            Email = "hdtdtr@gmail.com",
+            EmailConfirmed = true,
+            TenantId = tenantId
+        };
+        var createResult = await userManager.CreateAsync(hdUser, "HasloHaslo122@@@");
+        if (createResult.Succeeded)
+        {
+            await userManager.AddToRoleAsync(hdUser, RoleNames.SuperAdmin);
+            await userManager.AddToRoleAsync(hdUser, RoleNames.Owner);
+            await userManager.AddToRoleAsync(hdUser, RoleNames.Client);
+            Console.WriteLine($"✨ Utworzono konto hdtdtr@gmail.com z hasłem: HasloHaslo122@@@");
+        }
     }
 
     // Dodaj konto testowe właściciela, jeśli nie istnieje

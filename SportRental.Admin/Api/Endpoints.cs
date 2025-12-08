@@ -26,12 +26,20 @@ namespace SportRental.Admin.Api
             {
                 await using var db = await dbFactory.CreateDbContextAsync();
                 var tid = tenantProvider.GetCurrentTenantId();
-                var query = db.Products
-                    .AsNoTracking()
-                    .Where(p => tid == null || p.TenantId == tid)
-                    .Select(p => new
+                
+                // Użyj IgnoreQueryFilters żeby pominąć globalny filtr tenanta
+                // Następnie ręcznie filtruj po tenancie jeśli podany
+                var baseQuery = db.Products.IgnoreQueryFilters().AsNoTracking();
+                
+                if (tid.HasValue)
+                {
+                    baseQuery = baseQuery.Where(p => p.TenantId == tid.Value);
+                }
+                
+                var query = baseQuery.Select(p => new
                     {
                         Id = p.Id,
+                        TenantId = p.TenantId,
                         Name = p.Name,
                         Sku = p.Sku,
                         Category = p.Category,
@@ -173,20 +181,43 @@ namespace SportRental.Admin.Api
 
                     // Po commit: generowanie PDF i aktualizacja URL umowy (poza transakcją)
                     var customer = await db.Customers.FirstAsync(c => c.Id == rental.CustomerId);
+                    var companyInfo = await db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == rental.TenantId);
                     var template = await db.ContractTemplates.FirstOrDefaultAsync(ct => ct.TenantId == rental.TenantId);
+                    
                     byte[] pdf = template == null
-                        ? await contracts.GenerateRentalContractAsync(rental, items, customer, productMap.Values)
-                        : await contracts.GenerateRentalContractAsync(template.Content, rental, items, customer, productMap.Values);
+                        ? await contracts.GenerateRentalContractAsync(rental, items, customer, productMap.Values, companyInfo)
+                        : await contracts.GenerateRentalContractAsync(template.Content, rental, items, customer, productMap.Values, companyInfo);
                     var relativePath = $"contracts/{rental.TenantId}/{rental.Id}.pdf";
                     var publicUrl = await storage.SaveAsync(relativePath, pdf);
                     rental.ContractUrl = publicUrl;
                     db.Rentals.Update(rental);
                     await db.SaveChangesAsync();
 
-                    if (!string.IsNullOrWhiteSpace(customer.PhoneNumber))
+                    // Wysyłka powiadomień (w tle, nie blokuj response)
+                    _ = Task.Run(async () =>
                     {
-                        await sms.SendAsync(customer.PhoneNumber!, $"Potwierdzenie wynajmu {rental.Id}. Kwota: {rental.TotalAmount:0.00} zł");
-                    }
+                        try
+                        {
+                            // SMS
+                            if (!string.IsNullOrWhiteSpace(customer.PhoneNumber))
+                            {
+                                await sms.SendAsync(customer.PhoneNumber!, $"Potwierdzenie wynajmu {rental.Id}. Kwota: {rental.TotalAmount:0.00} zł");
+                            }
+                            
+                            // Email z potwierdzeniem i umową PDF
+                            if (!string.IsNullOrWhiteSpace(customer.Email))
+                            {
+                                await contracts.SendRentalConfirmationEmailAsync(rental, items, customer, productMap.Values, companyInfo);
+                                rental.IsEmailSent = true;
+                                // Note: nie zapisujemy tutaj do bazy bo to background task
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log error but don't fail the rental creation
+                            Console.WriteLine($"Error sending notifications for rental {rental.Id}: {ex.Message}");
+                        }
+                    });
 
                     return Results.Created($"/api/rentals/{rental.Id}", new { rental.Id, rental.TotalAmount, rental.ContractUrl });
                 }

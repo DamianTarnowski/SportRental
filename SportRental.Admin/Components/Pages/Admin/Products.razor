@@ -274,35 +274,208 @@
 
     <MudDialog @bind-Visible="dialogOpen" Options="@productDialogOptions">
         <TitleContent>
-            <MudText Typo="Typo.h6">
-                @(model.Id == Guid.Empty ? "Dodaj produkt" : "Edytuj produkt")
-            </MudText>
+            <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                <MudAvatar Color="Color.Info" Size="Size.Large" Style="background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" />
+                </MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5" Style="font-weight: 700;">
+                        @(model.Id == Guid.Empty ? "Nowy produkt" : "Edytuj produkt")
+                    </MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">
+                        @(model.Id == Guid.Empty ? "Dodaj nowy sprzęt do wypożyczalni" : "Zaktualizuj informacje o produkcie")
+                    </MudText>
+                </div>
+            </MudStack>
         </TitleContent>
         <DialogContent>
-            <MudStack Spacing="3">
-                <MudTextField @bind-Value="model.Name" Label="Nazwa produktu:" Required="true" />
-                <MudTextField @bind-Value="model.Sku" Label="SKU/Kod produktu:" Required="true" />
-                <MudTextField @bind-Value="model.Category" Label="Kategoria:" />
-                <MudNumericField T="decimal" @bind-Value="model.DailyPrice" Label="Cena za dzień:" Min="0" Format="0.00" Immediate="true" />
-                <MudNumericField T="int" @bind-Value="model.AvailableQuantity" Label="Dostępna ilość:" Min="0" Immediate="true" />
-                <MudTextField @bind-Value="model.ImageUrl" Label="URL zdjęcia:" InputType="InputType.Url" />
-                <MudTextField @bind-Value="model.ImageAlt" Label="Opis zdjęcia:" />
-                <MudSwitch @bind-Value="model.IsActive" Color="Color.Primary" Label="Produkt aktywny" />
-                
-                <MudDivider />
-                
-                <MudText Typo="Typo.subtitle1" Class="fw-bold">Zdjęcie produktu</MudText>
-                
-                <ImageCropper MaxSizeMB="8" 
-                              OnImageReady="OnImageReadySkipCrop"
-                              OnBase64ImageReady="OnImageReadyCropped" />
+            <MudStack Spacing="4" Class="pa-2">
+                @* SEKCJA: PODSTAWOWE INFORMACJE *@
+                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Podstawowe informacje</MudText>
+                        </MudStack>
+                        
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" md="8">
+                                <MudTextField @bind-Value="model.Name" 
+                                              Label="Nazwa produktu" 
+                                              Placeholder="np. Narty Atomic Redster X9"
+                                              Required="true"
+                                              Variant="Variant.Outlined"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.Label"
+                                              Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudTextField @bind-Value="model.Sku" 
+                                              Label="Kod SKU" 
+                                              Placeholder="np. NAR-001"
+                                              Required="true"
+                                              Variant="Variant.Outlined"
+                                              Adornment="Adornment.Start"
+                                              AdornmentIcon="@Icons.Material.Filled.QrCode"
+                                              Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="model.Description" 
+                                              Label="Opis produktu" 
+                                              Placeholder="Krótki opis sprzętu..."
+                                              Lines="3"
+                                              Variant="Variant.Outlined"
+                                              Class="rounded-lg" />
+                            </MudItem>
+                        </MudGrid>
+                    </MudStack>
+                </MudPaper>
+
+                @* SEKCJA: CENA I DOSTĘPNOŚĆ *@
+                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Success" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Cena i dostępność</MudText>
+                        </MudStack>
+                        
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="decimal" @bind-Value="model.DailyPrice" 
+                                                  Label="Cena za dzień" 
+                                                  Min="0" 
+                                                  Format="0.00"
+                                                  Adornment="Adornment.End"
+                                                  AdornmentText="zł"
+                                                  Variant="Variant.Outlined"
+                                                  Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudNumericField T="int" @bind-Value="model.AvailableQuantity" 
+                                                  Label="Dostępna ilość" 
+                                                  Min="0"
+                                                  Adornment="Adornment.End"
+                                                  AdornmentText="szt."
+                                                  Variant="Variant.Outlined"
+                                                  Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="12" md="4">
+                                <MudSelect T="string" @bind-Value="model.Category" 
+                                           Label="Kategoria"
+                                           Variant="Variant.Outlined"
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="@Icons.Material.Filled.Category"
+                                           Class="rounded-lg">
+                                    <MudSelectItem Value="@("Narty")">🎿 Narty</MudSelectItem>
+                                    <MudSelectItem Value="@("Snowboard")">🏂 Snowboard</MudSelectItem>
+                                    <MudSelectItem Value="@("Buty narciarskie")">👟 Buty narciarskie</MudSelectItem>
+                                    <MudSelectItem Value="@("Buty snowboardowe")">👢 Buty snowboardowe</MudSelectItem>
+                                    <MudSelectItem Value="@("Kije")">🥢 Kije</MudSelectItem>
+                                    <MudSelectItem Value="@("Kask")">⛑️ Kask</MudSelectItem>
+                                    <MudSelectItem Value="@("Gogle")">🥽 Gogle</MudSelectItem>
+                                    <MudSelectItem Value="@("Rower")">🚴 Rower</MudSelectItem>
+                                    <MudSelectItem Value="@("SUP")">🏄 SUP</MudSelectItem>
+                                    <MudSelectItem Value="@("Kajak")">🛶 Kajak</MudSelectItem>
+                                    <MudSelectItem Value="@("Inne")">📦 Inne</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                        </MudGrid>
+
+                        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                            <MudSwitch @bind-Value="model.IsActive" 
+                                       Color="Color.Success" 
+                                       Label="Produkt aktywny" />
+                            @if (model.IsActive)
+                            {
+                                <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                                    <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
+                                    Widoczny dla klientów
+                                </MudChip>
+                            }
+                            else
+                            {
+                                <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
+                                    <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small" Class="mr-1" />
+                                    Ukryty
+                                </MudChip>
+                            }
+                        </MudStack>
+                    </MudStack>
+                </MudPaper>
+
+                @* SEKCJA: ZDJĘCIE *@
+                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Image" Color="Color.Warning" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Zdjęcie produktu</MudText>
+                        </MudStack>
+                        
+                        @if (!string.IsNullOrEmpty(model.ImageUrl))
+                        {
+                            <MudPaper Elevation="2" Class="pa-3" Style="border-radius: 12px; background: white;">
+                                <MudStack Row="true" Spacing="3" Class="mud-align-center">
+                                    <MudImage Src="@model.ImageUrl" 
+                                              Alt="@model.Name" 
+                                              Width="100" 
+                                              Height="100" 
+                                              ObjectFit="ObjectFit.Cover"
+                                              Style="border-radius: 8px;" />
+                                    <MudStack Spacing="1">
+                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">Aktualne zdjęcie</MudText>
+                                        <MudButton Size="Size.Small" 
+                                                   Variant="Variant.Text" 
+                                                   Color="Color.Error"
+                                                   StartIcon="@Icons.Material.Filled.Delete"
+                                                   OnClick="() => model.ImageUrl = null">
+                                            Usuń zdjęcie
+                                        </MudButton>
+                                    </MudStack>
+                                </MudStack>
+                            </MudPaper>
+                        }
+                        
+                        <MudTextField @bind-Value="model.ImageUrl" 
+                                      Label="URL zdjęcia (opcjonalnie)" 
+                                      Placeholder="https://..."
+                                      Variant="Variant.Outlined"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Link"
+                                      Class="rounded-lg" />
+                        
+                        <MudDivider />
+                        
+                        <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-2">
+                            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Small" Class="mr-1" />
+                            Lub wgraj zdjęcie z dysku:
+                        </MudText>
+                        
+                        <ImageCropper MaxSizeMB="8" 
+                                      OnImageReady="OnImageReadySkipCrop"
+                                      OnBase64ImageReady="OnImageReadyCropped" />
+                    </MudStack>
+                </MudPaper>
             </MudStack>
         </DialogContent>
         <DialogActions>
-            <MudButton Variant="Variant.Filled" Color="Color.Secondary" OnClick="() => dialogOpen=false" Class="px-10">Anuluj</MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save" Class="px-10">
-                @(model.Id == Guid.Empty ? "Dodaj" : "Zapisz")
-            </MudButton>
+            <MudPaper Elevation="0" Class="pa-4 mud-width-full" Style="background: #f5f5f5; border-top: 1px solid #e0e0e0;">
+                <MudStack Row="true" Class="mud-width-full mud-justify-space-between">
+                    <MudButton Variant="Variant.Text" 
+                               Color="Color.Default"
+                               StartIcon="@Icons.Material.Filled.Close"
+                               OnClick="() => dialogOpen=false">
+                        Anuluj
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               Disabled="@(string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Sku))"
+                               OnClick="Save"
+                               Class="rounded-pill px-6">
+                        @(model.Id == Guid.Empty ? "✨ Dodaj produkt" : "💾 Zapisz zmiany")
+                    </MudButton>
+                </MudStack>
+            </MudPaper>
         </DialogActions>
     </MudDialog>
 </MudContainer>

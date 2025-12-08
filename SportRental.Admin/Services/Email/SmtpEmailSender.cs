@@ -66,7 +66,11 @@ namespace SportRental.Admin.Services.Email
                 message.Body = bodyBuilder.ToMessageBody();
 
                 using var client = new SmtpClient();
-                await client.ConnectAsync(smtpSettings.Host, smtpSettings.Port, smtpSettings.EnableSsl);
+                // Port 587 = STARTTLS, Port 465 = SSL
+                var secureOption = smtpSettings.Port == 587 
+                    ? MailKit.Security.SecureSocketOptions.StartTls 
+                    : (smtpSettings.UseSsl ? MailKit.Security.SecureSocketOptions.SslOnConnect : MailKit.Security.SecureSocketOptions.Auto);
+                await client.ConnectAsync(smtpSettings.Host, smtpSettings.Port, secureOption);
                 
                 if (!string.IsNullOrEmpty(smtpSettings.Username))
                 {
@@ -121,7 +125,11 @@ namespace SportRental.Admin.Services.Email
                 message.Body = bodyBuilder.ToMessageBody();
 
                 using var client = new SmtpClient();
-                await client.ConnectAsync(smtpSettings.Host, smtpSettings.Port, smtpSettings.EnableSsl);
+                // Port 587 = STARTTLS, Port 465 = SSL
+                var secureOption = smtpSettings.Port == 587 
+                    ? MailKit.Security.SecureSocketOptions.StartTls 
+                    : (smtpSettings.UseSsl ? MailKit.Security.SecureSocketOptions.SslOnConnect : MailKit.Security.SecureSocketOptions.Auto);
+                await client.ConnectAsync(smtpSettings.Host, smtpSettings.Port, secureOption);
                 
                 if (!string.IsNullOrEmpty(smtpSettings.Username))
                 {
@@ -175,7 +183,7 @@ namespace SportRental.Admin.Services.Email
             {
                 Host = _configuration["Email:Smtp:Host"] ?? "localhost",
                 Port = int.Parse(_configuration["Email:Smtp:Port"] ?? "587"),
-                EnableSsl = bool.Parse(_configuration["Email:Smtp:EnableSsl"] ?? "true"),
+                UseSsl = bool.Parse(_configuration["Email:Smtp:UseSsl"] ?? _configuration["Email:Smtp:EnableSsl"] ?? "true"),
                 Username = _configuration["Email:Smtp:Username"],
                 Password = _configuration["Email:Smtp:Password"],
                 SenderEmail = _configuration["Email:Smtp:SenderEmail"] ?? "sportrental@localhost",
@@ -187,7 +195,7 @@ namespace SportRental.Admin.Services.Email
         {
             public string Host { get; set; } = string.Empty;
             public int Port { get; set; }
-            public bool EnableSsl { get; set; }
+            public bool UseSsl { get; set; }
             public string? Username { get; set; }
             public string? Password { get; set; }
             public string SenderEmail { get; set; } = string.Empty;

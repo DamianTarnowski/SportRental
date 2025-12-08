@@ -251,9 +251,9 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
 
         var t1 = client.PostAsJsonAsync("/api/rentals", req);
         var t2 = client.PostAsJsonAsync("/api/rentals", req);
-        await Task.WhenAll(t1, t2);
+        var results = await Task.WhenAll(t1, t2);
 
-        var statuses = new[] { t1.Result.StatusCode, t2.Result.StatusCode };
+        var statuses = new[] { results[0].StatusCode, results[1].StatusCode };
         Assert.Contains(HttpStatusCode.Created, statuses);
         Assert.True(statuses.Contains(HttpStatusCode.Conflict) || statuses.All(status => status == HttpStatusCode.Created));
     }
@@ -345,13 +345,15 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
 
     private sealed class FakeContractGenerator : SportRental.Admin.Services.Contracts.IContractGenerator
     {
-        public Task<byte[]> GenerateRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CancellationToken ct = default)
+        public Task<byte[]> GenerateRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
             => Task.FromResult(System.Text.Encoding.UTF8.GetBytes("PDF"));
-        public Task<byte[]> GenerateRentalContractAsync(string templateContent, Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CancellationToken ct = default)
+        public Task<byte[]> GenerateRentalContractAsync(string templateContent, Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
             => Task.FromResult(System.Text.Encoding.UTF8.GetBytes("PDF"));
-        public Task<string> GenerateAndSaveRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CancellationToken ct = default)
+        public Task<string> GenerateAndSaveRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
             => Task.FromResult($"https://test/contracts/{rental.TenantId}/contract_{rental.Id}.pdf");
-        public Task SendRentalContractByEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CancellationToken ct = default)
+        public Task SendRentalContractByEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
+            => Task.CompletedTask;
+        public Task SendRentalConfirmationEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
             => Task.CompletedTask;
     }
 

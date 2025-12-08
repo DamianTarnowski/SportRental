@@ -3,22 +3,161 @@
 @attribute [Authorize(Roles = "Owner,SuperAdmin")]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
 
-<MudContainer Class="mt-4">
-    <MudText Typo="Typo.h5">Szablon umowy</MudText>
-    <MudPaper Class="p-3 mt-3">
-        <MudText Typo="Typo.caption">Możesz użyć prostych zmiennych: {{CustomerName}}, {{StartDate}}, {{EndDate}}, {{ItemsTable}}, {{Total}}</MudText>
-        <MudTextField @bind-Value="content" Lines="20" FullWidth="true" Label="Treść szablonu" />
-        <MudStack Row="true" Spacing="2" Class="mt-2">
-            <MudButton Color="Color.Primary" OnClick="Save">Zapisz</MudButton>
-            <MudButton Variant="Variant.Outlined" OnClick="ResetDefault">Przywróć domyślny</MudButton>
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%); color: white; border-radius: 20px;">
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudAvatar Size="Size.Large" Style="background: rgba(255,255,255,0.2);">
+                <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" />
+            </MudAvatar>
+            <div>
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">Szablon umowy</MudText>
+                <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Dostosuj treść umowy wypożyczenia</MudText>
+            </div>
         </MudStack>
     </MudPaper>
+
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="8">
+            <MudCard Elevation="4" Style="border-radius: 16px;">
+                <MudCardContent Class="pa-5">
+                    <MudStack Spacing="4">
+                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" />
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Edytor szablonu</MudText>
+                        </MudStack>
+
+                        <MudTextField @bind-Value="content" 
+                                      Lines="20" 
+                                      FullWidth="true" 
+                                      Label="Treść szablonu umowy"
+                                      Variant="Variant.Outlined"
+                                      Class="rounded-lg"
+                                      Style="font-family: 'Consolas', 'Monaco', monospace; font-size: 14px;" />
+
+                        <MudStack Row="true" Spacing="2" Class="mt-4">
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Primary" 
+                                       StartIcon="@Icons.Material.Filled.Save"
+                                       OnClick="Save"
+                                       Size="Size.Large"
+                                       Class="rounded-pill px-6">
+                                💾 Zapisz szablon
+                            </MudButton>
+                            <MudButton Variant="Variant.Outlined" 
+                                       Color="Color.Warning"
+                                       StartIcon="@Icons.Material.Filled.Refresh"
+                                       OnClick="ResetDefault"
+                                       Class="rounded-pill">
+                                Przywróć domyślny
+                            </MudButton>
+                        </MudStack>
+                    </MudStack>
+                </MudCardContent>
+            </MudCard>
+        </MudItem>
+
+        <MudItem xs="12" md="4">
+            <MudStack Spacing="3">
+                @* DOSTĘPNE ZMIENNE *@
+                <MudCard Elevation="4" Style="border-radius: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <MudCardContent Class="pa-5">
+                        <MudStack Spacing="3">
+                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Code" />
+                                <MudText Typo="Typo.h6" Style="font-weight: 600;">Dostępne zmienne</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Style="opacity: 0.9;">
+                                Kliknij na zmienną, aby skopiować do schowka
+                            </MudText>
+                            <MudStack Spacing="2">
+                                @foreach (var variable in availableVariables)
+                                {
+                                    <MudButton Variant="Variant.Filled" 
+                                               FullWidth="true"
+                                               Style="background: rgba(255,255,255,0.15); color: white; text-transform: none; justify-content: flex-start;"
+                                               StartIcon="@Icons.Material.Filled.ContentCopy"
+                                               OnClick="() => CopyVariable(variable.Key)"
+                                               Class="rounded-lg">
+                                        <MudStack Spacing="0" Class="text-left">
+                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@variable.Key</MudText>
+                                            <MudText Typo="Typo.caption" Style="opacity: 0.8;">@variable.Value</MudText>
+                                        </MudStack>
+                                    </MudButton>
+                                }
+                            </MudStack>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+
+                @* WSKAZÓWKI *@
+                <MudCard Elevation="2" Style="border-radius: 16px;">
+                    <MudCardContent Class="pa-4">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Color="Color.Warning" />
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Wskazówki</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.body2" Color="Color.Default">
+                                • Zmienne w formacie <code>@("{{Zmienna}}")</code> zostaną automatycznie zastąpione danymi<br/>
+                                • Szablon jest używany przy generowaniu PDF umowy<br/>
+                                • Możesz użyć znaczników HTML dla formatowania<br/>
+                                • Dane firmy są pobierane z ustawień
+                            </MudText>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+
+                @* PODGLĄD *@
+                <MudCard Elevation="2" Style="border-radius: 16px;">
+                    <MudCardContent Class="pa-4">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                <MudIcon Icon="@Icons.Material.Filled.Preview" Color="Color.Info" />
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Przykładowe dane</MudText>
+                            </MudStack>
+                            <MudText Typo="Typo.caption" Color="Color.Default">
+                                <strong>Klient:</strong> Jan Kowalski<br/>
+                                <strong>Dokument:</strong> ABC123456<br/>
+                                <strong>Okres:</strong> 15.12.2025 - 22.12.2025<br/>
+                                <strong>Produkt:</strong> Narty Atomic Pro (2 szt.)<br/>
+                                <strong>Kwota:</strong> 840.00 zł
+                            </MudText>
+                        </MudStack>
+                    </MudCardContent>
+                </MudCard>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
 </MudContainer>
 
 @code {
     private string content = "";
     private Guid TenantId => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+
+    private readonly Dictionary<string, string> availableVariables = new()
+    {
+        { "{{CustomerName}}", "Imię i nazwisko klienta" },
+        { "{{CustomerDocument}}", "Numer dokumentu klienta" },
+        { "{{CustomerPhone}}", "Telefon klienta" },
+        { "{{CustomerEmail}}", "Email klienta" },
+        { "{{CustomerAddress}}", "Adres klienta" },
+        { "{{StartDate}}", "Data rozpoczęcia wynajmu" },
+        { "{{EndDate}}", "Data zakończenia wynajmu" },
+        { "{{RentalDays}}", "Liczba dni wynajmu" },
+        { "{{ItemsTable}}", "Tabela z produktami" },
+        { "{{Total}}", "Suma do zapłaty" },
+        { "{{Deposit}}", "Kwota kaucji" },
+        { "{{CompanyName}}", "Nazwa wypożyczalni" },
+        { "{{CompanyAddress}}", "Adres wypożyczalni" },
+        { "{{CompanyNIP}}", "NIP wypożyczalni" },
+        { "{{CompanyPhone}}", "Telefon wypożyczalni" },
+        { "{{CurrentDate}}", "Aktualna data" },
+        { "{{RentalId}}", "Numer rezerwacji" }
+    };
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -52,14 +191,90 @@
             Db.ContractTemplates.Update(tpl);
         }
         await Db.SaveChangesAsync();
+        Snackbar.Add("✅ Szablon został zapisany", MudBlazor.Severity.Success);
     }
 
     private void ResetDefault()
     {
         content = DefaultTemplate();
+        Snackbar.Add("🔄 Przywrócono domyślny szablon", MudBlazor.Severity.Info);
     }
 
-    private static string DefaultTemplate() => "Umowa wynajmu\nKlient: {{CustomerName}}\nOkres: {{StartDate}} - {{EndDate}}\n{{ItemsTable}}\nSuma: {{Total}} zł";
+    private async Task CopyVariable(string variable)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", variable);
+        Snackbar.Add($"📋 Skopiowano: {variable}", MudBlazor.Severity.Success);
+    }
+
+    private static string DefaultTemplate() => @"
+═══════════════════════════════════════════════════════════════
+                    UMOWA WYPOŻYCZENIA SPRZĘTU SPORTOWEGO
+═══════════════════════════════════════════════════════════════
+
+Nr rezerwacji: {{RentalId}}
+Data zawarcia: {{CurrentDate}}
+
+───────────────────────────────────────────────────────────────
+                         STRONY UMOWY
+───────────────────────────────────────────────────────────────
+
+WYPOŻYCZAJĄCY:
+  {{CompanyName}}
+  {{CompanyAddress}}
+  NIP: {{CompanyNIP}}
+  Tel: {{CompanyPhone}}
+
+NAJEMCA:
+  {{CustomerName}}
+  Dokument tożsamości: {{CustomerDocument}}
+  Adres: {{CustomerAddress}}
+  Telefon: {{CustomerPhone}}
+  Email: {{CustomerEmail}}
+
+───────────────────────────────────────────────────────────────
+                      OKRES WYPOŻYCZENIA
+───────────────────────────────────────────────────────────────
+
+  Data wydania sprzętu:    {{StartDate}}
+  Data zwrotu sprzętu:     {{EndDate}}
+  Liczba dni wypożyczenia: {{RentalDays}}
+
+───────────────────────────────────────────────────────────────
+                     WYPOŻYCZONY SPRZĘT
+───────────────────────────────────────────────────────────────
+
+{{ItemsTable}}
+
+───────────────────────────────────────────────────────────────
+                      PŁATNOŚCI
+───────────────────────────────────────────────────────────────
+
+  Całkowita wartość wypożyczenia:  {{Total}} zł
+  Kaucja zwrotna:                  {{Deposit}} zł
+
+───────────────────────────────────────────────────────────────
+                      WARUNKI UMOWY
+───────────────────────────────────────────────────────────────
+
+1. Najemca zobowiązuje się do zwrotu sprzętu w stanie niepogorszonym.
+2. W przypadku uszkodzenia lub zagubienia sprzętu, Najemca ponosi 
+   pełną odpowiedzialność finansową.
+3. Kaucja zostanie zwrócona po pozytywnej weryfikacji stanu sprzętu.
+4. Przedłużenie okresu wypożyczenia wymaga wcześniejszego uzgodnienia.
+5. Najemca oświadcza, że posiada umiejętności do bezpiecznego 
+   użytkowania wypożyczonego sprzętu.
+
+───────────────────────────────────────────────────────────────
+                         PODPISY
+───────────────────────────────────────────────────────────────
+
+
+_________________________          _________________________
+       Wypożyczający                        Najemca
+       ({{CompanyName}})                    ({{CustomerName}})
+
+
+Dziękujemy za skorzystanie z naszych usług!
+Życzymy udanego wypoczynku! 🎿⛷️🏂
+";
 }
-
-

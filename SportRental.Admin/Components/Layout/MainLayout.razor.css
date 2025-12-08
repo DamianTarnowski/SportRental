@@ -2,6 +2,7 @@
     position: relative;
     display: flex;
     flex-direction: column;
+    padding-top: 64px; /* Wysokość MudAppBar */
 }
 
 main {
@@ -42,13 +43,14 @@ main {
 @media (min-width: 641px) {
     .page {
         flex-direction: row;
+        padding-top: 64px; /* Wysokość MudAppBar */
     }
 
     .sidebar {
         width: 250px;
-        height: 100vh;
+        height: calc(100vh - 64px);
         position: sticky;
-        top: 0;
+        top: 64px;
     }
 
     .top-row {

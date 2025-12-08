@@ -24,6 +24,28 @@ public class RentalConfirmationEmailService
     }
 
     /// <summary>
+    /// Generate and save contract PDF, return the URL
+    /// </summary>
+    public async Task<string?> GenerateAndSaveContractAsync(
+        Rental rental,
+        Customer customer,
+        List<(Product product, int quantity)> items,
+        CompanyInfo? companyInfo = null)
+    {
+        try
+        {
+            var contractUrl = await _pdfService.GenerateAndSaveContractPdfAsync(rental, customer, items, companyInfo);
+            _logger.LogInformation("Generated and saved contract PDF for rental {RentalId}: {Url}", rental.Id, contractUrl);
+            return contractUrl;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate/save contract PDF for rental {RentalId}", rental.Id);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Send rental confirmation email after successful payment (with PDF contract attachment)
     /// </summary>
     public async Task SendRentalConfirmationAsync(
@@ -381,8 +403,7 @@ public class RentalConfirmationEmailService
             <div style='text-align: center; margin-top: 30px;'>
                 <p style='color: #6b7280; font-size: 14px;'>
                     W razie pytań, skontaktuj się z nami:<br>
-                    📧 <a href='mailto:kontakt@sportrental.pl' style='color: #667eea;'>kontakt@sportrental.pl</a><br>
-                    📞 <strong>+48 123 456 789</strong>
+                    📧 <a href='mailto:sportrental.kontakt@gmail.com' style='color: #667eea;'>sportrental.kontakt@gmail.com</a>
                 </p>
             </div>
         </div>

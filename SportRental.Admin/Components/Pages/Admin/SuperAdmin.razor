@@ -2,13 +2,593 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "SuperAdmin")]
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-6">
-    <MudText Typo="Typo.h4">Panel SuperAdministratora</MudText>
-    <MudPaper Class="mt-4 p-4">
-        <MudText>Tu dodamy zarządzanie wypożyczalniami, placówkami, uprawnieniami.</MudText>
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+    <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; border-radius: 20px;">
+        <MudStack Row="true" Class="mud-space-between mud-align-center">
+            <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.AdminPanelSettings" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Panel SuperAdministratora</MudText>
+                    <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj wypożyczalniami i zaproszeniami</MudText>
+                </div>
+            </MudStack>
+        </MudStack>
     </MudPaper>
+
+    <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-4" Class="rounded-lg">
+        <MudTabPanel Text="Zaproszenia" Icon="@Icons.Material.Filled.Mail">
+            <MudStack Spacing="4">
+                <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Class="mr-2" />
+                        Wyślij zaproszenie
+                    </MudText>
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="5">
+                            <MudTextField @bind-Value="newInviteEmail" 
+                                          Label="Email nowego właściciela"
+                                          Placeholder="jan.kowalski@example.com"
+                                          InputType="InputType.Email"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Email"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="newInviteTenantName" 
+                                          Label="Nazwa wypożyczalni (opcjonalnie)"
+                                          Placeholder="Ski Rental Zakopane"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Store"
+                                          Variant="Variant.Outlined" />
+                        </MudItem>
+                        <MudItem xs="12" md="3" Class="d-flex align-end">
+                            <MudButton Variant="Variant.Filled" 
+                                       Color="Color.Primary" 
+                                       StartIcon="@Icons.Material.Filled.Send"
+                                       OnClick="SendInvitation"
+                                       Disabled="@(string.IsNullOrWhiteSpace(newInviteEmail) || isSending)"
+                                       FullWidth="true"
+                                       Size="Size.Large">
+                                @if (isSending)
+                                {
+                                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                                    <span>Wysyłanie...</span>
+                                }
+                                else
+                                {
+                                    <span>Wyślij zaproszenie</span>
+                                }
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+
+                <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 12px;">
+                    <MudStack Row="true" Class="mud-space-between mud-align-center mb-3">
+                        <MudText Typo="Typo.h6">
+                            <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+                            Historia zaproszeń
+                        </MudText>
+                        <MudButton Variant="Variant.Outlined" 
+                                   StartIcon="@Icons.Material.Filled.Refresh"
+                                   OnClick="LoadInvitations"
+                                   Size="Size.Small">
+                            Odśwież
+                        </MudButton>
+                    </MudStack>
+
+                    @if (invitations == null)
+                    {
+                        <MudProgressLinear Indeterminate="true" />
+                    }
+                    else if (!invitations.Any())
+                    {
+                        <MudAlert Severity="Severity.Info" Elevation="0">
+                            Brak wysłanych zaproszeń. Wyślij pierwsze zaproszenie powyżej!
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudTable Items="invitations" Dense="true" Hover="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Email</MudTh>
+                                <MudTh>Nazwa wypożyczalni</MudTh>
+                                <MudTh>Data wysłania</MudTh>
+                                <MudTh>Wygasa</MudTh>
+                                <MudTh>Status</MudTh>
+                                <MudTh>Akcje</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd DataLabel="Email">
+                                    <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                                        <MudIcon Icon="@Icons.Material.Filled.Email" Size="Size.Small" Color="Color.Primary" />
+                                        <span>@context.Email</span>
+                                    </MudStack>
+                                </MudTd>
+                                <MudTd DataLabel="Nazwa">@(context.TenantName ?? "-")</MudTd>
+                                <MudTd DataLabel="Wysłano">@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                                <MudTd DataLabel="Wygasa">@context.ExpiresAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                                <MudTd DataLabel="Status">
+                                    @if (context.IsUsed)
+                                    {
+                                        <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                                            ✓ Użyte
+                                        </MudChip>
+                                    }
+                                    else if (context.ExpiresAtUtc < DateTime.UtcNow)
+                                    {
+                                        <MudChip T="string" Color="Color.Error" Size="Size.Small" Variant="Variant.Filled">
+                                            Wygasłe
+                                        </MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled">
+                                            Oczekujące
+                                        </MudChip>
+                                    }
+                                </MudTd>
+                                <MudTd DataLabel="Akcje">
+                                    <MudStack Row="true" Spacing="1">
+                                        @if (!context.IsUsed && context.ExpiresAtUtc > DateTime.UtcNow)
+                                        {
+                                            <MudTooltip Text="Kopiuj link zaproszenia">
+                                                <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" 
+                                                               Size="Size.Small"
+                                                               OnClick="() => CopyInviteLink(context)" />
+                                            </MudTooltip>
+                                            <MudTooltip Text="Wyślij ponownie email">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Replay" 
+                                                               Size="Size.Small"
+                                                               Color="Color.Primary"
+                                                               OnClick="() => ResendInvitation(context)" />
+                                            </MudTooltip>
+                                        }
+                                        <MudTooltip Text="Usuń zaproszenie">
+                                            <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                           Size="Size.Small"
+                                                           Color="Color.Error"
+                                                           OnClick="() => DeleteInvitation(context)" />
+                                        </MudTooltip>
+                                    </MudStack>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </MudPaper>
+            </MudStack>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Wypożyczalnie" Icon="@Icons.Material.Filled.Store">
+            <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 12px;">
+                <MudStack Row="true" Class="mud-space-between mud-align-center mb-3">
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@Icons.Material.Filled.Business" Class="mr-2" />
+                        Lista wypożyczalni
+                    </MudText>
+                    <MudButton Variant="Variant.Outlined" 
+                               StartIcon="@Icons.Material.Filled.Refresh"
+                               OnClick="LoadTenants"
+                               Size="Size.Small">
+                        Odśwież
+                    </MudButton>
+                </MudStack>
+
+                @if (tenants == null)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+                else if (!tenants.Any())
+                {
+                    <MudAlert Severity="Severity.Info" Elevation="0">
+                        Brak zarejestrowanych wypożyczalni.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudGrid Spacing="3">
+                        @foreach (var tenant in tenants)
+                        {
+                            <MudItem xs="12" md="6" lg="4">
+                                <MudCard Elevation="3" Style="border-radius: 12px;">
+                                    <MudCardContent>
+                                        <MudStack Spacing="2">
+                                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                                @if (!string.IsNullOrEmpty(tenant.LogoUrl))
+                                                {
+                                                    <MudAvatar Size="Size.Large">
+                                                        <MudImage Src="@tenant.LogoUrl" />
+                                                    </MudAvatar>
+                                                }
+                                                else
+                                                {
+                                                    <MudAvatar Size="Size.Large" Color="Color.Primary">
+                                                        <MudIcon Icon="@Icons.Material.Filled.Store" />
+                                                    </MudAvatar>
+                                                }
+                                                <div>
+                                                    <MudText Typo="Typo.h6">@tenant.Name</MudText>
+                                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                        ID: @tenant.Id.ToString()[..8]...
+                                                    </MudText>
+                                                </div>
+                                            </MudStack>
+                                            <MudDivider />
+                                            <MudStack Spacing="1">
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.CalendarToday" Size="Size.Small" Class="mr-1" />
+                                                    Utworzono: @tenant.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")
+                                                </MudText>
+                                                @{
+                                                    var stats = tenantStats.GetValueOrDefault(tenant.Id);
+                                                }
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Small" Class="mr-1" />
+                                                    Produkty: @(stats?.Products ?? 0)
+                                                </MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.People" Size="Size.Small" Class="mr-1" />
+                                                    Klienci: @(stats?.Customers ?? 0)
+                                                </MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" Size="Size.Small" Class="mr-1" />
+                                                    Wynajmy: @(stats?.Rentals ?? 0)
+                                                </MudText>
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudCardContent>
+                                    <MudCardActions>
+                                        <MudButton Variant="Variant.Text" 
+                                                   Color="Color.Primary"
+                                                   StartIcon="@Icons.Material.Filled.ManageAccounts"
+                                                   OnClick="() => ManageTenant(tenant)">
+                                            Zarządzaj
+                                        </MudButton>
+                                    </MudCardActions>
+                                </MudCard>
+                            </MudItem>
+                        }
+                    </MudGrid>
+                }
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Użytkownicy" Icon="@Icons.Material.Filled.People">
+            <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 12px;">
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.SupervisorAccount" Class="mr-2" />
+                    Wszyscy użytkownicy systemu
+                </MudText>
+                
+                @if (users == null)
+                {
+                    <MudProgressLinear Indeterminate="true" />
+                }
+                else
+                {
+                    <MudTable Items="users" Dense="true" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Email</MudTh>
+                            <MudTh>Wypożyczalnia</MudTh>
+                            <MudTh>Role</MudTh>
+                            <MudTh>Data rejestracji</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd DataLabel="Email">@context.Email</MudTd>
+                            <MudTd DataLabel="Wypożyczalnia">
+                                @(tenants?.FirstOrDefault(t => t.Id == context.TenantId)?.Name ?? "-")
+                            </MudTd>
+                            <MudTd DataLabel="Role">
+                                @foreach (var role in context.Roles)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(role)" Class="mr-1">
+                                        @role
+                                    </MudChip>
+                                }
+                            </MudTd>
+                            <MudTd DataLabel="Rejestracja">-</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
 </MudContainer>
 
+@inject IJSRuntime JS
 
+@code {
+    private List<TenantInvitation>? invitations;
+    private List<Tenant>? tenants;
+    private List<UserWithRoles>? users;
+    private Dictionary<Guid, TenantStats> tenantStats = new();
+    
+    private string newInviteEmail = "";
+    private string newInviteTenantName = "";
+    private bool isSending = false;
 
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAll();
+    }
 
+    private async Task LoadAll()
+    {
+        await Task.WhenAll(LoadInvitations(), LoadTenants(), LoadUsers());
+    }
+
+    private async Task LoadInvitations()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        invitations = await db.TenantInvitations
+            .OrderByDescending(i => i.CreatedAtUtc)
+            .Take(100)
+            .ToListAsync();
+        StateHasChanged();
+    }
+
+    private async Task LoadTenants()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        tenants = await db.Tenants.OrderByDescending(t => t.CreatedAtUtc).ToListAsync();
+        
+        // Load stats for each tenant
+        tenantStats.Clear();
+        foreach (var tenant in tenants)
+        {
+            var products = await db.Products.IgnoreQueryFilters().CountAsync(p => p.TenantId == tenant.Id);
+            var customers = await db.Customers.IgnoreQueryFilters().CountAsync(c => c.TenantId == tenant.Id);
+            var rentals = await db.Rentals.IgnoreQueryFilters().CountAsync(r => r.TenantId == tenant.Id);
+            tenantStats[tenant.Id] = new TenantStats { Products = products, Customers = customers, Rentals = rentals };
+        }
+        StateHasChanged();
+    }
+
+    private async Task LoadUsers()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var allUsers = await db.Users.ToListAsync();
+        var userRoles = await db.UserRoles.ToListAsync();
+        var roles = await db.Roles.ToListAsync();
+        
+        users = allUsers.Select(u => new UserWithRoles
+        {
+            Id = u.Id,
+            Email = u.Email ?? "",
+            TenantId = u.TenantId,
+            Roles = userRoles
+                .Where(ur => ur.UserId == u.Id)
+                .Select(ur => roles.FirstOrDefault(r => r.Id == ur.RoleId)?.Name ?? "")
+                .Where(r => !string.IsNullOrEmpty(r))
+                .ToList()
+        }).ToList();
+        StateHasChanged();
+    }
+
+    private async Task SendInvitation()
+    {
+        if (string.IsNullOrWhiteSpace(newInviteEmail))
+        {
+            Snackbar.Add("Podaj adres email", Severity.Warning);
+            return;
+        }
+
+        isSending = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            
+            // Check if invitation already exists
+            var existing = await db.TenantInvitations
+                .FirstOrDefaultAsync(i => i.Email == newInviteEmail && !i.IsUsed && i.ExpiresAtUtc > DateTime.UtcNow);
+            
+            if (existing != null)
+            {
+                Snackbar.Add("Zaproszenie dla tego emaila już istnieje i jest aktywne", Severity.Warning);
+                return;
+            }
+
+            var invitation = new TenantInvitation
+            {
+                Id = Guid.NewGuid(),
+                Email = newInviteEmail.Trim().ToLowerInvariant(),
+                TenantName = string.IsNullOrWhiteSpace(newInviteTenantName) ? null : newInviteTenantName.Trim(),
+                Token = GenerateToken(),
+                CreatedAtUtc = DateTime.UtcNow,
+                ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+                IsUsed = false
+            };
+
+            db.TenantInvitations.Add(invitation);
+            await db.SaveChangesAsync();
+
+            // Send email
+            await SendInvitationEmail(invitation);
+
+            newInviteEmail = "";
+            newInviteTenantName = "";
+            await LoadInvitations();
+            
+            Snackbar.Add($"Zaproszenie wysłane do {invitation.Email}", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+
+    private async Task SendInvitationEmail(TenantInvitation invitation)
+    {
+        try
+        {
+            var baseUrl = Navigation.BaseUri.TrimEnd('/');
+            var inviteUrl = $"{baseUrl}/Account/RegisterOwner?token={invitation.Token}";
+            
+            var subject = "Zaproszenie do SportRental - Załóż swoją wypożyczalnię!";
+            var htmlBody = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; }}
+        .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+        .header {{ background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0; text-align: center; }}
+        .content {{ background: #f9fafb; padding: 30px; border-radius: 0 0 12px 12px; }}
+        .button {{ display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 20px 0; }}
+        .footer {{ text-align: center; color: #6b7280; font-size: 12px; margin-top: 20px; }}
+    </style>
+</head>
+<body>
+    <div class='container'>
+        <div class='header'>
+            <h1>🎿 SportRental</h1>
+            <p>Profesjonalne zarządzanie wypożyczalnią</p>
+        </div>
+        <div class='content'>
+            <h2>Cześć!</h2>
+            <p>Zostałeś zaproszony do założenia konta właściciela wypożyczalni w systemie <strong>SportRental</strong>.</p>
+            
+            {(string.IsNullOrEmpty(invitation.TenantName) ? "" : $"<p>Nazwa Twojej wypożyczalni: <strong>{invitation.TenantName}</strong></p>")}
+            
+            <p>Kliknij poniższy przycisk, aby utworzyć swoje konto i rozpocząć zarządzanie wypożyczalnią:</p>
+            
+            <p style='text-align: center;'>
+                <a href='{inviteUrl}' class='button'>🚀 Załóż konto właściciela</a>
+            </p>
+            
+            <p><strong>Co zyskujesz?</strong></p>
+            <ul>
+                <li>✅ Zarządzanie produktami i sprzętem</li>
+                <li>✅ System rezerwacji online</li>
+                <li>✅ Automatyczne umowy PDF</li>
+                <li>✅ Płatności Stripe</li>
+                <li>✅ Kalendarz wypożyczeń</li>
+            </ul>
+            
+            <p style='color: #6b7280; font-size: 14px;'>
+                Link jest ważny przez 7 dni. Jeśli nie prosiłeś o to zaproszenie, zignoruj tę wiadomość.
+            </p>
+        </div>
+        <div class='footer'>
+            <p>© {DateTime.Now.Year} SportRental. Wszelkie prawa zastrzeżone.</p>
+        </div>
+    </div>
+</body>
+</html>";
+
+            // Try to send email via IEmailSender if available
+            var emailSender = GetEmailSender();
+            if (emailSender != null)
+            {
+                await emailSender.SendEmailAsync(invitation.Email, subject, htmlBody);
+            }
+            else
+            {
+                // Log that email wasn't sent (SMTP not configured)
+                Snackbar.Add("Email nie został wysłany - skonfiguruj SMTP. Link: " + inviteUrl, Severity.Info);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Zaproszenie utworzone, ale email nie został wysłany: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    [Inject] private IServiceProvider ServiceProvider { get; set; } = default!;
+    
+    private SportRental.Admin.Services.Email.IEmailSender? GetEmailSender()
+    {
+        try
+        {
+            return ServiceProvider.GetService<SportRental.Admin.Services.Email.IEmailSender>();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task CopyInviteLink(TenantInvitation invitation)
+    {
+        var baseUrl = Navigation.BaseUri.TrimEnd('/');
+        var inviteUrl = $"{baseUrl}/Account/RegisterOwner?token={invitation.Token}";
+        
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", inviteUrl);
+        Snackbar.Add("Link skopiowany do schowka!", Severity.Success);
+    }
+
+    private async Task ResendInvitation(TenantInvitation invitation)
+    {
+        await SendInvitationEmail(invitation);
+        Snackbar.Add($"Email wysłany ponownie do {invitation.Email}", Severity.Success);
+    }
+
+    private async Task DeleteInvitation(TenantInvitation invitation)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Usuń zaproszenie",
+            $"Czy na pewno chcesz usunąć zaproszenie dla {invitation.Email}?",
+            yesText: "Usuń",
+            cancelText: "Anuluj");
+
+        if (confirm != true) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var toDelete = await db.TenantInvitations.FindAsync(invitation.Id);
+        if (toDelete != null)
+        {
+            db.TenantInvitations.Remove(toDelete);
+            await db.SaveChangesAsync();
+            await LoadInvitations();
+            Snackbar.Add("Zaproszenie usunięte", Severity.Success);
+        }
+    }
+
+    private void ManageTenant(Tenant tenant)
+    {
+        Snackbar.Add($"Zarządzanie wypożyczalnią: {tenant.Name} - funkcja w przygotowaniu", Severity.Info);
+    }
+
+    private static string GenerateToken()
+    {
+        var bytes = new byte[32];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(bytes);
+        return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+    }
+
+    private static Color GetRoleColor(string role) => role switch
+    {
+        "SuperAdmin" => Color.Error,
+        "Owner" => Color.Primary,
+        "Manager" => Color.Secondary,
+        "Employee" or "Pracownik" => Color.Info,
+        "Client" => Color.Success,
+        _ => Color.Default
+    };
+
+    private class TenantStats
+    {
+        public int Products { get; set; }
+        public int Customers { get; set; }
+        public int Rentals { get; set; }
+    }
+
+    private class UserWithRoles
+    {
+        public Guid Id { get; set; }
+        public string Email { get; set; } = "";
+        public Guid? TenantId { get; set; }
+        public List<string> Roles { get; set; } = new();
+    }
+}

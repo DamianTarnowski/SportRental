@@ -466,12 +466,6 @@ public static class StripeWebhookEndpoints
         Rental rental,
         IReadOnlyDictionary<Guid, DomainProduct> products)
     {
-        if (string.IsNullOrWhiteSpace(customer.Email))
-        {
-            logger.LogWarning("Customer {CustomerId} has no email, skipping confirmation message", customer.Id);
-            return;
-        }
-
         try
         {
             var companyInfo = await db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == rental.TenantId);
@@ -479,20 +473,38 @@ public static class StripeWebhookEndpoints
                 .Select(item => (products[item.ProductId], item.Quantity))
                 .ToList();
 
-            await emailService.SendRentalConfirmationAsync(
-                customer.Email,
-                customer.FullName ?? customer.Email,
-                customer,
-                rental,
-                itemTuples,
-                companyInfo);
+            // Generuj i zapisz PDF umowy (nawet jeśli klient nie ma emaila)
+            var contractUrl = await emailService.GenerateAndSaveContractAsync(rental, customer, itemTuples, companyInfo);
+            if (!string.IsNullOrWhiteSpace(contractUrl))
+            {
+                rental.ContractUrl = contractUrl;
+                logger.LogInformation("Contract PDF saved for rental {RentalId}: {ContractUrl}", rental.Id, contractUrl);
+            }
 
-            rental.IsEmailSent = true;
+            // Wyślij email z potwierdzeniem (jeśli klient ma email)
+            if (!string.IsNullOrWhiteSpace(customer.Email))
+            {
+                await emailService.SendRentalConfirmationAsync(
+                    customer.Email,
+                    customer.FullName ?? customer.Email,
+                    customer,
+                    rental,
+                    itemTuples,
+                    companyInfo);
+
+                rental.IsEmailSent = true;
+                logger.LogInformation("Confirmation email sent to {Email} for rental {RentalId}", customer.Email, rental.Id);
+            }
+            else
+            {
+                logger.LogWarning("Customer {CustomerId} has no email, skipping confirmation message", customer.Id);
+            }
+
             await db.SaveChangesAsync();
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to send confirmation email for rental {RentalId}", rental.Id);
+            logger.LogError(ex, "Failed to process confirmation for rental {RentalId}", rental.Id);
         }
     }
 }

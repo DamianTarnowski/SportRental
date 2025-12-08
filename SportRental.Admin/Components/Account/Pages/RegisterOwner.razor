@@ -1,0 +1,516 @@
+@page "/Account/RegisterOwner"
+
+@using System.ComponentModel.DataAnnotations
+@using System.Text
+@using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.EntityFrameworkCore
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IUserStore<ApplicationUser> UserStore
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject ILogger<RegisterOwner> Logger
+@inject NavigationManager NavigationManager
+
+<PageTitle>Rejestracja właściciela - SportRental</PageTitle>
+
+<div class="register-owner-container">
+    <div class="register-card">
+        <div class="register-header">
+            <div class="logo-icon">🎿</div>
+            <h1>SportRental</h1>
+            <p>Rejestracja właściciela wypożyczalni</p>
+        </div>
+
+        @if (invitation == null)
+        {
+            <div class="error-state">
+                <div class="error-icon">❌</div>
+                <h2>Nieprawidłowy lub wygasły link</h2>
+                <p>@errorMessage</p>
+                <a href="/Account/Login" class="btn-link">Przejdź do logowania</a>
+            </div>
+        }
+        else if (isRegistered)
+        {
+            <div class="success-state">
+                <div class="success-icon">🎉</div>
+                <h2>Konto utworzone!</h2>
+                <p>Twoja wypożyczalnia <strong>@invitation.TenantName</strong> została utworzona.</p>
+                <p>Za chwilę zostaniesz przekierowany do panelu...</p>
+                <a href="/" class="btn-primary">Przejdź do panelu</a>
+            </div>
+        }
+        else
+        {
+            <div class="invite-info">
+                <div class="invite-badge">✨ Zaproszenie aktywne</div>
+                @if (!string.IsNullOrEmpty(invitation.TenantName))
+                {
+                    <p>Wypożyczalnia: <strong>@invitation.TenantName</strong></p>
+                }
+                <p class="invite-email">Email: <strong>@invitation.Email</strong></p>
+            </div>
+
+            <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
+                <DataAnnotationsValidator />
+                
+                <div class="form-group">
+                    <label for="tenant-name">Nazwa wypożyczalni *</label>
+                    <InputText id="tenant-name" @bind-Value="Input.TenantName" class="form-input" placeholder="np. Ski Rental Zakopane" />
+                    <ValidationMessage For="() => Input.TenantName" class="validation-message" />
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <InputText id="email" @bind-Value="Input.Email" class="form-input" disabled="true" />
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="password">Hasło *</label>
+                        <InputText id="password" type="password" @bind-Value="Input.Password" class="form-input" placeholder="Min. 8 znaków" />
+                        <ValidationMessage For="() => Input.Password" class="validation-message" />
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-password">Potwierdź hasło *</label>
+                        <InputText id="confirm-password" type="password" @bind-Value="Input.ConfirmPassword" class="form-input" placeholder="Powtórz hasło" />
+                        <ValidationMessage For="() => Input.ConfirmPassword" class="validation-message" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Telefon kontaktowy</label>
+                    <InputText id="phone" @bind-Value="Input.PhoneNumber" class="form-input" placeholder="+48 123 456 789" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(registerError))
+                {
+                    <div class="error-message">
+                        @registerError
+                    </div>
+                }
+
+                <button type="submit" class="btn-submit" disabled="@isSubmitting">
+                    @if (isSubmitting)
+                    {
+                        <span class="spinner"></span>
+                        <span>Tworzenie konta...</span>
+                    }
+                    else
+                    {
+                        <span>🚀 Utwórz konto i wypożyczalnię</span>
+                    }
+                </button>
+            </EditForm>
+
+            <div class="form-footer">
+                <p>Masz już konto? <a href="/Account/Login">Zaloguj się</a></p>
+            </div>
+        }
+    </div>
+</div>
+
+<style>
+    .register-owner-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%);
+        padding: 20px;
+    }
+
+    .register-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        max-width: 520px;
+        width: 100%;
+        padding: 40px;
+        animation: slideUp 0.5s ease-out;
+    }
+
+    @@keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .register-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .logo-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+
+    .register-header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1f2937;
+        margin: 0 0 5px 0;
+    }
+
+    .register-header p {
+        color: #6b7280;
+        margin: 0;
+    }
+
+    .invite-info {
+        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        border: 1px solid #86efac;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 24px;
+        text-align: center;
+    }
+
+    .invite-badge {
+        display: inline-block;
+        background: #22c55e;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .invite-info p {
+        margin: 4px 0;
+        color: #166534;
+    }
+
+    .invite-email {
+        font-size: 14px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    @@media (max-width: 500px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 6px;
+        font-size: 14px;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 16px;
+        transition: all 0.2s;
+        box-sizing: border-box;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .form-input:disabled {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+
+    .validation-message {
+        color: #dc2626;
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .error-message {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        font-size: 14px;
+    }
+
+    .btn-submit {
+        width: 100%;
+        padding: 14px 24px;
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-submit:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+
+    .spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .form-footer {
+        text-align: center;
+        margin-top: 24px;
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .form-footer a {
+        color: #6366f1;
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .error-state, .success-state {
+        text-align: center;
+        padding: 20px;
+    }
+
+    .error-icon, .success-icon {
+        font-size: 64px;
+        margin-bottom: 16px;
+    }
+
+    .error-state h2, .success-state h2 {
+        color: #1f2937;
+        margin: 0 0 12px 0;
+    }
+
+    .error-state p, .success-state p {
+        color: #6b7280;
+        margin: 0 0 20px 0;
+    }
+
+    .btn-link, .btn-primary {
+        display: inline-block;
+        padding: 12px 24px;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .btn-link {
+        background: #f3f4f6;
+        color: #374151;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        color: white;
+    }
+</style>
+
+@code {
+    private TenantInvitation? invitation;
+    private string? errorMessage;
+    private string? registerError;
+    private bool isSubmitting = false;
+    private bool isRegistered = false;
+
+    [SupplyParameterFromQuery]
+    private string? Token { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(Token))
+        {
+            errorMessage = "Brak tokenu zaproszenia w linku.";
+            return;
+        }
+
+        var tokenTrimmed = Token.Trim();
+        
+        await using var db = await DbFactory.CreateDbContextAsync();
+        
+        invitation = await db.TenantInvitations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Token == tokenTrimmed);
+
+        if (invitation == null)
+        {
+            errorMessage = "Zaproszenie nie istnieje lub zostało usunięte.";
+            return;
+        }
+
+        if (invitation.IsUsed)
+        {
+            errorMessage = "To zaproszenie zostało już wykorzystane.";
+            invitation = null;
+            return;
+        }
+
+        if (invitation.ExpiresAtUtc < DateTime.UtcNow)
+        {
+            errorMessage = "Zaproszenie wygasło. Poproś o nowe zaproszenie.";
+            invitation = null;
+            return;
+        }
+
+        // Pre-fill form
+        Input.Email = invitation.Email;
+        Input.TenantName = invitation.TenantName ?? "";
+    }
+
+    public async Task RegisterUser()
+    {
+        if (invitation == null) return;
+        
+        isSubmitting = true;
+        registerError = null;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+
+            // Create new tenant
+            var tenantId = Guid.NewGuid();
+            var tenant = new Tenant
+            {
+                Id = tenantId,
+                Name = Input.TenantName,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            db.Tenants.Add(tenant);
+
+            // Create company info
+            var companyInfo = new CompanyInfo
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = Input.TenantName,
+                Email = Input.Email,
+                PhoneNumber = Input.PhoneNumber,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            };
+            db.CompanyInfos.Add(companyInfo);
+
+            await db.SaveChangesAsync();
+
+            // Create user
+            var user = new ApplicationUser
+            {
+                UserName = Input.Email,
+                Email = Input.Email,
+                EmailConfirmed = true,
+                TenantId = tenantId,
+                PhoneNumber = Input.PhoneNumber
+            };
+
+            var result = await UserManager.CreateAsync(user, Input.Password);
+
+            if (!result.Succeeded)
+            {
+                registerError = string.Join(", ", result.Errors.Select(e => e.Description));
+                return;
+            }
+
+            // Add Owner role
+            await UserManager.AddToRoleAsync(user, "Owner");
+            await UserManager.AddToRoleAsync(user, "Client");
+
+            // Mark invitation as used
+            invitation.IsUsed = true;
+            invitation.UsedAtUtc = DateTime.UtcNow;
+            invitation.CreatedTenantId = tenantId;
+            db.TenantInvitations.Update(invitation);
+            await db.SaveChangesAsync();
+
+            Logger.LogInformation("New owner registered: {Email}, Tenant: {TenantName}", Input.Email, Input.TenantName);
+
+            isRegistered = true;
+
+            // Auto sign in
+            await SignInManager.SignInAsync(user, isPersistent: false);
+
+            // Redirect after delay
+            await Task.Delay(2000);
+            NavigationManager.NavigateTo("/dashboard", true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during owner registration");
+            registerError = "Wystąpił błąd podczas rejestracji. Spróbuj ponownie.";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "Nazwa wypożyczalni jest wymagana")]
+        [StringLength(200, MinimumLength = 3, ErrorMessage = "Nazwa musi mieć od 3 do 200 znaków")]
+        public string TenantName { get; set; } = "";
+
+        [Required(ErrorMessage = "Email jest wymagany")]
+        [EmailAddress(ErrorMessage = "Nieprawidłowy format email")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Hasło jest wymagane")]
+        [StringLength(100, ErrorMessage = "Hasło musi mieć minimum {2} znaków", MinimumLength = 8)]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        [Required(ErrorMessage = "Potwierdzenie hasła jest wymagane")]
+        [Compare("Password", ErrorMessage = "Hasła nie są identyczne")]
+        [DataType(DataType.Password)]
+        public string ConfirmPassword { get; set; } = "";
+
+        [Phone(ErrorMessage = "Nieprawidłowy format numeru telefonu")]
+        public string? PhoneNumber { get; set; }
+    }
+}
+
