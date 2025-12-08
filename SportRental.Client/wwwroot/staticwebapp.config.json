@@ -1,0 +1,16 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/_framework/*", "/css/*", "/*.{css,ico,js,json,png,jpg,svg,woff,woff2}"]
+  },
+  "mimeTypes": {
+    ".wasm": "application/wasm",
+    ".dll": "application/octet-stream",
+    ".dat": "application/octet-stream",
+    ".blat": "application/octet-stream"
+  },
+  "globalHeaders": {
+    "Access-Control-Allow-Origin": "*"
+  }
+}
+

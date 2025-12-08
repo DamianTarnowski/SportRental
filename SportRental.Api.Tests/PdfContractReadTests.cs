@@ -40,7 +40,7 @@ public class PdfContractReadTests
         _output.WriteLine("");
 
         var testEmail = _configuration["TestAccounts:TestCustomer:Email"] ?? "testklient@op.pl";
-        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? "HasloHaslo122@@@";
+        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? throw new InvalidOperationException("Configure TestAccounts:TestCustomer:Password in appsettings.Test.json");
         var senderEmail = _configuration["Email:Smtp:SenderEmail"] ?? "contact.sportrental@op.pl";
 
         // Act - Connect to IMAP and get latest email with PDF

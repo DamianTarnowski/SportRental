@@ -93,13 +93,13 @@ SportRental składa się z 4 aplikacji + 2 baz danych:
 ### **1. Zaloguj się do Azure**
 
 ```bash
-az login --tenant 086c4236-ef41-4a3b-8224-13c921705d68
+az login --tenant <YOUR_TENANT_ID>
 ```
 
 ### **2. Ustaw domyślną subskrypcję**
 
 ```bash
-az account set --subscription "782a530d-e336-4b14-98ff-e39f876c790d"
+az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
 ```
 
 ### **3. Sprawdź czy wszystko działa**
@@ -132,7 +132,7 @@ az postgres flexible-server create \
   --resource-group SportRental-Production \
   --location westeurope \
   --admin-user sportadmin \
-  --admin-password "TwojeHaslo123!@#" \
+  --admin-password "<YOUR_SECURE_PASSWORD>" \
   --sku-name Standard_B1ms \
   --tier Burstable \
   --storage-size 32 \
@@ -154,11 +154,11 @@ az postgres flexible-server db create \
 
 ```bash
 # Connection string
-CONNECTION_STRING="Host=sportrental-db-prod.postgres.database.azure.com;Port=5432;Database=sportrental;Username=sportadmin;Password=TwojeHaslo123!@#;SSL Mode=Require;Trust Server Certificate=true"
+CONNECTION_STRING="Host=<YOUR_DB_SERVER>.postgres.database.azure.com;Port=5432;Database=sportrental;Username=sportadmin;Password=<YOUR_SECURE_PASSWORD>;SSL Mode=Require;Trust Server Certificate=true"
 
 # Dodaj do Key Vault
 az keyvault secret set \
-  --vault-name vault2127 \
+  --vault-name <YOUR_KEYVAULT_NAME> \
   --name "ConnectionStrings--DefaultConnection" \
   --value "$CONNECTION_STRING"
 ```
@@ -205,7 +205,7 @@ ADMIN_IDENTITY=$(az webapp identity show \
 
 # Daj dostęp do Key Vault
 az keyvault set-policy \
-  --name vault2127 \
+  --name <YOUR_KEYVAULT_NAME> \
   --object-id $ADMIN_IDENTITY \
   --secret-permissions get list
 ```
@@ -230,7 +230,7 @@ API_IDENTITY=$(az webapp identity show \
   --query principalId -o tsv)
 
 az keyvault set-policy \
-  --name vault2127 \
+  --name <YOUR_KEYVAULT_NAME> \
   --object-id $API_IDENTITY \
   --secret-permissions get list
 ```
@@ -255,7 +255,7 @@ MEDIA_IDENTITY=$(az webapp identity show \
   --query principalId -o tsv)
 
 az keyvault set-policy \
-  --name vault2127 \
+  --name <YOUR_KEYVAULT_NAME> \
   --object-id $MEDIA_IDENTITY \
   --secret-permissions get list
 ```
@@ -271,7 +271,7 @@ az webapp config appsettings set \
   --name sportrental-admin \
   --resource-group SportRental-Production \
   --settings \
-    "KeyVault__Url=https://vault2127.vault.azure.net/" \
+    "KeyVault__Url=https://<YOUR_KEYVAULT_NAME>.vault.azure.net/" \
     "ASPNETCORE_ENVIRONMENT=Production" \
     "Storage__Provider=AzureBlob"
 ```
@@ -283,7 +283,7 @@ az webapp config appsettings set \
   --name sportrental-api \
   --resource-group SportRental-Production \
   --settings \
-    "KeyVault__Url=https://vault2127.vault.azure.net/" \
+    "KeyVault__Url=https://<YOUR_KEYVAULT_NAME>.vault.azure.net/" \
     "ASPNETCORE_ENVIRONMENT=Production"
 ```
 
@@ -294,7 +294,7 @@ az webapp config appsettings set \
   --name sportrental-media \
   --resource-group SportRental-Production \
   --settings \
-    "KeyVault__Url=https://vault2127.vault.azure.net/" \
+    "KeyVault__Url=https://<YOUR_KEYVAULT_NAME>.vault.azure.net/" \
     "ASPNETCORE_ENVIRONMENT=Production"
 ```
 
@@ -365,7 +365,7 @@ cd ../..
 cd SportRental.Admin
 
 # Ustaw connection string tymczasowo
-export ConnectionStrings__DefaultConnection="Host=sportrental-db-prod.postgres.database.azure.com;Port=5432;Database=sportrental;Username=sportadmin;Password=TwojeHaslo123!@#;SSL Mode=Require"
+export ConnectionStrings__DefaultConnection="Host=<YOUR_DB_SERVER>.postgres.database.azure.com;Port=5432;Database=sportrental;Username=sportadmin;Password=<YOUR_SECURE_PASSWORD>;SSL Mode=Require"
 
 # Uruchom migracje
 dotnet ef database update
@@ -534,7 +534,7 @@ done
 ```bash
 # Sprawdź czy Managed Identity ma permissions
 az keyvault show \
-  --name vault2127 \
+  --name <YOUR_KEYVAULT_NAME> \
   --query properties.accessPolicies
 
 # Jeśli nie, dodaj ponownie:
@@ -544,7 +544,7 @@ IDENTITY=$(az webapp identity show \
   --query principalId -o tsv)
 
 az keyvault set-policy \
-  --name vault2127 \
+  --name <YOUR_KEYVAULT_NAME> \
   --object-id $IDENTITY \
   --secret-permissions get list
 ```
@@ -595,12 +595,177 @@ az postgres flexible-server parameter set \
 
 ---
 
+## 🎯 **RZECZYWISTY DEPLOYMENT (Grudzień 2024)**
+
+Poniżej dokładne komendy użyte podczas faktycznego wdrożenia na darmowe plany Azure.
+
+### **Aktualne adresy produkcyjne:**
+
+| Aplikacja | URL | Plan |
+|-----------|-----|------|
+| **Admin Panel** (Blazor Server) | https://sradmin2.azurewebsites.net | App Service F1 Free |
+| **Klient WASM** | https://nice-tree-0359d8403.3.azurestaticapps.net | Static Web App Free |
+
+### **1. Utworzenie darmowego App Service Plan (Poland Central)**
+
+```powershell
+# Tworzenie nowego darmowego planu w Polsce dla niskiego pingu
+az appservice plan create `
+  --name sportrental-free `
+  --resource-group DefaultResourceGroup-PLC `
+  --location polandcentral `
+  --sku F1 `
+  --is-linux false
+```
+
+### **2. Utworzenie App Service dla Admin Panel**
+
+```powershell
+# Utworzenie nowej aplikacji na darmowym planie
+az webapp create `
+  --name sradmin2 `
+  --resource-group DefaultResourceGroup-PLC `
+  --plan sportrental-free `
+  --runtime "dotnet:10"
+
+# Włączenie Managed Identity
+az webapp identity assign `
+  --name sradmin2 `
+  --resource-group DefaultResourceGroup-PLC
+
+# Pobranie Principal ID
+$principalId = az webapp identity show `
+  --name sradmin2 `
+  --resource-group DefaultResourceGroup-PLC `
+  --query principalId -o tsv
+
+# Nadanie uprawnień do Key Vault (RBAC)
+az role assignment create `
+  --role "Key Vault Secrets User" `
+  --assignee $principalId `
+  --scope "/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.KeyVault/vaults/<YOUR_KEYVAULT_NAME>"
+
+# Konfiguracja App Settings
+az webapp config appsettings set `
+  --name sradmin2 `
+  --resource-group DefaultResourceGroup-PLC `
+  --settings `
+    "KeyVault__Url=https://<YOUR_KEYVAULT_NAME>.vault.azure.net/" `
+    "ASPNETCORE_ENVIRONMENT=Production" `
+    "Storage__Provider=AzureBlob"
+```
+
+### **3. Build i Deploy Admin Panel**
+
+```powershell
+cd SportRental.Admin
+
+# Build Release
+dotnet publish -c Release -o ./publish
+
+# Tworzenie ZIP
+cd publish
+Compress-Archive -Path * -DestinationPath ../admin.zip -Force
+cd ..
+
+# Deploy przez ZIP
+az webapp deployment source config-zip `
+  --name sradmin2 `
+  --resource-group DefaultResourceGroup-PLC `
+  --src admin.zip
+```
+
+### **4. Utworzenie Azure Static Web App dla WASM**
+
+```powershell
+# Utworzenie Static Web App
+az staticwebapp create `
+  --name srclient-wasm `
+  --resource-group DefaultResourceGroup-PLC `
+  --location westeurope `
+  --sku Free
+```
+
+### **5. Build i Deploy WASM Client**
+
+```powershell
+cd SportRental.Client
+
+# Build WASM
+dotnet publish -c Release -o ./publish
+
+# Deploy przez SWA CLI
+$token = az staticwebapp secrets list --name srclient-wasm --query "properties.apiKey" -o tsv
+swa deploy "./publish/wwwroot" --deployment-token $token --env production
+```
+
+### **6. Konfiguracja CORS**
+
+```powershell
+# Dodanie domeny Static Web App do CORS w Admin API
+az webapp cors add `
+  --name sradmin2 `
+  --resource-group DefaultResourceGroup-PLC `
+  --allowed-origins "https://nice-tree-0359d8403.3.azurestaticapps.net"
+```
+
+### **7. Konfiguracja plików dla WASM**
+
+**`SportRental.Client/wwwroot/appsettings.Production.json`:**
+```json
+{
+  "Api": {
+    "BaseUrl": "https://sradmin2.azurewebsites.net",
+    "TenantId": "547f5df7-a389-44b3-bcc6-090ff2fa92e5"
+  }
+}
+```
+
+**`SportRental.Client/wwwroot/staticwebapp.config.json`:**
+```json
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/_framework/*", "/css/*", "/*.{css,ico,js,json,png,jpg,svg,woff,woff2}"]
+  },
+  "mimeTypes": {
+    ".wasm": "application/wasm",
+    ".dll": "application/octet-stream",
+    ".dat": "application/octet-stream",
+    ".blat": "application/octet-stream"
+  },
+  "globalHeaders": {
+    "Access-Control-Allow-Origin": "*"
+  }
+}
+```
+
+### **Rozwiązane problemy:**
+
+| Problem | Rozwiązanie |
+|---------|-------------|
+| Wyczerpany limit CPU na starym planie F1 | Utworzenie nowego planu `sportrental-free` |
+| HTTP 500.30 po deploy | Przypisanie roli "Key Vault Secrets User" do Managed Identity |
+| 404 na routing SPA w Static Web App | Dodanie `staticwebapp.config.json` z `navigationFallback` |
+| CORS blocked | `az webapp cors add` z domeną Static Web App |
+| Pliki .wasm nie ładują się | Dodanie `mimeTypes` w config |
+
+### **Ważne uwagi:**
+
+- **Free plan F1** ma limit 60 minut CPU dziennie - przy intensywnym użyciu może się wyczerpać
+- **Key Vault z RBAC** wymaga roli "Key Vault Secrets User", nie access policy
+- **Static Web App** wymaga pliku `staticwebapp.config.json` dla SPA routing
+- **Managed Identity** potrzebuje kilku minut na propagację uprawnień
+
+---
+
 ## 📚 **Dodatkowe Zasoby**
 
 - [Azure App Service Docs](https://learn.microsoft.com/azure/app-service/)
 - [Azure PostgreSQL Docs](https://learn.microsoft.com/azure/postgresql/)
 - [Azure Key Vault Docs](https://learn.microsoft.com/azure/key-vault/)
 - [Blazor on Azure](https://learn.microsoft.com/aspnet/core/blazor/host-and-deploy/webassembly)
+- [Azure Static Web Apps](https://learn.microsoft.com/azure/static-web-apps/)
 
 ---
 

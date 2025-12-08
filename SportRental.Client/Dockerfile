@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0-preview AS build
 WORKDIR /src
 COPY ["SportRental.Client/SportRental.Client.csproj", "SportRental.Client/"]
 COPY ["SportRental.Shared/SportRental.Shared.csproj", "SportRental.Shared/"]

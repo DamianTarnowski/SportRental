@@ -1,0 +1,15 @@
+warning: in the working copy of 'SportRental.Client/SportRental.Client.csproj', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SportRental.DbTool/Program.cs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'SportRental.Shared/SportRental.Shared.csproj', LF will be replaced by CRLF the next time Git touches it
+.gitignore
+SportRental.Admin/Components/Layout/ThemeSwitcher.razor
+SportRental.Admin/Dockerfile
+SportRental.Api.Tests/OnetEmailReceiveTests.cs
+SportRental.Api.Tests/PdfContractReadTests.cs
+SportRental.Client/Dockerfile
+SportRental.Client/SportRental.Client.csproj
+SportRental.DbTool/Program.cs
+SportRental.DbTool/SportRental.DbTool.csproj
+SportRental.Shared/SportRental.Shared.csproj
+doc/setup/AZURE_DEPLOYMENT.md
+doc/setup/ONET_EMAIL_SETUP.md

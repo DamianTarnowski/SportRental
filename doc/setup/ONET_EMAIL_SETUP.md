@@ -1,5 +1,9 @@
 # 📧 Onet Email Integration - Complete Setup
 
+> ⚠️ **UWAGA:** Ten plik zawiera hasła do TESTOWYCH kont email (Onet).
+> Te konta są przeznaczone tylko do developmentu i testów.
+> Dla produkcji użyj Key Vault lub własnych kont!
+
 ## ✅ **STATUS: CONFIGURED & TESTED!**
 
 ```

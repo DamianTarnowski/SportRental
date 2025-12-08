@@ -38,7 +38,7 @@ public class OnetEmailReceiveTests
         _output.WriteLine("");
 
         var testEmail = _configuration["TestAccounts:TestCustomer:Email"] ?? "testklient@op.pl";
-        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? "HasloHaslo122@@@";
+        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? throw new InvalidOperationException("Configure TestAccounts:TestCustomer:Password in appsettings.Test.json");
 
         _output.WriteLine($"Mailbox: {testEmail}");
         _output.WriteLine($"IMAP:    imap.poczta.onet.pl:993");
@@ -99,7 +99,7 @@ public class OnetEmailReceiveTests
         _output.WriteLine("");
 
         var testEmail = _configuration["TestAccounts:TestCustomer:Email"] ?? "testklient@op.pl";
-        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? "HasloHaslo122@@@";
+        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? throw new InvalidOperationException("Configure TestAccounts:TestCustomer:Password in appsettings.Test.json");
         var senderEmail = _configuration["Email:Smtp:SenderEmail"] ?? "contact.sportrental@op.pl";
 
         // Act
@@ -210,7 +210,7 @@ public class OnetEmailReceiveTests
         _output.WriteLine("");
 
         var testEmail = _configuration["TestAccounts:TestCustomer:Email"] ?? "testklient@op.pl";
-        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? "HasloHaslo122@@@";
+        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? throw new InvalidOperationException("Configure TestAccounts:TestCustomer:Password in appsettings.Test.json");
 
         // Act
         using var client = new ImapClient();
@@ -303,7 +303,7 @@ public class OnetEmailReceiveTests
         _output.WriteLine("");
 
         var testEmail = _configuration["TestAccounts:TestCustomer:Email"] ?? "testklient@op.pl";
-        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? "HasloHaslo122@@@";
+        var testPassword = _configuration["TestAccounts:TestCustomer:Password"] ?? throw new InvalidOperationException("Configure TestAccounts:TestCustomer:Password in appsettings.Test.json");
 
         // Act
         using var client = new ImapClient();

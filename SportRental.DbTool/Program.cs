@@ -1,15 +1,35 @@
-﻿using Npgsql;
+﻿using Microsoft.Extensions.Configuration;
+using Npgsql;
 using Spectre.Console;
 using System.Text;
 
 // 🎯 SportRental Database Tool
 // Bezpieczne narzędzie do przeglądania bazy danych PostgreSQL
 
-var connectionStrings = new Dictionary<string, string>
+// Wczytaj konfigurację z appsettings.json / appsettings.Development.json
+var configuration = new ConfigurationBuilder()
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: true)
+    .AddJsonFile("appsettings.Development.json", optional: true)
+    .AddEnvironmentVariables()
+    .Build();
+
+var connectionStrings = new Dictionary<string, string>();
+var connSection = configuration.GetSection("ConnectionStrings");
+foreach (var child in connSection.GetChildren())
 {
-    ["sr_test"] = "Host=eduedu.postgres.database.azure.com;Database=sr_test;Username=synapsis;Password=HasloHaslo122@@@@;SSL Mode=Require;Trust Server Certificate=true",
-    ["sr"] = "Host=eduedu.postgres.database.azure.com;Database=sr;Username=synapsis;Password=HasloHaslo122@@@@;SSL Mode=Require;Trust Server Certificate=true"
-};
+    if (!string.IsNullOrEmpty(child.Value) && !child.Value.StartsWith("<"))
+    {
+        connectionStrings[child.Key] = child.Value;
+    }
+}
+
+if (connectionStrings.Count == 0)
+{
+    AnsiConsole.MarkupLine("[red]❌ Brak connection stringów![/]");
+    AnsiConsole.MarkupLine("[yellow]Skopiuj appsettings.json do appsettings.Development.json i uzupełnij dane.[/]");
+    return;
+}
 
 var queryHistory = new List<string>();
 

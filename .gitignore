@@ -415,6 +415,23 @@ test-data.json
 ## Development overrides (use Key Vault instead)
 **/appsettings.Development.json
 
+## Master secrets file (for sharing with team members separately)
+secrets.Development.json
+secrets.*.json
+
+## Folder with ready-to-use secret files (share with team separately!)
+dev-secrets/
+
+## Quick test scripts with hardcoded credentials (use DbTool instead)
+DbTest/
+test-db-connection.csx
+
+## Deployment artifacts
+*.zip
+**/publish/
+**/publish-swa/
+**/pub/
+
 ## Development notes (internal, not for public repo)
 .dev-notes/
 
