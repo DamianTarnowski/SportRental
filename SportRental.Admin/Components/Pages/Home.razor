@@ -1,22 +1,192 @@
 @page "/"
 @rendermode InteractiveServer
 
-<PageTitle>Home</PageTitle>
+<PageTitle>SportRental - Panel Administracyjny</PageTitle>
 
-<MudContainer Class="mt-10">
-    <MudText Typo="Typo.h2" Class="mb-1">SportRental</MudText>
-    <MudText Typo="Typo.subtitle1" Class="mb-4">Wypożyczalnia sprzętu sportowego – panel administracyjny.</MudText>
+<div class="admin-home">
     <AuthorizeView>
         <Authorized>
-            <MudStack Row="true" Spacing="2">
-                <MudButton Href="/dashboard" Color="Color.Primary" Variant="Variant.Filled">Przejdź do panelu</MudButton>
-                <MudButton Href="/admin/products" Variant="Variant.Outlined">Produkty</MudButton>
-                <MudButton Href="/admin/rentals" Variant="Variant.Outlined">Wynajmy</MudButton>
-            </MudStack>
+            <!-- Welcome Hero -->
+            <div class="admin-hero">
+                <h1>👋 Witaj, @context.User.Identity?.Name!</h1>
+                <p>Panel administracyjny wypożyczalni sprzętu sportowego</p>
+            </div>
+
+            <!-- Quick Actions -->
+            <MudText Typo="Typo.h6" Class="mb-3">⚡ Szybkie akcje</MudText>
+            <MudGrid Spacing="3" Class="mb-6">
+                <MudItem xs="12" sm="6" md="3">
+                    <a href="/dashboard" class="admin-quick-action">
+                        <div class="admin-quick-action-icon">📊</div>
+                        <h3>Dashboard</h3>
+                        <p>Przegląd statystyk</p>
+                    </a>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <a href="/admin/rentals" class="admin-quick-action">
+                        <div class="admin-quick-action-icon" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%);">🛒</div>
+                        <h3>Nowy wynajem</h3>
+                        <p>Utwórz rezerwację</p>
+                    </a>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <a href="/admin/products" class="admin-quick-action">
+                        <div class="admin-quick-action-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">📦</div>
+                        <h3>Produkty</h3>
+                        <p>Zarządzaj sprzętem</p>
+                    </a>
+                </MudItem>
+                <MudItem xs="12" sm="6" md="3">
+                    <a href="/admin/customers" class="admin-quick-action">
+                        <div class="admin-quick-action-icon" style="background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);">👥</div>
+                        <h3>Klienci</h3>
+                        <p>Baza klientów</p>
+                    </a>
+                </MudItem>
+            </MudGrid>
+
+            <!-- Info Cards -->
+            <MudGrid Spacing="3">
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <div class="d-flex align-items-center gap-3 mb-3">
+                                <MudAvatar Color="Color.Primary" Size="Size.Large">📋</MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.h6">Funkcje panelu</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Dostępne narzędzia</MudText>
+                                </div>
+                            </div>
+                            <MudList T="string" Dense="true">
+                                <MudListItem Icon="@Icons.Material.Filled.Inventory" Text="Zarządzanie produktami i stanami magazynowymi" />
+                                <MudListItem Icon="@Icons.Material.Filled.People" Text="Baza klientów i historia wypożyczeń" />
+                                <MudListItem Icon="@Icons.Material.Filled.CalendarMonth" Text="Kalendarz rezerwacji" />
+                                <MudListItem Icon="@Icons.Material.Filled.Description" Text="Automatyczne generowanie umów PDF" />
+                                <MudListItem Icon="@Icons.Material.Filled.Analytics" Text="Raporty i statystyki" />
+                            </MudList>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudCard Elevation="2">
+                        <MudCardContent>
+                            <div class="d-flex align-items-center gap-3 mb-3">
+                                <MudAvatar Color="Color.Success" Size="Size.Large">💡</MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.h6">Wskazówki</MudText>
+                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Porady dla admina</MudText>
+                                </div>
+                            </div>
+                            <MudList T="string" Dense="true">
+                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Regularnie aktualizuj stany magazynowe" />
+                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Sprawdzaj kalendarz na początku dnia" />
+                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Wysyłaj przypomnienia o zwrotach" />
+                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Monitoruj raporty sprzedaży" />
+                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Dostosuj szablon umowy do potrzeb" />
+                            </MudList>
+                        </MudCardContent>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
         </Authorized>
         <NotAuthorized>
-            <MudText Typo="Typo.subtitle1">Zaloguj się, aby korzystać z panelu.</MudText>
-            <MudButton Href="/Account/Login" Color="Color.Primary" Variant="Variant.Filled">Zaloguj</MudButton>
+            <!-- Login Hero -->
+            <div class="login-hero">
+                <div class="login-hero-content">
+                    <div class="login-hero-icon">🏂</div>
+                    <h1>SportRental</h1>
+                    <p>Panel administracyjny wypożyczalni sprzętu sportowego</p>
+                    <div class="login-hero-features">
+                        <div class="feature-item">📦 Zarządzaj produktami</div>
+                        <div class="feature-item">👥 Obsługuj klientów</div>
+                        <div class="feature-item">📊 Analizuj raporty</div>
+                    </div>
+                    <MudButton Href="/Account/Login" 
+                               Variant="Variant.Filled" 
+                               Size="Size.Large"
+                               Class="login-hero-btn">
+                        🔑 Zaloguj się
+                    </MudButton>
+                    <MudText Typo="Typo.caption" Class="mt-3" Style="opacity: 0.7;">
+                        Nie masz konta? <MudLink Href="/Account/Register" Color="Color.Inherit" Underline="Underline.Always">Zarejestruj się</MudLink>
+                    </MudText>
+                </div>
+            </div>
         </NotAuthorized>
     </AuthorizeView>
-</MudContainer>
+</div>
+
+<style>
+    .admin-home {
+        animation: fadeInUp 0.4s ease-out;
+    }
+    
+    .login-hero {
+        min-height: calc(100vh - 150px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4f46e5 100%);
+        border-radius: 24px;
+        margin: -1.5rem;
+        padding: 3rem;
+    }
+    
+    .login-hero-content {
+        text-align: center;
+        color: white;
+        max-width: 500px;
+    }
+    
+    .login-hero-icon {
+        font-size: 5rem;
+        margin-bottom: 1.5rem;
+        animation: adminFloat 3s ease-in-out infinite;
+    }
+    
+    .login-hero h1 {
+        font-family: 'Poppins', sans-serif;
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(90deg, #fff 0%, #c7d2fe 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .login-hero p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        margin-bottom: 2rem;
+    }
+    
+    .login-hero-features {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 2rem;
+    }
+    
+    .feature-item {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.75rem 1.25rem;
+        border-radius: 30px;
+        font-size: 0.9rem;
+        backdrop-filter: blur(10px);
+    }
+    
+    .login-hero-btn {
+        background: white !important;
+        color: #4f46e5 !important;
+        font-weight: 600 !important;
+        padding: 0.75rem 2rem !important;
+        font-size: 1rem !important;
+    }
+    
+    .login-hero-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+</style>

@@ -7,111 +7,83 @@
 @inject ISnackbar Snackbar
 @implements IDisposable
 
-<nav class="space-y-2">
-    <NavLink href="/" Match="NavLinkMatch.All" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-             ActiveClass="bg-gray-100 text-gray-900 font-medium">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955a.75.75 0 0 1 1.06 0L21.218 12M4.5 9.75v10.125A1.125 1.125 0 0 0 5.625 21h12.75A1.125 1.125 0 0 0 19.5 19.875V9.75" />
-        </svg>
-        <span>Strona g��wna</span>
+<nav>
+    <!-- Main Navigation -->
+    <NavLink href="/" Match="NavLinkMatch.All" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon">🏠</span>
+        <span>Strona główna</span>
     </NavLink>
 
-    <NavLink href="/products" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-             ActiveClass="bg-gray-100 text-gray-900 font-medium">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-            <path d="M3.75 6A2.25 2.25 0 0 1 6 3.75h3A2.25 2.25 0 0 1 11.25 6v3A2.25 2.25 0 0 1 9 11.25H6A2.25 2.25 0 0 1 3.75 9V6Z" />
-            <path d="M12.75 6A2.25 2.25 0 0 1 15 3.75h3A2.25 2.25 0 0 1 20.25 6v3A2.25 2.25 0 0 1 18 11.25h-3A2.25 2.25 0 0 1 12.75 9V6Z" />
-            <path d="M3.75 15A2.25 2.25 0 0 1 6 12.75h3A2.25 2.25 0 0 1 11.25 15v3A2.25 2.25 0 0 1 9 20.25H6A2.25 2.25 0 0 1 3.75 18v-3Z" />
-            <path d="M12.75 15A2.25 2.25 0 0 1 15 12.75h3A2.25 2.25 0 0 1 20.25 15v3A2.25 2.25 0 0 1 18 20.25h-3A2.25 2.25 0 0 1 12.75 18v-3Z" />
-        </svg>
-        <span>Katalog produkt�w</span>
+    <NavLink href="/products" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon">📦</span>
+        <span>Katalog produktów</span>
     </NavLink>
 
-    <NavLink href="/cart" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-             ActiveClass="bg-gray-100 text-gray-900 font-medium">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-            <path d="M2.25 3a.75.75 0 0 0 0 1.5h1.386c.2 0 .374.133.428.326l2.201 7.705a2.25 2.25 0 0 0 2.185 1.669H17.25a2.25 2.25 0 0 0 2.154-1.59l1.563-5.26A.75.75 0 0 0 20.25 5.25H6.654l-.36-1.26A1.875 1.875 0 0 0 3.636 3H2.25Z" />
-            <path d="M9 21a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
-        </svg>
-        <span class="relative">
-            Koszyk
-            @if (_cart.TotalItems > 0)
-            {
-                <span class="absolute -top-2 -right-3 inline-flex items-center justify-center rounded-full bg-red-600 px-1.5 text-[10px] font-medium text-white min-w-[18px] h-[18px]">
-                    @_cart.TotalItems
-                </span>
-            }
-        </span>
+    <NavLink href="/cart" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon">🛒</span>
+        <span>Koszyk</span>
+        @if (_cart.TotalItems > 0)
+        {
+            <span class="sr-sidebar-badge">@_cart.TotalItems</span>
+        }
     </NavLink>
 
-    <NavLink href="/contact" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-             ActiveClass="bg-gray-100 text-gray-900 font-medium">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-            <path fill-rule="evenodd" d="M1.5 4.5A2.25 2.25 0 0 1 3.75 2.25h16.5A2.25 2.25 0 0 1 22.5 4.5v15a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 19.5v-15ZM3 6.75V18a.75.75 0 0 0 .75.75H20.25A.75.75 0 0 0 21 18V6.75l-8.34 5.212a2.25 2.25 0 0 1-2.32 0L3 6.75Z" clip-rule="evenodd" />
-        </svg>
+    <NavLink href="/contact" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon">✉️</span>
         <span>Kontakt</span>
     </NavLink>
 
-    <div class="my-3 border-t"></div>
+    <div class="sr-sidebar-divider"></div>
 
-    <div class="px-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Konto</div>
+    <!-- Account Section -->
+    <div class="sr-sidebar-title">Konto</div>
+    
     @if (_customer is null)
     {
-        <NavLink href="/login" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-                 ActiveClass="bg-gray-100 text-gray-900 font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-                <path fill-rule="evenodd" d="M8.25 4.5A2.25 2.25 0 0 1 10.5 2.25h3A2.25 2.25 0 0 1 15.75 4.5v.75a3.75 3.75 0 0 1-3 3.674v1.826h4.5a.75.75 0 0 1 0 1.5h-4.5V18a.75.75 0 0 1-1.5 0v-5.75H6.75a.75.75 0 0 1 0-1.5h4.5V8.924A3.75 3.75 0 0 1 8.25 5.25V4.5Z" clip-rule="evenodd" />
-            </svg>
-            <span>Zaloguj si�</span>
+        <NavLink href="/login" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon">🔑</span>
+            <span>Zaloguj się</span>
         </NavLink>
-        <NavLink href="/register" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-                 ActiveClass="bg-gray-100 text-gray-900 font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-                <path d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-                <path d="M4.5 20.25a8.25 8.25 0 0 1 16.5 0v.75h-16.5v-.75Z" />
-            </svg>
-            <span>Zarejestruj si�</span>
+        
+        <NavLink href="/register" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon">✨</span>
+            <span>Zarejestruj się</span>
         </NavLink>
-        <NavLink href="/my-rentals" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-                 ActiveClass="bg-gray-100 text-gray-900 font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-                <path d="M6.75 3A2.25 2.25 0 0 0 4.5 5.25v13.5A2.25 2.25 0 0 0 6.75 21h10.5A2.25 2.25 0 0 0 19.5 18.75V5.25A2.25 2.25 0 0 0 17.25 3H6.75Z" />
-                <path d="M8.25 7.5h7.5m-7.5 3h7.5m-7.5 3h6" />
-            </svg>
+        
+        <NavLink href="/my-rentals" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon">📋</span>
             <span>Moje wynajmy</span>
         </NavLink>
     }
     else
     {
-        <div class="px-3 pb-1 text-xs text-gray-500">Zalogowany jako <span class="font-medium text-gray-700">@_customer!.FullName</span></div>
-        <NavLink href="/profile" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-                 ActiveClass="bg-gray-100 text-gray-900 font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-                <path d="M12 12a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" />
-                <path d="M4.5 19.5a7.5 7.5 0 0 1 15 0V21h-15v-1.5Z" />
-            </svg>
+        <!-- User Info Card -->
+        <div class="sr-sidebar-user">
+            <div class="sr-sidebar-user-name">👤 @_customer!.FullName</div>
+            <div class="sr-sidebar-user-email">@_customer!.Email</div>
+        </div>
+        
+        <NavLink href="/profile" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon">⚙️</span>
             <span>Moje dane</span>
         </NavLink>
-        <NavLink href="/my-rentals" class="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
-                 ActiveClass="bg-gray-100 text-gray-900 font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-                <path d="M6.75 3A2.25 2.25 0 0 0 4.5 5.25v13.5A2.25 2.25 0 0 0 6.75 21h10.5A2.25 2.25 0 0 0 19.5 18.75V5.25A2.25 2.25 0 0 0 17.25 3H6.75Z" />
-                <path d="M8.25 7.5h7.5m-7.5 3h7.5m-7.5 3h6" />
-            </svg>
+        
+        <NavLink href="/my-rentals" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon">📋</span>
             <span>Moje wynajmy</span>
         </NavLink>
-        <button type="button" class="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-gray-700 hover:bg-gray-100 disabled:opacity-50"
-                disabled="@_isLoggingOut"
-                @onclick="LogoutAsync">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5">
-                <path fill-rule="evenodd" d="M7.5 3A1.5 1.5 0 0 1 9 1.5h6A1.5 1.5 0 0 1 16.5 3v18a.75.75 0 0 1-1.28.53l-3.44-3.44a2.25 2.25 0 0 0-1.59-.66H7.5A1.5 1.5 0 0 1 6 15.75v-9A1.5 1.5 0 0 1 7.5 5.25h2.73a2.25 2.25 0 0 0 1.59-.66L15.22 1.5H9A1.5 1.5 0 0 0 7.5 3Z" clip-rule="evenodd" />
-            </svg>
-            <span>@(_isLoggingOut ? "Wylogowywanie..." : "Wyloguj si�")</span>
+        
+        <button type="button" class="sr-sidebar-logout" disabled="@_isLoggingOut" @onclick="LogoutAsync">
+            <span class="sr-sidebar-link-icon">🚪</span>
+            <span>@(_isLoggingOut ? "Wylogowywanie..." : "Wyloguj się")</span>
         </button>
     }
 </nav>
 
 @code {
+    [Parameter]
+    public EventCallback OnNavigate { get; set; }
+    
     private Cart _cart = new();
     private CustomerDto? _customer;
     private bool _isLoggingOut;
@@ -123,6 +95,14 @@
 
         await LoadSessionAsync();
         Session.SessionChanged += OnSessionChanged;
+    }
+
+    private async Task HandleNavigation()
+    {
+        if (OnNavigate.HasDelegate)
+        {
+            await OnNavigate.InvokeAsync();
+        }
     }
 
     private async Task LoadSessionAsync()

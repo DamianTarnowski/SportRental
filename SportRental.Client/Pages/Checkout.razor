@@ -11,158 +11,213 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 
-<PageTitle>Finalizacja</PageTitle>
+<PageTitle>Finalizacja zamówienia - SportRental</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.False" Class="pa-4">
-    <Breadcrumbs />
-    
-    @if (_isPaymentInProgress)
-    {
-        <MudOverlay Visible="true" DarkBackground="true" Absolute="false">
-            <MudPaper Class="pa-8 text-center" Elevation="8">
-                <MudProgressCircular Indeterminate="true" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
-                <MudText Typo="Typo.h6" Class="mb-2">Przekierowanie do płatności...</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">Proszę czekać, nie zamykaj okna</MudText>
-            </MudPaper>
-        </MudOverlay>
-    }
-    
-    <MudPaper Class="pa-4" Elevation="2">
-        <MudText Typo="Typo.h5" Class="mb-3">Finalizacja zamowienia</MudText>
+<div class="checkout-container">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="checkout-header">
+            <h1>💳 Finalizacja zamówienia</h1>
+            <p>Ostatni krok - sprawdź szczegóły i dokonaj płatności</p>
+            <div class="checkout-steps">
+                <div class="checkout-step">
+                    <span class="checkout-step-number">✓</span>
+                    <span>Koszyk</span>
+                </div>
+                <div class="checkout-step active">
+                    <span class="checkout-step-number">2</span>
+                    <span>Finalizacja</span>
+                </div>
+                <div class="checkout-step">
+                    <span class="checkout-step-number">3</span>
+                    <span>Płatność</span>
+                </div>
+            </div>
+        </div>
+
+        @if (_isPaymentInProgress)
+        {
+            <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                <div class="bg-white rounded-3xl p-10 text-center shadow-2xl">
+                    <div class="w-20 h-20 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-6"></div>
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Przekierowanie do płatności...</h2>
+                    <p class="text-gray-600">Proszę czekać, nie zamykaj okna</p>
+                </div>
+            </div>
+        }
 
         @if (_cart.Items.Count == 0)
         {
-            <MudAlert Severity="Severity.Info">Koszyk jest pusty. <MudLink Href="/products">Wroc do produktow</MudLink>.</MudAlert>
+            <div class="text-center py-20 bg-white rounded-3xl shadow-sm">
+                <div class="text-8xl mb-6">🛒</div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-3">Koszyk jest pusty</h2>
+                <p class="text-gray-600 mb-8">Dodaj produkty do koszyka aby kontynuować</p>
+                <a href="/products" class="checkout-submit-btn" style="max-width: 280px; margin: 0 auto; text-decoration: none;">
+                    📦 Przeglądaj katalog
+                </a>
+            </div>
         }
         else
         {
-            <MudGrid>
-                <MudItem xs="12" md="8">
-                    <MudTable Items="_cart.Items" Dense="true" Hover="true">
-                        <HeaderContent>
-                            <MudTh>Produkt</MudTh>
-                            <MudTh>Ilosc</MudTh>
-                            <MudTh>Od</MudTh>
-                            <MudTh>Do</MudTh>
-                            <MudTh>Cena / dzien</MudTh>
-                            <MudTh>Razem</MudTh>
-                            <MudTh>Hold</MudTh>
-                        </HeaderContent>
-                        <RowTemplate Context="item">
-                            <MudTd DataLabel="Produkt">@item.ProductName</MudTd>
-                            <MudTd DataLabel="Ilosc">@item.Quantity</MudTd>
-                            <MudTd DataLabel="Od">@item.StartDate.ToShortDateString()</MudTd>
-                            <MudTd DataLabel="Do">@item.EndDate.ToShortDateString()</MudTd>
-                            <MudTd DataLabel="Cena / dzien">@item.DailyPrice.ToString("C")</MudTd>
-                            <MudTd DataLabel="Razem">@item.TotalPrice.ToString("C")</MudTd>
-                            <MudTd DataLabel="Hold">
+            <div class="checkout-grid">
+                <!-- Items List -->
+                <div class="checkout-items-card">
+                    <h2>📦 Produkty do wypożyczenia</h2>
+                    
+                    @foreach (var item in _cart.Items)
+                    {
+                        <div class="checkout-item">
+                            <div>
+                                <div class="checkout-item-name">@item.ProductName</div>
+                                <div class="checkout-item-details">
+                                    @item.Quantity szt. × @item.TotalDays dni
+                                    (@item.StartDate.ToShortDateString() - @item.EndDate.ToShortDateString())
+                                </div>
                                 @if (item.HoldId is not null)
                                 {
-                                    <MudChip T="string" Color="Color.Info" Variant="Variant.Filled" Size="Size.Small">
-                                        @($"do {item.HoldExpiresAtUtc?.ToLocalTime():HH:mm:ss}")
-                                    </MudChip>
+                                    <span class="inline-block mt-1 px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-lg">
+                                        ✅ Zarezerwowany do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm:ss")
+                                    </span>
                                 }
-                                else
-                                {
-                                    <MudChip T="string" Color="Color.Warning" Variant="Variant.Outlined" Size="Size.Small">brak</MudChip>
-                                }
-                            </MudTd>
-                        </RowTemplate>
-                    </MudTable>
-                </MudItem>
-                <MudItem xs="12" md="4">
-                    <MudPaper Class="pa-3" Elevation="1">
-                        <MudText Typo="Typo.h6" Class="mb-2">Dane do rezerwacji</MudText>
+                            </div>
+                            <div class="checkout-item-price">@item.TotalPrice.ToString("C")</div>
+                        </div>
+                    }
 
-                        <MudForm @ref="_customerForm" Model="_customer" Class="mb-3">
-                            <MudStack Spacing="2">
-                                <MudTextField T="string" For="@(() => _customer.FullName)" Label="Imie i nazwisko" Variant="Variant.Outlined" Dense="true" Required="true" />
-                                <MudTextField T="string"
-                                              For="@(() => _customer.Email)"
-                                              Label="Email"
-                                              Variant="Variant.Outlined"
-                                              Dense="true"
-                                              Required="true"
-                                              @bind-Value="_customer.Email"
-                                              Immediate="true"
-                                              OnBlur="HandleEmailBlur" />
-                                <MudTextField T="string" For="@(() => _customer.PhoneNumber)" Label="Telefon" Variant="Variant.Outlined" Dense="true" Required="true" />
-                                <MudTextField T="string" For="@(() => _customer.Address)" Label="Adres (opcjonalnie)" Variant="Variant.Outlined" Lines="2" />
-                                <MudTextField T="string" For="@(() => _customer.DocumentNumber)" Label="Dokument tozsamosci (opcjonalnie)" Variant="Variant.Outlined" Dense="true" />
-                                <MudTextField T="string" For="@(() => _customer.Notes)" Label="Notatka klienta (opcjonalnie)" Variant="Variant.Outlined" Lines="2" />
-                                <MudButton Variant="Variant.Outlined"
-                                           Color="Color.Secondary"
-                                           OnClick="LookupCustomerButtonAsync"
-                                           Disabled="@(!CanSearchExisting || _isLookupInProgress)"
-                                           Loading="_isLookupInProgress">
-                                    Wyszukaj klienta po emailu
-                                </MudButton>
-                            </MudStack>
-                        </MudForm>
+                    @if (_hasMixedDates)
+                    {
+                        <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800">
+                            ⚠️ Pozycje mają różne daty. Ujednolić daty przed finalizacją.
+                        </div>
+                    }
+                </div>
 
-                        <MudTextField @bind-Value="_notes" Label="Uwagi do rezerwacji (opcjonalnie)" Variant="Variant.Outlined" Lines="3" Class="mb-2" />
+                <!-- Form & Summary -->
+                <div class="checkout-form-card">
+                    <h2>👤 Dane do rezerwacji</h2>
 
-                        <MudDivider Class="my-2" />
+                    <EditForm Model="_customer">
+                        <DataAnnotationsValidator />
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Imię i nazwisko *</label>
+                                <InputText @bind-Value="_customer.FullName" 
+                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                                           placeholder="Jan Kowalski" />
+                            </div>
 
-                        <MudStack Spacing="1">
-                            <MudText Typo="Typo.subtitle2">Podsumowanie platnosci</MudText>
+                            <div class="flex gap-2">
+                                <div class="flex-1">
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                                    <InputText @bind-Value="_customer.Email" type="email"
+                                               @onfocusout="HandleEmailBlur"
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                                               placeholder="jan@example.com" />
+                                </div>
+                                <button type="button" 
+                                        class="self-end px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium transition"
+                                        disabled="@(!CanSearchExisting || _isLookupInProgress)"
+                                        @onclick="LookupCustomerButtonAsync">
+                                    @if (_isLookupInProgress)
+                                    {
+                                        <span>🔄</span>
+                                    }
+                                    else
+                                    {
+                                        <span>🔍</span>
+                                    }
+                                </button>
+                            </div>
 
-                            @if (_quoteError is not null)
-                            {
-                                <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-1">
-                                    @_quoteError
-                                    <MudButton Variant="Variant.Text"
-                                               Color="Color.Warning"
-                                               Size="Size.Small"
-                                               OnClick="RefreshPaymentSummaryAsync">
-                                        Odswiez
-                                    </MudButton>
-                                </MudAlert>
-                            }
-                            else if (_quote is null)
-                            {
-                                <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="my-2" />
-                                <MudText Typo="Typo.caption">Liczymy kwote...</MudText>
-                            }
-                            else
-                            {
-                                <MudStack Row Justify="Justify.SpaceBetween">
-                                    <MudText>Lacznie:</MudText>
-                                    <MudText Color="Color.Primary">@_quote.TotalAmount.ToString("C")</MudText>
-                                </MudStack>
-                                <MudStack Row Justify="Justify.SpaceBetween">
-                                    <MudText>Depozyt (platne teraz):</MudText>
-                                    <MudText Color="Color.Secondary">@_quote.DepositAmount.ToString("C")</MudText>
-                                </MudStack>
-                                <MudStack Row Justify="Justify.SpaceBetween">
-                                    <MudText>Pozostalo przy odbiorze:</MudText>
-                                    <MudText>@(_quote.TotalAmount - _quote.DepositAmount).ToString("C")</MudText>
-                                </MudStack>
-                            }
-                        </MudStack>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Telefon *</label>
+                                <InputText @bind-Value="_customer.PhoneNumber" type="tel"
+                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                                           placeholder="+48 123 456 789" />
+                            </div>
 
-                        @if (_hasMixedDates)
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Adres (opcjonalnie)</label>
+                                <InputTextArea @bind-Value="_customer.Address" rows="2"
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                                               placeholder="ul. Sportowa 123, Warszawa" />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Uwagi do rezerwacji</label>
+                                <InputTextArea @bind-Value="_notes" rows="2"
+                                               class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+                                               placeholder="Dodatkowe informacje..." />
+                            </div>
+                        </div>
+                    </EditForm>
+
+                    <!-- Payment Summary -->
+                    <div class="checkout-summary">
+                        <h3 class="font-semibold text-gray-800 mb-3">💰 Podsumowanie płatności</h3>
+                        
+                        @if (_quoteError is not null)
                         {
-                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
-                                Pozycje w koszyku maja rozne daty. Ujednolic daty przed finalizacja.
-                            </MudAlert>
+                            <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-sm mb-3">
+                                ⚠️ @_quoteError
+                                <button @onclick="RefreshPaymentSummaryAsync" class="ml-2 underline">Odśwież</button>
+                            </div>
                         }
+                        else if (_quote is null)
+                        {
+                            <div class="flex items-center gap-2 text-gray-500">
+                                <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                Obliczanie kwoty...
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="checkout-summary-row">
+                                <span>Łącznie za wypożyczenie</span>
+                                <span class="font-semibold">@_quote.TotalAmount.ToString("C")</span>
+                            </div>
+                            <div class="checkout-summary-row">
+                                <span>Depozyt (płatne teraz)</span>
+                                <span class="font-semibold text-blue-600">@_quote.DepositAmount.ToString("C")</span>
+                            </div>
+                            <div class="checkout-summary-row">
+                                <span>Pozostało przy odbiorze</span>
+                                <span>@((_quote.TotalAmount - _quote.DepositAmount).ToString("C"))</span>
+                            </div>
+                            <div class="checkout-summary-row checkout-summary-total">
+                                <span>Do zapłaty teraz</span>
+                                <span class="text-xl text-blue-600">@_quote.DepositAmount.ToString("C")</span>
+                            </div>
+                        }
+                    </div>
 
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" FullWidth="true" Class="mt-3" Disabled="@(_isSubmitting || _isPaymentInProgress || _cart.Items.Count == 0 || _hasMixedDates || _quote is null || _quoteError is not null)" OnClick="SubmitAsync" StartIcon="@Icons.Material.Filled.CheckCircle">
-                            @(_isSubmitting ? "Przetwarzanie..." : "Potwierdz rezerwacje")
-                        </MudButton>
-                    </MudPaper>
-                </MudItem>
-            </MudGrid>
+                    <button class="checkout-submit-btn" 
+                            disabled="@(_isSubmitting || _isPaymentInProgress || _cart.Items.Count == 0 || _hasMixedDates || _quote is null || _quoteError is not null)"
+                            @onclick="SubmitAsync">
+                        @if (_isSubmitting)
+                        {
+                            <span>⏳ Przetwarzanie...</span>
+                        }
+                        else
+                        {
+                            <span>✅ Potwierdź i zapłać</span>
+                        }
+                    </button>
+
+                    <p class="text-center text-sm text-gray-500 mt-4">
+                        🔒 Płatność obsługiwana przez Stripe
+                    </p>
+                </div>
+            </div>
         }
-    </MudPaper>
-</MudContainer>
+    </div>
+</div>
 
 @code {
     private CartModel _cart = new();
     private bool _isSubmitting;
     private CheckoutCustomerModel _customer = new();
-    private MudForm? _customerForm;
     private string? _notes;
     private bool _hasMixedDates;
     private Guid? _existingCustomerId;
@@ -171,7 +226,6 @@
     private CancellationTokenSource? _refreshCts;
     private Task? _refreshLoop;
     private PaymentQuoteResponse? _quote;
-    private PaymentIntentDto? _paymentIntent;
     private string? _quoteError;
     private bool _isPaymentInProgress;
 
@@ -192,10 +246,7 @@
         try
         {
             var customer = await Session.GetCustomerAsync();
-            if (customer is null)
-            {
-                return;
-            }
+            if (customer is null) return;
 
             _existingCustomerId = customer.Id;
             _customer.FullName = customer.FullName ?? string.Empty;
@@ -213,6 +264,7 @@
             Console.Error.WriteLine("[Checkout] Failed to prefill customer session: {0}", ex);
         }
     }
+
     private void OnCartChanged(object? sender, EventArgs e)
     {
         _cart = CartService.GetCart();
@@ -234,7 +286,6 @@
         {
             _quote = null;
             _quoteError = null;
-            _paymentIntent = null;
             await InvokeAsync(StateHasChanged);
             return;
         }
@@ -255,7 +306,7 @@
         catch (Exception ex)
         {
             _quote = null;
-            _quoteError = $"Nie udalo sie obliczyc kosztu: {ex.Message}";
+            _quoteError = $"Nie udało się obliczyć kosztu: {ex.Message}";
         }
 
         await InvokeAsync(StateHasChanged);
@@ -282,10 +333,7 @@
 
     private async Task LookupCustomerAsync(bool showFeedback)
     {
-        if (_isLookupInProgress)
-        {
-            return;
-        }
+        if (_isLookupInProgress) return;
 
         var email = _customer.Email?.Trim();
         if (string.IsNullOrWhiteSpace(email))
@@ -323,19 +371,18 @@
             _customer.Address = existing.Address;
             _customer.DocumentNumber = existing.DocumentNumber;
             _customer.Notes = existing.Notes;
-            _customerForm?.ResetValidation();
             await InvokeAsync(StateHasChanged);
 
             if (showFeedback)
             {
-                Snackbar.Add("Zaladowano dane istniejacego klienta.", Severity.Success);
+                Snackbar.Add("Załadowano dane istniejącego klienta.", Severity.Success);
             }
         }
         catch (Exception ex)
         {
             if (showFeedback)
             {
-                Snackbar.Add($"Blad podczas wyszukiwania klienta: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Błąd podczas wyszukiwania klienta: {ex.Message}", Severity.Error);
             }
         }
         finally
@@ -358,25 +405,21 @@
 
             if (_hasMixedDates)
             {
-                Snackbar.Add("Rozne daty w pozycjach koszyka - ustaw te same daty dla wszystkich pozycji.", Severity.Error);
+                Snackbar.Add("Różne daty w pozycjach koszyka - ustaw te same daty dla wszystkich pozycji.", Severity.Error);
                 return;
             }
 
-            if (_customerForm is not null)
+            if (string.IsNullOrWhiteSpace(_customer.FullName) || string.IsNullOrWhiteSpace(_customer.Email) || string.IsNullOrWhiteSpace(_customer.PhoneNumber))
             {
-                await _customerForm.Validate();
-                if (!_customerForm.IsValid)
-                {
-                    Snackbar.Add("Uzupelnij poprawnie dane klienta.", Severity.Error);
-                    return;
-                }
+                Snackbar.Add("Uzupełnij poprawnie dane klienta.", Severity.Error);
+                return;
             }
 
             await CartService.RefreshHoldsIfNeededAsync();
             var holdsOk = await CartService.EnsureHoldsAsync();
             if (!holdsOk)
             {
-                Snackbar.Add("Nie udalo sie odswiezyc/utworzyc holdow. Sprobuj ponownie.", Severity.Error);
+                Snackbar.Add("Nie udało się odświeżyć/utworzyć holdów. Spróbuj ponownie.", Severity.Error);
                 return;
             }
 
@@ -401,7 +444,7 @@
                 }
                 catch (Exception ex)
                 {
-                    Snackbar.Add($"Nie udalo sie zaktualizowac danych klienta: {ex.Message}", Severity.Error);
+                    Snackbar.Add($"Nie udało się zaktualizować danych klienta: {ex.Message}", Severity.Error);
                     return;
                 }
 
@@ -428,14 +471,14 @@
                 }
                 catch (Exception ex)
                 {
-                    Snackbar.Add($"Nie udalo sie zapisac danych klienta: {ex.Message}", Severity.Error);
+                    Snackbar.Add($"Nie udało się zapisać danych klienta: {ex.Message}", Severity.Error);
                     return;
                 }
             }
 
             if (customer is null)
             {
-                Snackbar.Add("Nie udalo sie otrzymac danych klienta.", Severity.Error);
+                Snackbar.Add("Nie udało się otrzymać danych klienta.", Severity.Error);
                 return;
             }
 
@@ -470,11 +513,10 @@
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Nie udalo sie obliczyc platnosci: {ex.Message}", Severity.Error);
+                Snackbar.Add($"Nie udało się obliczyć płatności: {ex.Message}", Severity.Error);
                 return;
             }
 
-            // Utwórz Stripe Checkout Session
             CheckoutSessionResponse session;
             try
             {
@@ -499,16 +541,14 @@
                 return;
             }
 
-            // Release holds - user idzie do Stripe
             await CartService.ReleaseAllHoldsAsync();
             await CartService.ClearCartAsync();
             
-            // Redirect do Stripe Checkout (BEZ JavaScript!)
             Nav.NavigateTo(session.Url, forceLoad: true);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Blad podczas finalizacji: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Błąd podczas finalizacji: {ex.Message}", Severity.Error);
         }
         finally
         {
@@ -531,9 +571,7 @@
                     await Task.Delay(TimeSpan.FromSeconds(60), token);
                 }
             }
-            catch (TaskCanceledException)
-            {
-            }
+            catch (TaskCanceledException) { }
         }, token);
     }
 
@@ -545,7 +583,7 @@
 
     private class CheckoutCustomerModel
     {
-        [Required(ErrorMessage = "Imie i nazwisko jest wymagane.")]
+        [Required(ErrorMessage = "Imię i nazwisko jest wymagane.")]
         [StringLength(100)]
         public string FullName { get; set; } = string.Empty;
 
@@ -566,8 +604,3 @@
         public string? Notes { get; set; }
     }
 }
-
-
-
-
-

@@ -11,215 +11,249 @@
 <PageTitle>SportRental - Katalog produktów</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="py-4">
-    <Breadcrumbs />
-    <MudPaper Elevation="2" Class="pa-4 mb-4" Style="border-radius: 16px; background: linear-gradient(135deg, #2563eb 0%, #60a5fa 100%); color: white;">
-        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
-            <div>
-                <MudText Typo="Typo.h4" Class="fw-bold">Znajdź swoją następną przygodę</MudText>
-                <MudText Typo="Typo.subtitle1">Przeglądaj sprzęt sportowy gotowy do wypożyczenia.</MudText>
+    
+    <!-- =============================================
+         HERO SECTION
+         ============================================= -->
+    <div class="products-hero">
+        <div class="products-hero-content">
+            <h1 class="products-hero-title">🎿 Znajdź swoją przygodę</h1>
+            <p class="products-hero-subtitle">
+                Przeglądaj nasz katalog profesjonalnego sprzętu sportowego
+            </p>
+            <div class="products-stats">
+                <div class="products-stat">
+                    <span class="products-stat-icon">📦</span>
+                    <span class="products-stat-value">@products.Count</span>
+                    <span class="products-stat-label">produktów</span>
+                </div>
+                <div class="products-stat">
+                    <span class="products-stat-icon">✅</span>
+                    <span class="products-stat-value">@availableCount</span>
+                    <span class="products-stat-label">dostępnych</span>
+                </div>
+                <div class="products-stat">
+                    <span class="products-stat-icon">💰</span>
+                    <span class="products-stat-value">@averagePrice.ToString("C")</span>
+                    <span class="products-stat-label">śr. cena</span>
+                </div>
             </div>
-            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
-                <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Style="color: white;">Łącznie: @products.Count</MudChip>
-                <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Style="color: white;">Dostępnych: @availableCount</MudChip>
-                <MudChip T="string" Color="Color.Info" Variant="Variant.Filled" Style="color: white;">Średnia cena: @averagePrice.ToString("C")</MudChip>
-            </MudStack>
-        </MudStack>
-    </MudPaper>
+        </div>
+    </div>
 
-    <MudPaper Elevation="1" Class="pa-4 mb-4" Style="border-radius: 16px;">
-        <MudGrid Spacing="3" AlignItems="AlignItems.Center">
+    <!-- =============================================
+         FILTERS SECTION
+         ============================================= -->
+    <div class="products-filters">
+        <MudGrid Spacing="3">
+            <!-- Search -->
             <MudItem xs="12" md="4">
                 <MudTextField @bind-Value="searchText"
-                              Label="Szukaj produktów"
-                              Placeholder="Wpisz nazwę produktu..."
+                              Label="🔍 Szukaj produktów"
+                              Placeholder="Wpisz nazwę..."
                               Variant="Variant.Outlined"
-                              Adornment="Adornment.Start"
+                              Adornment="Adornment.End"
                               AdornmentIcon="@Icons.Material.Filled.Search"
-                              OnKeyDown="OnSearchKeyDown" />
+                              OnKeyDown="OnSearchKeyDown"
+                              Style="border-radius: 12px;" />
             </MudItem>
-            <MudItem xs="12" md="3">
-                <MudSelect T="string" 
-                           Label="Kategoria" 
-                           @bind-Value="SelectedCategory" 
-                           Variant="Variant.Outlined" 
-                           Clearable="true"
-                           Placeholder="Wybierz kategorię">
-                    <MudSelectItem Value="@string.Empty">Wszystkie kategorie</MudSelectItem>
-                    @foreach (var category in categories)
+            
+            <!-- Category chips -->
+            <MudItem xs="12" md="8">
+                <div class="filter-section-title">Kategorie</div>
+                <div class="filter-chips">
+                    <div class="filter-chip @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")" 
+                         @onclick="@(() => SelectCategory(string.Empty))">
+                        <span>🎯</span> Wszystkie
+                    </div>
+                    @foreach (var cat in GetCategoryChips())
                     {
-                        <MudSelectItem Value="@category">@category</MudSelectItem>
+                        <div class="filter-chip @(selectedCategory == cat.Name ? "active" : "")"
+                             @onclick="@(() => SelectCategory(cat.Name))">
+                            <span>@cat.Icon</span> @cat.Name
+                        </div>
                     }
+                </div>
+            </MudItem>
+            
+            <!-- Additional filters row -->
+            <MudItem xs="12" md="3">
+                <MudSelect T="string" Label="Sortuj" @bind-Value="SelectedSort" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("featured")">⭐ Polecane</MudSelectItem>
+                    <MudSelectItem Value="@("price-asc")">💵 Najtańsze</MudSelectItem>
+                    <MudSelectItem Value="@("price-desc")">💎 Najdroższe</MudSelectItem>
+                    <MudSelectItem Value="@("name")">🔤 Nazwa A-Z</MudSelectItem>
                 </MudSelect>
             </MudItem>
-            <MudItem xs="12" md="3">
-                <MudSelect T="string" Label="Sortuj według" @bind-Value="SelectedSort" Variant="Variant.Outlined">
-                    <MudSelectItem Value="@("featured")">Polecane</MudSelectItem>
-                    <MudSelectItem Value="@("price-asc")">Najniższa cena</MudSelectItem>
-                    <MudSelectItem Value="@("price-desc")">Najwyższa cena</MudSelectItem>
-                    <MudSelectItem Value="@("name")">Nazwa</MudSelectItem>
-                </MudSelect>
-            </MudItem>
-            <MudItem xs="12" md="2">
-                <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="Tylko dostępne" />
-            </MudItem>
-            <MudItem xs="12" md="3">
+            
+            <MudItem xs="6" md="2">
                 <MudNumericField T="decimal"
-                                 Label="Cena min"
+                                 Label="Cena od"
                                  Variant="Variant.Outlined"
                                  Value="selectedMinPrice"
                                  ValueChanged="OnMinPriceChanged"
-                                 Immediate="true"
+                                 Adornment="Adornment.End"
+                                 AdornmentText="zł"
                                  Min="@minPrice"
                                  Max="@selectedMaxPrice" />
             </MudItem>
-            <MudItem xs="12" md="3">
+            
+            <MudItem xs="6" md="2">
                 <MudNumericField T="decimal"
-                                 Label="Cena max"
+                                 Label="Cena do"
                                  Variant="Variant.Outlined"
                                  Value="selectedMaxPrice"
                                  ValueChanged="OnMaxPriceChanged"
-                                 Immediate="true"
+                                 Adornment="Adornment.End"
+                                 AdornmentText="zł"
                                  Min="@selectedMinPrice"
                                  Max="@maxPrice" />
             </MudItem>
-            <MudItem xs="12" md="6">
-                <MudStack Row="true" Spacing="2">
-                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SearchProducts">Szukaj</MudButton>
-                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="ClearFilters">Wyczyść filtry</MudButton>
-                </MudStack>
+            
+            <MudItem xs="12" md="3">
+                <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="✅ Tylko dostępne" />
+            </MudItem>
+            
+            <MudItem xs="12" md="2">
+                <MudButton Variant="Variant.Text" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="ClearFilters"
+                           FullWidth="true">
+                    Resetuj
+                </MudButton>
             </MudItem>
         </MudGrid>
-    </MudPaper>
+    </div>
 
+    <!-- =============================================
+         PRODUCTS GRID
+         ============================================= -->
     @if (isLoading)
     {
-        <MudGrid Spacing="3">
+        <div class="products-grid">
             @for (int i = 0; i < 8; i++)
             {
-                <MudItem xs="12" sm="6" md="4" lg="3">
-                    <MudCard Elevation="2">
-                        <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="200px" />
-                        <MudCardContent>
-                            <MudSkeleton SkeletonType="SkeletonType.Text" />
-                            <MudSkeleton SkeletonType="SkeletonType.Text" Width="60%" />
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
+                <div class="product-skeleton">
+                    <div class="skeleton-shimmer" style="height: 220px;"></div>
+                    <div style="padding: 1.25rem;">
+                        <div class="skeleton-shimmer" style="height: 24px; border-radius: 8px; margin-bottom: 0.75rem;"></div>
+                        <div class="skeleton-shimmer" style="height: 32px; width: 60%; border-radius: 8px; margin-bottom: 0.75rem;"></div>
+                        <div class="skeleton-shimmer" style="height: 44px; border-radius: 12px;"></div>
+                    </div>
+                </div>
             }
-        </MudGrid>
+        </div>
     }
     else if (!filteredProducts.Any())
     {
-        <MudPaper Elevation="1" Class="pa-6 text-center" Style="border-radius: 16px;">
-            <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" />
-            <MudText Typo="Typo.h6">Brak produktów spełniających filtry</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">Dostosuj filtry lub zresetuj je, aby zobaczyć cały sprzęt.</MudText>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Class="mt-3" OnClick="ClearFilters">Resetuj filtry</MudButton>
-        </MudPaper>
+        <div class="products-empty">
+            <div class="products-empty-icon">🔍</div>
+            <h3 class="products-empty-title">Brak produktów</h3>
+            <p class="products-empty-text">Nie znaleźliśmy produktów spełniających Twoje kryteria.</p>
+            <button class="products-reset-btn" @onclick="ClearFilters">
+                Resetuj filtry
+            </button>
+        </div>
     }
     else
     {
-        <MudGrid Spacing="3">
+        <div class="products-grid">
             @foreach (var product in filteredProducts)
             {
-                <MudItem xs="12" sm="6" md="4" lg="3">
-                    <MudCard Elevation="4" Class="h-100 mud-card-hover" Style="border-radius: 16px; transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer;"
-                             @onclick="@(() => ViewProduct(product))">
-                        @{
-                            // Use smaller image for grid - w400 for mobile, w800 for larger screens
-                            var imageUrl = product.GetImageUrl(400);
-                            var imageSrcSet = product.GetImageSrcSet();
-                        }
+                var imageUrl = product.GetImageUrl(400);
+                var categoryIcon = GetCategoryIcon(product.Category);
+                
+                <div class="product-card" @onclick="@(() => ViewProduct(product))">
+                    <!-- Image section -->
+                    <div class="product-card-image">
                         @if (!string.IsNullOrEmpty(imageUrl))
                         {
-                            @if (!string.IsNullOrEmpty(imageSrcSet))
-                            {
-                                <img src="@imageUrl" 
-                                     srcset="@imageSrcSet" 
-                                     sizes="(max-width: 600px) 400px, (max-width: 900px) 400px, 800px"
-                                     alt="@product.Name" 
-                                     style="height: 200px; width: 100%; object-fit: cover; border-radius: 16px 16px 0 0;" />
-                            }
-                            else
-                            {
-                                <MudCardMedia Image="@imageUrl" Height="200" Style="border-radius: 16px 16px 0 0;" />
-                            }
+                            <img src="@imageUrl" alt="@product.Name" loading="lazy" />
                         }
                         else
                         {
-                            <div style="height: 200px; background: linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%); display: flex; align-items: center; justify-center: center;">
-                                <MudIcon Icon="@Icons.Material.Filled.Image" Size="Size.Large" Color="Color.Surface" />
+                            <div class="product-card-placeholder">
+                                <span class="product-card-placeholder-icon">📷</span>
                             </div>
                         }
-
-                        <MudCardContent>
-                            <MudStack Spacing="2">
-                                <MudText Typo="Typo.h6" Class="fw-bold">@product.Name</MudText>
-
-                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-                                    <MudText Typo="Typo.h6" Color="Color.Primary">@product.DailyPrice.ToString("C") / dzień</MudText>
-                                    @if (product.IsAvailable && product.AvailableQuantity > 0)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Success">Dostępny</MudChip>
-                                    }
-                                    else
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Error">Niedostępny</MudChip>
-                                    }
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">
-                                        @product.AvailableQuantity szt.
-                                    </MudChip>
-                                </MudStack>
-
-                                @if (!string.IsNullOrEmpty(product.Category))
-                                {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Secondary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Category">
-                                        @product.Category
-                                    </MudChip>
-                                }
-
-                                @if (!string.IsNullOrEmpty(product.Description))
-                                {
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="line-clamp-3">
-                                        @product.Description
-                                    </MudText>
-                                }
-                            </MudStack>
-                        </MudCardContent>
-
-                        <MudCardActions Class="pa-3 pt-0">
-                        <MudStack Spacing="1">
-                            <MudButton Variant="Variant.Filled"
-                                       Color="Color.Primary"
-                                       StartIcon="@Icons.Material.Filled.AddShoppingCart"
-                                       FullWidth="true"
-                                       Disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
-                                       OnClick="@(async () => await AddToCart(product))">
-                                Dodaj do koszyka
-                            </MudButton>
-                            <MudButton Variant="Variant.Outlined"
-                                       Color="Color.Primary"
-                                       FullWidth="true"
-                                       Href="@($"/products/{product.Id}")"
-                                       aria-label="@($"Zobacz szczegóły produktu: {product.Name}")">
-                                Zobacz szczegóły
-                            </MudButton>
-                        </MudStack>
-                    </MudCardActions>
-                </MudCard>
-            </MudItem>
+                        
+                        <!-- Badges -->
+                        <div class="product-card-badges">
+                            @if (product.IsAvailable && product.AvailableQuantity > 0)
+                            {
+                                <span class="product-badge product-badge-available">Dostępny</span>
+                            }
+                            else
+                            {
+                                <span class="product-badge product-badge-unavailable">Niedostępny</span>
+                            }
+                            
+                            @if (!string.IsNullOrEmpty(product.Category))
+                            {
+                                <span class="product-badge product-badge-category">
+                                    @categoryIcon @product.Category
+                                </span>
+                            }
+                        </div>
+                        
+                        <!-- Quick actions overlay -->
+                        <div class="product-card-actions-overlay">
+                            <button class="product-quick-btn product-quick-btn-primary"
+                                    disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
+                                    @onclick="@(async () => await AddToCart(product))"
+                                    @onclick:stopPropagation="true">
+                                🛒 Do koszyka
+                            </button>
+                            <button class="product-quick-btn product-quick-btn-secondary"
+                                    @onclick="@(() => NavigateToProduct(product.Id))"
+                                    @onclick:stopPropagation="true">
+                                👁️
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Content section -->
+                    <div class="product-card-content">
+                        <h3 class="product-card-title">@product.Name</h3>
+                        
+                        <div class="product-card-price">
+                            <span class="product-price-amount">@product.DailyPrice.ToString("N0") zł</span>
+                            <span class="product-price-period">/ dzień</span>
+                        </div>
+                        
+                        <div class="product-card-meta">
+                            <div class="product-meta-item">
+                                <span class="product-meta-icon">📦</span>
+                                <span>@product.AvailableQuantity szt.</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer with button -->
+                    <div class="product-card-footer">
+                        <button class="product-add-btn"
+                                disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
+                                @onclick="@(async () => await AddToCart(product))"
+                                @onclick:stopPropagation="true">
+                            <span>🛒</span> Dodaj do koszyka
+                        </button>
+                    </div>
+                </div>
             }
-        </MudGrid>
+        </div>
 
         @if (totalPages > 1)
         {
-            <MudStack AlignItems="AlignItems.Center" Class="mt-6">
+            <div class="products-pagination">
                 <MudPagination Count="totalPages"
                                @bind-Selected="CurrentPage"
                                Color="Color.Primary"
                                ShowFirstButton="true"
-                               ShowLastButton="true" />
-            </MudStack>
+                               ShowLastButton="true"
+                               BoundaryCount="1"
+                               MiddleCount="3" />
+            </div>
         }
     }
 </MudContainer>
@@ -246,19 +280,30 @@
     private int availableCount => products.Count(p => p.IsAvailable && p.AvailableQuantity > 0);
     private decimal averagePrice => products.Any() ? Math.Round(products.Average(p => p.DailyPrice), 2) : 0m;
 
-    private string SelectedCategory
+    private record CategoryChip(string Name, string Icon);
+
+    private List<CategoryChip> GetCategoryChips()
     {
-        get => selectedCategory;
-        set
-        {
-            var newValue = value ?? string.Empty;
-            if (selectedCategory != newValue)
-            {
-                selectedCategory = newValue;
-                currentPage = 1;
-                ApplyFilters();
-            }
-        }
+        return categories.Select(c => new CategoryChip(c, GetCategoryIcon(c))).ToList();
+    }
+
+    private string GetCategoryIcon(string? category) => category?.ToLower() switch
+    {
+        "narty" or "ski" => "⛷️",
+        "snowboard" => "🏂",
+        "rowery" or "bike" or "rower" => "🚴",
+        "sporty wodne" or "water" or "sup" or "kajak" => "🏄",
+        "buty" or "buty narciarskie" => "👢",
+        "kaski" or "kask" => "⛑️",
+        "akcesoria" => "🎒",
+        _ => "🎿"
+    };
+
+    private void SelectCategory(string category)
+    {
+        selectedCategory = category;
+        currentPage = 1;
+        ApplyFilters();
     }
 
     private string SelectedSort
@@ -431,24 +476,8 @@
 
     private decimal ClampPrice(decimal value)
     {
-        if (!products.Any())
-        {
-            return value;
-        }
-
-        var min = minPrice;
-        var max = maxPrice;
-        if (value < min)
-        {
-            return min;
-        }
-
-        if (value > max)
-        {
-            return max;
-        }
-
-        return value;
+        if (!products.Any()) return value;
+        return Math.Clamp(value, minPrice, maxPrice);
     }
 
     private async Task OnSearchKeyDown(KeyboardEventArgs args)
@@ -463,7 +492,7 @@
     private async Task AddToCart(ProductDto product)
     {
         await CartService.AddToCartAsync(product);
-        Snackbar.Add($"Produkt {product.Name} dodany do koszyka.", Severity.Success);
+        Snackbar.Add($"✅ {product.Name} dodany do koszyka!", Severity.Success);
     }
 
     private Task AddToCartFromDialog(ProductDto product) => AddToCart(product);

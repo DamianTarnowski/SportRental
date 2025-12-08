@@ -1,63 +1,523 @@
 @page "/login"
+@layout HomeLayout
 @using SportRental.Client.Services
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
-    <MudPaper Elevation="4" Class="pa-8">
-        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-4">
-            Logowanie
-        </MudText>
+<PageTitle>SportRental - Logowanie</PageTitle>
 
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+<div class="login-page">
+    <!-- Background decoration -->
+    <div class="login-bg-decoration">
+        <div class="login-bg-circle login-bg-circle-1"></div>
+        <div class="login-bg-circle login-bg-circle-2"></div>
+        <div class="login-bg-circle login-bg-circle-3"></div>
+    </div>
+    
+    <div class="login-container">
+        <!-- Left side - Branding -->
+        <div class="login-branding">
+            <div class="login-branding-content">
+                <div class="login-logo">
+                    <span class="login-logo-icon">🏂</span>
+                    <span class="login-logo-text">Sport<span>Rental</span></span>
+                </div>
+                <h1 class="login-branding-title">Witaj ponownie!</h1>
+                <p class="login-branding-subtitle">
+                    Zaloguj się do swojego konta i kontynuuj sportową przygodę.
+                </p>
+                
+                <div class="login-features">
+                    <div class="login-feature">
+                        <span class="login-feature-icon">🎿</span>
+                        <span>Dostęp do wszystkich wypożyczalni</span>
+                    </div>
+                    <div class="login-feature">
+                        <span class="login-feature-icon">📋</span>
+                        <span>Historia Twoich wypożyczeń</span>
+                    </div>
+                    <div class="login-feature">
+                        <span class="login-feature-icon">⚡</span>
+                        <span>Szybka rezerwacja sprzętu</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right side - Login form -->
+        <div class="login-form-wrapper">
+            <div class="login-card">
+                <div class="login-card-header">
+                    <h2 class="login-card-title">Logowanie</h2>
+                    <p class="login-card-subtitle">Wprowadź swoje dane dostępowe</p>
+                </div>
+                
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="login-alert login-alert-error">
+                        <span class="login-alert-icon">⚠️</span>
+                        <span>@_errorMessage</span>
+                    </div>
+                }
+                
+                <EditForm Model="@_model" OnValidSubmit="HandleLoginAsync" class="login-form">
+                    <DataAnnotationsValidator />
+                    
+                    <div class="login-field">
+                        <label class="login-label">
+                            <span class="login-label-icon">📧</span>
+                            Email
+                        </label>
+                        <InputText @bind-Value="_model.Email" 
+                                   class="login-input" 
+                                   type="email"
+                                   placeholder="twoj@email.pl" />
+                    </div>
+                    
+                    <div class="login-field">
+                        <label class="login-label">
+                            <span class="login-label-icon">🔒</span>
+                            Hasło
+                        </label>
+                        <InputText @bind-Value="_model.Password" 
+                                   class="login-input" 
+                                   type="password"
+                                   placeholder="••••••••" />
+                    </div>
+                    
+                    <div class="login-options">
+                        <label class="login-remember">
+                            <input type="checkbox" class="login-checkbox" />
+                            <span>Zapamiętaj mnie</span>
+                        </label>
+                        <a href="/forgot-password" class="login-forgot">Zapomniałeś hasła?</a>
+                    </div>
+                    
+                    <button type="submit" class="login-button" disabled="@_isProcessing">
+                        @if (_isProcessing)
+                        {
+                            <span class="login-button-spinner"></span>
+                            <span>Logowanie...</span>
+                        }
+                        else
+                        {
+                            <span>🚀 Zaloguj się</span>
+                        }
+                    </button>
+                </EditForm>
+                
+                <div class="login-divider">
+                    <span>lub</span>
+                </div>
+                
+                <div class="login-footer">
+                    <p>Nie masz jeszcze konta?</p>
+                    <a href="/register" class="login-register-link">
+                        ✨ Zarejestruj się za darmo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ============================================
+       LOGIN PAGE - Premium Design
+       ============================================ */
+    
+    .login-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f766e 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Background decorations */
+    .login-bg-decoration {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+    
+    .login-bg-circle {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(59, 130, 246, 0.1);
+        filter: blur(60px);
+    }
+    
+    .login-bg-circle-1 {
+        width: 600px;
+        height: 600px;
+        top: -200px;
+        right: -100px;
+    }
+    
+    .login-bg-circle-2 {
+        width: 400px;
+        height: 400px;
+        bottom: -100px;
+        left: -100px;
+        background: rgba(139, 92, 246, 0.1);
+    }
+    
+    .login-bg-circle-3 {
+        width: 300px;
+        height: 300px;
+        top: 50%;
+        left: 30%;
+        background: rgba(16, 185, 129, 0.1);
+    }
+    
+    /* Main container */
+    .login-container {
+        display: flex;
+        max-width: 1000px;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(20px);
+        border-radius: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Left side - Branding */
+    .login-branding {
+        flex: 1;
+        padding: 3rem;
+        display: none;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    @@media (min-width: 768px) {
+        .login-branding {
+            display: flex;
+            align-items: center;
         }
-
-        <EditForm Model="@_model" OnValidSubmit="HandleLoginAsync">
-            <DataAnnotationsValidator />
-
-            <MudTextField @bind-Value="_model.Email"
-                          Label="Email"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Email"
-                          Required="true"
-                          Class="mb-4" />
-
-            <MudTextField @bind-Value="_model.Password"
-                          Label="Hasło"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Password"
-                          Required="true"
-                          Class="mb-4" />
-
-            <MudButton ButtonType="ButtonType.Submit"
-                       Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       FullWidth="true"
-                       Disabled="@_isProcessing"
-                       Class="mb-4">
-                @if (_isProcessing)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    <span>Logowanie...</span>
-                }
-                else
-                {
-                    <span>Zaloguj się</span>
-                }
-            </MudButton>
-        </EditForm>
-
-        <MudDivider Class="my-4" />
-
-        <MudText Align="Align.Center">
-            Nie masz konta?
-            <MudLink Href="/register" Color="Color.Primary">Zarejestruj się</MudLink>
-        </MudText>
-    </MudPaper>
-</MudContainer>
+    }
+    
+    .login-branding-content {
+        color: #fff;
+    }
+    
+    .login-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+    }
+    
+    .login-logo-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+    }
+    
+    .login-logo-text {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.75rem;
+        font-weight: 700;
+    }
+    
+    .login-logo-text span {
+        background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .login-branding-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        line-height: 1.2;
+    }
+    
+    .login-branding-subtitle {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.1rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 2.5rem;
+        line-height: 1.6;
+    }
+    
+    .login-features {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .login-feature {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.95rem;
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .login-feature-icon {
+        font-size: 1.5rem;
+    }
+    
+    /* Right side - Form */
+    .login-form-wrapper {
+        flex: 1;
+        padding: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    @@media (min-width: 768px) {
+        .login-form-wrapper {
+            padding: 3rem;
+        }
+    }
+    
+    .login-card {
+        width: 100%;
+        max-width: 400px;
+    }
+    
+    .login-card-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .login-card-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 0.5rem;
+    }
+    
+    .login-card-subtitle {
+        font-family: 'Outfit', sans-serif;
+        color: rgba(255, 255, 255, 0.6);
+    }
+    
+    /* Alert */
+    .login-alert {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9rem;
+    }
+    
+    .login-alert-error {
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+    }
+    
+    .login-alert-icon {
+        font-size: 1.25rem;
+    }
+    
+    /* Form */
+    .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+    
+    .login-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .login-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .login-label-icon {
+        font-size: 1rem;
+    }
+    
+    .login-input {
+        width: 100%;
+        padding: 1rem 1.25rem;
+        border-radius: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        outline: none;
+    }
+    
+    .login-input::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+    
+    .login-input:focus {
+        border-color: #3b82f6;
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* Options row */
+    .login-options {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9rem;
+    }
+    
+    .login-remember {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+    }
+    
+    .login-checkbox {
+        width: 18px;
+        height: 18px;
+        accent-color: #3b82f6;
+    }
+    
+    .login-forgot {
+        color: #60a5fa;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+    
+    .login-forgot:hover {
+        color: #93c5fd;
+    }
+    
+    /* Submit button */
+    .login-button {
+        width: 100%;
+        padding: 1rem;
+        border-radius: 12px;
+        border: none;
+        background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        margin-top: 0.5rem;
+    }
+    
+    .login-button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.5);
+    }
+    
+    .login-button:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+    }
+    
+    .login-button-spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Divider */
+    .login-divider {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 2rem 0;
+        color: rgba(255, 255, 255, 0.4);
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.85rem;
+    }
+    
+    .login-divider::before,
+    .login-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    }
+    
+    /* Footer */
+    .login-footer {
+        text-align: center;
+        font-family: 'Outfit', sans-serif;
+    }
+    
+    .login-footer p {
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 0.75rem;
+    }
+    
+    .login-register-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .login-register-link:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+</style>
 
 @code {
     private LoginModel _model = new();
@@ -79,7 +539,7 @@
 
             if (result.Succeeded)
             {
-                Snackbar.Add("Zalogowano pomyślnie!", Severity.Success);
+                Snackbar.Add("✅ Zalogowano pomyślnie!", Severity.Success);
                 NavigationManager.NavigateTo(ReturnUrl ?? "/");
             }
             else

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Configuration;
 
 namespace SportRental.Client.Services;
 
@@ -8,26 +9,30 @@ public class AuthService
     private readonly HttpClient _httpClient;
     private readonly AuthenticationStateProvider _authStateProvider;
     private readonly TenantService _tenantService;
+    private readonly string _apiBaseUrl;
+    private readonly string _defaultTenantId;
 
-    public AuthService(HttpClient httpClient, AuthenticationStateProvider authStateProvider, TenantService tenantService)
+    public AuthService(HttpClient httpClient, AuthenticationStateProvider authStateProvider, TenantService tenantService, IConfiguration configuration)
     {
         _httpClient = httpClient;
         _authStateProvider = authStateProvider;
         _tenantService = tenantService;
+        _apiBaseUrl = configuration["Api:BaseUrl"] ?? "http://localhost:5001";
+        _defaultTenantId = configuration["Api:TenantId"] ?? "547f5df7-a389-44b3-bcc6-090ff2fa92e5";
     }
 
     public async Task<AuthResult> RegisterAsync(string email, string password, string? fullName = null, string? phoneNumber = null, string? documentNumber = null)
     {
         try
         {
-            // Get tenant ID
+            // Użyj wybranego tenanta lub domyślnego z konfiguracji
             var tenantId = await _tenantService.GetSelectedTenantIdAsync();
             if (string.IsNullOrEmpty(tenantId))
             {
-                return AuthResult.Failure("Wybierz wypożyczalnię przed rejestracją");
+                tenantId = _defaultTenantId;
             }
 
-            var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/register")
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{_apiBaseUrl}/api/auth/register")
             {
                 Content = JsonContent.Create(new
                 {
@@ -54,7 +59,11 @@ public class AuthService
             if (result == null)
                 return AuthResult.Failure("Nieprawidłowa odpowiedź serwera");
 
-            await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsAuthenticated(result.AccessToken, result.RefreshToken);
+            await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsAuthenticated(
+                result.AccessToken, 
+                result.RefreshToken,
+                result.User?.Id.ToString(),
+                result.User?.Email);
 
             return AuthResult.Success();
         }
@@ -68,26 +77,12 @@ public class AuthService
     {
         try
         {
-            // Get tenant ID for header
-            var tenantId = await _tenantService.GetSelectedTenantIdAsync();
-            if (string.IsNullOrEmpty(tenantId))
+            // Login nie wymaga tenant ID - użytkownik ma przypisany tenant w bazie
+            var response = await _httpClient.PostAsJsonAsync($"{_apiBaseUrl}/api/auth/login", new
             {
-                return AuthResult.Failure("Wybierz wypożyczalnię przed logowaniem");
-            }
-
-            var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
-            {
-                Content = JsonContent.Create(new
-                {
-                    Email = email,
-                    Password = password
-                })
-            };
-
-            // Add X-Tenant-Id header
-            request.Headers.Add("X-Tenant-Id", tenantId);
-
-            var response = await _httpClient.SendAsync(request);
+                Email = email,
+                Password = password
+            });
 
             if (!response.IsSuccessStatusCode)
             {
@@ -99,7 +94,11 @@ public class AuthService
             if (result == null)
                 return AuthResult.Failure("Nieprawidłowa odpowiedź serwera");
 
-            await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsAuthenticated(result.AccessToken, result.RefreshToken);
+            await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsAuthenticated(
+                result.AccessToken, 
+                result.RefreshToken,
+                result.User?.Id.ToString(),
+                result.User?.Email);
 
             return AuthResult.Success();
         }

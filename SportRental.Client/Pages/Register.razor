@@ -1,90 +1,606 @@
 @page "/register"
+@layout HomeLayout
 @using SportRental.Client.Services
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
 
-<MudContainer MaxWidth="MaxWidth.Small" Class="mt-16">
-    <MudPaper Elevation="4" Class="pa-8">
-        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-4">
-            Rejestracja
-        </MudText>
+<PageTitle>SportRental - Rejestracja</PageTitle>
 
-        @if (!string.IsNullOrEmpty(_errorMessage))
-        {
-            <MudAlert Severity="Severity.Error" Class="mb-4">@_errorMessage</MudAlert>
+<div class="register-page">
+    <!-- Background decoration -->
+    <div class="register-bg-decoration">
+        <div class="register-bg-circle register-bg-circle-1"></div>
+        <div class="register-bg-circle register-bg-circle-2"></div>
+        <div class="register-bg-circle register-bg-circle-3"></div>
+    </div>
+    
+    <div class="register-container">
+        <!-- Left side - Branding -->
+        <div class="register-branding">
+            <div class="register-branding-content">
+                <div class="register-logo">
+                    <span class="register-logo-icon">🏂</span>
+                    <span class="register-logo-text">Sport<span>Rental</span></span>
+                </div>
+                <h1 class="register-branding-title">Dołącz do nas!</h1>
+                <p class="register-branding-subtitle">
+                    Załóż konto i wypożyczaj sprzęt sportowy z dowolnej wypożyczalni.
+                </p>
+                
+                <div class="register-features">
+                    <div class="register-feature">
+                        <span class="register-feature-icon">🎿</span>
+                        <span>Tysiące produktów do wyboru</span>
+                    </div>
+                    <div class="register-feature">
+                        <span class="register-feature-icon">💳</span>
+                        <span>Bezpieczne płatności online</span>
+                    </div>
+                    <div class="register-feature">
+                        <span class="register-feature-icon">📱</span>
+                        <span>Rezerwuj z telefonu 24/7</span>
+                    </div>
+                    <div class="register-feature">
+                        <span class="register-feature-icon">🏆</span>
+                        <span>Najwyższa jakość sprzętu</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right side - Register form -->
+        <div class="register-form-wrapper">
+            <div class="register-card">
+                <div class="register-card-header">
+                    <h2 class="register-card-title">Załóż konto</h2>
+                    <p class="register-card-subtitle">Wypełnij formularz, aby utworzyć konto</p>
+                </div>
+                
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="register-alert register-alert-error">
+                        <span class="register-alert-icon">⚠️</span>
+                        <span>@_errorMessage</span>
+                    </div>
+                }
+                
+                <EditForm Model="@_model" OnValidSubmit="HandleRegisterAsync" class="register-form">
+                    <DataAnnotationsValidator />
+                    
+                    <div class="register-field">
+                        <label class="register-label">
+                            <span class="register-label-icon">👤</span>
+                            Imię i nazwisko
+                        </label>
+                        <InputText @bind-Value="_model.FullName" 
+                                   class="register-input" 
+                                   placeholder="Jan Kowalski" />
+                    </div>
+                    
+                    <div class="register-field">
+                        <label class="register-label">
+                            <span class="register-label-icon">📧</span>
+                            Email <span class="text-red-400">*</span>
+                        </label>
+                        <InputText @bind-Value="_model.Email" 
+                                   class="register-input" 
+                                   type="email"
+                                   placeholder="twoj@email.pl" />
+                    </div>
+                    
+                    <div class="register-row">
+                        <div class="register-field">
+                            <label class="register-label">
+                                <span class="register-label-icon">🔒</span>
+                                Hasło <span class="text-red-400">*</span>
+                            </label>
+                            <InputText @bind-Value="_model.Password" 
+                                       class="register-input" 
+                                       type="password"
+                                       placeholder="••••••••" />
+                        </div>
+                        
+                        <div class="register-field">
+                            <label class="register-label">
+                                <span class="register-label-icon">🔒</span>
+                                Potwierdź <span class="text-red-400">*</span>
+                            </label>
+                            <InputText @bind-Value="_model.ConfirmPassword" 
+                                       class="register-input" 
+                                       type="password"
+                                       placeholder="••••••••" />
+                        </div>
+                    </div>
+                    
+                    <p class="register-password-hint">
+                        Min. 8 znaków, wielka litera, mała litera, cyfra i znak specjalny
+                    </p>
+                    
+                    <div class="register-terms">
+                        <label class="register-checkbox-label">
+                            <input type="checkbox" @bind="_acceptTerms" class="register-checkbox" />
+                            <span>Akceptuję <a href="/terms" class="register-link">regulamin</a> i <a href="/privacy" class="register-link">politykę prywatności</a></span>
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="register-button" disabled="@(_isProcessing || !_acceptTerms)">
+                        @if (_isProcessing)
+                        {
+                            <span class="register-button-spinner"></span>
+                            <span>Rejestracja...</span>
+                        }
+                        else
+                        {
+                            <span>✨ Załóż konto</span>
+                        }
+                    </button>
+                </EditForm>
+                
+                <div class="register-divider">
+                    <span>lub</span>
+                </div>
+                
+                <div class="register-footer">
+                    <p>Masz już konto?</p>
+                    <a href="/login" class="register-login-link">
+                        🔑 Zaloguj się
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ============================================
+       REGISTER PAGE - Premium Design
+       ============================================ */
+    
+    .register-page {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #134e4a 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    /* Background decorations */
+    .register-bg-decoration {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
+    
+    .register-bg-circle {
+        position: absolute;
+        border-radius: 50%;
+        background: rgba(16, 185, 129, 0.1);
+        filter: blur(60px);
+    }
+    
+    .register-bg-circle-1 {
+        width: 600px;
+        height: 600px;
+        top: -200px;
+        left: -100px;
+        background: rgba(59, 130, 246, 0.1);
+    }
+    
+    .register-bg-circle-2 {
+        width: 400px;
+        height: 400px;
+        bottom: -100px;
+        right: -100px;
+        background: rgba(16, 185, 129, 0.15);
+    }
+    
+    .register-bg-circle-3 {
+        width: 300px;
+        height: 300px;
+        top: 40%;
+        right: 20%;
+        background: rgba(139, 92, 246, 0.1);
+    }
+    
+    /* Main container */
+    .register-container {
+        display: flex;
+        max-width: 1100px;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(20px);
+        border-radius: 32px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Left side - Branding */
+    .register-branding {
+        flex: 1;
+        padding: 3rem;
+        display: none;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    @@media (min-width: 900px) {
+        .register-branding {
+            display: flex;
+            align-items: center;
         }
-
-        <EditForm Model="@_model" OnValidSubmit="HandleRegisterAsync">
-            <DataAnnotationsValidator />
-
-            <MudTextField @bind-Value="_model.FullName"
-                          Label="Imię i nazwisko"
-                          Variant="Variant.Outlined"
-                          Class="mb-4" />
-
-            <MudTextField @bind-Value="_model.Email"
-                          Label="Email"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Email"
-                          Required="true"
-                          Class="mb-4" />
-
-            <MudTextField @bind-Value="_model.Password"
-                          Label="Hasło"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Password"
-                          Required="true"
-                          HelperText="Min. 8 znaków, wielka litera, mała litera, cyfra"
-                          Class="mb-4" />
-
-            <MudTextField @bind-Value="_model.ConfirmPassword"
-                          Label="Potwierdź hasło"
-                          Variant="Variant.Outlined"
-                          InputType="InputType.Password"
-                          Required="true"
-                          Class="mb-4" />
-
-            <MudButton ButtonType="ButtonType.Submit"
-                       Variant="Variant.Filled"
-                       Color="Color.Primary"
-                       FullWidth="true"
-                       Disabled="@_isProcessing"
-                       Class="mb-4">
-                @if (_isProcessing)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    <span>Rejestracja...</span>
-                }
-                else
-                {
-                    <span>Zarejestruj się</span>
-                }
-            </MudButton>
-        </EditForm>
-
-        <MudDivider Class="my-4" />
-
-        <MudText Align="Align.Center">
-            Masz już konto?
-            <MudLink Href="/login" Color="Color.Primary">Zaloguj się</MudLink>
-        </MudText>
-    </MudPaper>
-</MudContainer>
+    }
+    
+    .register-branding-content {
+        color: #fff;
+    }
+    
+    .register-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+    }
+    
+    .register-logo-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+    }
+    
+    .register-logo-text {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.75rem;
+        font-weight: 700;
+    }
+    
+    .register-logo-text span {
+        background: linear-gradient(135deg, #34d399 0%, #60a5fa 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .register-branding-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        line-height: 1.2;
+    }
+    
+    .register-branding-subtitle {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.1rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin-bottom: 2.5rem;
+        line-height: 1.6;
+    }
+    
+    .register-features {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    
+    .register-feature {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 0.875rem 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9rem;
+        color: rgba(255, 255, 255, 0.9);
+    }
+    
+    .register-feature-icon {
+        font-size: 1.25rem;
+    }
+    
+    /* Right side - Form */
+    .register-form-wrapper {
+        flex: 1.2;
+        padding: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    @@media (min-width: 768px) {
+        .register-form-wrapper {
+            padding: 2.5rem;
+        }
+    }
+    
+    .register-card {
+        width: 100%;
+        max-width: 420px;
+    }
+    
+    .register-card-header {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .register-card-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.875rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 0.5rem;
+    }
+    
+    .register-card-subtitle {
+        font-family: 'Outfit', sans-serif;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.9rem;
+    }
+    
+    /* Alert */
+    .register-alert {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.875rem 1rem;
+        border-radius: 12px;
+        margin-bottom: 1.25rem;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.875rem;
+    }
+    
+    .register-alert-error {
+        background: rgba(239, 68, 68, 0.15);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        color: #fca5a5;
+    }
+    
+    .register-alert-icon {
+        font-size: 1.125rem;
+    }
+    
+    /* Form */
+    .register-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .register-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    @@media (min-width: 480px) {
+        .register-row {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    
+    .register-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+    
+    .register-label {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .register-label-icon {
+        font-size: 0.9rem;
+    }
+    
+    .register-input {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        border-radius: 10px;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        outline: none;
+    }
+    
+    .register-input::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+    
+    .register-input:focus {
+        border-color: #10b981;
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+    }
+    
+    .register-password-hint {
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.5);
+        margin-top: -0.5rem;
+    }
+    
+    /* Terms checkbox */
+    .register-terms {
+        margin-top: 0.5rem;
+    }
+    
+    .register-checkbox-label {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.7);
+        cursor: pointer;
+    }
+    
+    .register-checkbox {
+        width: 18px;
+        height: 18px;
+        accent-color: #10b981;
+        margin-top: 2px;
+        flex-shrink: 0;
+    }
+    
+    .register-link {
+        color: #34d399;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+    
+    .register-link:hover {
+        color: #6ee7b7;
+        text-decoration: underline;
+    }
+    
+    /* Submit button */
+    .register-button {
+        width: 100%;
+        padding: 0.875rem;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+        color: #fff;
+        font-family: 'Outfit', sans-serif;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+        margin-top: 0.5rem;
+    }
+    
+    .register-button:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(16, 185, 129, 0.5);
+    }
+    
+    .register-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .register-button-spinner {
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    /* Divider */
+    .register-divider {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 1.5rem 0;
+        color: rgba(255, 255, 255, 0.4);
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.8rem;
+    }
+    
+    .register-divider::before,
+    .register-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    }
+    
+    /* Footer */
+    .register-footer {
+        text-align: center;
+        font-family: 'Outfit', sans-serif;
+    }
+    
+    .register-footer p {
+        color: rgba(255, 255, 255, 0.6);
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .register-login-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+    
+    .register-login-link:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+</style>
 
 @code {
     private RegisterModel _model = new();
     private string? _errorMessage;
     private bool _isProcessing;
+    private bool _acceptTerms = false;
 
     private async Task HandleRegisterAsync()
     {
         _isProcessing = true;
         _errorMessage = null;
 
+        if (!_acceptTerms)
+        {
+            _errorMessage = "Musisz zaakceptować regulamin";
+            _isProcessing = false;
+            return;
+        }
+
         if (_model.Password != _model.ConfirmPassword)
         {
             _errorMessage = "Hasła nie są identyczne";
+            _isProcessing = false;
+            return;
+        }
+
+        if (_model.Password.Length < 8)
+        {
+            _errorMessage = "Hasło musi mieć minimum 8 znaków";
             _isProcessing = false;
             return;
         }
@@ -95,7 +611,7 @@
 
             if (result.Succeeded)
             {
-                Snackbar.Add("Konto utworzono pomyślnie!", Severity.Success);
+                Snackbar.Add("✅ Konto utworzono pomyślnie!", Severity.Success);
                 NavigationManager.NavigateTo("/");
             }
             else

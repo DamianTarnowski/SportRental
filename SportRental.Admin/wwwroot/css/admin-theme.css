@@ -1,0 +1,549 @@
+/* ============================================
+   SPORTRENTAL ADMIN PANEL - MODERN THEME
+   ============================================ */
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@500;600;700&display=swap');
+
+/* Root variables */
+:root {
+    --admin-primary: #6366f1;
+    --admin-primary-dark: #4f46e5;
+    --admin-primary-light: #818cf8;
+    --admin-secondary: #10b981;
+    --admin-accent: #f59e0b;
+    --admin-danger: #ef4444;
+    --admin-warning: #f59e0b;
+    --admin-success: #10b981;
+    --admin-info: #3b82f6;
+    
+    --admin-bg: #f8fafc;
+    --admin-surface: #ffffff;
+    --admin-sidebar: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
+    --admin-header: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+    
+    --admin-text: #1e293b;
+    --admin-text-secondary: #64748b;
+    --admin-text-light: #94a3b8;
+    
+    --admin-border: #e2e8f0;
+    --admin-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --admin-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    
+    --admin-radius: 12px;
+    --admin-radius-lg: 16px;
+    --admin-radius-xl: 24px;
+}
+
+/* Base styles */
+html, body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--admin-bg);
+    color: var(--admin-text);
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes adminFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+/* ============================================
+   SIDEBAR
+   ============================================ */
+.sidebar {
+    background: var(--admin-sidebar) !important;
+    box-shadow: 4px 0 15px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar .top-row {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 1rem 1.25rem;
+}
+
+.sidebar .navbar-brand {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white !important;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sidebar .navbar-brand::before {
+    content: '🏂';
+    font-size: 1.5rem;
+}
+
+.sidebar .nav-scrollable {
+    background: transparent !important;
+}
+
+.sidebar .nav-item {
+    margin: 0.25rem 0.75rem;
+}
+
+.sidebar .nav-link {
+    color: rgba(255, 255, 255, 0.8) !important;
+    padding: 0.75rem 1rem;
+    border-radius: var(--admin-radius);
+    font-size: 0.95rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.sidebar .nav-link:hover {
+    color: white !important;
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateX(4px);
+}
+
+.sidebar .nav-link.active {
+    color: white !important;
+    background: linear-gradient(90deg, var(--admin-primary) 0%, var(--admin-primary-light) 100%);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+
+.sidebar .nav-link span[class^="bi"] {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+/* Nav icons with emoji fallback */
+.sidebar .nav-link span[class*="-nav-menu"]::before {
+    margin-right: 0.5rem;
+}
+
+/* ============================================
+   HEADER / APP BAR
+   ============================================ */
+.mud-appbar {
+    background: var(--admin-header) !important;
+    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3) !important;
+}
+
+.mud-appbar .mud-typography {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* ============================================
+   MAIN CONTENT
+   ============================================ */
+.page {
+    background: var(--admin-bg);
+}
+
+main {
+    background: var(--admin-bg);
+}
+
+.top-row {
+    background: var(--admin-surface);
+    border-bottom: 1px solid var(--admin-border);
+    box-shadow: var(--admin-shadow);
+}
+
+.content {
+    animation: fadeInUp 0.4s ease-out;
+}
+
+article.content {
+    padding: 1.5rem;
+}
+
+/* ============================================
+   CARDS
+   ============================================ */
+.mud-card {
+    border-radius: var(--admin-radius-lg) !important;
+    box-shadow: var(--admin-shadow) !important;
+    border: 1px solid var(--admin-border);
+    transition: all 0.3s ease;
+}
+
+.mud-card:hover {
+    box-shadow: var(--admin-shadow-lg) !important;
+    transform: translateY(-2px);
+}
+
+.mud-card-header {
+    border-bottom: 1px solid var(--admin-border);
+}
+
+/* ============================================
+   STAT CARDS
+   ============================================ */
+.admin-stat-card {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-lg);
+    padding: 1.5rem;
+    box-shadow: var(--admin-shadow);
+    border: 1px solid var(--admin-border);
+    transition: all 0.3s ease;
+    animation: fadeInUp 0.5s ease-out;
+    animation-fill-mode: both;
+}
+
+.admin-stat-card:nth-child(1) { animation-delay: 0.1s; }
+.admin-stat-card:nth-child(2) { animation-delay: 0.15s; }
+.admin-stat-card:nth-child(3) { animation-delay: 0.2s; }
+.admin-stat-card:nth-child(4) { animation-delay: 0.25s; }
+
+.admin-stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--admin-shadow-lg);
+}
+
+.admin-stat-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: var(--admin-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.admin-stat-icon.primary { background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-light) 100%); }
+.admin-stat-icon.success { background: linear-gradient(135deg, var(--admin-success) 0%, #34d399 100%); }
+.admin-stat-icon.warning { background: linear-gradient(135deg, var(--admin-warning) 0%, #fbbf24 100%); }
+.admin-stat-icon.danger { background: linear-gradient(135deg, var(--admin-danger) 0%, #f87171 100%); }
+.admin-stat-icon.info { background: linear-gradient(135deg, var(--admin-info) 0%, #60a5fa 100%); }
+
+.admin-stat-value {
+    font-family: 'Poppins', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--admin-text);
+    line-height: 1.2;
+}
+
+.admin-stat-label {
+    color: var(--admin-text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+.mud-button-root {
+    border-radius: var(--admin-radius) !important;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    letter-spacing: 0.3px !important;
+    transition: all 0.2s ease !important;
+}
+
+.mud-button-root:hover {
+    transform: translateY(-2px);
+}
+
+.mud-button-filled.mud-button-primary {
+    background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%) !important;
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3) !important;
+}
+
+.mud-button-filled.mud-button-primary:hover {
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4) !important;
+}
+
+/* ============================================
+   TABLES
+   ============================================ */
+.mud-table {
+    border-radius: var(--admin-radius-lg) !important;
+    overflow: hidden;
+    box-shadow: var(--admin-shadow) !important;
+}
+
+.mud-table-head {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+}
+
+.mud-table-head th {
+    font-weight: 600 !important;
+    color: var(--admin-text) !important;
+    text-transform: uppercase;
+    font-size: 0.75rem !important;
+    letter-spacing: 0.5px;
+}
+
+.mud-table-row:hover {
+    background: rgba(99, 102, 241, 0.04) !important;
+}
+
+/* ============================================
+   FORMS
+   ============================================ */
+.mud-input-control {
+    margin-bottom: 1rem;
+}
+
+.mud-input {
+    border-radius: var(--admin-radius) !important;
+}
+
+.mud-input-outlined .mud-input-outlined-border {
+    border-radius: var(--admin-radius) !important;
+    border-color: var(--admin-border) !important;
+}
+
+.mud-input-outlined:hover .mud-input-outlined-border {
+    border-color: var(--admin-primary-light) !important;
+}
+
+.mud-input-outlined.mud-input-focus .mud-input-outlined-border {
+    border-color: var(--admin-primary) !important;
+    border-width: 2px !important;
+}
+
+/* ============================================
+   CHIPS
+   ============================================ */
+.mud-chip {
+    border-radius: 20px !important;
+    font-weight: 500 !important;
+}
+
+/* ============================================
+   ALERTS
+   ============================================ */
+.mud-alert {
+    border-radius: var(--admin-radius) !important;
+}
+
+/* ============================================
+   DIALOGS
+   ============================================ */
+.mud-dialog {
+    border-radius: var(--admin-radius-xl) !important;
+}
+
+.mud-dialog-title {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+}
+
+/* ============================================
+   ADMIN PAGE HEADER
+   ============================================ */
+.admin-page-header {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-xl);
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--admin-shadow);
+    border: 1px solid var(--admin-border);
+    animation: fadeInUp 0.4s ease-out;
+}
+
+.admin-page-header h1 {
+    font-size: 1.75rem;
+    color: var(--admin-text);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.admin-page-header p {
+    color: var(--admin-text-secondary);
+    margin: 0;
+}
+
+/* ============================================
+   ADMIN DASHBOARD HERO
+   ============================================ */
+.admin-hero {
+    background: linear-gradient(135deg, var(--admin-primary) 0%, #7c3aed 50%, #a855f7 100%);
+    border-radius: var(--admin-radius-xl);
+    padding: 2.5rem;
+    color: white;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+    animation: fadeInUp 0.4s ease-out;
+}
+
+.admin-hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    animation: pulse 8s ease-in-out infinite;
+}
+
+.admin-hero h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+.admin-hero p {
+    opacity: 0.9;
+    font-size: 1.1rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* ============================================
+   QUICK ACTIONS
+   ============================================ */
+.admin-quick-action {
+    background: var(--admin-surface);
+    border-radius: var(--admin-radius-lg);
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid var(--admin-border);
+    text-decoration: none;
+    color: var(--admin-text);
+    display: block;
+}
+
+.admin-quick-action:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--admin-shadow-lg);
+    border-color: var(--admin-primary-light);
+}
+
+.admin-quick-action-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--admin-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 1rem;
+    background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-light) 100%);
+    color: white;
+}
+
+.admin-quick-action h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.admin-quick-action p {
+    color: var(--admin-text-secondary);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+    .admin-hero {
+        padding: 1.5rem;
+    }
+    
+    .admin-hero h1 {
+        font-size: 1.5rem;
+    }
+    
+    .admin-stat-card {
+        padding: 1rem;
+    }
+    
+    .admin-stat-value {
+        font-size: 1.5rem;
+    }
+}
+
+/* ============================================
+   DATA GRID IMPROVEMENTS
+   ============================================ */
+.mud-table-container {
+    border-radius: var(--admin-radius-lg);
+}
+
+/* ============================================
+   SKELETON LOADING
+   ============================================ */
+.admin-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: var(--admin-radius);
+}
+
+/* ============================================
+   SCROLL STYLING
+   ============================================ */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+

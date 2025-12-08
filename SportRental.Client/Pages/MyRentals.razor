@@ -6,100 +6,97 @@
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 
-<MudContainer MaxWidth="MaxWidth.Large" Class="mt-8">
-    <MudPaper Elevation="4" Class="pa-8">
-        <MudText Typo="Typo.h4" Class="mb-6">Moje wypożyczenia</MudText>
+<PageTitle>Moje wypożyczenia - SportRental</PageTitle>
+
+<div class="rentals-container">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <div class="rentals-header">
+            <h1>📋 Moje wypożyczenia</h1>
+            <p>Przeglądaj historię swoich wypożyczeń i aktywne rezerwacje</p>
+        </div>
 
         @if (_isLoading)
         {
-            <MudProgressCircular Indeterminate="true" Class="my-8" />
+            <div class="flex items-center justify-center py-20">
+                <div class="text-center">
+                    <div class="w-16 h-16 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin mx-auto mb-4"></div>
+                    <p class="text-gray-600">Ładowanie wypożyczeń...</p>
+                </div>
+            </div>
         }
         else if (_rentals == null || !_rentals.Any())
         {
-            <MudAlert Severity="Severity.Info" Class="my-4">
-                <MudText>Nie masz jeszcze żadnych wypożyczeń.</MudText>
-            </MudAlert>
-
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Primary" 
-                       Href="/"
-                       StartIcon="@Icons.Material.Filled.ShoppingCart"
-                       Class="mt-4">
-                Zacznij wypożyczać
-            </MudButton>
+            <div class="rentals-empty">
+                <div class="rentals-empty-icon">📭</div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Brak wypożyczeń</h2>
+                <p class="text-gray-600 mb-6">Nie masz jeszcze żadnych wypożyczeń. Zacznij swoją przygodę ze sportem!</p>
+                <a href="/products" class="cart-checkout-btn" style="max-width: 300px; margin: 0 auto; text-decoration: none; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    🎿 Przeglądaj sprzęt
+                </a>
+            </div>
         }
         else
         {
-            <MudTable Items="@_rentals" Hover="true" Striped="true" Breakpoint="Breakpoint.Sm">
-                <HeaderContent>
-                    <MudTh>Data wypożyczenia</MudTh>
-                    <MudTh>Klient</MudTh>
-                    <MudTh>Produkty</MudTh>
-                    <MudTh>Status</MudTh>
-                    <MudTh>Kwota</MudTh>
-                    <MudTh>Depozyt</MudTh>
-                    <MudTh>Akcje</MudTh>
-                </HeaderContent>
-                <RowTemplate>
-                    <MudTd DataLabel="Data">
-                        <MudStack Spacing="0">
-                            <MudText Typo="Typo.body2"><strong>Od:</strong> @context.StartDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
-                            <MudText Typo="Typo.body2"><strong>Do:</strong> @context.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudText>
-                        </MudStack>
-                    </MudTd>
-                    <MudTd DataLabel="Klient">
-                        <MudText Typo="Typo.body2">@context.CustomerName</MudText>
-                    </MudTd>
-                    <MudTd DataLabel="Produkty">
-                        <MudStack Spacing="1">
-                            @foreach (var item in context.Items.Take(3))
+            <div class="space-y-4">
+                @foreach (var rental in _rentals.OrderByDescending(r => r.StartDateUtc))
+                {
+                    <div class="rental-card">
+                        <div class="rental-card-header">
+                            <div class="rental-card-dates">
+                                <div class="rental-date-group">
+                                    <div class="rental-date-label">Od</div>
+                                    <div class="rental-date-value">@rental.StartDateUtc.ToLocalTime().ToString("dd.MM.yyyy")</div>
+                                </div>
+                                <div class="rental-date-group">
+                                    <div class="rental-date-label">Do</div>
+                                    <div class="rental-date-value">@rental.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy")</div>
+                                </div>
+                            </div>
+                            <span class="rental-status @GetStatusClass(rental.Status)">
+                                @GetStatusEmoji(rental.Status) @rental.Status
+                            </span>
+                        </div>
+
+                        <div class="rental-products">
+                            @foreach (var item in rental.Items.Take(3))
                             {
-                                <MudText Typo="Typo.body2">@item.ProductName (x@item.Quantity)</MudText>
+                                <div class="rental-product-item">
+                                    <span>📦 @item.ProductName</span>
+                                    <span class="font-medium">x@item.Quantity</span>
+                                </div>
                             }
-                            @if (context.Items.Count > 3)
+                            @if (rental.Items.Count > 3)
                             {
-                                <MudText Typo="Typo.caption" Color="Color.Secondary">+@(context.Items.Count - 3) więcej...</MudText>
+                                <div class="text-sm text-gray-500 mt-2">
+                                    + @(rental.Items.Count - 3) więcej...
+                                </div>
                             }
-                        </MudStack>
-                    </MudTd>
-                    <MudTd DataLabel="Status">
-                        <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small" Variant="Variant.Filled">
-                            @context.Status
-                        </MudChip>
-                    </MudTd>
-                    <MudTd DataLabel="Kwota">
-                        <MudText Typo="Typo.body1" Color="Color.Primary"><strong>@context.TotalAmount.ToString("C")</strong></MudText>
-                    </MudTd>
-                    <MudTd DataLabel="Depozyt">
-                        <MudText Typo="Typo.body2">@context.DepositAmount.ToString("C")</MudText>
-                    </MudTd>
-                    <MudTd DataLabel="Akcje">
-                        <MudStack Row="true" Spacing="1">
-                            <MudButton Size="Size.Small" 
-                                       Variant="Variant.Outlined" 
-                                       Color="Color.Primary"
-                                       OnClick="@(() => ViewDetails(context.Id))"
-                                       StartIcon="@Icons.Material.Filled.Info">
-                                Szczegóły
-                            </MudButton>
-                            @if (context.ContractUrl != null)
-                            {
-                                <MudButton Size="Size.Small" 
-                                           Variant="Variant.Outlined" 
-                                           Color="Color.Secondary"
-                                           Href="@context.ContractUrl"
-                                           Target="_blank"
-                                           StartIcon="@Icons.Material.Filled.Description">
-                                    Umowa
-                                </MudButton>
-                            }
-                        </MudStack>
-                    </MudTd>
-                </RowTemplate>
-            </MudTable>
+                        </div>
+
+                        <div class="rental-card-footer">
+                            <div class="rental-total">
+                                @rental.TotalAmount.ToString("C")
+                                <span>depozyt: @rental.DepositAmount.ToString("C")</span>
+                            </div>
+                            <div class="rental-actions">
+                                <button class="rental-btn rental-btn-primary" @onclick="@(() => ViewDetails(rental.Id))">
+                                    👁️ Szczegóły
+                                </button>
+                                @if (rental.ContractUrl != null)
+                                {
+                                    <a href="@rental.ContractUrl" target="_blank" class="rental-btn rental-btn-secondary">
+                                        📄 Umowa
+                                    </a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
         }
-    </MudPaper>
-</MudContainer>
+    </div>
+</div>
 
 @code {
     private bool _isLoading = true;
@@ -117,13 +114,7 @@
 
         try
         {
-            // Pobierz wszystkie rentals użytkownika (API sprawdzi JWT i zwróci tylko jego)
             _rentals = await Api.GetMyRentalsAsync();
-            
-            if (_rentals == null || !_rentals.Any())
-            {
-                Snackbar.Add("Nie masz jeszcze żadnych wypożyczeń.", Severity.Info);
-            }
         }
         catch (Exception ex)
         {
@@ -137,16 +128,29 @@
         }
     }
 
-    private Color GetStatusColor(string status)
+    private string GetStatusClass(string status)
     {
-        return status switch
+        return status.ToLower() switch
         {
-            "Reserved" or "Confirmed" => Color.Primary,
-            "Active" or "OnRent" => Color.Success,
-            "Returned" or "Completed" => Color.Info,
-            "Cancelled" => Color.Error,
-            "Overdue" => Color.Warning,
-            _ => Color.Default
+            "reserved" or "confirmed" => "reserved",
+            "active" or "onrent" => "active",
+            "returned" or "completed" => "completed",
+            "cancelled" => "cancelled",
+            "overdue" => "overdue",
+            _ => ""
+        };
+    }
+
+    private string GetStatusEmoji(string status)
+    {
+        return status.ToLower() switch
+        {
+            "reserved" or "confirmed" => "📅",
+            "active" or "onrent" => "✅",
+            "returned" or "completed" => "🏁",
+            "cancelled" => "❌",
+            "overdue" => "⚠️",
+            _ => "📋"
         };
     }
 

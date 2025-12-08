@@ -29,28 +29,54 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
         // Set default authorization header
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        var claims = ParseClaimsFromJwt(token);
-        var expiry = claims.FirstOrDefault(c => c.Type == "exp")?.Value;
-
-        if (expiry != null && long.TryParse(expiry, out var exp))
+        var claims = ParseClaimsFromJwt(token).ToList();
+        
+        // If no claims from JWT (cookie-based auth), try to get from stored user info
+        if (!claims.Any())
         {
-            var expiryDate = DateTimeOffset.FromUnixTimeSeconds(exp);
-            if (expiryDate < DateTimeOffset.UtcNow)
+            var userId = await _localStorage.GetItemAsync<string>("userId");
+            var email = await _localStorage.GetItemAsync<string>("userEmail");
+            
+            if (!string.IsNullOrEmpty(email))
             {
-                // Token expired, try to refresh
-                var refreshed = await TryRefreshTokenAsync();
-                if (!refreshed)
+                claims = new List<Claim>
                 {
-                    await MarkUserAsLoggedOut();
-                    return _anonymous;
-                }
-                
-                // Get new token and parse again
-                token = await _localStorage.GetItemAsync<string>("authToken");
-                if (string.IsNullOrWhiteSpace(token))
-                    return _anonymous;
+                    new Claim(ClaimTypes.NameIdentifier, userId ?? ""),
+                    new Claim(ClaimTypes.Email, email),
+                    new Claim(ClaimTypes.Name, email)
+                };
+            }
+            else
+            {
+                // No valid auth info
+                return _anonymous;
+            }
+        }
+        else
+        {
+            // JWT-based auth - check expiry
+            var expiry = claims.FirstOrDefault(c => c.Type == "exp")?.Value;
+
+            if (expiry != null && long.TryParse(expiry, out var exp))
+            {
+                var expiryDate = DateTimeOffset.FromUnixTimeSeconds(exp);
+                if (expiryDate < DateTimeOffset.UtcNow)
+                {
+                    // Token expired, try to refresh
+                    var refreshed = await TryRefreshTokenAsync();
+                    if (!refreshed)
+                    {
+                        await MarkUserAsLoggedOut();
+                        return _anonymous;
+                    }
                     
-                claims = ParseClaimsFromJwt(token);
+                    // Get new token and parse again
+                    token = await _localStorage.GetItemAsync<string>("authToken");
+                    if (string.IsNullOrWhiteSpace(token))
+                        return _anonymous;
+                        
+                    claims = ParseClaimsFromJwt(token).ToList();
+                }
             }
         }
 
@@ -60,14 +86,32 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
         return new AuthenticationState(user);
     }
 
-    public async Task MarkUserAsAuthenticated(string token, string refreshToken)
+    public async Task MarkUserAsAuthenticated(string token, string refreshToken, string? userId = null, string? email = null)
     {
         await _localStorage.SetItemAsync("authToken", token);
         await _localStorage.SetItemAsync("refreshToken", refreshToken);
+        
+        // Store user info for cookie-based auth
+        if (!string.IsNullOrEmpty(userId))
+            await _localStorage.SetItemAsync("userId", userId);
+        if (!string.IsNullOrEmpty(email))
+            await _localStorage.SetItemAsync("userEmail", email);
 
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var claims = ParseClaimsFromJwt(token);
+        
+        // If no claims from JWT (cookie-based auth), create claims from stored user info
+        if (!claims.Any() && !string.IsNullOrEmpty(email))
+        {
+            claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, userId ?? ""),
+                new Claim(ClaimTypes.Email, email),
+                new Claim(ClaimTypes.Name, email)
+            };
+        }
+        
         var identity = new ClaimsIdentity(claims, "jwt");
         var user = new ClaimsPrincipal(identity);
 
@@ -78,6 +122,8 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
     {
         await _localStorage.RemoveItemAsync("authToken");
         await _localStorage.RemoveItemAsync("refreshToken");
+        await _localStorage.RemoveItemAsync("userId");
+        await _localStorage.RemoveItemAsync("userEmail");
 
         _httpClient.DefaultRequestHeaders.Authorization = null;
 
@@ -115,7 +161,15 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
 
     private static IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
     {
-        var payload = jwt.Split('.')[1];
+        // Handle cookie-based auth or invalid JWT
+        var parts = jwt.Split('.');
+        if (parts.Length != 3)
+        {
+            // Not a valid JWT - return empty claims
+            return Enumerable.Empty<Claim>();
+        }
+
+        var payload = parts[1];
         var jsonBytes = ParseBase64WithoutPadding(payload);
         var keyValuePairs = JsonSerializer.Deserialize<Dictionary<string, object>>(jsonBytes);
 
