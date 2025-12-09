@@ -13,7 +13,9 @@ main {
     background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
 }
 
-.top-row { display:none; }
+.top-row {
+    display: none;
+}
 
     .top-row ::deep a, .top-row ::deep .btn-link {
         white-space: nowrap;
@@ -91,3 +93,5 @@ main {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+

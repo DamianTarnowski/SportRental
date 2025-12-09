@@ -547,3 +547,123 @@ article.content {
     background: #94a3b8;
 }
 
+/* ============================================
+   MUD DRAWER - RESPONSIVE SIDEBAR
+   ============================================ */
+.sidebar-drawer {
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%) !important;
+}
+
+.sidebar-drawer .mud-drawer-content {
+    background: transparent !important;
+}
+
+.drawer-header {
+    padding: 24px 16px;
+    text-align: center;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.drawer-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 12px;
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+}
+
+.drawer-logo .mud-icon-root {
+    color: white !important;
+}
+
+.drawer-title {
+    color: white !important;
+    font-weight: 700 !important;
+    margin-bottom: 2px !important;
+}
+
+.drawer-subtitle {
+    color: rgba(255, 255, 255, 0.5) !important;
+    font-size: 0.75rem !important;
+}
+
+.sidebar-drawer .mud-navmenu {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.sidebar-drawer .mud-nav-link {
+    color: rgba(255, 255, 255, 0.7) !important;
+    border-radius: 8px !important;
+    margin: 2px 0 !important;
+    transition: all 0.2s ease !important;
+}
+
+.sidebar-drawer .mud-nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: white !important;
+}
+
+.sidebar-drawer .mud-nav-link.active {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.sidebar-drawer .mud-nav-group .mud-nav-group-title {
+    color: rgba(255, 255, 255, 0.4) !important;
+    font-size: 0.65rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 1.2px !important;
+    text-transform: uppercase !important;
+    padding: 16px 12px 8px !important;
+}
+
+.sidebar-drawer .mud-navmenu-list-padding {
+    padding-top: 0 !important;
+}
+
+.mud-drawer-overlay {
+    background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+.main-content {
+    min-height: 100vh;
+    background: var(--admin-bg);
+}
+
+/* Hamburger toggle button */
+.hamburger-toggle {
+    display: none !important;
+}
+
+/* Mobile hamburger menu */
+@media (max-width: 959.95px) {
+    .hamburger-toggle {
+        display: inline-flex !important;
+    }
+    
+    .sidebar-drawer {
+        width: 280px !important;
+    }
+    
+    .main-content {
+        padding-top: 56px !important;
+    }
+}
+
+/* Desktop sidebar */
+@media (min-width: 960px) {
+    .hamburger-toggle {
+        display: none !important;
+    }
+    
+    .main-content {
+        padding-top: 48px !important;
+    }
+}
+
