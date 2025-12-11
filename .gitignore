@@ -422,6 +422,9 @@ secrets.*.json
 ## Folder with ready-to-use secret files (share with team separately!)
 dev-secrets/
 
+## Folder z sekretami (Azure, Stripe, DB credentials)
+secrets/
+
 ## Quick test scripts with hardcoded credentials (use DbTool instead)
 DbTest/
 test-db-connection.csx

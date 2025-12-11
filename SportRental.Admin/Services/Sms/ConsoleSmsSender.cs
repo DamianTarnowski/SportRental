@@ -29,6 +29,19 @@ namespace SportRental.Admin.Services.Sms
             var message = $"Witaj {customerName}! Potwierdzenie wynajmu {rentalId.ToString()[..8]}. Nie odpowiadaj na tę wiadomość - SportRental";
             return SendAsync(phoneNumber, message, ct);
         }
+        
+        public Task SendContractConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, CancellationToken ct = default)
+        {
+            return SendContractConfirmationRequestAsync(phoneNumber, customerName, rentalId, null, ct);
+        }
+        
+        public Task SendContractConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, string? customerEmail, CancellationToken ct = default)
+        {
+            var contractUrl = $"https://sradmin2.azurewebsites.net/c/{rentalId.ToString()[..8].ToLower()}";
+            var emailInfo = !string.IsNullOrWhiteSpace(customerEmail) ? $" wysłanej na {customerEmail}" : "";
+            var message = $"SportRental: {customerName}, czy potwierdzasz warunki umowy{emailInfo}? {contractUrl} Odpisz TAK lub NIE.";
+            return SendAsync(phoneNumber, message, ct);
+        }
     }
 }
 

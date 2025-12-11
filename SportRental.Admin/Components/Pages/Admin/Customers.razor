@@ -1,6 +1,6 @@
 @page "/admin/customers"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 @using SportRental.Admin.Components.Dialogs
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory

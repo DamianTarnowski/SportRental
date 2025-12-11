@@ -29,6 +29,8 @@ namespace SportRental.Infrastructure.Domain
         public bool KierownikCanAddMultipleRental { get; set; } = false;
         public bool KierownikCanEditMultipleRental { get; set; } = false;
         public bool KierownikCanDeleteMultipleRental { get; set; } = false;
+        public bool KierownikCanIssueEquipment { get; set; } = false;    // Wydanie sprzętu
+        public bool KierownikCanReturnEquipment { get; set; } = false;   // Przyjęcie zwrotu
 
         // Manager permissions
         public bool ManagerCanAddClient { get; set; } = false;
@@ -47,6 +49,8 @@ namespace SportRental.Infrastructure.Domain
         public bool ManagerCanAddMultipleRental { get; set; } = false;
         public bool ManagerCanEditMultipleRental { get; set; } = false;
         public bool ManagerCanDeleteMultipleRental { get; set; } = false;
+        public bool ManagerCanIssueEquipment { get; set; } = false;
+        public bool ManagerCanReturnEquipment { get; set; } = false;
 
         // Pracownik permissions
         public bool PracownikCanAddClient { get; set; } = false;
@@ -65,6 +69,8 @@ namespace SportRental.Infrastructure.Domain
         public bool PracownikCanAddMultipleRental { get; set; } = false;
         public bool PracownikCanEditMultipleRental { get; set; } = false;
         public bool PracownikCanDeleteMultipleRental { get; set; } = false;
+        public bool PracownikCanIssueEquipment { get; set; } = false;
+        public bool PracownikCanReturnEquipment { get; set; } = false;
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAtUtc { get; set; }

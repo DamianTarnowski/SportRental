@@ -53,10 +53,23 @@
                                     <div class="rental-date-value">@rental.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy")</div>
                                 </div>
                             </div>
-                            <span class="rental-status @GetStatusClass(rental.Status)">
-                                @GetStatusEmoji(rental.Status) @rental.Status
-                            </span>
+                            <div class="rental-status-badges">
+                                <span class="rental-status @GetStatusClass(rental.Status)">
+                                    @GetStatusEmoji(rental.Status) @GetStatusText(rental.Status)
+                                </span>
+                                <span class="rental-status @GetEquipmentStatusClass(rental)">
+                                    @GetEquipmentStatusEmoji(rental) @GetEquipmentStatusText(rental)
+                                </span>
+                            </div>
                         </div>
+                        
+                        @* Ostrzeżenie o przeterminowaniu *@
+                        @if (rental.IsOverdue)
+                        {
+                            <div class="rental-overdue-warning">
+                                ⚠️ Termin zwrotu minął! Prosimy o pilny kontakt z wypożyczalnią.
+                            </div>
+                        }
 
                         <div class="rental-products">
                             @foreach (var item in rental.Items.Take(3))
@@ -132,6 +145,7 @@
     {
         return status.ToLower() switch
         {
+            "draft" or "pending" => "pending",
             "reserved" or "confirmed" => "reserved",
             "active" or "onrent" => "active",
             "returned" or "completed" => "completed",
@@ -145,6 +159,7 @@
     {
         return status.ToLower() switch
         {
+            "draft" or "pending" => "⏳",
             "reserved" or "confirmed" => "📅",
             "active" or "onrent" => "✅",
             "returned" or "completed" => "🏁",
@@ -152,6 +167,48 @@
             "overdue" => "⚠️",
             _ => "📋"
         };
+    }
+
+    private string GetStatusText(string status)
+    {
+        return status.ToLower() switch
+        {
+            "draft" => "Szkic",
+            "pending" => "Oczekujące",
+            "confirmed" => "Potwierdzone",
+            "active" => "Aktywne",
+            "completed" => "Zakończone",
+            "cancelled" => "Anulowane",
+            _ => status
+        };
+    }
+
+    // Status wydania/zwrotu sprzętu
+    private string GetEquipmentStatusClass(MyRentalDto rental)
+    {
+        if (rental.ReturnedAtUtc.HasValue)
+            return "completed";
+        if (rental.IssuedAtUtc.HasValue)
+            return rental.IsOverdue ? "overdue" : "active";
+        return "pending";
+    }
+
+    private string GetEquipmentStatusEmoji(MyRentalDto rental)
+    {
+        if (rental.ReturnedAtUtc.HasValue)
+            return "✅";
+        if (rental.IssuedAtUtc.HasValue)
+            return rental.IsOverdue ? "⚠️" : "📦";
+        return "⏳";
+    }
+
+    private string GetEquipmentStatusText(MyRentalDto rental)
+    {
+        if (rental.ReturnedAtUtc.HasValue)
+            return $"Zwrócono {rental.ReturnedAtUtc.Value.ToLocalTime():dd.MM}";
+        if (rental.IssuedAtUtc.HasValue)
+            return $"Wydano {rental.IssuedAtUtc.Value.ToLocalTime():dd.MM}";
+        return "Oczekuje na odbiór";
     }
 
     private void ViewDetails(Guid rentalId)

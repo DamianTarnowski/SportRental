@@ -10,4 +10,16 @@ internal sealed class StripeCheckoutSessionService : ICheckoutSessionService
     {
         return _sessionService.CreateAsync(options, null, cancellationToken);
     }
+
+    public async Task<Session?> GetAsync(string sessionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _sessionService.GetAsync(sessionId, null, null, cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

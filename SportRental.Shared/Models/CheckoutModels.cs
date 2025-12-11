@@ -13,3 +13,8 @@ public record CheckoutSessionResponse(
     string SessionId,
     string Url,
     DateTime ExpiresAt);
+
+public record FinalizeSessionResponse(
+    bool Success,
+    string Message,
+    Guid? RentalId);

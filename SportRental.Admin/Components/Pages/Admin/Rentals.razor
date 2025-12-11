@@ -1,6 +1,6 @@
 @page "/admin/rentals"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
@@ -89,7 +89,7 @@
                     <MudTooltip Text="Odśwież listę wynajmów">
                         <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
                                        Color="Color.Primary" 
-                                       OnClick="() => InvokeAsync(StateHasChanged)"
+                                       OnClick="RefreshRentals"
                                        Size="Size.Large" />
                     </MudTooltip>
                 </MudItem>
@@ -109,7 +109,7 @@
                 <MudStack Spacing="3">
                     @foreach (var rental in filteredRentals)
                     {
-                        <MudCard Elevation="6" Class="rental-card" Style="@($"border-radius: 16px; transition: all 0.3s ease; border-left: 4px solid {GetStatusColorHex(rental.Status)};")">
+                        <MudCard Elevation="6" Class="@GetRentalCardClass(rental)" Style="@GetRentalCardStyle(rental)">
                             <MudCardContent Class="pa-5">
                                 <MudGrid Spacing="3" Class="mud-align-center">
                                     <MudItem xs="12" md="8">
@@ -183,6 +183,30 @@
                                                          Size="Size.Small">
                                                     Email: @(rental.IsEmailSent ? "✓" : "✗")
                                                 </MudChip>
+                                                @* Źródło wypożyczenia *@
+                                                <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
+                                                         Color="@GetSourceColor(rental.Source)" 
+                                                         Variant="Variant.Text"
+                                                         Size="Size.Small">
+                                                    @GetSourceText(rental.Source)
+                                                </MudChip>
+                                                @* Status wydania/zwrotu *@
+                                                <MudChip T="string" Icon="@GetEquipmentStatusIcon(rental)" 
+                                                         Color="@GetEquipmentStatusColor(rental)" 
+                                                         Variant="Variant.Filled"
+                                                         Size="Size.Small">
+                                                    @GetEquipmentStatusText(rental)
+                                                </MudChip>
+                                                @* Ostrzeżenie o przeterminowaniu *@
+                                                @if (IsOverdue(rental))
+                                                {
+                                                    <MudChip T="string" Icon="@Icons.Material.Filled.Warning" 
+                                                             Color="Color.Error" 
+                                                             Variant="Variant.Filled"
+                                                             Size="Size.Small">
+                                                        PRZETERMINOWANE (@GetOverdueDays(rental) dni)
+                                                    </MudChip>
+                                                }
                                             </MudStack>
 
                                             @if (!string.IsNullOrEmpty(rental.Notes))
@@ -257,6 +281,18 @@
                                                     </MudButton>
                                                 }
                                             </MudStack>
+                                            @* Przycisk przedłużenia dla przeterminowanych *@
+                                            @if (IsOverdue(rental))
+                                            {
+                                                <MudButton StartIcon="@Icons.Material.Filled.Update" 
+                                                           OnClick="() => ExtendRental(rental)"
+                                                           Color="Color.Error"
+                                                           Variant="Variant.Filled"
+                                                           FullWidth="true"
+                                                           Size="Size.Small">
+                                                    ⚠️ Przedłuż wynajem
+                                                </MudButton>
+                                            }
                                         </MudStack>
                                     </MudItem>
                                 </MudGrid>
@@ -824,41 +860,137 @@
 
     private async Task Save()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(CurrentTenantId());
-        editModel.StartDateUtc = (startDate ?? DateTime.Today).ToUniversalTime();
-        editModel.EndDateUtc = (endDate ?? DateTime.Today.AddDays(1)).ToUniversalTime();
-        editModel.TotalAmount = editItems.Sum(i => i.Subtotal);
-
-        if (editModel.Id == Guid.Empty)
+        try
         {
-            editModel.Id = Guid.NewGuid();
-            editModel.CreatedAtUtc = DateTime.UtcNow;
-            editModel.TenantId = CurrentTenantId();
-            await Db.Rentals.AddAsync(editModel);
-        }
-        else
-        {
-            Db.Rentals.Update(editModel);
-            var existing = Db.RentalItems.Where(i => i.RentalId == editModel.Id);
-            Db.RentalItems.RemoveRange(existing);
-        }
+            // Walidacja
+            if (editModel.CustomerId == Guid.Empty)
+            {
+                Snackbar.Add("Wybierz klienta!", MudBlazor.Severity.Error);
+                return;
+            }
+            if (!editItems.Any())
+            {
+                Snackbar.Add("Dodaj przynajmniej jeden produkt!", MudBlazor.Severity.Error);
+                return;
+            }
+            if (!startDate.HasValue || !endDate.HasValue)
+            {
+                Snackbar.Add("Ustaw daty rozpoczęcia i zakończenia!", MudBlazor.Severity.Error);
+                return;
+            }
 
-        foreach (var item in editItems)
-        {
-            item.Id = Guid.NewGuid();
-            item.RentalId = editModel.Id;
-            await Db.RentalItems.AddAsync(item);
-        }
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(CurrentTenantId());
+            editModel.StartDateUtc = startDate.Value.ToUniversalTime();
+            editModel.EndDateUtc = endDate.Value.ToUniversalTime();
+            editModel.TotalAmount = editItems.Sum(i => i.Subtotal);
 
-        await Db.SaveChangesAsync();
-        rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
-        dialogOpen = false;
-        StateHasChanged();
+            if (editModel.Id == Guid.Empty)
+            {
+                editModel.Id = Guid.NewGuid();
+                editModel.CreatedAtUtc = DateTime.UtcNow;
+                editModel.TenantId = CurrentTenantId();
+                editModel.Status = RentalStatus.Confirmed;
+                await Db.Rentals.AddAsync(editModel);
+                Logger.LogInformation("Creating new rental {RentalId} for customer {CustomerId}", editModel.Id, editModel.CustomerId);
+            }
+            else
+            {
+                Db.Rentals.Update(editModel);
+                var existing = Db.RentalItems.Where(i => i.RentalId == editModel.Id);
+                Db.RentalItems.RemoveRange(existing);
+                Logger.LogInformation("Updating rental {RentalId}", editModel.Id);
+            }
+
+            foreach (var item in editItems)
+            {
+                item.Id = Guid.NewGuid();
+                item.RentalId = editModel.Id;
+                await Db.RentalItems.AddAsync(item);
+            }
+
+            await Db.SaveChangesAsync();
+            Logger.LogInformation("Rental {RentalId} saved successfully with {ItemCount} items", editModel.Id, editItems.Count);
+            
+            // Pobierz dane potrzebne do umowy
+            var customer = await Db.Customers.FindAsync(editModel.CustomerId);
+            var productIds = editItems.Select(i => i.ProductId).ToList();
+            var productsForContract = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+            var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+            
+            // Generuj umowę
+            try
+            {
+                var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(
+                    editModel, editItems.ToList(), customer!, productsForContract, companyInfo);
+                editModel.ContractUrl = contractUrl;
+                Db.Rentals.Update(editModel);
+                await Db.SaveChangesAsync();
+                Logger.LogInformation("Contract generated for rental {RentalId}: {ContractUrl}", editModel.Id, contractUrl);
+                Snackbar.Add("📄 Umowa została wygenerowana", MudBlazor.Severity.Success);
+            }
+            catch (Exception contractEx)
+            {
+                Logger.LogError(contractEx, "Failed to generate contract for rental {RentalId}", editModel.Id);
+                Snackbar.Add($"⚠️ Wynajem zapisany, ale błąd generowania umowy: {contractEx.Message}", MudBlazor.Severity.Warning);
+            }
+            
+            // Wyślij email z umową (jeśli klient ma email)
+            if (customer != null && !string.IsNullOrWhiteSpace(customer.Email))
+            {
+                try
+                {
+                    await ContractGenerator.SendRentalConfirmationEmailAsync(
+                        editModel, editItems.ToList(), customer, productsForContract, companyInfo);
+                    editModel.IsEmailSent = true;
+                    Db.Rentals.Update(editModel);
+                    await Db.SaveChangesAsync();
+                    Logger.LogInformation("Email sent for rental {RentalId} to {Email}", editModel.Id, customer.Email);
+                    Snackbar.Add($"📧 Email wysłany do {customer.Email}", MudBlazor.Severity.Success);
+                }
+                catch (Exception emailEx)
+                {
+                    Logger.LogError(emailEx, "Failed to send email for rental {RentalId}", editModel.Id);
+                    Snackbar.Add($"⚠️ Błąd wysyłania emaila: {emailEx.Message}", MudBlazor.Severity.Warning);
+                }
+            }
+            else
+            {
+                Snackbar.Add("ℹ️ Klient nie ma adresu email - email nie został wysłany", MudBlazor.Severity.Info);
+            }
+            
+            // Odśwież listę
+            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            dialogOpen = false;
+            Snackbar.Add("✅ Wynajem został zapisany!", MudBlazor.Severity.Success);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving rental");
+            Snackbar.Add($"Błąd zapisu: {ex.Message}", MudBlazor.Severity.Error);
+        }
     }
 
     [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
     private Guid CurrentTenantId() => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+
+    private async Task RefreshRentals()
+    {
+        try
+        {
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(CurrentTenantId());
+            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            Snackbar.Add("Lista wynajmów odświeżona", MudBlazor.Severity.Info);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error refreshing rentals");
+            Snackbar.Add($"Błąd odświeżania: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
 
     private IEnumerable<Rental> FilterRentals()
     {
@@ -899,14 +1031,84 @@
         return $"{rental.Id}. {customerName}";
     }
 
-    private string GetRentalStyle(Rental rental)
+    private string GetRentalCardClass(Rental rental)
     {
-        // Czerwone tło dla przekroczonych terminów (jak w starym projekcie)
-        if (rental.Status == RentalStatus.Active && rental.EndDateUtc < DateTime.UtcNow)
-        {
-            return "background-color: #ffebee;"; // Jasny czerwony
-        }
-        return "";
+        var baseClass = "rental-card";
+        if (IsOverdue(rental))
+            return $"{baseClass} overdue-rental";
+        return baseClass;
+    }
+
+    private string GetRentalCardStyle(Rental rental)
+    {
+        var borderColor = IsOverdue(rental) ? "#f44336" : GetStatusColorHex(rental.Status);
+        var bgColor = IsOverdue(rental) ? "background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);" : "";
+        return $"border-radius: 16px; transition: all 0.3s ease; border-left: 4px solid {borderColor}; {bgColor}";
+    }
+
+    private bool IsOverdue(Rental rental)
+    {
+        // Przeterminowane = aktywne lub potwierdzone, sprzęt wydany, nie zwrócony, termin minął
+        return (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
+               && rental.IssuedAtUtc.HasValue
+               && !rental.ReturnedAtUtc.HasValue
+               && rental.EndDateUtc < DateTime.UtcNow;
+    }
+
+    private int GetOverdueDays(Rental rental)
+    {
+        if (!IsOverdue(rental)) return 0;
+        return (int)Math.Ceiling((DateTime.UtcNow - rental.EndDateUtc).TotalDays);
+    }
+
+    // Źródło wypożyczenia
+    private string GetSourceIcon(RentalSource source) => source switch
+    {
+        RentalSource.Online => Icons.Material.Filled.Language,
+        RentalSource.InStore => Icons.Material.Filled.Store,
+        _ => Icons.Material.Filled.Help
+    };
+
+    private Color GetSourceColor(RentalSource source) => source switch
+    {
+        RentalSource.Online => Color.Info,
+        RentalSource.InStore => Color.Secondary,
+        _ => Color.Default
+    };
+
+    private string GetSourceText(RentalSource source) => source switch
+    {
+        RentalSource.Online => "Online",
+        RentalSource.InStore => "W sklepie",
+        _ => "Nieznane"
+    };
+
+    // Status wydania/zwrotu sprzętu
+    private string GetEquipmentStatusIcon(Rental rental)
+    {
+        if (rental.ReturnedAtUtc.HasValue)
+            return Icons.Material.Filled.AssignmentTurnedIn;
+        if (rental.IssuedAtUtc.HasValue)
+            return Icons.Material.Filled.Output;
+        return Icons.Material.Filled.Pending;
+    }
+
+    private Color GetEquipmentStatusColor(Rental rental)
+    {
+        if (rental.ReturnedAtUtc.HasValue)
+            return Color.Success;
+        if (rental.IssuedAtUtc.HasValue)
+            return Color.Warning;
+        return Color.Default;
+    }
+
+    private string GetEquipmentStatusText(Rental rental)
+    {
+        if (rental.ReturnedAtUtc.HasValue)
+            return $"Zwrócono {rental.ReturnedAtUtc.Value.ToLocalTime():dd.MM HH:mm}";
+        if (rental.IssuedAtUtc.HasValue)
+            return $"Wydano {rental.IssuedAtUtc.Value.ToLocalTime():dd.MM HH:mm}";
+        return "Oczekuje na wydanie";
     }
 
     private Color GetStatusColor(RentalStatus status) => status switch
@@ -1127,5 +1329,18 @@
         {
             Snackbar.Add($"Błąd podczas usuwania wynajmu: {ex.Message}", MudBlazor.Severity.Error);
         }
+    }
+
+    private void ExtendRental(Rental rental)
+    {
+        // Otwórz dialog edycji z sugerowaną nową datą końcową
+        Edit(rental);
+        
+        // Ustaw nową datę końcową na tydzień od teraz
+        var newEndDate = DateTime.Now.AddDays(7);
+        endDate = newEndDate;
+        editModel.EndDateUtc = DateTime.SpecifyKind(newEndDate, DateTimeKind.Utc);
+        
+        Snackbar.Add("Zmień datę zakończenia aby przedłużyć wynajem", MudBlazor.Severity.Warning);
     }
 }

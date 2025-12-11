@@ -1,4 +1,4 @@
-namespace SportRental.Api.Auth;
+namespace SportRental.Infrastructure.Domain;
 
 /// <summary>
 /// Refresh token stored in database for secure token rotation

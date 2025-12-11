@@ -1,0 +1,175 @@
+@rendermode InteractiveServer
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Input" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Przyjęcie zwrotu sprzętu</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                <MudText Typo="Typo.body2">
+                    Klient: <strong>@(Rental?.Customer?.FullName ?? "Nieznany")</strong>
+                </MudText>
+            </MudAlert>
+            
+            <MudText Typo="Typo.subtitle2">Produkty do zwrotu:</MudText>
+            <MudList T="string" Dense="true">
+                @if (Rental?.Items != null)
+                {
+                    @foreach (var item in Rental.Items)
+                    {
+                        <MudListItem Icon="@Icons.Material.Filled.SportsSoccer">
+                            @(item.Product?.Name ?? "Produkt") × @item.Quantity
+                        </MudListItem>
+                    }
+                }
+            </MudList>
+            
+            <MudDivider />
+            
+            <MudText Typo="Typo.subtitle2">Rozliczenie depozytu</MudText>
+            
+            <MudAlert Severity="Severity.Warning" Dense="true">
+                Depozyt pobrany: <strong>@(Rental?.DepositAmount.ToString("C") ?? "0 zł")</strong>
+            </MudAlert>
+            
+            <MudNumericField @bind-Value="_depositRefund" 
+                             Label="Kwota depozytu do zwrotu"
+                             Variant="Variant.Outlined"
+                             Adornment="Adornment.End"
+                             AdornmentText="zł"
+                             Min="0"
+                             Max="@(Rental?.DepositAmount ?? 0)" />
+            
+            <MudNumericField @bind-Value="_damageCharge" 
+                             Label="Opłata za uszkodzenia (opcjonalne)"
+                             Variant="Variant.Outlined"
+                             Adornment="Adornment.End"
+                             AdornmentText="zł"
+                             Min="0" />
+            
+            <MudTextField @bind-Value="_returnNotes" 
+                          Label="Uwagi do zwrotu (opcjonalne)"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Placeholder="Np. stan sprzętu po zwrocie, uszkodzenia..." />
+            
+            <MudRadioGroup @bind-Value="_equipmentCondition">
+                <MudRadio Value="@("good")" Color="Color.Success">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Class="mr-1" />
+                    Sprzęt w dobrym stanie
+                </MudRadio>
+                <MudRadio Value="@("minor")" Color="Color.Warning">
+                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-1" />
+                    Drobne uszkodzenia
+                </MudRadio>
+                <MudRadio Value="@("damaged")" Color="Color.Error">
+                    <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Class="mr-1" />
+                    Poważne uszkodzenia
+                </MudRadio>
+            </MudRadioGroup>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Anuluj</MudButton>
+        <MudButton OnClick="Submit" 
+                   Variant="Variant.Filled" 
+                   Color="Color.Primary"
+                   Disabled="@(string.IsNullOrEmpty(_equipmentCondition) || _isProcessing)"
+                   StartIcon="@Icons.Material.Filled.Check">
+            @if (_isProcessing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Potwierdź zwrot
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance? MudDialog { get; set; }
+    
+    [Parameter]
+    public Rental? Rental { get; set; }
+    
+    private string? _returnNotes;
+    private decimal _depositRefund;
+    private decimal _damageCharge;
+    private string? _equipmentCondition;
+    private bool _isProcessing;
+
+    protected override void OnParametersSet()
+    {
+        // Domyślnie zwracamy cały depozyt
+        _depositRefund = Rental?.DepositAmount ?? 0;
+    }
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private async Task Submit()
+    {
+        if (Rental == null || string.IsNullOrEmpty(_equipmentCondition)) return;
+        
+        _isProcessing = true;
+        
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            
+            var rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == Rental.Id);
+            if (rental == null)
+            {
+                Snackbar.Add("Nie znaleziono wypożyczenia", Severity.Error);
+                MudDialog?.Cancel();
+                return;
+            }
+            
+            rental.ReturnedAtUtc = DateTime.UtcNow;
+            rental.ReturnNotes = _returnNotes;
+            rental.ReturnDepositRefund = _depositRefund;
+            rental.DamageCharge = _damageCharge > 0 ? _damageCharge : null;
+            rental.Status = RentalStatus.Completed;
+            
+            // Dodaj informację o stanie sprzętu do notatek
+            var conditionText = _equipmentCondition switch
+            {
+                "good" => "Stan: dobry",
+                "minor" => "Stan: drobne uszkodzenia",
+                "damaged" => "Stan: poważne uszkodzenia",
+                _ => ""
+            };
+            
+            if (!string.IsNullOrEmpty(conditionText))
+            {
+                rental.ReturnNotes = string.IsNullOrEmpty(rental.ReturnNotes) 
+                    ? conditionText 
+                    : $"{conditionText}. {rental.ReturnNotes}";
+            }
+            
+            // TODO: Dodać ReturnedByEmployeeId z kontekstu użytkownika
+            
+            await db.SaveChangesAsync();
+            
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd podczas przyjmowania zwrotu: {ex.Message}", Severity.Error);
+            MudDialog?.Cancel();
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+}

@@ -162,6 +162,23 @@ public class ApiService : IApiService
             ?? throw new InvalidOperationException("Failed to create checkout session");
     }
 
+    public async Task<FinalizeSessionResponse?> FinalizeCheckoutSessionAsync(string sessionId)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/api/checkout/finalize-session/{sessionId}", null);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<FinalizeSessionResponse>();
+            }
+            return null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
     public async Task<RentalResponse> CreateRentalAsync(CreateRentalRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync("/api/rentals", request);

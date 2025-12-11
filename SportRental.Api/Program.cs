@@ -379,10 +379,22 @@ app.MapPost("/api/customers", async (HttpRequest http, ApplicationDbContext db, 
 
     if (!string.IsNullOrEmpty(normalizedEmail))
     {
-        var conflict = await db.Customers
-            .AnyAsync(c => c.TenantId == tenantId && c.Email != null && c.Email.ToLower() == normalizedEmail.ToLower(), ct);
-        if (conflict)
+        // For global customers (no tenant), check if email exists globally
+        // For tenant-specific customers, check within tenant
+        var query = db.Customers.Where(c => c.Email != null && c.Email.ToLower() == normalizedEmail.ToLower());
+        if (tenantId != Guid.Empty)
         {
+            query = query.Where(c => c.TenantId == tenantId);
+        }
+        
+        var existingCustomer = await query.FirstOrDefaultAsync(ct);
+        if (existingCustomer is not null)
+        {
+            // If customer exists, return it instead of conflict (for WASM client convenience)
+            if (tenantId == Guid.Empty)
+            {
+                return Results.Ok(ToCustomerDto(existingCustomer));
+            }
             return Results.Conflict(new { error = "Customer with the provided email already exists." });
         }
     }
@@ -417,18 +429,35 @@ app.MapPost("/api/customers", async (HttpRequest http, ApplicationDbContext db, 
 app.MapPut("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CreateCustomerRequest req, CancellationToken ct) =>
 {
     var tenantId = GetTenantId(http);
-    var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId, ct);
+    
+    // First try to find by ID only (for global customers or cross-tenant updates)
+    var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == id, ct);
+    
+    // If not found, or if tenant-specific and customer belongs to different tenant, deny access
     if (customer is null)
     {
         return Results.NotFound();
     }
+    
+    // Security check: if request has tenant, customer must belong to that tenant OR be global (TenantId = Empty)
+    if (tenantId != Guid.Empty && customer.TenantId != Guid.Empty && customer.TenantId != tenantId)
+    {
+        return Results.NotFound(); // Don't reveal that customer exists in another tenant
+    }
 
     var normalizedEmail = req.Email?.Trim();
-    if (!string.IsNullOrEmpty(normalizedEmail))
+    // Only check for email conflict if email is being changed
+    var emailChanged = !string.Equals(customer.Email?.Trim(), normalizedEmail, StringComparison.OrdinalIgnoreCase);
+    if (!string.IsNullOrEmpty(normalizedEmail) && emailChanged)
     {
-        var conflict = await db.Customers
-            .AnyAsync(c => c.TenantId == tenantId && c.Id != id && c.Email != null && c.Email.ToLower() == normalizedEmail.ToLower(), ct);
-        if (conflict)
+        // Check for email conflict within tenant (or globally if no tenant)
+        var conflictQuery = db.Customers.Where(c => c.Id != id && c.Email != null && c.Email.ToLower() == normalizedEmail.ToLower());
+        if (tenantId != Guid.Empty)
+        {
+            conflictQuery = conflictQuery.Where(c => c.TenantId == tenantId);
+        }
+        
+        if (await conflictQuery.AnyAsync(ct))
         {
             return Results.Conflict(new { error = "Customer with the provided email already exists." });
         }
@@ -458,7 +487,16 @@ app.MapPut("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbCon
 app.MapGet("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CancellationToken ct) =>
 {
     var tenantId = GetTenantId(http);
-    var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId, ct);
+    
+    // For global customers (no tenant), find by ID only
+    // For tenant-specific, filter by tenant
+    var query = db.Customers.Where(c => c.Id == id);
+    if (tenantId != Guid.Empty)
+    {
+        query = query.Where(c => c.TenantId == tenantId);
+    }
+    
+    var customer = await query.FirstOrDefaultAsync(ct);
     return customer is null ? Results.NotFound() : Results.Ok(ToCustomerDto(customer));
 })
 .WithName("GetCustomerById")
@@ -478,8 +516,16 @@ app.MapGet("/api/customers/by-email", async (HttpRequest http, ApplicationDbCont
 
     var tenantId = GetTenantId(http);
     var normalizedEmail = email.Trim().ToLower();
-    var customer = await db.Customers
-        .FirstOrDefaultAsync(c => c.TenantId == tenantId && c.Email != null && c.Email.ToLower() == normalizedEmail, ct);
+    
+    // For global search (no tenant), search across all customers
+    // For tenant-specific search, filter by tenant
+    var query = db.Customers.Where(c => c.Email != null && c.Email.ToLower() == normalizedEmail);
+    if (tenantId != Guid.Empty)
+    {
+        query = query.Where(c => c.TenantId == tenantId);
+    }
+    
+    var customer = await query.FirstOrDefaultAsync(ct);
 
     return customer is null ? Results.NotFound() : Results.Ok(ToCustomerDto(customer));
 })

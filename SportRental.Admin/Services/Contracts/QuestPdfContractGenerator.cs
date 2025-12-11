@@ -18,6 +18,9 @@ namespace SportRental.Admin.Services.Contracts
             _fileStorage = fileStorage;
             _emailSender = emailSender;
             _logger = logger;
+            
+            // Ustaw licencję QuestPDF - Community jest darmowa dla firm z przychodem < $1M USD
+            QuestPDF.Settings.License = LicenseType.Community;
         }
 
         public Task<byte[]> GenerateRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)

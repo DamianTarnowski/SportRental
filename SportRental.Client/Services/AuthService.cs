@@ -17,7 +17,7 @@ public class AuthService
         _httpClient = httpClient;
         _authStateProvider = authStateProvider;
         _tenantService = tenantService;
-        _apiBaseUrl = configuration["Api:BaseUrl"] ?? "http://localhost:5001";
+        _apiBaseUrl = configuration["Api:BaseUrl"] ?? "http://localhost:5002";
         _defaultTenantId = configuration["Api:TenantId"] ?? "547f5df7-a389-44b3-bcc6-090ff2fa92e5";
     }
 
@@ -86,8 +86,22 @@ public class AuthService
 
             if (!response.IsSuccessStatusCode)
             {
-                var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
-                return AuthResult.Failure(error?.Error ?? "Logowanie nie powiodło się");
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    return AuthResult.Failure("Nieprawidłowy email lub hasło");
+                }
+                
+                var content = await response.Content.ReadAsStringAsync();
+                if (!string.IsNullOrWhiteSpace(content))
+                {
+                    try
+                    {
+                        var error = System.Text.Json.JsonSerializer.Deserialize<ErrorResponse>(content);
+                        return AuthResult.Failure(error?.Error ?? "Logowanie nie powiodło się");
+                    }
+                    catch { }
+                }
+                return AuthResult.Failure("Logowanie nie powiodło się");
             }
 
             var result = await response.Content.ReadFromJsonAsync<AuthResponse>();

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SportRental.Infrastructure.Data;
+using SportRental.Infrastructure.Domain;
 
 namespace SportRental.Api.Auth;
 

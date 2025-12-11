@@ -1,0 +1,143 @@
+@using SportRental.Shared.Services
+@using MudBlazor
+
+<MudStack Row="true" Spacing="2" Class="@Class">
+    <MudSelect T="CountryCode" 
+               Value="_selectedCountry" 
+               ValueChanged="OnCountryChanged"
+               Label="Kraj"
+               Variant="@Variant"
+               Style="min-width: 140px; max-width: 160px;"
+               Dense="true"
+               AnchorOrigin="Origin.BottomCenter">
+        @foreach (var country in PhoneValidationService.Countries)
+        {
+            <MudSelectItem Value="@country">
+                @country.ShortDisplay
+            </MudSelectItem>
+        }
+    </MudSelect>
+    
+    <MudTextField @bind-Value="_phoneNumber"
+                  Label="@Label"
+                  Placeholder="@GetPlaceholder()"
+                  Variant="@Variant"
+                  Adornment="Adornment.Start"
+                  AdornmentIcon="@Icons.Material.Filled.Phone"
+                  Error="@_hasError"
+                  ErrorText="@_errorMessage"
+                  DebounceInterval="500"
+                  OnDebounceIntervalElapsed="ValidateAndNotify"
+                  Immediate="false"
+                  Style="flex: 1;" />
+</MudStack>
+
+@code {
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "Numer telefonu";
+
+    [Parameter]
+    public Variant Variant { get; set; } = Variant.Outlined;
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public bool Required { get; set; }
+
+    [Parameter]
+    public string DefaultCountry { get; set; } = "PL";
+
+    private CountryCode _selectedCountry = PhoneValidationService.Countries[0];
+    private string _phoneNumber = string.Empty;
+    private bool _hasError;
+    private string? _errorMessage;
+    private bool _isInitialized;
+
+    protected override void OnParametersSet()
+    {
+        if (!_isInitialized && !string.IsNullOrEmpty(Value))
+        {
+            // Spróbuj wykryć kraj z istniejącego numeru
+            var detectedCountry = PhoneValidationService.DetectCountry(Value);
+            if (detectedCountry != null)
+            {
+                _selectedCountry = PhoneValidationService.GetCountry(detectedCountry) 
+                    ?? PhoneValidationService.Countries[0];
+            }
+            else
+            {
+                _selectedCountry = PhoneValidationService.GetCountry(DefaultCountry) 
+                    ?? PhoneValidationService.Countries[0];
+            }
+
+            // Usuń prefix kraju z numeru do wyświetlenia
+            _phoneNumber = Value?.Replace(_selectedCountry.DialCode, "").Trim() ?? string.Empty;
+            _isInitialized = true;
+        }
+        else if (!_isInitialized)
+        {
+            _selectedCountry = PhoneValidationService.GetCountry(DefaultCountry) 
+                ?? PhoneValidationService.Countries[0];
+            _isInitialized = true;
+        }
+    }
+
+    private string GetPlaceholder()
+    {
+        return _selectedCountry.IsoCode switch
+        {
+            "PL" => "123 456 789",
+            "DE" => "151 12345678",
+            "GB" => "7911 123456",
+            "US" => "(555) 123-4567",
+            _ => "123456789"
+        };
+    }
+
+    private async Task OnCountryChanged(CountryCode newCountry)
+    {
+        _selectedCountry = newCountry;
+        await ValidateAndNotify();
+    }
+
+    private async Task ValidateAndNotify()
+    {
+        if (string.IsNullOrWhiteSpace(_phoneNumber))
+        {
+            if (Required)
+            {
+                _hasError = true;
+                _errorMessage = "Numer telefonu jest wymagany";
+            }
+            else
+            {
+                _hasError = false;
+                _errorMessage = null;
+            }
+            await ValueChanged.InvokeAsync(null);
+            return;
+        }
+
+        var result = PhoneValidationService.Validate(_phoneNumber, _selectedCountry.IsoCode);
+
+        _hasError = !result.IsValid;
+        _errorMessage = result.ErrorMessage;
+
+        if (result.IsValid)
+        {
+            await ValueChanged.InvokeAsync(result.E164Format);
+        }
+        else
+        {
+            // Wyślij surowy numer z prefiksem, żeby użytkownik mógł go poprawić
+            await ValueChanged.InvokeAsync(_selectedCountry.DialCode + _phoneNumber);
+        }
+    }
+}

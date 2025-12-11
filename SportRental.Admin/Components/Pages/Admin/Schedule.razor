@@ -1,6 +1,6 @@
 @page "/admin/schedule"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = "SuperAdmin")]
+@attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
 

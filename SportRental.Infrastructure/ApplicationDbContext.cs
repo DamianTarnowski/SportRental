@@ -34,9 +34,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<ErrorLog> ErrorLogs => Set<ErrorLog>();
     public DbSet<SmsConfirmation> SmsConfirmations => Set<SmsConfirmation>();
     public DbSet<TenantInvitation> TenantInvitations => Set<TenantInvitation>();
-    
-    // Note: RefreshToken is API-specific, not part of Infrastructure domain
-    // It's registered externally via DbContext.Set<T>()
+    public DbSet<EmployeeInvitation> EmployeeInvitations => Set<EmployeeInvitation>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -238,6 +238,42 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(ti => ti.Token).IsUnique();
             entity.HasIndex(ti => ti.Email);
             entity.HasIndex(ti => ti.ExpiresAtUtc);
+        });
+
+        modelBuilder.Entity<EmployeeInvitation>(entity =>
+        {
+            entity.HasKey(ei => ei.Id);
+            entity.Property(ei => ei.Email).HasMaxLength(256).IsRequired();
+            entity.Property(ei => ei.FullName).HasMaxLength(200);
+            entity.Property(ei => ei.Token).HasMaxLength(128).IsRequired();
+            entity.Property(ei => ei.Notes).HasMaxLength(500);
+            entity.HasIndex(ei => ei.Token).IsUnique();
+            entity.HasIndex(ei => new { ei.TenantId, ei.Email });
+            entity.HasIndex(ei => ei.ExpiresAtUtc);
+            entity.HasQueryFilter(ei => _tenantId == null || ei.TenantId == _tenantId);
+        });
+
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("RefreshTokens");
+            entity.HasKey(rt => rt.Id);
+            entity.HasIndex(rt => rt.Token).IsUnique();
+            entity.HasIndex(rt => rt.UserId);
+            entity.HasIndex(rt => rt.ExpiresAtUtc);
+            entity.Property(rt => rt.Token).HasMaxLength(128).IsRequired();
+            entity.Property(rt => rt.RevokedReason).HasMaxLength(200);
+            entity.Property(rt => rt.ReplacedByToken).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<CheckoutSession>(entity =>
+        {
+            entity.ToTable("CheckoutSessions");
+            entity.HasKey(cs => cs.Id);
+            entity.HasIndex(cs => cs.IdempotencyKey).IsUnique();
+            entity.HasIndex(cs => cs.StripeSessionId);
+            entity.HasIndex(cs => cs.ExpiresAtUtc);
+            entity.Property(cs => cs.IdempotencyKey).HasMaxLength(100).IsRequired();
+            entity.Property(cs => cs.StripeSessionId).HasMaxLength(200);
         });
     }
 }

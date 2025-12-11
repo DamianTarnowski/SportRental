@@ -15,6 +15,14 @@ namespace SportRental.Shared.Models
         public bool CanCancel { get; set; }
         public string? ContractUrl { get; set; }
         public List<MyRentalItemDto> Items { get; set; } = new();
+        
+        // Nowe pola do śledzenia wydania/zwrotu
+        public DateTime? IssuedAtUtc { get; set; }
+        public DateTime? ReturnedAtUtc { get; set; }
+        public string? IssueNotes { get; set; }
+        public string? ReturnNotes { get; set; }
+        public decimal? ReturnDepositRefund { get; set; }
+        public bool IsOverdue => IssuedAtUtc.HasValue && !ReturnedAtUtc.HasValue && EndDateUtc < DateTime.UtcNow;
     }
 
     public class MyRentalItemDto

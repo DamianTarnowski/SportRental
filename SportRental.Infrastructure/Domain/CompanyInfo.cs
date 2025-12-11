@@ -49,6 +49,22 @@ namespace SportRental.Infrastructure.Domain
         [MaxLength(100)]
         public string? AdminName { get; set; }
 
+        // SMS Configuration
+        /// <summary>
+        /// Czy włączone jest wysyłanie SMS z prośbą o potwierdzenie umowy po dodaniu wynajmu
+        /// </summary>
+        public bool SmsConfirmationEnabled { get; set; } = false;
+        
+        /// <summary>
+        /// Czy włączone jest wysyłanie SMS z podziękowaniem po zakończeniu wynajmu
+        /// </summary>
+        public bool SmsThanksEnabled { get; set; } = false;
+        
+        /// <summary>
+        /// Czy włączone jest wysyłanie SMS z przypomnieniem przed końcem wynajmu
+        /// </summary>
+        public bool SmsReminderEnabled { get; set; } = false;
+
         // SMS Templates
         [MaxLength(500)]
         public string? SmsThanksText { get; set; } = null;

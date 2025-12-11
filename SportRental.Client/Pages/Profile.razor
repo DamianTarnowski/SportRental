@@ -1,9 +1,11 @@
 @page "/profile"
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
 @inject IApiService Api
 @inject SportRental.Client.Services.ICustomerSessionService Session
 @inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Moje dane - SportRental</PageTitle>
 
@@ -159,7 +161,39 @@
         _loading = true;
         try
         {
+            // First try to get from session
             var customer = await Session.GetCustomerAsync();
+            
+            // If no session, try to get from authenticated user
+            if (customer is null)
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true)
+                {
+                    var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value 
+                             ?? user.FindFirst("email")?.Value;
+                    
+                    if (!string.IsNullOrWhiteSpace(email))
+                    {
+                        // Try to find existing customer by email
+                        try
+                        {
+                            customer = await Api.FindCustomerByEmailAsync(email);
+                            if (customer is not null)
+                            {
+                                // Save to session for future use
+                                await Session.SetCustomerAsync(customer);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine("[Profile] Failed to lookup customer by email: {0}", ex);
+                        }
+                    }
+                }
+            }
+            
             if (customer is null)
             {
                 _customerId = null;

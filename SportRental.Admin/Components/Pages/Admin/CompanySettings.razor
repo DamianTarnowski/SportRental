@@ -59,21 +59,61 @@
             
             <MudItem xs="12" md="6">
                 <MudPaper Class="p-4">
+                    <MudText Typo="Typo.h6" Class="mb-3">📱 Konfiguracja SMS</MudText>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                        <MudText Typo="Typo.body2">
+                            Włącz funkcje SMS dla automatycznych powiadomień klientów.
+                        </MudText>
+                    </MudAlert>
+                    <MudStack Spacing="3">
+                        <MudSwitch @bind-Value="companyInfo.SmsConfirmationEnabled" 
+                                   Label="Potwierdzenie umowy przez SMS" 
+                                   Color="Color.Primary"
+                                   LabelPosition="LabelPosition.End" />
+                        <MudText Typo="Typo.caption" Class="ml-12" Style="margin-top: -12px; color: #666;">
+                            Po dodaniu wynajmu klient otrzyma SMS z prośbą o potwierdzenie warunków umowy
+                        </MudText>
+                        
+                        <MudSwitch @bind-Value="companyInfo.SmsThanksEnabled" 
+                                   Label="SMS z podziękowaniem" 
+                                   Color="Color.Primary"
+                                   LabelPosition="LabelPosition.End" />
+                        <MudText Typo="Typo.caption" Class="ml-12" Style="margin-top: -12px; color: #666;">
+                            Po zakończeniu wynajmu klient otrzyma SMS z podziękowaniem
+                        </MudText>
+                        
+                        <MudSwitch @bind-Value="companyInfo.SmsReminderEnabled" 
+                                   Label="SMS z przypomnieniem" 
+                                   Color="Color.Primary"
+                                   LabelPosition="LabelPosition.End" />
+                        <MudText Typo="Typo.caption" Class="ml-12" Style="margin-top: -12px; color: #666;">
+                            Przed końcem wynajmu klient otrzyma SMS z przypomnieniem o zwrocie
+                        </MudText>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+            
+            <MudItem xs="12" md="6">
+                <MudPaper Class="p-4">
                     <MudText Typo="Typo.h6" Class="mb-3">Szablony SMS</MudText>
                     <MudStack Spacing="3">
                         <MudTextField @bind-Value="companyInfo.SmsThanksText" 
                                       Label="SMS - podziękowanie" 
                                       Lines="2"
-                                      HelperText="SMS po zakończeniu wynajmu" />
+                                      HelperText="SMS po zakończeniu wynajmu"
+                                      Disabled="@(!companyInfo.SmsThanksEnabled)" />
                         <MudTextField @bind-Value="companyInfo.SmsReminderText" 
                                       Label="SMS - przypomnienie 1" 
-                                      Lines="2" />
+                                      Lines="2"
+                                      Disabled="@(!companyInfo.SmsReminderEnabled)" />
                         <MudTextField @bind-Value="companyInfo.SmsReminderText2" 
                                       Label="SMS - przypomnienie 2" 
-                                      Lines="2" />
+                                      Lines="2"
+                                      Disabled="@(!companyInfo.SmsReminderEnabled)" />
                         <MudTextField @bind-Value="companyInfo.SmsReminderText3" 
                                       Label="SMS - przypomnienie 3" 
-                                      Lines="2" />
+                                      Lines="2"
+                                      Disabled="@(!companyInfo.SmsReminderEnabled)" />
                     </MudStack>
                 </MudPaper>
             </MudItem>
@@ -188,6 +228,11 @@
                 ExtraInfo = existingCompanyInfo.ExtraInfo,
                 Lat = existingCompanyInfo.Lat,
                 Lon = existingCompanyInfo.Lon,
+                // SMS Configuration
+                SmsConfirmationEnabled = existingCompanyInfo.SmsConfirmationEnabled,
+                SmsThanksEnabled = existingCompanyInfo.SmsThanksEnabled,
+                SmsReminderEnabled = existingCompanyInfo.SmsReminderEnabled,
+                // SMS Templates
                 SmsThanksText = existingCompanyInfo.SmsThanksText,
                 SmsReminderText = existingCompanyInfo.SmsReminderText,
                 SmsReminderText2 = existingCompanyInfo.SmsReminderText2,
@@ -248,6 +293,11 @@
                 existingCompanyInfo.ExtraInfo = companyInfo.ExtraInfo;
                 existingCompanyInfo.Lat = companyInfo.Lat;
                 existingCompanyInfo.Lon = companyInfo.Lon;
+                // SMS Configuration
+                existingCompanyInfo.SmsConfirmationEnabled = companyInfo.SmsConfirmationEnabled;
+                existingCompanyInfo.SmsThanksEnabled = companyInfo.SmsThanksEnabled;
+                existingCompanyInfo.SmsReminderEnabled = companyInfo.SmsReminderEnabled;
+                // SMS Templates
                 existingCompanyInfo.SmsThanksText = companyInfo.SmsThanksText;
                 existingCompanyInfo.SmsReminderText = companyInfo.SmsReminderText;
                 existingCompanyInfo.SmsReminderText2 = companyInfo.SmsReminderText2;
@@ -277,6 +327,11 @@
                     ExtraInfo = companyInfo.ExtraInfo,
                     Lat = companyInfo.Lat,
                     Lon = companyInfo.Lon,
+                    // SMS Configuration
+                    SmsConfirmationEnabled = companyInfo.SmsConfirmationEnabled,
+                    SmsThanksEnabled = companyInfo.SmsThanksEnabled,
+                    SmsReminderEnabled = companyInfo.SmsReminderEnabled,
+                    // SMS Templates
                     SmsThanksText = companyInfo.SmsThanksText,
                     SmsReminderText = companyInfo.SmsReminderText,
                     SmsReminderText2 = companyInfo.SmsReminderText2,
@@ -319,6 +374,11 @@
         public string? ExtraInfo { get; set; }
         public double? Lat { get; set; }
         public double? Lon { get; set; }
+        // SMS Configuration
+        public bool SmsConfirmationEnabled { get; set; }
+        public bool SmsThanksEnabled { get; set; }
+        public bool SmsReminderEnabled { get; set; }
+        // SMS Templates
         public string? SmsThanksText { get; set; }
         public string? SmsReminderText { get; set; }
         public string? SmsReminderText2 { get; set; }

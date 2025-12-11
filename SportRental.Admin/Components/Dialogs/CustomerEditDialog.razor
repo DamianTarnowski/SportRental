@@ -1,4 +1,6 @@
 @using SportRental.Infrastructure.Domain
+@using SportRental.Shared.Components
+@using SportRental.Shared.Services
 @using MudBlazor
 
 <MudDialog>
@@ -38,11 +40,9 @@
                                       Variant="Variant.Outlined" />
                     </MudItem>
                     <MudItem xs="12" md="6">
-                        <MudTextField @bind-Value="Customer.PhoneNumber"
-                                      Label="Numer telefonu"
-                                      Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Phone"
-                                      Variant="Variant.Outlined" />
+                        <PhoneInput @bind-Value="Customer.PhoneNumber"
+                                    Label="Numer telefonu"
+                                    Variant="Variant.Outlined" />
                     </MudItem>
                     <MudItem xs="12" md="6">
                         <MudTextField @bind-Value="Customer.DocumentNumber"

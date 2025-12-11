@@ -1,8 +1,10 @@
 @page "/checkout/success"
 @using SportRental.Shared.Models
 @using SportRental.Shared.Services
+@using SportRental.Client.Services
 @inject NavigationManager NavigationManager
 @inject IApiService ApiService
+@inject ICustomerSessionService CustomerSession
 @inject ISnackbar Snackbar
 
 <PageTitle>Płatność zakończona sukcesem - SportRental</PageTitle>
@@ -134,7 +136,18 @@
         
         try
         {
-            var rentals = await ApiService.GetMyRentalsAsync();
+            // Najpierw spróbuj sfinalizować sesję (utworzyć rental jeśli webhook nie zadziałał)
+            if (!string.IsNullOrEmpty(SessionId))
+            {
+                await FinalizeSessionAsync(SessionId);
+            }
+
+            // Pobierz customerId z sesji
+            var customer = await CustomerSession.GetCustomerAsync();
+            var customerId = customer?.Id;
+
+            // Pobierz wypożyczenia dla tego klienta
+            var rentals = await ApiService.GetMyRentalsAsync(customerId: customerId);
             
             if (rentals != null && rentals.Any())
             {
@@ -151,6 +164,27 @@
         finally
         {
             _isLoading = false;
+        }
+    }
+
+    private async Task FinalizeSessionAsync(string sessionId)
+    {
+        try
+        {
+            var response = await ApiService.FinalizeCheckoutSessionAsync(sessionId);
+            if (response != null && response.Success)
+            {
+                Console.WriteLine($"[CheckoutSuccess] Session finalized: {response.Message}, RentalId: {response.RentalId}");
+            }
+            else if (response != null)
+            {
+                Console.WriteLine($"[CheckoutSuccess] Session not finalized: {response.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Nie pokazuj błędu - może webhook już zadziałał
+            Console.WriteLine($"[CheckoutSuccess] Finalize error (may be OK if webhook worked): {ex.Message}");
         }
     }
 }

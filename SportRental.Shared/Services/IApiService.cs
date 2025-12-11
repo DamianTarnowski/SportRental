@@ -23,6 +23,7 @@ public interface IApiService
     Task<PaymentIntentDto> CreatePaymentIntentAsync(CreatePaymentIntentRequest request);
     Task<PaymentIntentDto?> GetPaymentIntentAsync(string id);
     Task<CheckoutSessionResponse> CreateCheckoutSessionAsync(CreateCheckoutSessionRequest request);
+    Task<FinalizeSessionResponse?> FinalizeCheckoutSessionAsync(string sessionId);
 
     // Wynajmy
     Task<RentalResponse> CreateRentalAsync(CreateRentalRequest request);

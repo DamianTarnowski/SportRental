@@ -74,7 +74,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
             "http://localhost:5014",
             "https://localhost:7083",
-            "http://localhost:5015"  // dodatkowy port dla backupu
+            "http://localhost:5015",  // dodatkowy port dla backupu
+            "https://nice-tree-0359d8403.3.azurestaticapps.net"  // Production WASM client
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
@@ -120,10 +121,13 @@ builder.Services.AddScoped<IContractGenerator, QuestPdfContractGenerator>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("MediaStorage");
 
-// SMSAPI Configuration - integracja z SMSAPI.pl
-// Dokumentacja: https://www.smsapi.pl/docs
-builder.Services.Configure<SmsApiSettings>(builder.Configuration.GetSection(SmsApiSettings.SectionName));
-builder.Services.AddSingleton<ISmsSender, SmsApiSender>();
+// SerwerSMS.pl Configuration - integracja z SerwerSMS.pl
+// Dokumentacja: https://dev.serwersms.pl/https-api-v2/wprowadzenie
+// Panel: Ustawienia interfejsów → HTTP API → Użytkownicy API
+builder.Services.Configure<SerwerSmsSettings>(builder.Configuration.GetSection(SerwerSmsSettings.SectionName));
+builder.Services.AddHttpClient("SerwerSms");
+builder.Services.AddSingleton<ISmsSender, SerwerSmsSender>();
+builder.Services.AddScoped<ISmsConfirmationService, SmsConfirmationService>();
 // WewnÄ™trzny blob: domyĹ›lnie App_Data (+ mapowanie StaticFiles), alternatywnie wwwroot
 builder.Services.AddSingleton<IFileStorage>(sp =>
 {
@@ -256,7 +260,11 @@ builder.Services.AddScoped<SportRental.Admin.Services.Logging.IAuditLogger, Spor
 builder.Services.AddScoped<SportRental.Admin.Services.QrCode.IQrCodeGenerator, SportRental.Admin.Services.QrCode.SimpleQrCodeGenerator>();
 builder.Services.AddScoped<SportRental.Admin.Services.Sms.ISmsConfirmationService, SportRental.Admin.Services.Sms.SmsConfirmationService>();
 
-// Authorization builder (musi byÄ‡ przed var app = builder.Build())
+// Stripe Payment Gateway
+builder.Services.Configure<SportRental.Admin.Payments.StripeOptions>(builder.Configuration.GetSection("Stripe"));
+builder.Services.AddSingleton<SportRental.Admin.Payments.IPaymentGateway, SportRental.Admin.Payments.StripePaymentGateway>();
+
+// Authorization builder (musi być przed var app = builder.Build())
 builder.Services.AddAuthorizationBuilder();
 
 var mediaConfig = builder.Configuration.GetSection("MediaStorage");

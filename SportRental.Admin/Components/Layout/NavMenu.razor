@@ -32,6 +32,8 @@
                         </NavLink>
                     </div>
                 </AuthorizeView>
+                
+                @* Sekcja dla Owner i SuperAdmin - pełny dostęp *@
                 <AuthorizeView Roles="Owner,SuperAdmin" Context="ownerCtx">
                     <div class="nav-item px-3 mt-2">
                         <span class="nav-section-title">ZARZĄDZANIE</span>
@@ -54,6 +56,11 @@
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="admin/rentals">
                             🛒 Wynajmy
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="admin/equipment-handling">
+                            📦 Wydania/Zwroty
                         </NavLink>
                     </div>
                     <div class="nav-item px-3">
@@ -85,6 +92,42 @@
                             🏢 Ustawienia firmy
                         </NavLink>
                     </div>
+                </AuthorizeView>
+                
+                @* Sekcja dla Employee - ograniczony dostęp (bez szablonu umowy, ustawień firmy, pracowników) *@
+                <AuthorizeView Roles="Employee" Context="employeeCtx">
+                    @* Pokaż tylko jeśli NIE jest Owner/SuperAdmin (bo wtedy ma pełne menu powyżej) *@
+                    @if (!context.User.IsInRole("Owner") && !context.User.IsInRole("SuperAdmin"))
+                    {
+                        <div class="nav-item px-3 mt-2">
+                            <span class="nav-section-title">ZARZĄDZANIE</span>
+                        </div>
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="admin/products">
+                                📦 Produkty
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="admin/customers">
+                                👥 Klienci
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="admin/rentals">
+                                🛒 Wynajmy
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="admin/equipment-handling">
+                                📦 Wydania/Zwroty
+                            </NavLink>
+                        </div>
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="admin/schedule">
+                                📅 Kalendarz
+                            </NavLink>
+                        </div>
+                    }
                 </AuthorizeView>
                 
                 <div class="nav-item px-3 mt-2">

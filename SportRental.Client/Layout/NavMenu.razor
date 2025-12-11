@@ -1,10 +1,13 @@
 @using SportRental.Client.Services
 @using SportRental.Shared.Models
 @using SportRental.Shared.Services
+@using Microsoft.AspNetCore.Components.Authorization
 @inject ICartService CartService
 @inject ICustomerSessionService Session
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IApiService Api
 @implements IDisposable
 
 <nav>
@@ -95,6 +98,9 @@
 
         await LoadSessionAsync();
         Session.SessionChanged += OnSessionChanged;
+        
+        // Subscribe to auth state changes
+        AuthStateProvider.AuthenticationStateChanged += OnAuthStateChanged;
     }
 
     private async Task HandleNavigation()
@@ -107,7 +113,56 @@
 
     private async Task LoadSessionAsync()
     {
+        // First try session
         _customer = await Session.GetCustomerAsync();
+        
+        // If no session, check if user is authenticated via JWT
+        if (_customer is null)
+        {
+            try
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var user = authState.User;
+                if (user.Identity?.IsAuthenticated == true)
+                {
+                    var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value 
+                             ?? user.FindFirst("email")?.Value;
+                    
+                    if (!string.IsNullOrWhiteSpace(email))
+                    {
+                        // Try to find existing customer by email
+                        var customer = await Api.FindCustomerByEmailAsync(email);
+                        
+                        // If no customer exists, create one from JWT data
+                        if (customer is null)
+                        {
+                            var name = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value 
+                                    ?? user.FindFirst("name")?.Value 
+                                    ?? email.Split('@')[0];
+                            
+                            var request = new CreateCustomerRequest
+                            {
+                                Email = email,
+                                FullName = name,
+                                PhoneNumber = "" // Will need to be filled later
+                            };
+                            
+                            customer = await Api.CreateCustomerAsync(request);
+                        }
+                        
+                        if (customer is not null)
+                        {
+                            _customer = customer;
+                            await Session.SetCustomerAsync(customer);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("[NavMenu] Failed to load auth state: {0}", ex);
+            }
+        }
     }
 
     private void OnCartChanged(object? sender, EventArgs e)
@@ -117,6 +172,15 @@
     }
 
     private void OnSessionChanged(object? sender, EventArgs e)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadSessionAsync();
+            StateHasChanged();
+        });
+    }
+
+    private void OnAuthStateChanged(Task<AuthenticationState> task)
     {
         _ = InvokeAsync(async () =>
         {
@@ -135,7 +199,16 @@
         _isLoggingOut = true;
         try
         {
+            // Clear customer session
             await Session.ClearAsync();
+            
+            // Also logout from JWT auth
+            if (AuthStateProvider is ApiAuthenticationStateProvider apiAuth)
+            {
+                await apiAuth.MarkUserAsLoggedOut();
+            }
+            
+            _customer = null;
             Snackbar.Add("Wylogowano.", Severity.Info);
             Navigation.NavigateTo("/", true);
         }
@@ -149,5 +222,6 @@
     {
         CartService.CartChanged -= OnCartChanged;
         Session.SessionChanged -= OnSessionChanged;
+        AuthStateProvider.AuthenticationStateChanged -= OnAuthStateChanged;
     }
 }

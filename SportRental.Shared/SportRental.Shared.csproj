@@ -14,6 +14,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
     <PackageReference Include="MudBlazor" Version="8.13.0" />
+    <PackageReference Include="libphonenumber-csharp" Version="8.13.50" />
   </ItemGroup>
 
 </Project>

@@ -10,6 +10,15 @@ namespace SportRental.Infrastructure.Domain
         Cancelled = 5
     }
 
+    /// <summary>
+    /// Źródło wypożyczenia - online (WASM klient) lub fizyczne (w wypożyczalni)
+    /// </summary>
+    public enum RentalSource
+    {
+        Online = 0,     // Wypożyczenie przez klienta WASM
+        InStore = 1     // Wypożyczenie fizyczne w wypożyczalni
+    }
+
     public class Rental
     {
         public Guid Id { get; set; }
@@ -34,6 +43,23 @@ namespace SportRental.Infrastructure.Domain
         // SMS and Email tracking
         public bool IsSmsConfirmed { get; set; } = false;
         public bool IsEmailSent { get; set; } = false;
+
+        // Źródło wypożyczenia
+        public RentalSource Source { get; set; } = RentalSource.Online;
+
+        // Wydanie sprzętu
+        public DateTime? IssuedAtUtc { get; set; }
+        public Guid? IssuedByEmployeeId { get; set; }
+        public Employee? IssuedByEmployee { get; set; }
+        public string? IssueNotes { get; set; }
+
+        // Zwrot sprzętu
+        public DateTime? ReturnedAtUtc { get; set; }
+        public Guid? ReturnedByEmployeeId { get; set; }
+        public Employee? ReturnedByEmployee { get; set; }
+        public string? ReturnNotes { get; set; }
+        public decimal? ReturnDepositRefund { get; set; }  // Ile z depozytu zwrócono
+        public decimal? DamageCharge { get; set; }         // Opłata za uszkodzenia
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 

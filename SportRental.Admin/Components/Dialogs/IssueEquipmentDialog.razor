@@ -1,0 +1,116 @@
+@rendermode InteractiveServer
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Output" Color="Color.Success" />
+            <MudText Typo="Typo.h6">Wydanie sprzętu</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                <MudText Typo="Typo.body2">
+                    Klient: <strong>@(Rental?.Customer?.FullName ?? "Nieznany")</strong>
+                </MudText>
+            </MudAlert>
+            
+            <MudText Typo="Typo.subtitle2">Produkty do wydania:</MudText>
+            <MudList T="string" Dense="true">
+                @if (Rental?.Items != null)
+                {
+                    @foreach (var item in Rental.Items)
+                    {
+                        <MudListItem Icon="@Icons.Material.Filled.SportsSoccer">
+                            @(item.Product?.Name ?? "Produkt") × @item.Quantity
+                        </MudListItem>
+                    }
+                }
+            </MudList>
+            
+            <MudDivider />
+            
+            <MudTextField @bind-Value="_issueNotes" 
+                          Label="Uwagi do wydania (opcjonalne)"
+                          Variant="Variant.Outlined"
+                          Lines="3"
+                          Placeholder="Np. stan sprzętu, dodatkowe informacje..." />
+            
+            <MudCheckBox @bind-Value="_confirmChecklist" 
+                         Label="Potwierdzam sprawdzenie stanu sprzętu przed wydaniem"
+                         Color="Color.Success" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Anuluj</MudButton>
+        <MudButton OnClick="Submit" 
+                   Variant="Variant.Filled" 
+                   Color="Color.Success"
+                   Disabled="@(!_confirmChecklist || _isProcessing)"
+                   StartIcon="@Icons.Material.Filled.Check">
+            @if (_isProcessing)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+            }
+            Potwierdź wydanie
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    private IMudDialogInstance? MudDialog { get; set; }
+    
+    [Parameter]
+    public Rental? Rental { get; set; }
+    
+    private string? _issueNotes;
+    private bool _confirmChecklist;
+    private bool _isProcessing;
+
+    private void Cancel() => MudDialog?.Cancel();
+
+    private async Task Submit()
+    {
+        if (Rental == null || !_confirmChecklist) return;
+        
+        _isProcessing = true;
+        
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            
+            var rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == Rental.Id);
+            if (rental == null)
+            {
+                Snackbar.Add("Nie znaleziono wypożyczenia", Severity.Error);
+                MudDialog?.Cancel();
+                return;
+            }
+            
+            rental.IssuedAtUtc = DateTime.UtcNow;
+            rental.IssueNotes = _issueNotes;
+            rental.Status = RentalStatus.Active;
+            // TODO: Dodać IssuedByEmployeeId z kontekstu użytkownika
+            
+            await db.SaveChangesAsync();
+            
+            MudDialog?.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd podczas wydawania sprzętu: {ex.Message}", Severity.Error);
+            MudDialog?.Cancel();
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+}

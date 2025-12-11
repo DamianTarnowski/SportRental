@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SportRental.Infrastructure.Data;
+using SportRental.Infrastructure.Domain;
 using System.Security.Cryptography;
 
 namespace SportRental.Api.Auth;
@@ -184,7 +185,7 @@ public static class AuthEndpoints
             return Results.BadRequest(new { error = "Refresh token jest wymagany" });
         }
 
-        var storedToken = await dbContext.Set<Auth.RefreshToken>()
+        var storedToken = await dbContext.RefreshTokens
             .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken);
 
         if (storedToken == null || !storedToken.IsActive)
@@ -235,7 +236,7 @@ public static class AuthEndpoints
             return Results.BadRequest(new { error = "Refresh token jest wymagany" });
         }
 
-        var storedToken = await dbContext.Set<Auth.RefreshToken>()
+        var storedToken = await dbContext.RefreshTokens
             .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken);
 
         if (storedToken != null && storedToken.IsActive)
@@ -259,7 +260,7 @@ public static class AuthEndpoints
         var tokenResult = jwtTokenService.CreateToken(user, tenantId, roles);
         var refreshTokenString = GenerateRefreshTokenString();
 
-        var refreshToken = new Auth.RefreshToken
+        var refreshToken = new RefreshToken
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
@@ -269,7 +270,7 @@ public static class AuthEndpoints
             IsRevoked = false
         };
 
-        dbContext.Set<Auth.RefreshToken>().Add(refreshToken);
+        dbContext.RefreshTokens.Add(refreshToken);
         await dbContext.SaveChangesAsync();
 
         return (tokenResult.AccessToken, refreshTokenString);

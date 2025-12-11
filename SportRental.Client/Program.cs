@@ -48,12 +48,23 @@ var apiService = host.Services.GetRequiredService<IApiService>();
 var configuration = host.Services.GetRequiredService<IConfiguration>();
 var tenantService = host.Services.GetRequiredService<TenantService>();
 
+// Automatyczne wykrywanie API URL na podstawie środowiska
 var baseUrl = configuration["Api:BaseUrl"];
-if (string.IsNullOrWhiteSpace(baseUrl))
+var hostAddress = builder.HostEnvironment.BaseAddress;
+
+// Produkcja: Azure Static Web Apps -> Admin na Azure App Service
+if (hostAddress.Contains("azurestaticapps.net") || hostAddress.Contains("nice-tree"))
 {
-    baseUrl = builder.HostEnvironment.BaseAddress;
+    baseUrl = "https://sradmin2.azurewebsites.net";
 }
+// Development: użyj konfiguracji lub localhost Admin
+else if (string.IsNullOrWhiteSpace(baseUrl))
+{
+    baseUrl = "http://localhost:5001";
+}
+
 apiService.SetBaseUrl(baseUrl);
+Console.WriteLine($"🔗 API BaseUrl: {baseUrl}");
 
 // Opcjonalnie: załaduj wybraną wypożyczalnię z LocalStorage (jeśli użytkownik wybrał)
 var selectedTenantId = await tenantService.GetSelectedTenantIdAsync();
