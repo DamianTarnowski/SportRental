@@ -19,6 +19,15 @@ namespace SportRental.Infrastructure.Domain
         InStore = 1     // Wypożyczenie fizyczne w wypożyczalni
     }
 
+    /// <summary>
+    /// Typ wynajmu - godzinowy lub dzienny
+    /// </summary>
+    public enum RentalType
+    {
+        Daily = 0,      // Wynajem na dni
+        Hourly = 1      // Wynajem na godziny
+    }
+
     public class Rental
     {
         public Guid Id { get; set; }
@@ -41,11 +50,16 @@ namespace SportRental.Infrastructure.Domain
         public string? IdempotencyKey { get; set; }
 
         // SMS and Email tracking
-        public bool IsSmsConfirmed { get; set; } = false;
+        public bool IsSmsConfirmationSent { get; set; } = false;  // Czy wysłano SMS z prośbą o potwierdzenie
+        public bool IsSmsConfirmed { get; set; } = false;          // Czy klient potwierdził SMS-em
         public bool IsEmailSent { get; set; } = false;
 
         // Źródło wypożyczenia
         public RentalSource Source { get; set; } = RentalSource.Online;
+
+        // Typ wynajmu (godzinowy/dzienny)
+        public RentalType RentalType { get; set; } = RentalType.Daily;
+        public int? HoursRented { get; set; }  // Liczba godzin (tylko dla RentalType.Hourly)
 
         // Wydanie sprzętu
         public DateTime? IssuedAtUtc { get; set; }

@@ -5,6 +5,8 @@
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
 
 <MudContainer Class="mt-4">
     <MudText Typo="Typo.h4" Class="mb-4">Ustawienia firmy</MudText>
@@ -57,42 +59,20 @@
                 </MudPaper>
             </MudItem>
             
+            @* SMS Configuration - tymczasowo ukryte (brak aktywnego konta SMS)
             <MudItem xs="12" md="6">
                 <MudPaper Class="p-4">
                     <MudText Typo="Typo.h6" Class="mb-3">📱 Konfiguracja SMS</MudText>
-                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
                         <MudText Typo="Typo.body2">
-                            Włącz funkcje SMS dla automatycznych powiadomień klientów.
+                            ⚠️ Funkcje SMS są tymczasowo niedostępne - trwa konfiguracja dostawcy.
                         </MudText>
                     </MudAlert>
-                    <MudStack Spacing="3">
-                        <MudSwitch @bind-Value="companyInfo.SmsConfirmationEnabled" 
-                                   Label="Potwierdzenie umowy przez SMS" 
-                                   Color="Color.Primary"
-                                   LabelPosition="LabelPosition.End" />
-                        <MudText Typo="Typo.caption" Class="ml-12" Style="margin-top: -12px; color: #666;">
-                            Po dodaniu wynajmu klient otrzyma SMS z prośbą o potwierdzenie warunków umowy
-                        </MudText>
-                        
-                        <MudSwitch @bind-Value="companyInfo.SmsThanksEnabled" 
-                                   Label="SMS z podziękowaniem" 
-                                   Color="Color.Primary"
-                                   LabelPosition="LabelPosition.End" />
-                        <MudText Typo="Typo.caption" Class="ml-12" Style="margin-top: -12px; color: #666;">
-                            Po zakończeniu wynajmu klient otrzyma SMS z podziękowaniem
-                        </MudText>
-                        
-                        <MudSwitch @bind-Value="companyInfo.SmsReminderEnabled" 
-                                   Label="SMS z przypomnieniem" 
-                                   Color="Color.Primary"
-                                   LabelPosition="LabelPosition.End" />
-                        <MudText Typo="Typo.caption" Class="ml-12" Style="margin-top: -12px; color: #666;">
-                            Przed końcem wynajmu klient otrzyma SMS z przypomnieniem o zwrocie
-                        </MudText>
-                    </MudStack>
                 </MudPaper>
             </MudItem>
+            *@
             
+            @* Szablony SMS - tymczasowo ukryte (brak aktywnego konta SMS)
             <MudItem xs="12" md="6">
                 <MudPaper Class="p-4">
                     <MudText Typo="Typo.h6" Class="mb-3">Szablony SMS</MudText>
@@ -117,6 +97,7 @@
                     </MudStack>
                 </MudPaper>
             </MudItem>
+            *@
             
             <MudItem xs="12" md="6">
                 <MudPaper Class="p-4">
@@ -182,25 +163,51 @@
     private IBrowserFile? selectedLogoFile;
     private bool isSaving = false;
     
-    private Guid TenantId => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+    private Guid _tenantId = Guid.Empty;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadData();
+        try
+        {
+            // Pobierz _tenantId z różnych źródeł
+            _tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+            
+            // Jeśli TenantProvider nie zwrócił _tenantId, spróbuj pobrać z użytkownika
+            if (_tenantId == Guid.Empty)
+            {
+                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+                var userPrincipal = authState.User;
+                if (userPrincipal?.Identity?.IsAuthenticated == true)
+                {
+                    var user = await UserManager.GetUserAsync(userPrincipal);
+                    if (user?.TenantId.HasValue == true && user.TenantId.Value != Guid.Empty)
+                    {
+                        _tenantId = user.TenantId.Value;
+                    }
+                }
+            }
+            
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd ładowania ustawień: {ex.Message}", Severity.Error);
+            Console.WriteLine($"CompanySettings LoadData error: {ex}");
+        }
     }
 
     private async Task LoadData()
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(TenantId);
+        Db.SetTenant(_tenantId);
         
-        tenant = await Db.Tenants.FirstOrDefaultAsync(t => t.Id == TenantId);
+        tenant = await Db.Tenants.FirstOrDefaultAsync(t => t.Id == _tenantId);
         if (tenant == null)
         {
             // Utwórz nowy tenant jeśli nie istnieje (dla SuperAdmina)
-            if (TenantId != Guid.Empty)
+            if (_tenantId != Guid.Empty)
             {
-                tenant = new Tenant { Id = TenantId, Name = "Nowa wypożyczalnia" };
+                tenant = new Tenant { Id = _tenantId, Name = "Nowa wypożyczalnia" };
                 Db.Tenants.Add(tenant);
                 await Db.SaveChangesAsync();
                 Snackbar.Add("Utworzono nową firmę - uzupełnij dane", Severity.Info);
@@ -212,7 +219,7 @@
             }
         }
 
-        var existingCompanyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == TenantId);
+        var existingCompanyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == _tenantId);
         if (existingCompanyInfo != null)
         {
             companyInfo = new CompanyInfoDto
@@ -258,7 +265,7 @@
         try
         {
             await using var Db = await DbFactory.CreateDbContextAsync();
-            Db.SetTenant(TenantId);
+            Db.SetTenant(_tenantId);
             
             // Update tenant info
             Db.Tenants.Update(tenant);
@@ -270,7 +277,7 @@
                 content.Add(new StreamContent(selectedLogoFile.OpenReadStream(5 * 1024 * 1024)), "file", selectedLogoFile.Name);
                 
                 var client = new HttpClient { BaseAddress = new Uri(Navigation.ToAbsoluteUri("/").ToString()) };
-                var res = await client.PostAsync($"api/tenants/{TenantId}/logo", content);
+                var res = await client.PostAsync($"api/tenants/{_tenantId}/logo", content);
                 if (res.IsSuccessStatusCode)
                 {
                     var json = await res.Content.ReadFromJsonAsync<LogoResponse>();
@@ -279,7 +286,7 @@
             }
             
             // Update or create company info
-            var existingCompanyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == TenantId);
+            var existingCompanyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == _tenantId);
             if (existingCompanyInfo != null)
             {
                 existingCompanyInfo.Address = companyInfo.Address;
@@ -315,7 +322,7 @@
                 var newCompanyInfo = new CompanyInfo
                 {
                     Id = Guid.NewGuid(),
-                    TenantId = TenantId,
+                    TenantId = _tenantId,
                     Address = companyInfo.Address,
                     PhoneNumber = companyInfo.PhoneNumber,
                     Email = companyInfo.Email,

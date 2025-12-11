@@ -171,12 +171,12 @@
                                                          Size="Size.Small">
                                                     @GetStatusText(rental.Status)
                                                 </MudChip>
-                                                <MudChip T="string" Icon="@Icons.Material.Filled.Sms" 
-                                                         Color="@(rental.IsSmsConfirmed ? Color.Success : Color.Default)" 
-                                                         Variant="Variant.Text"
+@*                                                <MudChip T="string" Icon="@Icons.Material.Filled.Sms" 
+                                                         Color="@GetSmsStatusColor(rental)" 
+                                                         Variant="@(rental.IsSmsConfirmed ? Variant.Filled : Variant.Text)"
                                                          Size="Size.Small">
-                                                    SMS: @(rental.IsSmsConfirmed ? "✓" : "✗")
-                                                </MudChip>
+                                                    @GetSmsStatusText(rental)
+                                                </MudChip> *@
                                                 <MudChip T="string" Icon="@Icons.Material.Filled.Email" 
                                                          Color="@(rental.IsEmailSent ? Color.Success : Color.Default)" 
                                                          Variant="Variant.Text"
@@ -260,15 +260,23 @@
                                             </MudButtonGroup>
                                             
                                             <MudStack Row="true" Spacing="1">
+                                                @* SMS buttons - tymczasowo ukryte (brak aktywnego konta SMS)
                                                 <MudButton StartIcon="@Icons.Material.Filled.Sms" 
                                                            OnClick="() => SendSmsConfirmation(rental)"
-                                                           Color="Color.Info"
-                                                           Variant="@(rental.IsSmsConfirmed ? Variant.Text : Variant.Filled)"
+                                                           Color="@GetSmsButtonColor(rental)"
+                                                           Variant="@GetSmsButtonVariant(rental)"
                                                            Disabled="@(rental.IsSmsConfirmed)"
                                                            Size="Size.Small"
                                                            Class="flex-1">
-                                                    @(rental.IsSmsConfirmed ? "SMS ✓" : "SMS")
+                                                    @GetSmsButtonText(rental)
                                                 </MudButton>
+                                                <MudTooltip Text="Wyślij własny SMS do klienta">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Message" 
+                                                                   OnClick="() => OpenCustomSmsDialog(rental)"
+                                                                   Color="Color.Secondary"
+                                                                   Size="Size.Small" />
+                                                </MudTooltip>
+                                                *@
                                                 @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
                                                 {
                                                     <MudButton StartIcon="@Icons.Material.Filled.CheckCircle" 
@@ -611,6 +619,58 @@
             </MudPaper>
         </DialogActions>
     </MudDialog>
+    
+    @* Dialog do wysyłania customowego SMS *@
+    <MudDialog @bind-Visible="customSmsDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small })">
+        <TitleContent>
+            <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                <MudIcon Icon="@Icons.Material.Filled.Sms" Color="Color.Info" />
+                <MudText Typo="Typo.h6">Wyślij SMS do klienta</MudText>
+            </MudStack>
+        </TitleContent>
+        <DialogContent>
+            <MudStack Spacing="3">
+                @if (customSmsRental != null)
+                {
+                    var customer = customersDict.GetValueOrDefault(customSmsRental.CustomerId);
+                    <MudAlert Severity="Severity.Info" Dense="true">
+                        <MudText Typo="Typo.body2">
+                            <strong>Odbiorca:</strong> @(customer?.FullName ?? "Nieznany")<br/>
+                            <strong>Telefon:</strong> @(customer?.PhoneNumber ?? "Brak numeru")
+                        </MudText>
+                    </MudAlert>
+                }
+                <MudTextField @bind-Value="customSmsMessage"
+                              Label="Treść wiadomości SMS"
+                              Placeholder="Wpisz treść SMS..."
+                              Variant="Variant.Outlined"
+                              Lines="4"
+                              MaxLength="480"
+                              Counter="480"
+                              HelperText="Maksymalnie 480 znaków (3 SMS-y)" />
+            </MudStack>
+        </DialogContent>
+        <DialogActions>
+            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="CloseCustomSmsDialog">
+                Anuluj
+            </MudButton>
+            <MudButton Variant="Variant.Filled" 
+                       Color="Color.Info"
+                       StartIcon="@Icons.Material.Filled.Send"
+                       Disabled="@(string.IsNullOrWhiteSpace(customSmsMessage) || sendingCustomSms)"
+                       OnClick="SendCustomSms">
+                @if (sendingCustomSms)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    <span>Wysyłanie...</span>
+                }
+                else
+                {
+                    <span>Wyślij SMS</span>
+                }
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
 </MudContainer>
 
 @code {
@@ -640,6 +700,12 @@
     private bool cbEnded = true; 
     private bool cbIncoming = true;
     private IEnumerable<Rental> filteredRentals => FilterRentals();
+    
+    // Custom SMS dialog
+    private bool customSmsDialogOpen;
+    private Rental? customSmsRental;
+    private string customSmsMessage = "";
+    private bool sendingCustomSms;
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Inject] private SportRental.Admin.Services.Contracts.IContractGenerator ContractGenerator { get; set; } = default!;
@@ -959,6 +1025,44 @@
                 Snackbar.Add("ℹ️ Klient nie ma adresu email - email nie został wysłany", MudBlazor.Severity.Info);
             }
             
+            // Automatyczne wysyłanie SMS z prośbą o potwierdzenie (jeśli włączone w ustawieniach)
+            // Jeśli SMS wyłączone - status pozostaje "Confirmed", można ręcznie wysłać SMS przyciskiem
+            // Jeśli SMS włączone - automatycznie wysyła i zmienia status na "Pending" (oczekuje na potwierdzenie)
+            if (companyInfo?.SmsConfirmationEnabled == true && customer != null && !string.IsNullOrWhiteSpace(customer.PhoneNumber))
+            {
+                try
+                {
+                    // Generate confirmation code
+                    await SmsConfirmationService.GenerateConfirmationCodeAsync(editModel.Id);
+                    
+                    // Send SMS with contract confirmation request
+                    await SmsSender.SendContractConfirmationRequestAsync(
+                        customer.PhoneNumber, 
+                        customer.FullName ?? "Klient", 
+                        editModel.Id,
+                        customer.Email);
+                    
+                    // Mark SMS as sent and change status to Pending (awaiting SMS confirmation)
+                    editModel.IsSmsConfirmationSent = true;
+                    editModel.Status = RentalStatus.Pending; // Oczekuje na potwierdzenie SMS
+                    Db.Rentals.Update(editModel);
+                    await Db.SaveChangesAsync();
+                    
+                    Logger.LogInformation("SMS confirmation sent for rental {RentalId} to {Phone}", editModel.Id, customer.PhoneNumber);
+                    Snackbar.Add($"📱 SMS z prośbą o potwierdzenie wysłany do {customer.PhoneNumber}. Wynajem oczekuje na potwierdzenie.", MudBlazor.Severity.Info);
+                }
+                catch (Exception smsEx)
+                {
+                    Logger.LogError(smsEx, "Failed to send SMS for rental {RentalId}", editModel.Id);
+                    Snackbar.Add($"⚠️ Błąd wysyłania SMS: {smsEx.Message}", MudBlazor.Severity.Warning);
+                }
+            }
+            else if (companyInfo?.SmsConfirmationEnabled != true)
+            {
+                // SMS wyłączone - status pozostaje "Confirmed", nie wymaga potwierdzenia SMS
+                Logger.LogInformation("SMS confirmation disabled for tenant, rental {RentalId} confirmed without SMS", editModel.Id);
+            }
+            
             // Odśwież listę
             rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             dialogOpen = false;
@@ -1255,20 +1359,28 @@
             }
             
             // Generate confirmation code
-            var code = await SmsConfirmationService.GenerateConfirmationCodeAsync(rental.Id);
+            await SmsConfirmationService.GenerateConfirmationCodeAsync(rental.Id);
             
-            // Send SMS
-            await SmsSender.SendConfirmationRequestAsync(customer.PhoneNumber, customer.FullName ?? "Klient", rental.Id);
+            // Send SMS with contract confirmation request (includes email info)
+            await SmsSender.SendContractConfirmationRequestAsync(
+                customer.PhoneNumber, 
+                customer.FullName ?? "Klient", 
+                rental.Id,
+                customer.Email);
             
-            // Update rental status to pending if it's draft
-            if (rental.Status == RentalStatus.Draft)
+            // Mark SMS as sent and update status
+            var dbRental = await Db.Rentals.FindAsync(rental.Id);
+            if (dbRental != null)
             {
-                rental.Status = RentalStatus.Pending;
-                Db.Rentals.Update(rental);
+                dbRental.IsSmsConfirmationSent = true;
+                if (dbRental.Status == RentalStatus.Draft)
+                {
+                    dbRental.Status = RentalStatus.Pending;
+                }
                 await Db.SaveChangesAsync();
             }
             
-            Snackbar.Add($"SMS z kodem potwierdzenia został wysłany na numer {customer.PhoneNumber}", MudBlazor.Severity.Success);
+            Snackbar.Add($"📱 SMS z prośbą o potwierdzenie wysłany do {customer.PhoneNumber}", MudBlazor.Severity.Success);
             
             // Refresh rentals list
             rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
@@ -1278,6 +1390,42 @@
         {
             Snackbar.Add($"Błąd podczas wysyłania SMS: {ex.Message}", MudBlazor.Severity.Error);
         }
+    }
+    
+    // SMS Status helpers
+    private Color GetSmsStatusColor(Rental rental)
+    {
+        if (rental.IsSmsConfirmed) return Color.Success;
+        if (rental.IsSmsConfirmationSent) return Color.Warning;
+        return Color.Default;
+    }
+    
+    private string GetSmsStatusText(Rental rental)
+    {
+        if (rental.IsSmsConfirmed) return "SMS ✓ Potwierdzone";
+        if (rental.IsSmsConfirmationSent) return "SMS wysłany";
+        return "SMS: —";
+    }
+    
+    private Color GetSmsButtonColor(Rental rental)
+    {
+        if (rental.IsSmsConfirmed) return Color.Success;
+        if (rental.IsSmsConfirmationSent) return Color.Warning;
+        return Color.Info;
+    }
+    
+    private Variant GetSmsButtonVariant(Rental rental)
+    {
+        if (rental.IsSmsConfirmed) return Variant.Text;
+        if (rental.IsSmsConfirmationSent) return Variant.Outlined;
+        return Variant.Filled;
+    }
+    
+    private string GetSmsButtonText(Rental rental)
+    {
+        if (rental.IsSmsConfirmed) return "✓ Potwierdzone";
+        if (rental.IsSmsConfirmationSent) return "Wyślij ponownie";
+        return "Wyślij SMS";
     }
 
     private async Task CompleteRental(Rental rental)
@@ -1342,5 +1490,60 @@
         editModel.EndDateUtc = DateTime.SpecifyKind(newEndDate, DateTimeKind.Utc);
         
         Snackbar.Add("Zmień datę zakończenia aby przedłużyć wynajem", MudBlazor.Severity.Warning);
+    }
+    
+    // Custom SMS dialog methods
+    private void OpenCustomSmsDialog(Rental rental)
+    {
+        var customer = customersDict.GetValueOrDefault(rental.CustomerId);
+        if (customer == null || string.IsNullOrWhiteSpace(customer.PhoneNumber))
+        {
+            Snackbar.Add("Klient nie ma numeru telefonu", MudBlazor.Severity.Warning);
+            return;
+        }
+        
+        customSmsRental = rental;
+        customSmsMessage = "";
+        customSmsDialogOpen = true;
+    }
+    
+    private void CloseCustomSmsDialog()
+    {
+        customSmsDialogOpen = false;
+        customSmsRental = null;
+        customSmsMessage = "";
+    }
+    
+    private async Task SendCustomSms()
+    {
+        if (customSmsRental == null || string.IsNullOrWhiteSpace(customSmsMessage))
+            return;
+            
+        var customer = customersDict.GetValueOrDefault(customSmsRental.CustomerId);
+        if (customer == null || string.IsNullOrWhiteSpace(customer.PhoneNumber))
+        {
+            Snackbar.Add("Klient nie ma numeru telefonu", MudBlazor.Severity.Warning);
+            return;
+        }
+        
+        sendingCustomSms = true;
+        StateHasChanged();
+        
+        try
+        {
+            await SmsSender.SendAsync(customer.PhoneNumber, customSmsMessage);
+            Snackbar.Add($"📱 SMS wysłany do {customer.PhoneNumber}", MudBlazor.Severity.Success);
+            CloseCustomSmsDialog();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to send custom SMS to {Phone}", customer.PhoneNumber);
+            Snackbar.Add($"Błąd wysyłania SMS: {ex.Message}", MudBlazor.Severity.Error);
+        }
+        finally
+        {
+            sendingCustomSms = false;
+            StateHasChanged();
+        }
     }
 }

@@ -276,6 +276,17 @@ if (builder.Environment.IsDevelopment() && mediaAutoStart)
 
 var app = builder.Build();
 
+// Test SMS: dotnet run --project SportRental.Admin -- --test-sms 667362375
+var testSmsArg = args.FirstOrDefault(a => a.StartsWith("--test-sms", StringComparison.OrdinalIgnoreCase));
+if (testSmsArg != null)
+{
+    var phone = args.SkipWhile(a => !a.StartsWith("--test-sms")).Skip(1).FirstOrDefault() 
+                ?? testSmsArg.Split('=', 2).ElementAtOrDefault(1) 
+                ?? "667362375";
+    await SportRental.Admin.Tests.SmsIntegrationTest.RunAsync(phone);
+    return;
+}
+
 // Jednorazowe seeding danych demo: dotnet run --project SportRental.Admin -- --seed-demo [--seed-email=hdtdtr@gmail.com]
 if (args.Any(a => a.Equals("--seed-demo", StringComparison.OrdinalIgnoreCase)))
 {

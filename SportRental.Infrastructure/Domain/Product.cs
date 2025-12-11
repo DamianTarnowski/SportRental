@@ -36,6 +36,7 @@ namespace SportRental.Infrastructure.Domain
         public string? ImageAlt { get; set; }
         
         public decimal DailyPrice { get; set; }
+        public decimal? HourlyPrice { get; set; }  // Cena za godzinę (opcjonalna)
         public bool IsActive { get; set; } = true;
         public bool Available { get; set; } = true;
         public bool Disabled { get; set; } = false;
