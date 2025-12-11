@@ -13,6 +13,10 @@ public class PaymentQuoteRequest
     [Required]
     [MinLength(1)]
     public List<CreateRentalItem> Items { get; set; } = new();
+
+    // Typ wynajmu (godzinowy/dzienny)
+    public RentalTypeDto RentalType { get; set; } = RentalTypeDto.Daily;
+    public int? HoursRented { get; set; }
 }
 
 public class PaymentQuoteResponse

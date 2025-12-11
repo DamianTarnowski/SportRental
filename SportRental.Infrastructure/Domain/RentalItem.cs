@@ -11,6 +11,7 @@ namespace SportRental.Infrastructure.Domain
 
         public int Quantity { get; set; } = 1;
         public decimal PricePerDay { get; set; }
+        public decimal? PricePerHour { get; set; }  // Cena za godzinę (dla wynajmu godzinowego)
         public decimal Subtotal { get; set; }
     }
 }

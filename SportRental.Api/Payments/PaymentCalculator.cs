@@ -33,7 +33,8 @@ internal static class PaymentCalculator
             {
                 p.Id,
                 p.TenantId,
-                p.DailyPrice
+                p.DailyPrice,
+                p.HourlyPrice
             })
             .ToListAsync(ct);
 
@@ -52,10 +53,14 @@ internal static class PaymentCalculator
             throw new InvalidOperationException("Produkty musza nalezec do wybranej wypozyczalni.");
         }
 
-        var prices = products.ToDictionary(p => p.Id, p => p.DailyPrice);
+        var dailyPrices = products.ToDictionary(p => p.Id, p => p.DailyPrice);
+        var hourlyPrices = products.ToDictionary(p => p.Id, p => p.HourlyPrice);
         var productTenants = products.ToDictionary(p => p.Id, p => p.TenantId);
 
         var rentalDays = Math.Max(1, (int)Math.Ceiling((req.EndDateUtc - req.StartDateUtc).TotalDays));
+        var isHourly = req.RentalType == RentalTypeDto.Hourly && req.HoursRented.HasValue && req.HoursRented.Value > 0;
+        var hours = req.HoursRented ?? 1;
+        
         var productPrices = new Dictionary<Guid, decimal>();
         var tenantTotals = new Dictionary<Guid, decimal>();
         var tenantItems = new Dictionary<Guid, Dictionary<Guid, CreateRentalItem>>();
@@ -63,9 +68,22 @@ internal static class PaymentCalculator
 
         foreach (var item in req.Items)
         {
-            var pricePerDay = prices[item.ProductId];
-            productPrices[item.ProductId] = pricePerDay;
+            var dailyPrice = dailyPrices[item.ProductId];
+            var hourlyPrice = hourlyPrices[item.ProductId];
             var tenant = productTenants[item.ProductId];
+            
+            // Oblicz cenę w zależności od typu wynajmu
+            decimal itemTotal;
+            if (isHourly && hourlyPrice.HasValue && hourlyPrice.Value > 0)
+            {
+                itemTotal = hourlyPrice.Value * item.Quantity * hours;
+                productPrices[item.ProductId] = hourlyPrice.Value;
+            }
+            else
+            {
+                itemTotal = dailyPrice * item.Quantity * rentalDays;
+                productPrices[item.ProductId] = dailyPrice;
+            }
 
             if (!tenantItems.TryGetValue(tenant, out var itemsForTenant))
             {
@@ -86,14 +104,14 @@ internal static class PaymentCalculator
                 };
             }
 
-            total += pricePerDay * item.Quantity * rentalDays;
+            total += itemTotal;
 
             if (!tenantTotals.ContainsKey(tenant))
             {
                 tenantTotals[tenant] = 0m;
             }
 
-            tenantTotals[tenant] += pricePerDay * item.Quantity * rentalDays;
+            tenantTotals[tenant] += itemTotal;
         }
 
         var deposit = Math.Round(total * 0.3m, 2, MidpointRounding.AwayFromZero);

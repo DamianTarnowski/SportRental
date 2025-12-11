@@ -26,6 +26,16 @@ public class CreateRentalRequest
 
     // Idempotency support (optional)
     public string? IdempotencyKey { get; set; }
+
+    // Typ wynajmu (godzinowy/dzienny)
+    public RentalTypeDto RentalType { get; set; } = RentalTypeDto.Daily;
+    public int? HoursRented { get; set; }  // Liczba godzin (tylko dla RentalType.Hourly)
+}
+
+public enum RentalTypeDto
+{
+    Daily = 0,
+    Hourly = 1
 }
 
 public class CreateRentalItem

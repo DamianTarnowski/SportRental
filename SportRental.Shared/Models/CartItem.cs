@@ -8,16 +8,23 @@ public class CartItem
     public required string ProductName { get; set; }
     public string? ProductImageUrl { get; set; }
     public decimal DailyPrice { get; set; }
+    public decimal? HourlyPrice { get; set; }
     public int Quantity { get; set; } = 1;
     public DateTime StartDate { get; set; } = DateTime.Today.AddDays(1);
     public DateTime EndDate { get; set; } = DateTime.Today.AddDays(2);
+
+    // Typ wynajmu (godzinowy/dzienny)
+    public RentalTypeDto RentalType { get; set; } = RentalTypeDto.Daily;
+    public int? HoursRented { get; set; }
 
     // Reservation hold metadata (managed by CartService)
     public Guid? HoldId { get; set; }
     public DateTime? HoldExpiresAtUtc { get; set; }
 
     public int TotalDays => Math.Max(1, (EndDate - StartDate).Days);
-    public decimal TotalPrice => DailyPrice * Quantity * TotalDays;
+    public decimal TotalPrice => RentalType == RentalTypeDto.Hourly && HourlyPrice.HasValue && HoursRented.HasValue
+        ? HourlyPrice.Value * Quantity * HoursRented.Value
+        : DailyPrice * Quantity * TotalDays;
 }
 
 public class Cart
@@ -50,6 +57,7 @@ public class Cart
                 ProductName = product.Name,
                 ProductImageUrl = product.FullImageUrl ?? product.ImageUrl,
                 DailyPrice = product.DailyPrice,
+                HourlyPrice = product.HourlyPrice,
                 Quantity = quantity,
                 StartDate = startDate ?? DateTime.Today.AddDays(1),
                 EndDate = endDate ?? DateTime.Today.AddDays(2)

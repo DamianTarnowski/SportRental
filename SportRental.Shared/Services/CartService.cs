@@ -83,6 +83,18 @@ public class CartService : ICartService
         }
     }
 
+    public async Task UpdateRentalTypeAsync(Guid productId, Models.RentalTypeDto rentalType, int? hoursRented)
+    {
+        var item = _cart.Items.FirstOrDefault(i => i.ProductId == productId);
+        if (item != null)
+        {
+            item.RentalType = rentalType;
+            item.HoursRented = rentalType == Models.RentalTypeDto.Hourly ? hoursRented : null;
+            await SaveCartToStorageAsync();
+            CartChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
     public async Task ClearCartAsync()
     {
         // Release all holds

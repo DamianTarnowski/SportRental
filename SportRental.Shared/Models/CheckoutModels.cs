@@ -5,7 +5,9 @@ public record CreateCheckoutSessionRequest(
     DateTime EndDateUtc,
     List<CheckoutItem> Items,
     string CustomerEmail,
-    Guid? CustomerId = null);
+    Guid? CustomerId = null,
+    RentalTypeDto RentalType = RentalTypeDto.Daily,
+    int? HoursRented = null);
 
 public record CheckoutItem(Guid ProductId, int Quantity);
 

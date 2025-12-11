@@ -11,6 +11,7 @@ public interface ICartService
     Task RemoveFromCartAsync(Guid productId);
     Task UpdateQuantityAsync(Guid productId, int quantity);
     Task UpdateDatesAsync(Guid productId, DateTime startDate, DateTime endDate);
+    Task UpdateRentalTypeAsync(Guid productId, RentalTypeDto rentalType, int? hoursRented);
     Task ClearCartAsync();
     Task<bool> ValidateAvailabilityAsync();
 

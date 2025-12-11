@@ -342,7 +342,9 @@
         {
             StartDateUtc = first.StartDate.ToUniversalTime(),
             EndDateUtc = first.EndDate.ToUniversalTime(),
-            Items = BuildCartItemsPayload()
+            Items = BuildCartItemsPayload(),
+            RentalType = first.RentalType,
+            HoursRented = first.HoursRented
         };
 
         try
@@ -553,7 +555,9 @@
                 {
                     StartDateUtc = startUtc,
                     EndDateUtc = endUtc,
-                    Items = itemsPayload
+                    Items = itemsPayload,
+                    RentalType = first.RentalType,
+                    HoursRented = first.HoursRented
                 });
                 _quote = quote;
                 _quoteError = null;
@@ -576,7 +580,9 @@
                     EndDateUtc: endUtc,
                     Items: itemsPayload.Select(i => new CheckoutItem(i.ProductId, i.Quantity)).ToList(),
                     CustomerEmail: customerEmail,
-                    CustomerId: customerId
+                    CustomerId: customerId,
+                    RentalType: first.RentalType,
+                    HoursRented: first.HoursRented
                 ));
                 
                 Snackbar.Add("Przekierowanie do Stripe...", Severity.Info);

@@ -123,9 +123,17 @@
                                     }
                                     
                                     <MudStack Row="true" Class="mud-space-between" Spacing="3">
-                                        <MudText Typo="Typo.h6" Color="Color.Primary" Style="font-weight: 700;">
-                                            @product.DailyPrice.ToString("0.00") zł/dzień
-                                        </MudText>
+                                        <MudStack Spacing="0">
+                                            <MudText Typo="Typo.h6" Color="Color.Primary" Style="font-weight: 700;">
+                                                @product.DailyPrice.ToString("0.00") zł/dzień
+                                            </MudText>
+                                            @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
+                                            {
+                                                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                    @product.HourlyPrice.Value.ToString("0.00") zł/godz.
+                                                </MudText>
+                                            }
+                                        </MudStack>
                                         <MudChip T="string" Size="Size.Small" 
                                                  Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)"
                                                  Variant="Variant.Filled">
@@ -340,7 +348,7 @@
                         </MudStack>
                         
                         <MudGrid Spacing="3">
-                            <MudItem xs="12" md="4">
+                            <MudItem xs="12" md="3">
                                 <MudNumericField T="decimal" @bind-Value="model.DailyPrice" 
                                                   Label="Cena za dzień" 
                                                   Min="0" 
@@ -350,7 +358,18 @@
                                                   Variant="Variant.Outlined"
                                                   Class="rounded-lg" />
                             </MudItem>
-                            <MudItem xs="12" md="4">
+                            <MudItem xs="12" md="3">
+                                <MudNumericField T="decimal?" @bind-Value="model.HourlyPrice" 
+                                                  Label="Cena za godzinę" 
+                                                  Min="0" 
+                                                  Format="0.00"
+                                                  Adornment="Adornment.End"
+                                                  AdornmentText="zł"
+                                                  Variant="Variant.Outlined"
+                                                  HelperText="Opcjonalne"
+                                                  Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="12" md="3">
                                 <MudNumericField T="int" @bind-Value="model.AvailableQuantity" 
                                                   Label="Dostępna ilość" 
                                                   Min="0"

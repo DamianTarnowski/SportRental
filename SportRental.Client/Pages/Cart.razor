@@ -69,9 +69,43 @@
                                                class="px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 </div>
+
+                                @* Typ wynajmu *@
+                                <div class="flex items-center gap-3 mt-3">
+                                    <div class="flex flex-col">
+                                        <label class="text-xs text-gray-500 mb-1">🕐 Typ wynajmu</label>
+                                        <select value="@((int)item.RentalType)"
+                                                @onchange="@((e) => OnRentalTypeChanged(item, e))"
+                                                class="px-3 py-2 border rounded-lg text-sm">
+                                            <option value="0">📅 Dzienny</option>
+                                            @if (item.HourlyPrice.HasValue && item.HourlyPrice.Value > 0)
+                                            {
+                                                <option value="1">⏰ Godzinowy</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    @if (item.RentalType == RentalTypeDto.Hourly)
+                                    {
+                                        <div class="flex flex-col">
+                                            <label class="text-xs text-gray-500 mb-1">Liczba godzin</label>
+                                            <input type="number" 
+                                                   value="@(item.HoursRented ?? 1)"
+                                                   min="1" max="24"
+                                                   @onchange="@((e) => OnHoursChanged(item, e))"
+                                                   class="px-3 py-2 border rounded-lg text-sm w-20" />
+                                        </div>
+                                    }
+                                </div>
                                 
                                 <p class="text-sm text-gray-500 mt-2">
-                                    ⏱️ @item.TotalDays dni wynajmu
+                                    @if (item.RentalType == RentalTypeDto.Hourly && item.HoursRented.HasValue)
+                                    {
+                                        <span>⏱️ @item.HoursRented.Value godz. × @(item.HourlyPrice?.ToString("C") ?? "0 zł")/godz.</span>
+                                    }
+                                    else
+                                    {
+                                        <span>⏱️ @item.TotalDays dni × @item.DailyPrice.ToString("C")/dzień</span>
+                                    }
                                 </p>
 
                                 @if (item.HoldId is not null)
@@ -205,6 +239,26 @@
 
             item.EndDate = newDate;
             await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
+        }
+    }
+
+    private async Task OnRentalTypeChanged(CartItem item, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var typeValue))
+        {
+            var rentalType = (RentalTypeDto)typeValue;
+            var hours = rentalType == RentalTypeDto.Hourly ? (item.HoursRented ?? 1) : (int?)null;
+            await CartService.UpdateRentalTypeAsync(item.ProductId, rentalType, hours);
+        }
+    }
+
+    private async Task OnHoursChanged(CartItem item, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var hours))
+        {
+            if (hours < 1) hours = 1;
+            if (hours > 24) hours = 24;
+            await CartService.UpdateRentalTypeAsync(item.ProductId, RentalTypeDto.Hourly, hours);
         }
     }
 

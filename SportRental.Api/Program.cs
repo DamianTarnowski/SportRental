@@ -720,7 +720,9 @@ app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IP
             {
                 StartDateUtc = req.StartDateUtc,
                 EndDateUtc = req.EndDateUtc,
-                Items = req.Items
+                Items = req.Items,
+                RentalType = req.RentalType,
+                HoursRented = req.HoursRented
             }, db, ct, allowMixedTenants: false);
         }
         catch (InvalidOperationException ex)
@@ -743,6 +745,8 @@ app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IP
         Notes = req.Notes,
         IdempotencyKey = req.IdempotencyKey,
         Status = RentalStatus.Pending,
+        RentalType = (RentalType)(int)req.RentalType,
+        HoursRented = req.HoursRented,
         CreatedAtUtc = DateTime.UtcNow,
         TotalAmount = computation.TotalAmount,
         DepositAmount = computation.DepositAmount,
@@ -750,17 +754,25 @@ app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IP
         PaymentStatus = intent.Status
     };
 
+    var isHourly = req.RentalType == RentalTypeDto.Hourly && req.HoursRented.HasValue;
+    var hours = req.HoursRented ?? 1;
+    
     foreach (var item in req.Items)
     {
-        var pricePerDay = computation.ProductPrices[item.ProductId];
+        var price = computation.ProductPrices[item.ProductId];
+        var subtotal = isHourly 
+            ? price * item.Quantity * hours 
+            : price * item.Quantity * computation.RentalDays;
+            
         rental.Items.Add(new RentalItem
         {
             Id = Guid.NewGuid(),
             RentalId = rental.Id,
             ProductId = item.ProductId,
             Quantity = item.Quantity,
-            PricePerDay = pricePerDay,
-            Subtotal = pricePerDay * item.Quantity * computation.RentalDays
+            PricePerDay = isHourly ? 0 : price,
+            PricePerHour = isHourly ? price : null,
+            Subtotal = subtotal
         });
     }
 

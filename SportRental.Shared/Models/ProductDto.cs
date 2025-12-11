@@ -10,6 +10,7 @@ namespace SportRental.Shared.Models
         public string? ImageUrl { get; set; }
         public string? ImageBasePath { get; set; } // For responsive images
         public decimal DailyPrice { get; set; }
+        public decimal? HourlyPrice { get; set; }  // Cena za godzinę (opcjonalna)
         
         // Dodatkowe właściwości dla klienta
         public string? Description { get; set; }

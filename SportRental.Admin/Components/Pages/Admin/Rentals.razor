@@ -381,15 +381,55 @@
                             </MudItem>
                         </MudGrid>
                         
+                        @* Typ wynajmu *@
+                        <MudGrid Spacing="3">
+                            <MudItem xs="12" md="6">
+                                <MudSelect T="RentalType" @bind-Value="editModel.RentalType" 
+                                           Label="Typ wynajmu"
+                                           Variant="Variant.Outlined"
+                                           Adornment="Adornment.Start"
+                                           AdornmentIcon="@Icons.Material.Filled.AccessTime"
+                                           Class="rounded-lg">
+                                    <MudSelectItem Value="RentalType.Daily">📅 Dzienny</MudSelectItem>
+                                    <MudSelectItem Value="RentalType.Hourly">⏰ Godzinowy</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            @if (editModel.RentalType == RentalType.Hourly)
+                            {
+                                <MudItem xs="12" md="6">
+                                    <MudNumericField T="int?" @bind-Value="editModel.HoursRented" 
+                                                      Label="Liczba godzin"
+                                                      Min="1"
+                                                      Max="24"
+                                                      Variant="Variant.Outlined"
+                                                      Adornment="Adornment.End"
+                                                      AdornmentText="godz."
+                                                      Class="rounded-lg" />
+                                </MudItem>
+                            }
+                        </MudGrid>
+                        
                         @if (startDate.HasValue && endDate.HasValue)
                         {
-                            var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
-                            <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="rounded-lg">
-                                <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
-                                    <MudText Typo="Typo.body2">Czas trwania: <strong>@days dni</strong></MudText>
-                                </MudStack>
-                            </MudAlert>
+                            @if (editModel.RentalType == RentalType.Hourly && editModel.HoursRented.HasValue)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="rounded-lg">
+                                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">Czas trwania: <strong>@editModel.HoursRented.Value godzin</strong></MudText>
+                                    </MudStack>
+                                </MudAlert>
+                            }
+                            else
+                            {
+                                var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
+                                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="rounded-lg">
+                                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">Czas trwania: <strong>@days dni</strong></MudText>
+                                    </MudStack>
+                                </MudAlert>
+                            }
                         }
                     </MudStack>
                 </MudPaper>
@@ -864,11 +904,27 @@
         var start = startDate ?? DateTime.Today;
         var end = endDate ?? DateTime.Today.AddDays(1);
         var days = Math.Max(1, (int)Math.Ceiling((end - start).TotalDays));
+        var hours = editModel.HoursRented ?? 1;
+        
         foreach (var item in editItems)
         {
-            var price = products.FirstOrDefault(p => p.Id == item.ProductId)?.DailyPrice ?? item.PricePerDay;
-            item.PricePerDay = price;
-            item.Subtotal = price * item.Quantity * days;
+            var product = products.FirstOrDefault(p => p.Id == item.ProductId);
+            
+            if (editModel.RentalType == RentalType.Hourly && product?.HourlyPrice.HasValue == true)
+            {
+                // Wynajem godzinowy
+                item.PricePerHour = product.HourlyPrice;
+                item.PricePerDay = product.DailyPrice;
+                item.Subtotal = product.HourlyPrice.Value * item.Quantity * hours;
+            }
+            else
+            {
+                // Wynajem dzienny (domyślny)
+                var price = product?.DailyPrice ?? item.PricePerDay;
+                item.PricePerDay = price;
+                item.PricePerHour = product?.HourlyPrice;
+                item.Subtotal = price * item.Quantity * days;
+            }
         }
     }
 

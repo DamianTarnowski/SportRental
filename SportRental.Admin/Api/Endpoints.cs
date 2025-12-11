@@ -356,6 +356,8 @@ namespace SportRental.Admin.Api
                         EndDateUtc = req.EndDateUtc,
                         Status = RentalStatus.Confirmed,
                         Source = RentalSource.InStore, // Wypożyczenie fizyczne przez panel Admin
+                        RentalType = (SportRental.Infrastructure.Domain.RentalType)(int)req.RentalType,
+                        HoursRented = req.HoursRented,
                         CreatedAtUtc = DateTime.UtcNow,
                         IdempotencyKey = string.IsNullOrWhiteSpace(req.IdempotencyKey) ? null : req.IdempotencyKey
                     };
@@ -366,7 +368,8 @@ namespace SportRental.Admin.Api
                     foreach (var it in req.Items)
                     {
                         var product = productMap[it.ProductId];
-                        var price = product.DailyPrice;
+                        var isHourly = req.RentalType == Models.RentalType.Hourly && product.HourlyPrice.HasValue && req.HoursRented.HasValue;
+                        var price = isHourly ? product.HourlyPrice!.Value : product.DailyPrice;
 
                         // Ponowna walidacja dostępności w transakcji
                         var overlappingReservedQty = await db.RentalItems
@@ -391,14 +394,17 @@ namespace SportRental.Admin.Api
                         if (overlappingReservedQty + activeHoldsQty + it.Quantity > product.AvailableQuantity)
                             return Results.Conflict(new { message = $"Brak dostępności dla produktu {product.Name}. Dostępne: {Math.Max(0, product.AvailableQuantity - overlappingReservedQty)}", productId = product.Id });
 
-                        var subtotal = price * it.Quantity * days;
+                        var subtotal = isHourly 
+                            ? price * it.Quantity * req.HoursRented!.Value 
+                            : price * it.Quantity * days;
                         items.Add(new RentalItem
                         {
                             Id = Guid.NewGuid(),
                             RentalId = rental.Id,
                             ProductId = product.Id,
                             Quantity = it.Quantity,
-                            PricePerDay = price,
+                            PricePerDay = product.DailyPrice,
+                            PricePerHour = product.HourlyPrice,
                             Subtotal = subtotal
                         });
                         total += subtotal;
