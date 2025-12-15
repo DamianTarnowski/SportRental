@@ -112,13 +112,27 @@ namespace SportRental.Admin.Api
             // Customer endpoints for WASM client
             MapCustomerEndpoints(api);
 
-            api.MapGet("/products", [AllowAnonymous] async (IDbContextFactory<ApplicationDbContext> dbFactory, ITenantProvider tenantProvider, int? page, int? pageSize) =>
+            api.MapGet("/products", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory, 
+                ITenantProvider tenantProvider, 
+                int? page, 
+                int? pageSize,
+                string? search,
+                string? category,
+                string? city,
+                string? voivodeship,
+                string? tenant,
+                decimal? minPrice,
+                decimal? maxPrice,
+                bool? available,
+                string? sort,
+                double? userLat,
+                double? userLon) =>
             {
                 await using var db = await dbFactory.CreateDbContextAsync();
                 var tid = tenantProvider.GetCurrentTenantId();
                 
-                // Użyj IgnoreQueryFilters żeby pominąć globalny filtr tenanta
-                // Następnie ręcznie filtruj po tenancie jeśli podany
+                // Base query with tenant filter bypass
                 var baseQuery = db.Products.IgnoreQueryFilters().AsNoTracking();
                 
                 if (tid.HasValue)
@@ -126,30 +140,109 @@ namespace SportRental.Admin.Api
                     baseQuery = baseQuery.Where(p => p.TenantId == tid.Value);
                 }
                 
-                var query = baseQuery.Select(p => new
+                // Join with Tenants and CompanyInfos
+                var query = baseQuery
+                    .Join(db.Tenants, p => p.TenantId, t => t.Id, (p, t) => new { Product = p, Tenant = t })
+                    .GroupJoin(db.CompanyInfos, x => x.Product.TenantId, ci => ci.TenantId, (x, cis) => new { x.Product, x.Tenant, CompanyInfo = cis.FirstOrDefault() })
+                    .Select(x => new
                     {
-                        Id = p.Id,
-                        TenantId = p.TenantId,
-                        Name = p.Name,
-                        Sku = p.Sku,
-                        Category = p.Category,
-                        Description = p.Description,
-                        ImageUrl = p.ImageUrl,
-                        PricePerDay = p.DailyPrice,
-                        DailyPrice = p.DailyPrice,
-                        Quantity = p.AvailableQuantity,
-                        AvailableQuantity = p.AvailableQuantity,
-                        IsAvailable = p.Available && p.IsActive && p.AvailableQuantity > 0
+                        Id = x.Product.Id,
+                        TenantId = x.Product.TenantId,
+                        TenantName = x.Tenant.Name,
+                        Name = x.Product.Name,
+                        Sku = x.Product.Sku,
+                        Category = x.Product.Category,
+                        Description = x.Product.Description,
+                        ImageUrl = x.Product.ImageUrl,
+                        PricePerDay = x.Product.DailyPrice,
+                        DailyPrice = x.Product.DailyPrice,
+                        HourlyPrice = x.Product.HourlyPrice,
+                        Quantity = x.Product.AvailableQuantity,
+                        AvailableQuantity = x.Product.AvailableQuantity,
+                        IsAvailable = x.Product.Available && x.Product.IsActive && x.Product.AvailableQuantity > 0,
+                        City = x.Product.City ?? x.CompanyInfo!.City,
+                        Voivodeship = x.Product.Voivodeship ?? x.CompanyInfo!.Voivodeship,
+                        Lat = x.CompanyInfo != null ? x.CompanyInfo.Lat : (double?)null,
+                        Lon = x.CompanyInfo != null ? x.CompanyInfo.Lon : (double?)null
                     });
 
-                var p = Math.Max(1, page ?? 1);
-                var ps = Math.Clamp(pageSize ?? 50, 1, 200);
-                var products = await query
-                    .OrderBy(p => p.Name)
-                    .Skip((p - 1) * ps)
-                    .Take(ps)
+                // Apply filters
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    var searchLower = search.ToLower();
+                    query = query.Where(p => p.Name.ToLower().Contains(searchLower) || 
+                                            (p.Description != null && p.Description.ToLower().Contains(searchLower)));
+                }
+
+                if (!string.IsNullOrWhiteSpace(category))
+                {
+                    query = query.Where(p => p.Category != null && p.Category.ToLower() == category.ToLower());
+                }
+
+                if (!string.IsNullOrWhiteSpace(city))
+                {
+                    query = query.Where(p => p.City != null && p.City.ToLower() == city.ToLower());
+                }
+
+                if (!string.IsNullOrWhiteSpace(voivodeship))
+                {
+                    query = query.Where(p => p.Voivodeship != null && p.Voivodeship.ToLower() == voivodeship.ToLower());
+                }
+
+                if (!string.IsNullOrWhiteSpace(tenant))
+                {
+                    query = query.Where(p => p.TenantName.ToLower() == tenant.ToLower());
+                }
+
+                if (minPrice.HasValue)
+                {
+                    query = query.Where(p => p.DailyPrice >= minPrice.Value);
+                }
+
+                if (maxPrice.HasValue)
+                {
+                    query = query.Where(p => p.DailyPrice <= maxPrice.Value);
+                }
+
+                if (available == true)
+                {
+                    query = query.Where(p => p.IsAvailable);
+                }
+
+                // Get total count before pagination
+                var totalCount = await query.CountAsync();
+
+                // Apply sorting
+                IOrderedQueryable<dynamic>? orderedQuery = sort?.ToLower() switch
+                {
+                    "price-asc" => query.OrderBy(p => p.DailyPrice),
+                    "price-desc" => query.OrderByDescending(p => p.DailyPrice),
+                    "name" => query.OrderBy(p => p.Name),
+                    "distance" when userLat.HasValue && userLon.HasValue => 
+                        query.OrderBy(p => p.Lat.HasValue && p.Lon.HasValue 
+                            ? Math.Sqrt(Math.Pow((p.Lat.Value - userLat.Value) * 111.32, 2) + 
+                                       Math.Pow((p.Lon.Value - userLon.Value) * 111.32 * Math.Cos(userLat.Value * Math.PI / 180), 2))
+                            : 999999),
+                    _ => query.OrderByDescending(p => p.IsAvailable).ThenBy(p => p.Name)
+                };
+
+                // Pagination
+                var pageNum = Math.Max(1, page ?? 1);
+                var pageSizeNum = Math.Clamp(pageSize ?? 12, 1, 100);
+                
+                var items = await orderedQuery!
+                    .Skip((pageNum - 1) * pageSizeNum)
+                    .Take(pageSizeNum)
                     .ToListAsync();
-                return Results.Ok(products);
+
+                return Results.Ok(new
+                {
+                    Items = items,
+                    TotalCount = totalCount,
+                    Page = pageNum,
+                    PageSize = pageSizeNum,
+                    TotalPages = (int)Math.Ceiling(totalCount / (double)pageSizeNum)
+                });
             });
 
             // GET /api/products/{id} - pojedynczy produkt
@@ -162,32 +255,66 @@ namespace SportRental.Admin.Api
                 await using var db = await dbFactory.CreateDbContextAsync(ct);
                 var tid = tenantProvider.GetCurrentTenantId();
 
-                var query = db.Products.IgnoreQueryFilters().AsNoTracking();
+                var baseQuery = db.Products.IgnoreQueryFilters().AsNoTracking();
                 if (tid.HasValue)
                 {
-                    query = query.Where(p => p.TenantId == tid.Value);
+                    baseQuery = baseQuery.Where(p => p.TenantId == tid.Value);
                 }
 
-                var product = await query
+                var product = await baseQuery
                     .Where(p => p.Id == id)
-                    .Select(p => new
+                    .Join(db.Tenants, p => p.TenantId, t => t.Id, (p, t) => new { Product = p, TenantName = t.Name })
+                    .Select(x => new
                     {
-                        Id = p.Id,
-                        TenantId = p.TenantId,
-                        Name = p.Name,
-                        Sku = p.Sku,
-                        Category = p.Category,
-                        Description = p.Description,
-                        ImageUrl = p.ImageUrl,
-                        PricePerDay = p.DailyPrice,
-                        DailyPrice = p.DailyPrice,
-                        Quantity = p.AvailableQuantity,
-                        AvailableQuantity = p.AvailableQuantity,
-                        IsAvailable = p.Available && p.IsActive && p.AvailableQuantity > 0
+                        Id = x.Product.Id,
+                        TenantId = x.Product.TenantId,
+                        TenantName = x.TenantName,
+                        Name = x.Product.Name,
+                        Sku = x.Product.Sku,
+                        Category = x.Product.Category,
+                        Description = x.Product.Description,
+                        ImageUrl = x.Product.ImageUrl,
+                        PricePerDay = x.Product.DailyPrice,
+                        DailyPrice = x.Product.DailyPrice,
+                        HourlyPrice = x.Product.HourlyPrice,
+                        Quantity = x.Product.AvailableQuantity,
+                        AvailableQuantity = x.Product.AvailableQuantity,
+                        IsAvailable = x.Product.Available && x.Product.IsActive && x.Product.AvailableQuantity > 0,
+                        City = x.Product.City,
+                        Voivodeship = x.Product.Voivodeship
                     })
                     .FirstOrDefaultAsync(ct);
 
                 return product is null ? Results.NotFound() : Results.Ok(product);
+            });
+
+            // GET /api/tenants/locations - lokalizacje wypożyczalni (dla mapy)
+            api.MapGet("/tenants/locations", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                CancellationToken ct) =>
+            {
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var locations = await db.CompanyInfos
+                    .AsNoTracking()
+                    .Where(ci => ci.Lat.HasValue && ci.Lon.HasValue && ci.Lat != 0 && ci.Lon != 0)
+                    .Join(db.Tenants, ci => ci.TenantId, t => t.Id, (ci, t) => new
+                    {
+                        TenantId = t.Id,
+                        TenantName = t.Name,
+                        Lat = ci.Lat,
+                        Lon = ci.Lon,
+                        Address = ci.Address,
+                        City = ci.City,
+                        Voivodeship = ci.Voivodeship,
+                        PhoneNumber = ci.PhoneNumber,
+                        Email = ci.Email,
+                        OpeningHours = ci.OpeningHours,
+                        LogoUrl = t.LogoUrl
+                    })
+                    .ToListAsync(ct);
+
+                return Results.Ok(locations);
             });
 
             // POST /api/payments/quote - wycena płatności

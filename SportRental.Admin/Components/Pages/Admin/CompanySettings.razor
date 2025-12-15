@@ -8,156 +8,291 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject UserManager<ApplicationUser> UserManager
 
-<MudContainer Class="mt-4">
-    <MudText Typo="Typo.h4" Class="mb-4">Ustawienia firmy</MudText>
-    
-    @if (tenant == null)
-    {
-        <MudProgressLinear Indeterminate="true" />
-    }
-    else
-    {
-        <MudGrid Spacing="3">
-            <MudItem xs="12" md="6">
-                <MudPaper Class="p-4">
-                    <MudText Typo="Typo.h6" Class="mb-3">Informacje podstawowe</MudText>
-                    <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
-                        <MudText Typo="Typo.body2">
-                            📄 Te dane będą automatycznie uwzględniane w umowach PDF wysyłanych do klientów!
-                        </MudText>
-                    </MudAlert>
-                    <MudStack Spacing="3">
-                        <MudTextField @bind-Value="tenant.Name" Label="Nazwa firmy" Required="true" />
-                        <MudTextField @bind-Value="companyInfo.Address" Label="Adres" Lines="2" />
-                        <MudTextField @bind-Value="companyInfo.PhoneNumber" Label="Telefon" />
-                        <MudTextField @bind-Value="companyInfo.Email" Label="Email" InputType="InputType.Email" />
-                        <MudTextField @bind-Value="companyInfo.NIP" Label="NIP" HelperText="10 cyfr" MaxLength="20" />
-                        <MudTextField @bind-Value="companyInfo.REGON" Label="REGON" HelperText="9 lub 14 cyfr" MaxLength="14" />
-                        <MudTextField @bind-Value="companyInfo.LegalForm" Label="Forma prawna" />
-                        <MudTextField @bind-Value="companyInfo.OpeningHours" Label="Godziny otwarcia" />
-                        <MudTextField @bind-Value="companyInfo.Description" Label="Opis" Lines="2" />
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
-            
-            <MudItem xs="12" md="6">
-                <MudPaper Class="p-4">
-                    <MudText Typo="Typo.h6" Class="mb-3">Personalizacja</MudText>
-                    <MudStack Spacing="3">
-                        <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny (#RRGGBB)" />
-                        <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy (#RRGGBB)" />
-                        <MudText Typo="Typo.caption">Logo firmy (PNG/SVG)</MudText>
-                        <InputFile OnChange="OnLogoSelected" accept="image/*" />
-                        @if (!string.IsNullOrWhiteSpace(tenant.LogoUrl))
-                        {
-                            <div>
-                                <MudText Typo="Typo.caption">Obecne logo:</MudText>
-                                <img src="@tenant.LogoUrl" alt="Logo" style="max-height: 80px; max-width: 200px;" />
-                            </div>
-                        }
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
-            
-            @* SMS Configuration - tymczasowo ukryte (brak aktywnego konta SMS)
-            <MudItem xs="12" md="6">
-                <MudPaper Class="p-4">
-                    <MudText Typo="Typo.h6" Class="mb-3">📱 Konfiguracja SMS</MudText>
-                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3">
-                        <MudText Typo="Typo.body2">
-                            ⚠️ Funkcje SMS są tymczasowo niedostępne - trwa konfiguracja dostawcy.
-                        </MudText>
-                    </MudAlert>
-                </MudPaper>
-            </MudItem>
-            *@
-            
-            @* Szablony SMS - tymczasowo ukryte (brak aktywnego konta SMS)
-            <MudItem xs="12" md="6">
-                <MudPaper Class="p-4">
-                    <MudText Typo="Typo.h6" Class="mb-3">Szablony SMS</MudText>
-                    <MudStack Spacing="3">
-                        <MudTextField @bind-Value="companyInfo.SmsThanksText" 
-                                      Label="SMS - podziękowanie" 
-                                      Lines="2"
-                                      HelperText="SMS po zakończeniu wynajmu"
-                                      Disabled="@(!companyInfo.SmsThanksEnabled)" />
-                        <MudTextField @bind-Value="companyInfo.SmsReminderText" 
-                                      Label="SMS - przypomnienie 1" 
-                                      Lines="2"
-                                      Disabled="@(!companyInfo.SmsReminderEnabled)" />
-                        <MudTextField @bind-Value="companyInfo.SmsReminderText2" 
-                                      Label="SMS - przypomnienie 2" 
-                                      Lines="2"
-                                      Disabled="@(!companyInfo.SmsReminderEnabled)" />
-                        <MudTextField @bind-Value="companyInfo.SmsReminderText3" 
-                                      Label="SMS - przypomnienie 3" 
-                                      Lines="2"
-                                      Disabled="@(!companyInfo.SmsReminderEnabled)" />
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
-            *@
-            
-            <MudItem xs="12" md="6">
-                <MudPaper Class="p-4">
-                    <MudText Typo="Typo.h6" Class="mb-3">Szablony Email</MudText>
-                    <MudStack Spacing="3">
-                        <MudTextField @bind-Value="companyInfo.EmailThanksText" 
-                                      Label="Email - podziękowanie" 
-                                      Lines="3"
-                                      HelperText="Email po zakończeniu wynajmu" />
-                        <MudTextField @bind-Value="companyInfo.EmailReminderText" 
-                                      Label="Email - przypomnienie 1" 
-                                      Lines="3" />
-                        <MudTextField @bind-Value="companyInfo.EmailReminderText2" 
-                                      Label="Email - przypomnienie 2" 
-                                      Lines="3" />
-                        <MudTextField @bind-Value="companyInfo.EmailReminderText3" 
-                                      Label="Email - przypomnienie 3" 
-                                      Lines="3" />
-                    </MudStack>
-                </MudPaper>
-            </MudItem>
-            
-            <MudItem xs="12">
-                <MudPaper Class="p-4">
-                    <MudText Typo="Typo.h6" Class="mb-3">Dodatkowe informacje</MudText>
-                    <MudStack Spacing="3">
+@if (_isMobile)
+{
+    @* ==================== MOBILE UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-2 px-2">
+        @* Nagłówek mobilny *@
+        <MudPaper Class="pa-3 mb-2" Elevation="2" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">⚙️ Ustawienia firmy</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Save" 
+                               Color="Color.Inherit" 
+                               OnClick="Save"
+                               Disabled="@isSaving" />
+            </div>
+        </MudPaper>
+        
+        @if (tenant == null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudStack Spacing="2">
+                @* Informacje podstawowe *@
+                <MudExpansionPanels Elevation="2">
+                    <MudExpansionPanel Text="📋 Dane firmy" IsInitiallyExpanded="true" Style="border-radius: 10px;">
+                        <MudStack Spacing="2">
+                            <MudTextField @bind-Value="tenant.Name" Label="Nazwa firmy" Required="true" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Address" Label="Adres" Lines="2" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.PhoneNumber" Label="Telefon" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Email" Label="Email" InputType="InputType.Email" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.NIP" Label="NIP" MaxLength="20" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.REGON" Label="REGON" MaxLength="14" Dense="true" Variant="Variant.Outlined" />
+                        </MudStack>
+                    </MudExpansionPanel>
+                    
+                    <MudExpansionPanel Text="🎨 Personalizacja" Style="border-radius: 10px;">
+                        <MudStack Spacing="2">
+                            <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy" Dense="true" Variant="Variant.Outlined" />
+                            <MudText Typo="Typo.caption">Logo firmy</MudText>
+                            <InputFile OnChange="OnLogoSelected" accept="image/*" />
+                            @if (!string.IsNullOrWhiteSpace(tenant.LogoUrl))
+                            {
+                                <img src="@tenant.LogoUrl" alt="Logo" style="max-height: 60px; max-width: 150px;" />
+                            }
+                        </MudStack>
+                    </MudExpansionPanel>
+                    
+                    <MudExpansionPanel Text="📧 Szablony Email" Style="border-radius: 10px;">
+                        <MudStack Spacing="2">
+                            <MudTextField @bind-Value="companyInfo.EmailThanksText" Label="Email - podziękowanie" Lines="2" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.EmailReminderText" Label="Email - przypomnienie" Lines="2" Dense="true" Variant="Variant.Outlined" />
+                        </MudStack>
+                    </MudExpansionPanel>
+                    
+                    <MudExpansionPanel Text="📍 Lokalizacja" Style="border-radius: 10px;">
+                        <MudStack Spacing="2">
+                            <MudTextField @bind-Value="companyInfo.City" Label="Miasto" ReadOnly="true" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Voivodeship" Label="Województwo" ReadOnly="true" Dense="true" Variant="Variant.Outlined" />
+                            <LeafletMap MapId="company-location-map-mobile"
+                                        Height="250px"
+                                        Latitude="@(companyInfo.Lat ?? 52.0)"
+                                        Longitude="@(companyInfo.Lon ?? 19.0)"
+                                        Zoom="@(companyInfo.Lat.HasValue ? 15 : 6)"
+                                        AllowMarkerDrag="true"
+                                        OnLocationChanged="OnLocationChanged"
+                                        OnLocationDetailsChanged="OnLocationDetailsChanged" />
+                        </MudStack>
+                    </MudExpansionPanel>
+                    
+                    <MudExpansionPanel Text="📝 Dodatkowe" Style="border-radius: 10px;">
+                        <MudStack Spacing="2">
+                            <MudTextField @bind-Value="companyInfo.LegalForm" Label="Forma prawna" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.OpeningHours" Label="Godziny otwarcia" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Description" Label="Opis" Lines="2" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.ExtraInfo" Label="Dodatkowe info" Lines="2" Dense="true" Variant="Variant.Outlined" />
+                        </MudStack>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+                
+                @* Przyciski *@
+                <MudStack Row="true" Spacing="2" Class="mud-justify-end">
+                    <MudButton Href="/admin/owner" Variant="Variant.Outlined" Size="Size.Small">Anuluj</MudButton>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@isSaving" Size="Size.Small">
+                        @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
+                        Zapisz
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        }
+    </MudContainer>
+}
+else
+{
+    @* ==================== DESKTOP UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+        <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px;">
+            <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                <MudIcon Icon="@Icons.Material.Filled.Settings" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Ustawienia firmy</MudText>
+                    <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Skonfiguruj dane i wygląd wypożyczalni</MudText>
+                </div>
+            </MudStack>
+        </MudPaper>
+        
+        @if (tenant == null)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else
+        {
+            <MudGrid Spacing="3">
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">📋 Informacje podstawowe</MudText>
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                            <MudText Typo="Typo.body2">
+                                📄 Te dane będą automatycznie uwzględniane w umowach PDF wysyłanych do klientów!
+                            </MudText>
+                        </MudAlert>
+                        <MudStack Spacing="3">
+                            <MudTextField @bind-Value="tenant.Name" Label="Nazwa firmy" Required="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Address" Label="Adres" Lines="2" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.PhoneNumber" Label="Telefon" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Email" Label="Email" InputType="InputType.Email" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.NIP" Label="NIP" HelperText="10 cyfr" MaxLength="20" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.REGON" Label="REGON" HelperText="9 lub 14 cyfr" MaxLength="14" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.LegalForm" Label="Forma prawna" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.OpeningHours" Label="Godziny otwarcia" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Description" Label="Opis" Lines="2" Variant="Variant.Outlined" />
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">🎨 Personalizacja</MudText>
+                        <MudStack Spacing="3">
+                            <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny (#RRGGBB)" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy (#RRGGBB)" Variant="Variant.Outlined" />
+                            <MudText Typo="Typo.caption">Logo firmy (PNG/SVG)</MudText>
+                            <InputFile OnChange="OnLogoSelected" accept="image/*" />
+                            @if (!string.IsNullOrWhiteSpace(tenant.LogoUrl))
+                            {
+                                <div>
+                                    <MudText Typo="Typo.caption">Obecne logo:</MudText>
+                                    <img src="@tenant.LogoUrl" alt="Logo" style="max-height: 80px; max-width: 200px;" />
+                                </div>
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">📧 Szablony Email</MudText>
+                        <MudStack Spacing="3">
+                            <MudTextField @bind-Value="companyInfo.EmailThanksText" 
+                                          Label="Email - podziękowanie" 
+                                          Lines="3"
+                                          Variant="Variant.Outlined"
+                                          HelperText="Email po zakończeniu wynajmu" />
+                            <MudTextField @bind-Value="companyInfo.EmailReminderText" 
+                                          Label="Email - przypomnienie 1" 
+                                          Lines="3"
+                                          Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.EmailReminderText2" 
+                                          Label="Email - przypomnienie 2" 
+                                          Lines="3"
+                                          Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.EmailReminderText3" 
+                                          Label="Email - przypomnienie 3" 
+                                          Lines="3"
+                                          Variant="Variant.Outlined" />
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">📝 Dodatkowe informacje</MudText>
                         <MudTextField @bind-Value="companyInfo.ExtraInfo" 
                                       Label="Dodatkowe informacje" 
                                       Lines="3"
+                                      Variant="Variant.Outlined"
                                       HelperText="Informacje dodatkowe o firmie" />
-                        <MudText Typo="Typo.subtitle2">Lokalizacja GPS</MudText>
-                        <MudStack Row="true" Spacing="2">
-                            <MudNumericField T="double?" @bind-Value="companyInfo.Lat" Label="Szerokość geograficzna" />
-                            <MudNumericField T="double?" @bind-Value="companyInfo.Lon" Label="Długość geograficzna" />
+                    </MudPaper>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">📍 Lokalizacja wypożyczalni</MudText>
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                            <MudText Typo="Typo.body2">
+                                Kliknij na mapie lub wyszukaj adres, aby ustawić lokalizację wypożyczalni. 
+                                Ta lokalizacja będzie widoczna dla klientów w aplikacji.
+                            </MudText>
+                        </MudAlert>
+                        <MudStack Spacing="3">
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="companyInfo.City" 
+                                                  Label="Miasto" 
+                                                  ReadOnly="true"
+                                                  Variant="Variant.Outlined"
+                                                  Adornment="Adornment.Start"
+                                                  AdornmentIcon="@Icons.Material.Filled.LocationCity" />
+                                </MudItem>
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="companyInfo.Voivodeship" 
+                                                  Label="Województwo" 
+                                                  ReadOnly="true"
+                                                  Variant="Variant.Outlined"
+                                                  Adornment="Adornment.Start"
+                                                  AdornmentIcon="@Icons.Material.Filled.Map" />
+                                </MudItem>
+                            </MudGrid>
+                            <MudStack Row="true" Spacing="2" Class="mb-2">
+                                <MudNumericField T="double?" @bind-Value="companyInfo.Lat" 
+                                                 Label="Szerokość geograficzna" 
+                                                 Format="F6"
+                                                 ReadOnly="true"
+                                                 Variant="Variant.Outlined" />
+                                <MudNumericField T="double?" @bind-Value="companyInfo.Lon" 
+                                                 Label="Długość geograficzna" 
+                                                 Format="F6"
+                                                 ReadOnly="true"
+                                                 Variant="Variant.Outlined" />
+                                @if (companyInfo.Lat.HasValue && companyInfo.Lon.HasValue)
+                                {
+                                    <MudButton Variant="Variant.Outlined" 
+                                               Color="Color.Secondary" 
+                                               OnClick="ClearLocation"
+                                               StartIcon="@Icons.Material.Filled.Clear">
+                                        Wyczyść
+                                    </MudButton>
+                                }
+                            </MudStack>
+                            <LeafletMap MapId="company-location-map"
+                                        Height="400px"
+                                        Latitude="@(companyInfo.Lat ?? 52.0)"
+                                        Longitude="@(companyInfo.Lon ?? 19.0)"
+                                        Zoom="@(companyInfo.Lat.HasValue ? 15 : 6)"
+                                        AllowMarkerDrag="true"
+                                        OnLocationChanged="OnLocationChanged"
+                                        OnLocationDetailsChanged="OnLocationDetailsChanged" />
                         </MudStack>
+                    </MudPaper>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudStack Row="true" Spacing="2" Class="mud-justify-end">
+                        <MudButton Href="/admin/owner" Variant="Variant.Outlined">Anuluj</MudButton>
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@isSaving">
+                            @if (isSaving)
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+                                <MudText Class="ml-2">Zapisywanie...</MudText>
+                            }
+                            else
+                            {
+                                <MudText>Zapisz ustawienia</MudText>
+                            }
+                        </MudButton>
                     </MudStack>
-                </MudPaper>
-            </MudItem>
-            
-            <MudItem xs="12">
-                <MudStack Row="true" Spacing="2" Class="mud-justify-end">
-                    <MudButton Href="/admin/owner" Variant="Variant.Outlined">Anuluj</MudButton>
-                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@isSaving">
-                        @if (isSaving)
-                        {
-                            <MudProgressCircular Size="Size.Small" Indeterminate="true" />
-                            <MudText Class="ml-2">Zapisywanie...</MudText>
-                        }
-                        else
-                        {
-                            <MudText>Zapisz ustawienia</MudText>
-                        }
-                    </MudButton>
-                </MudStack>
-            </MudItem>
-        </MudGrid>
-    }
-</MudContainer>
+                </MudItem>
+            </MudGrid>
+        }
+    </MudContainer>
+}
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
 @code {
+    // ==================== BREAKPOINT ====================
+    private bool _isMobile = false;
+    
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        _isMobile = breakpoint < Breakpoint.Md;
+        StateHasChanged();
+    }
+
+    // ==================== DATA ====================
     private Tenant? tenant;
     private CompanyInfoDto companyInfo = new();
     private IBrowserFile? selectedLogoFile;
@@ -169,10 +304,8 @@
     {
         try
         {
-            // Pobierz _tenantId z różnych źródeł
             _tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
             
-            // Jeśli TenantProvider nie zwrócił _tenantId, spróbuj pobrać z użytkownika
             if (_tenantId == Guid.Empty)
             {
                 var authState = await AuthStateProvider.GetAuthenticationStateAsync();
@@ -192,7 +325,6 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Błąd ładowania ustawień: {ex.Message}", Severity.Error);
-            Console.WriteLine($"CompanySettings LoadData error: {ex}");
         }
     }
 
@@ -204,7 +336,6 @@
         tenant = await Db.Tenants.FirstOrDefaultAsync(t => t.Id == _tenantId);
         if (tenant == null)
         {
-            // Utwórz nowy tenant jeśli nie istnieje (dla SuperAdmina)
             if (_tenantId != Guid.Empty)
             {
                 tenant = new Tenant { Id = _tenantId, Name = "Nowa wypożyczalnia" };
@@ -235,11 +366,11 @@
                 ExtraInfo = existingCompanyInfo.ExtraInfo,
                 Lat = existingCompanyInfo.Lat,
                 Lon = existingCompanyInfo.Lon,
-                // SMS Configuration
+                City = existingCompanyInfo.City,
+                Voivodeship = existingCompanyInfo.Voivodeship,
                 SmsConfirmationEnabled = existingCompanyInfo.SmsConfirmationEnabled,
                 SmsThanksEnabled = existingCompanyInfo.SmsThanksEnabled,
                 SmsReminderEnabled = existingCompanyInfo.SmsReminderEnabled,
-                // SMS Templates
                 SmsThanksText = existingCompanyInfo.SmsThanksText,
                 SmsReminderText = existingCompanyInfo.SmsReminderText,
                 SmsReminderText2 = existingCompanyInfo.SmsReminderText2,
@@ -257,6 +388,35 @@
         selectedLogoFile = e.File;
     }
 
+    private void OnLocationChanged((double Lat, double Lon) location)
+    {
+        companyInfo.Lat = Math.Round(location.Lat, 6);
+        companyInfo.Lon = Math.Round(location.Lon, 6);
+        StateHasChanged();
+    }
+
+    private void OnLocationDetailsChanged(LeafletMap.LocationDetails details)
+    {
+        companyInfo.Lat = Math.Round(details.Lat, 6);
+        companyInfo.Lon = Math.Round(details.Lon, 6);
+        companyInfo.City = details.City;
+        companyInfo.Voivodeship = details.Voivodeship;
+        if (!string.IsNullOrWhiteSpace(details.Address))
+        {
+            companyInfo.Address = details.Address;
+        }
+        StateHasChanged();
+    }
+
+    private void ClearLocation()
+    {
+        companyInfo.Lat = null;
+        companyInfo.Lon = null;
+        companyInfo.City = null;
+        companyInfo.Voivodeship = null;
+        StateHasChanged();
+    }
+
     private async Task Save()
     {
         if (tenant == null) return;
@@ -267,10 +427,8 @@
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(_tenantId);
             
-            // Update tenant info
             Db.Tenants.Update(tenant);
             
-            // Handle logo upload
             if (selectedLogoFile != null)
             {
                 using var content = new MultipartFormDataContent();
@@ -285,7 +443,6 @@
                 }
             }
             
-            // Update or create company info
             var existingCompanyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == _tenantId);
             if (existingCompanyInfo != null)
             {
@@ -300,11 +457,11 @@
                 existingCompanyInfo.ExtraInfo = companyInfo.ExtraInfo;
                 existingCompanyInfo.Lat = companyInfo.Lat;
                 existingCompanyInfo.Lon = companyInfo.Lon;
-                // SMS Configuration
+                existingCompanyInfo.City = companyInfo.City;
+                existingCompanyInfo.Voivodeship = companyInfo.Voivodeship;
                 existingCompanyInfo.SmsConfirmationEnabled = companyInfo.SmsConfirmationEnabled;
                 existingCompanyInfo.SmsThanksEnabled = companyInfo.SmsThanksEnabled;
                 existingCompanyInfo.SmsReminderEnabled = companyInfo.SmsReminderEnabled;
-                // SMS Templates
                 existingCompanyInfo.SmsThanksText = companyInfo.SmsThanksText;
                 existingCompanyInfo.SmsReminderText = companyInfo.SmsReminderText;
                 existingCompanyInfo.SmsReminderText2 = companyInfo.SmsReminderText2;
@@ -334,11 +491,11 @@
                     ExtraInfo = companyInfo.ExtraInfo,
                     Lat = companyInfo.Lat,
                     Lon = companyInfo.Lon,
-                    // SMS Configuration
+                    City = companyInfo.City,
+                    Voivodeship = companyInfo.Voivodeship,
                     SmsConfirmationEnabled = companyInfo.SmsConfirmationEnabled,
                     SmsThanksEnabled = companyInfo.SmsThanksEnabled,
                     SmsReminderEnabled = companyInfo.SmsReminderEnabled,
-                    // SMS Templates
                     SmsThanksText = companyInfo.SmsThanksText,
                     SmsReminderText = companyInfo.SmsReminderText,
                     SmsReminderText2 = companyInfo.SmsReminderText2,
@@ -381,11 +538,11 @@
         public string? ExtraInfo { get; set; }
         public double? Lat { get; set; }
         public double? Lon { get; set; }
-        // SMS Configuration
+        public string? City { get; set; }
+        public string? Voivodeship { get; set; }
         public bool SmsConfirmationEnabled { get; set; }
         public bool SmsThanksEnabled { get; set; }
         public bool SmsReminderEnabled { get; set; }
-        // SMS Templates
         public string? SmsThanksText { get; set; }
         public string? SmsReminderText { get; set; }
         public string? SmsReminderText2 { get; set; }

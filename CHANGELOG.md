@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### ✨ Added (Grudzień 2025)
+
+#### 🕐 Wynajem godzinowy
+- Dodano `HourlyPrice` do modelu `Product` - opcjonalna cena za godzinę
+- Dodano `RentalType` enum (`Daily`, `Hourly`) do `Rental` i `RentalItem`
+- Dodano `HoursRented` do `Rental` - liczba godzin przy wynajmie godzinowym
+- Dodano `PricePerHour` do `RentalItem` - cena za godzinę w momencie wynajmu
+- Zaktualizowano `PaymentCalculator` - obsługa kalkulacji cen godzinowych
+- Zaktualizowano UI w Admin - wybór typu wynajmu przy tworzeniu wynajmu
+- Zaktualizowano UI w Client:
+  - `Products.razor` - wyświetlanie ceny godzinowej
+  - `ProductDetails.razor` - wybór typu wynajmu i liczby godzin
+  - `Cart.razor` - zmiana typu wynajmu per pozycja
+  - `Checkout.razor` - wyświetlanie i przekazywanie typu wynajmu do API
+
+#### 🛠️ Usprawnienia developerskie
+- Dodano profil uruchamiania "Admin + Client" w Visual Studio (`SportRentalHybrid.slnLaunch`)
+- Wyłączono `launchBrowser` dla Admin - tylko Client otwiera przeglądarkę
+- Wyłączono HTTPS redirect w Development - poprawka CORS dla lokalnego testowania
+- Zaktualizowano `appsettings.Development.json` w Client - poprawny port API
+
+#### 📡 Zmiany w architekturze
+- **SportRental.Api** - projekt wyłączony, API hostowane w SportRental.Admin
+- **SportRental.MediaStorage** - projekt wyłączony, pliki w Azure Blob Storage
+- Dodano `HourlyPrice` do endpointów `/api/products` i `/api/products/{id}`
+
+#### 📚 Dokumentacja
+- Zaktualizowano README.md - nowa architektura, wyłączone projekty
+- Zaktualizowano ARCHITECTURE.md - aktualne diagramy i opisy
+- Dodano informacje o nowych funkcjach (wynajem godzinowy, SMS, holds)
+
+---
+
+## [1.0.0] - Initial Release
+
 ### 🎉 Initial Release Features
 
 #### ✨ Added

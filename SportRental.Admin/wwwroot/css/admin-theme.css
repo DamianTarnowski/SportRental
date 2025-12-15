@@ -667,3 +667,141 @@ article.content {
     }
 }
 
+/* ============================================
+   DASHBOARD GRADIENT CARDS
+   ============================================ */
+.dashboard-card-peach {
+    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+}
+
+.dashboard-card-title {
+    color: #2c3e50;
+}
+
+.dashboard-card-subtitle {
+    color: #7f8c8d;
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+.mud-theme-dark {
+    --admin-bg: #121212;
+    --admin-surface: #1e1e1e;
+    --admin-text: #e0e0e0;
+    --admin-text-secondary: #9e9e9e;
+    --admin-border: #333333;
+}
+
+/* Dark mode - karty z gradientami */
+.mud-theme-dark .mud-card {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Dark mode - karty z jasnymi gradientami - przyciemnij je */
+.mud-theme-dark [style*="linear-gradient(135deg, #ffecd2"] {
+    background: linear-gradient(135deg, #3d2f1f 0%, #4a3020 100%) !important;
+}
+
+.mud-theme-dark [style*="linear-gradient(135deg, #a8edea"] {
+    background: linear-gradient(135deg, #1f3d3a 0%, #2a3d38 100%) !important;
+}
+
+.mud-theme-dark [style*="linear-gradient(135deg, #ff9a9e"] {
+    background: linear-gradient(135deg, #3d1f1f 0%, #4a2030 100%) !important;
+}
+
+/* Dark mode - tekst w kartach z jasnymi gradientami */
+.mud-theme-dark [style*="color: #2c3e50"] {
+    color: #e0e0e0 !important;
+}
+
+.mud-theme-dark [style*="color: #7f8c8d"] {
+    color: #9e9e9e !important;
+}
+
+/* Dark mode - tabele */
+.mud-theme-dark .mud-table-head {
+    background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%) !important;
+}
+
+.mud-theme-dark .mud-table-head th {
+    color: #e0e0e0 !important;
+}
+
+.mud-theme-dark .mud-table-row:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Dark mode - scrollbar */
+.mud-theme-dark ::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.mud-theme-dark ::-webkit-scrollbar-thumb {
+    background: #424242;
+}
+
+.mud-theme-dark ::-webkit-scrollbar-thumb:hover {
+    background: #616161;
+}
+
+/* Dark mode - formularze */
+.mud-theme-dark .mud-input-outlined .mud-input-outlined-border {
+    border-color: #424242 !important;
+}
+
+.mud-theme-dark .mud-input-outlined:hover .mud-input-outlined-border {
+    border-color: #616161 !important;
+}
+
+/* Dark mode - alerty */
+.mud-theme-dark .mud-alert-filled-info {
+    background-color: rgba(33, 150, 243, 0.15) !important;
+}
+
+/* Dark mode - skeleton */
+.mud-theme-dark .admin-skeleton {
+    background: linear-gradient(90deg, #2d2d2d 25%, #3d3d3d 50%, #2d2d2d 75%);
+}
+
+/* Dark mode - page header */
+.mud-theme-dark .admin-page-header {
+    background: var(--admin-surface);
+    border-color: var(--admin-border);
+}
+
+/* Dark mode - stat cards */
+.mud-theme-dark .admin-stat-card {
+    background: var(--admin-surface);
+    border-color: var(--admin-border);
+}
+
+.mud-theme-dark .admin-stat-value {
+    color: var(--admin-text);
+}
+
+/* Dark mode - quick actions */
+.mud-theme-dark .admin-quick-action {
+    background: var(--admin-surface);
+    border-color: var(--admin-border);
+    color: var(--admin-text);
+}
+
+.mud-theme-dark .admin-quick-action p {
+    color: var(--admin-text-secondary);
+}
+
+/* Dark mode - dashboard gradient cards */
+.mud-theme-dark .dashboard-card-peach {
+    background: linear-gradient(135deg, #3d2a1f 0%, #4a2820 100%) !important;
+}
+
+.mud-theme-dark .dashboard-card-title {
+    color: #e0e0e0 !important;
+}
+
+.mud-theme-dark .dashboard-card-subtitle {
+    color: #9e9e9e !important;
+}
+

@@ -2,9 +2,20 @@
 
 > Looking for a portfolio pitch? Check `docs/SHOWCASE.md` for a curated overview and demo script.
 
+> **Ostatnia aktualizacja:** Grudzień 2025
+
+## ⚠️ Aktualna architektura
+
+**WAŻNE:** Obecna architektura jest uproszczona:
+
+- **SportRental.Admin** - Blazor Server hostujący panel administracyjny **ORAZ API dla klienta WASM**
+- **SportRental.Client** - Blazor WASM łączący się z API w Admin
+- **SportRental.Api** - ⏸️ **WYŁĄCZONY** - przygotowany na przyszłość
+- **SportRental.MediaStorage** - ⏸️ **WYŁĄCZONY** - pliki w Azure Blob Storage
+
 ## Wymagania wstepne
 - Windows/Linux/macOS z aktualnym PowerShell lub bash.
-- .NET 9 SDK (RC1 lub nowszy) oraz narzedzie Entity Framework CLI (`dotnet tool install --global dotnet-ef`).
+- .NET 10 SDK oraz narzedzie Entity Framework CLI (`dotnet tool install --global dotnet-ef`).
 - **Azure CLI** (`az`) - WYMAGANE dla lokalnego developmentu! https://aka.ms/installazurecliwindows
 - **Dostęp do Azure Key Vault** - sekrety są przechowywane TYLKO w Key Vault (nie w plikach!).
 - PostgreSQL 15+ (lokalny lub kontener Azure). Connection string w Key Vault.
@@ -46,9 +57,8 @@ dotnet restore SportRentalHybrid.sln
      --value "Host=YOUR-HOST;Port=5432;Database=sr;Username=...;Password=...;SSL Mode=Require"
    ```
 3. Connection string używany jest przez:
-   - `SportRental.Admin` (panel administracyjny)
-   - `SportRental.Api` (publiczne API)
-   - Oba pobierają automatycznie z Key Vault przy starcie.
+   - `SportRental.Admin` (panel administracyjny + API)
+   - Pobiera automatycznie z Key Vault przy starcie.
 
 ## Migracje EF Core
 - Zastosowanie migracji:
@@ -75,19 +85,24 @@ az login --tenant YOUR-TENANT-ID
 az account show
 ```
 
-Zalecana kolejnosc (od osobnych terminali lub poprzez konfiguracje VS/Rider):
+### Opcja A: Visual Studio (ZALECANE)
+1. Otwórz `SportRentalHybrid.sln`
+2. Przy przycisku Start kliknij strzałkę w dół
+3. Wybierz profil **"Admin + Client"**
+4. Naciśnij F5 - uruchomią się oba projekty
+
+### Opcja B: Terminal
 ```bash
-# 1. Publiczne API (pobiera sekrety z Key Vault)
-dotnet run --project SportRental.Api --urls "https://localhost:7142"
+# 1. Panel administracyjny + API (pobiera sekrety z Key Vault)
+dotnet run --project SportRental.Admin --urls "http://localhost:5001"
 # Musisz zobaczyć: 🔐 Azure Key Vault configured: https://...
 
-# 2. Panel administracyjny (pobiera sekrety z Key Vault)
-dotnet run --project SportRental.Admin --urls "https://localhost:5016"
-# Musisz zobaczyć: 🔐 Azure Key Vault configured: https://...
-
-# 3. Klient WASM
+# 2. Klient WASM (w osobnym terminalu)
 dotnet run --project SportRental.Client --urls "http://localhost:5014"
 ```
+
+> **UWAGA:** Projekty `SportRental.Api` i `SportRental.MediaStorage` są obecnie **WYŁĄCZONE**.
+> API jest hostowane w `SportRental.Admin`, pliki w Azure Blob Storage.
 
 **Jeśli NIE widzisz "🔐 Azure Key Vault configured":**
 1. Sprawdź `appsettings.Development.json` → `KeyVault:Url` musi być ustawione

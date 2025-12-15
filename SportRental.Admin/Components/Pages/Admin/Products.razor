@@ -3,261 +3,294 @@
 @attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 @using SportRental.Infrastructure.Domain
 
-
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject MudBlazor.ISnackbar Snackbar
 @inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
 @inject IDialogService DialogService
+@if (_isMobile)
+{
+    @* ==================== MOBILE UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-2 px-2">
+        @* Nagłówek mobilny - kompaktowy *@
+        <MudPaper Class="pa-3 mb-2" Elevation="2" Style="background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%); color: white; border-radius: 12px;">
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">📦 Produkty</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                               Color="Color.Inherit" 
+                               OnClick="CreateNew" />
+            </div>
+        </MudPaper>
+        
+        @* Wyszukiwarka mobilna *@
+        <MudTextField @bind-Value="search"
+                      Placeholder="Szukaj..." 
+                      Immediate="true" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      Clearable="true"
+                      Variant="Variant.Outlined"
+                      Dense="true"
+                      Class="mb-2" />
+        
+        @* Filtry mobilne - chipy *@
+        <div class="d-flex gap-1 mb-2 flex-wrap">
+            <MudChip T="string" 
+                     Color="@(cbAvailable ? Color.Success : Color.Default)" 
+                     Variant="@(cbAvailable ? Variant.Filled : Variant.Outlined)"
+                     Size="Size.Small"
+                     OnClick="() => cbAvailable = !cbAvailable">
+                Dostępne
+            </MudChip>
+            <MudChip T="string" 
+                     Color="@(cbRented ? Color.Warning : Color.Default)" 
+                     Variant="@(cbRented ? Variant.Filled : Variant.Outlined)"
+                     Size="Size.Small"
+                     OnClick="() => cbRented = !cbRented">
+                Wypożyczone
+            </MudChip>
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                           Size="Size.Small"
+                           OnClick="() => InvokeAsync(StateHasChanged)" />
+        </div>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-    <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%); color: white; border-radius: 20px;">
-        <MudStack Row="true" Class="mud-space-between">
-            <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" />
-                <div>
-                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Produkty</MudText>
-                    <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj sprzętem sportowym</MudText>
-                </div>
-            </MudStack>
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Surface" 
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="CreateNew"
-                       Size="Size.Large"
-                       Class="rounded-pill px-6">
-                Nowy produkt
-            </MudButton>
-        </MudStack>
-    </MudPaper>
-    <MudCard Elevation="4" Class="mb-4" Style="border-radius: 16px;">
-        <MudCardContent Class="pa-4">
-            <MudGrid Class="mud-align-end" Spacing="3">
-                <MudItem xs="12" md="4">
-                    <MudTextField 
-                        @bind-Value="search"
-                        Placeholder="Wyszukaj produkt..." 
-                        Immediate="true" 
-                        Adornment="Adornment.Start" 
-                        AdornmentIcon="@Icons.Material.Filled.Search" 
-                        Clearable="true"
-                        Variant="Variant.Outlined"
-                        Class="rounded-lg" />
-                </MudItem>
-                <MudItem xs="12" md="6">
-                    <MudStack Row="true" Spacing="4" Class="mud-align-center">
-                        <MudSwitch @bind-Value="cbAvailable" 
-                                   Label="Dostępne" 
-                                   Color="Color.Success"
-                                   ThumbIcon="@Icons.Material.Filled.CheckCircle" />
-                        <MudSwitch @bind-Value="cbRented" 
-                                   Label="Wypożyczone" 
-                                   Color="Color.Warning"
-                                   ThumbIcon="@Icons.Material.Filled.Schedule" />
-                    </MudStack>
-                </MudItem>
-                <MudItem xs="12" md="2">
-                    <MudStack Row="true" Spacing="1">
-                        <MudTooltip Text="Odśwież listę produktów">
-                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
-                                           Color="Color.Primary" 
-                                           OnClick="() => InvokeAsync(StateHasChanged)"
-                                           Size="Size.Large" />
-                        </MudTooltip>
-                        <MudTooltip Text="Widok siatki/lista">
-                            <MudIconButton Icon="@(gridView ? Icons.Material.Filled.ViewList : Icons.Material.Filled.GridView)" 
-                                           Color="Color.Primary" 
-                                           OnClick="() => gridView = !gridView"
-                                           Size="Size.Large" />
-                        </MudTooltip>
-                    </MudStack>
-                </MudItem>
-            </MudGrid>
-        </MudCardContent>
-    </MudCard>
-
-    @if (!filtered.Any())
-    {
-        <MudCard Elevation="2" Class="text-center pa-8" Style="border-radius: 16px;">
-            <MudCardContent>
-                <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" Class="mb-3" />
-                <MudText Typo="Typo.h6" Color="Color.Default">Brak produktów do wyświetlenia</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Default">Zmień filtry lub dodaj nowy produkt</MudText>
-            </MudCardContent>
-        </MudCard>
-    }
-    else
-    {
-        @if (gridView)
+        @if (!filtered.Any())
         {
-            <MudGrid Spacing="3">
-                @foreach (var product in filtered)
-                {
-                    <MudItem xs="12" sm="6" md="4" lg="3">
-                        <MudCard Elevation="6" Class="product-card h-100" Style="@($"border-radius: 16px; transition: all 0.3s ease;{(IsCurrentlyRented(product.Id) ? " border: 2px solid #ff9800;" : "")}")" >
-                            @if (!string.IsNullOrEmpty(product.ImageUrl))
-                            {
-                                <MudCardMedia Image="@product.ImageUrl" Height="200" Style="border-radius: 16px 16px 0 0;" />
-                            }
-                            else
-                            {
-                                <MudPaper Height="200px" Class="d-flex align-center justify-center" Style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 16px 16px 0 0;">
-                                    <MudIcon Icon="@GetProductIcon(product.Category)" Size="Size.Large" Color="Color.Primary" />
-                                </MudPaper>
-                            }
-                            
-                            <MudCardContent Class="pa-4">
-                                <MudStack Spacing="2">
-                                    <div>
-                                        <MudText Typo="Typo.h6" Style="font-weight: 600;" Class="mb-1">@product.Name</MudText>
-                                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">@product.Sku</MudChip>
-                                    </div>
-                                    
-                                    @if (IsCurrentlyRented(product.Id))
-                                    {
-                                        <MudAlert Severity="Severity.Warning" Dense="true" NoIcon="true" Class="pa-2">
-                                            <MudText Typo="Typo.caption">
-                                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
-                                                Obecnie wypożyczony
-                                            </MudText>
-                                        </MudAlert>
-                                    }
-                                    
-                                    <MudStack Row="true" Class="mud-space-between" Spacing="3">
-                                        <MudStack Spacing="0">
-                                            <MudText Typo="Typo.h6" Color="Color.Primary" Style="font-weight: 700;">
-                                                @product.DailyPrice.ToString("0.00") zł/dzień
-                                            </MudText>
-                                            @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
-                                            {
-                                                <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                                    @product.HourlyPrice.Value.ToString("0.00") zł/godz.
-                                                </MudText>
-                                            }
-                                        </MudStack>
-                                        <MudChip T="string" Size="Size.Small" 
-                                                 Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)"
-                                                 Variant="Variant.Filled">
-                                            @product.AvailableQuantity szt.
-                                        </MudChip>
-                                    </MudStack>
-                                    
-                                    @if (!string.IsNullOrEmpty(product.Category))
-                                    {
-                                        <MudChip T="string" Size="Size.Small" 
-                                                 Icon="@Icons.Material.Filled.Category" 
-                                                 Color="Color.Info" 
-                                                 Variant="Variant.Text">
-                                            @product.Category
-                                        </MudChip>
-                                    }
-                                    
-                                    @if (!string.IsNullOrEmpty(product.Description))
-                                    {
-                                        <MudText Typo="Typo.body2" Color="Color.Default" Style="line-height: 1.4;">
-                                            @(product.Description.Length > 80 ? product.Description.Substring(0, 80) + "..." : product.Description)
-                                        </MudText>
-                                    }
-                                </MudStack>
-                            </MudCardContent>
-                            
-                            <MudCardActions Class="pa-3 pt-0">
-                                <MudStack Spacing="1" Class="w-100">
-                                    <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" FullWidth="true">
-                                        <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                                   OnClick="() => Edit(product)"
-                                                   Size="Size.Small">
-                                            Edytuj
-                                        </MudButton>
-                                        <MudButton StartIcon="@Icons.Material.Filled.Delete" 
-                                                   OnClick="() => Delete(product)"
-                                                   Color="Color.Error"
-                                                   Size="Size.Small">
-                                            Usuń
-                                        </MudButton>
-                                    </MudButtonGroup>
-                                    
-                                    @if (product.IsActive)
-                                    {
-                                        <MudButton StartIcon="@Icons.Material.Filled.VisibilityOff" 
-                                                   OnClick="() => ToggleActive(product)"
-                                                   Color="Color.Warning"
-                                                   Variant="Variant.Filled"
-                                                   Size="Size.Small"
-                                                   FullWidth="true">
-                                            Dezaktywuj
-                                        </MudButton>
-                                    }
-                                    else
-                                    {
-                                        <MudButton StartIcon="@Icons.Material.Filled.Visibility" 
-                                                   OnClick="() => ToggleActive(product)"
-                                                   Color="Color.Success"
-                                                   Variant="Variant.Filled"
-                                                   Size="Size.Small"
-                                                   FullWidth="true">
-                                            Aktywuj
-                                        </MudButton>
-                                    }
-                                </MudStack>
-                            </MudCardActions>
-                        </MudCard>
-                    </MudItem>
-                }
-            </MudGrid>
+            <MudAlert Severity="Severity.Info" Dense="true">Brak produktów</MudAlert>
         }
         else
         {
-            <MudStack Spacing="2">
+            @* Lista produktów mobilna *@
+            <MudStack Spacing="1">
                 @foreach (var product in filtered)
                 {
-                    <MudCard Elevation="4" Style="@($"border-radius: 16px;{(IsCurrentlyRented(product.Id) ? " border-left: 4px solid #ff9800;" : "")}")" >
-                        <MudCardContent Class="pa-4">
-                            <MudGrid Class="mud-align-center" Spacing="3">
-                                <MudItem xs="12" md="8">
-                    <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                                        @if (!string.IsNullOrEmpty(product.ImageUrl))
+                    <MudCard Elevation="2" Style="@($"border-radius: 10px;{(IsCurrentlyRented(product.Id) ? " border-left: 3px solid #ff9800;" : "")}")">
+                        <MudCardContent Class="pa-2">
+                            <div class="d-flex align-center gap-2">
+                                @if (!string.IsNullOrEmpty(product.ImageUrl))
+                                {
+                                    <MudAvatar Size="Size.Medium" Style="border-radius: 8px;">
+                                        <MudImage Src="@product.ImageUrl" Alt="@product.Name" />
+                                    </MudAvatar>
+                                }
+                                else
+                                {
+                                    <MudAvatar Size="Size.Medium" Color="Color.Primary">
+                                        <MudIcon Icon="@GetProductIcon(product.Category)" Size="Size.Small" />
+                                    </MudAvatar>
+                                }
+                                <div class="flex-1 overflow-hidden">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        @product.Name
+                                    </MudText>
+                                    <div class="d-flex align-center gap-1">
+                                        <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">
+                                            @product.DailyPrice.ToString("0") zł
+                                        </MudText>
+                                        <MudText Typo="Typo.caption">•</MudText>
+                                        <MudText Typo="Typo.caption" Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)">
+                                            @product.AvailableQuantity szt.
+                                        </MudText>
+                                    </div>
+                                </div>
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => Edit(product)">Edytuj</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="() => Delete(product)">Usuń</MudMenuItem>
+                                    @if (product.IsActive)
+                                    {
+                                        <MudMenuItem Icon="@Icons.Material.Filled.VisibilityOff" OnClick="() => ToggleActive(product)">Dezaktywuj</MudMenuItem>
+                                    }
+                                    else
+                                    {
+                                        <MudMenuItem Icon="@Icons.Material.Filled.Visibility" OnClick="() => ToggleActive(product)">Aktywuj</MudMenuItem>
+                                    }
+                                </MudMenu>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+        }
+    </MudContainer>
+}
+else
+{
+    @* ==================== DESKTOP UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%); color: white; border-radius: 20px;">
+            <MudStack Row="true" Class="mud-space-between">
+                <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                    <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" />
+                    <div>
+                        <MudText Typo="Typo.h4" Style="font-weight: 700;">Produkty</MudText>
+                        <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj sprzętem sportowym</MudText>
+                    </div>
+                </MudStack>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Surface" 
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="CreateNew"
+                           Size="Size.Large"
+                           Class="rounded-pill px-6">
+                    Nowy produkt
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+        
+        <MudCard Elevation="4" Class="mb-4" Style="border-radius: 16px;">
+            <MudCardContent Class="pa-4">
+                <MudGrid Class="mud-align-end" Spacing="3">
+                    <MudItem xs="12" md="4">
+                        <MudTextField 
+                            @bind-Value="search"
+                            Placeholder="Wyszukaj produkt..." 
+                            Immediate="true" 
+                            Adornment="Adornment.Start" 
+                            AdornmentIcon="@Icons.Material.Filled.Search" 
+                            Clearable="true"
+                            Variant="Variant.Outlined"
+                            Class="rounded-lg" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudStack Row="true" Spacing="4" Class="mud-align-center">
+                            <MudSwitch @bind-Value="cbAvailable" 
+                                       Label="Dostępne" 
+                                       Color="Color.Success"
+                                       ThumbIcon="@Icons.Material.Filled.CheckCircle" />
+                            <MudSwitch @bind-Value="cbRented" 
+                                       Label="Wypożyczone" 
+                                       Color="Color.Warning"
+                                       ThumbIcon="@Icons.Material.Filled.Schedule" />
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" md="2">
+                        <MudStack Row="true" Spacing="1">
+                            <MudTooltip Text="Odśwież listę produktów">
+                                <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                                               Color="Color.Primary" 
+                                               OnClick="() => InvokeAsync(StateHasChanged)"
+                                               Size="Size.Large" />
+                            </MudTooltip>
+                            <MudTooltip Text="Widok siatki/lista">
+                                <MudIconButton Icon="@(gridView ? Icons.Material.Filled.ViewList : Icons.Material.Filled.GridView)" 
+                                               Color="Color.Primary" 
+                                               OnClick="() => gridView = !gridView"
+                                               Size="Size.Large" />
+                            </MudTooltip>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+
+        @if (!filtered.Any())
+        {
+            <MudCard Elevation="2" Class="text-center pa-8" Style="border-radius: 16px;">
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" Class="mb-3" />
+                    <MudText Typo="Typo.h6" Color="Color.Default">Brak produktów do wyświetlenia</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">Zmień filtry lub dodaj nowy produkt</MudText>
+                </MudCardContent>
+            </MudCard>
+        }
+        else
+        {
+            @if (gridView)
+            {
+                <MudGrid Spacing="3">
+                    @foreach (var product in filtered)
+                    {
+                        <MudItem xs="12" sm="6" md="4" lg="3">
+                            <MudCard Elevation="6" Class="product-card h-100" Style="@($"border-radius: 16px; transition: all 0.3s ease;{(IsCurrentlyRented(product.Id) ? " border: 2px solid #ff9800;" : "")}")">
+                                @if (!string.IsNullOrEmpty(product.ImageUrl))
+                                {
+                                    <MudCardMedia Image="@product.ImageUrl" Height="200" Style="border-radius: 16px 16px 0 0;" />
+                                }
+                                else
+                                {
+                                    <MudPaper Height="200px" Class="d-flex align-center justify-center" Style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-radius: 16px 16px 0 0;">
+                                        <MudIcon Icon="@GetProductIcon(product.Category)" Size="Size.Large" Color="Color.Primary" />
+                                    </MudPaper>
+                                }
+                                
+                                <MudCardContent Class="pa-4">
+                                    <MudStack Spacing="2">
+                                        <div>
+                                            <MudText Typo="Typo.h6" Style="font-weight: 600;" Class="mb-1">@product.Name</MudText>
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Text">@product.Sku</MudChip>
+                                        </div>
+                                        
+                                        @if (IsCurrentlyRented(product.Id))
                                         {
-                                            <MudAvatar Size="Size.Large">
-                                                <img src="@product.ImageUrl" alt="@product.Name" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />
-                                            </MudAvatar>
+                                            <MudAlert Severity="Severity.Warning" Dense="true" NoIcon="true" Class="pa-2">
+                                                <MudText Typo="Typo.caption">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
+                                                    Obecnie wypożyczony
+                                                </MudText>
+                                            </MudAlert>
                                         }
-                                        else
-                                        {
-                                            <MudAvatar Size="Size.Large" Color="Color.Primary">
-                                                <MudIcon Icon="@GetProductIcon(product.Category)" />
-                                            </MudAvatar>
-                                        }
-                                        <MudStack Spacing="1">
-                                            <MudText Typo="Typo.h6" Style="font-weight: 600;">@product.Name</MudText>
-                                            <MudStack Row="true" Spacing="2" Class="mud-align-center">
-                                                <MudChip T="string" Size="Size.Small" Color="Color.Default">@product.Sku</MudChip>
-                                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Category">@(product.Category ?? "Brak")</MudChip>
-                                                <MudChip T="string" Size="Size.Small" Color="Color.Success">@product.DailyPrice.ToString("0.00") zł/dzień</MudChip>
-                                                <MudChip T="string" Size="Size.Small" Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)">@product.AvailableQuantity szt.</MudChip>
+                                        
+                                        <MudStack Row="true" Class="mud-space-between" Spacing="3">
+                                            <MudStack Spacing="0">
+                                                <MudText Typo="Typo.h6" Color="Color.Primary" Style="font-weight: 700;">
+                                                    @product.DailyPrice.ToString("0.00") zł/dzień
+                                                </MudText>
+                                                @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
+                                                {
+                                                    <MudText Typo="Typo.body2" Color="Color.Secondary">
+                                                        @product.HourlyPrice.Value.ToString("0.00") zł/godz.
+                                                    </MudText>
+                                                }
                                             </MudStack>
+                                            <MudChip T="string" Size="Size.Small" 
+                                                     Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)"
+                                                     Variant="Variant.Filled">
+                                                @product.AvailableQuantity szt.
+                                            </MudChip>
                                         </MudStack>
+                                        
+                                        @if (!string.IsNullOrEmpty(product.Category))
+                                        {
+                                            <MudChip T="string" Size="Size.Small" 
+                                                     Icon="@Icons.Material.Filled.Category" 
+                                                     Color="Color.Info" 
+                                                     Variant="Variant.Text">
+                                                @product.Category
+                                            </MudChip>
+                                        }
+                                        
+                                        @if (!string.IsNullOrEmpty(product.Description))
+                                        {
+                                            <MudText Typo="Typo.body2" Color="Color.Default" Style="line-height: 1.4;">
+                                                @(product.Description.Length > 80 ? product.Description.Substring(0, 80) + "..." : product.Description)
+                                            </MudText>
+                                        }
                                     </MudStack>
-                                </MudItem>
-                                <MudItem xs="12" md="4">
-                                    <MudStack Row="true" Spacing="1" Class="mud-justify-end">
-                                        <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                                   OnClick="() => Edit(product)"
-                                                   Color="Color.Primary"
-                                                   Size="Size.Small">
-                                            Edytuj
-                                        </MudButton>
-                                        <MudButton StartIcon="@Icons.Material.Filled.Delete" 
-                                                   OnClick="() => Delete(product)"
-                                                   Color="Color.Error"
-                                                   Size="Size.Small">
-                                            Usuń
-                                        </MudButton>
+                                </MudCardContent>
+                                
+                                <MudCardActions Class="pa-3 pt-0">
+                                    <MudStack Spacing="1" Class="w-100">
+                                        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" FullWidth="true">
+                                            <MudButton StartIcon="@Icons.Material.Filled.Edit" 
+                                                       OnClick="() => Edit(product)"
+                                                       Size="Size.Small">
+                                                Edytuj
+                                            </MudButton>
+                                            <MudButton StartIcon="@Icons.Material.Filled.Delete" 
+                                                       OnClick="() => Delete(product)"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small">
+                                                Usuń
+                                            </MudButton>
+                                        </MudButtonGroup>
+                                        
                                         @if (product.IsActive)
                                         {
                                             <MudButton StartIcon="@Icons.Material.Filled.VisibilityOff" 
                                                        OnClick="() => ToggleActive(product)"
                                                        Color="Color.Warning"
-                                                       Size="Size.Small">
+                                                       Variant="Variant.Filled"
+                                                       Size="Size.Small"
+                                                       FullWidth="true">
                                                 Dezaktywuj
                                             </MudButton>
                                         }
@@ -266,240 +299,328 @@
                                             <MudButton StartIcon="@Icons.Material.Filled.Visibility" 
                                                        OnClick="() => ToggleActive(product)"
                                                        Color="Color.Success"
-                                                       Size="Size.Small">
+                                                       Variant="Variant.Filled"
+                                                       Size="Size.Small"
+                                                       FullWidth="true">
                                                 Aktywuj
                                             </MudButton>
                                         }
                                     </MudStack>
-                                </MudItem>
-                            </MudGrid>
-                        </MudCardContent>
-                    </MudCard>
-                }
-            </MudStack>
+                                </MudCardActions>
+                            </MudCard>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+            else
+            {
+                <MudStack Spacing="2">
+                    @foreach (var product in filtered)
+                    {
+                        <MudCard Elevation="4" Style="@($"border-radius: 16px;{(IsCurrentlyRented(product.Id) ? " border-left: 4px solid #ff9800;" : "")}")">
+                            <MudCardContent Class="pa-4">
+                                <MudGrid Class="mud-align-center" Spacing="3">
+                                    <MudItem xs="12" md="8">
+                                        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                                            @if (!string.IsNullOrEmpty(product.ImageUrl))
+                                            {
+                                                <MudAvatar Size="Size.Large">
+                                                    <img src="@product.ImageUrl" alt="@product.Name" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" />
+                                                </MudAvatar>
+                                            }
+                                            else
+                                            {
+                                                <MudAvatar Size="Size.Large" Color="Color.Primary">
+                                                    <MudIcon Icon="@GetProductIcon(product.Category)" />
+                                                </MudAvatar>
+                                            }
+                                            <MudStack Spacing="1">
+                                                <MudText Typo="Typo.h6" Style="font-weight: 600;">@product.Name</MudText>
+                                                <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Default">@product.Sku</MudChip>
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Category">@(product.Category ?? "Brak")</MudChip>
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">@product.DailyPrice.ToString("0.00") zł/dzień</MudChip>
+                                                    <MudChip T="string" Size="Size.Small" Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)">@product.AvailableQuantity szt.</MudChip>
+                                                </MudStack>
+                                            </MudStack>
+                                        </MudStack>
+                                    </MudItem>
+                                    <MudItem xs="12" md="4">
+                                        <MudStack Row="true" Spacing="1" Class="mud-justify-end">
+                                            <MudButton StartIcon="@Icons.Material.Filled.Edit" 
+                                                       OnClick="() => Edit(product)"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Small">
+                                                Edytuj
+                                            </MudButton>
+                                            <MudButton StartIcon="@Icons.Material.Filled.Delete" 
+                                                       OnClick="() => Delete(product)"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small">
+                                                Usuń
+                                            </MudButton>
+                                            @if (product.IsActive)
+                                            {
+                                                <MudButton StartIcon="@Icons.Material.Filled.VisibilityOff" 
+                                                           OnClick="() => ToggleActive(product)"
+                                                           Color="Color.Warning"
+                                                           Size="Size.Small">
+                                                    Dezaktywuj
+                                                </MudButton>
+                                            }
+                                            else
+                                            {
+                                                <MudButton StartIcon="@Icons.Material.Filled.Visibility" 
+                                                           OnClick="() => ToggleActive(product)"
+                                                           Color="Color.Success"
+                                                           Size="Size.Small">
+                                                    Aktywuj
+                                                </MudButton>
+                                            }
+                                        </MudStack>
+                                    </MudItem>
+                                </MudGrid>
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </MudStack>
+            }
         }
-    }
+    </MudContainer>
+}
 
-    <MudDialog @bind-Visible="dialogOpen" Options="@productDialogOptions">
-        <TitleContent>
-            <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                <MudAvatar Color="Color.Info" Size="Size.Large" Style="background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);">
-                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" />
-                </MudAvatar>
-                <div>
-                    <MudText Typo="Typo.h5" Style="font-weight: 700;">
-                        @(model.Id == Guid.Empty ? "Nowy produkt" : "Edytuj produkt")
-                    </MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Default">
-                        @(model.Id == Guid.Empty ? "Dodaj nowy sprzęt do wypożyczalni" : "Zaktualizuj informacje o produkcie")
-                    </MudText>
-                </div>
-            </MudStack>
-        </TitleContent>
-        <DialogContent>
-            <MudStack Spacing="4" Class="pa-2">
-                @* SEKCJA: PODSTAWOWE INFORMACJE *@
-                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);">
-                    <MudStack Spacing="3">
-                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                            <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Primary" />
-                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Podstawowe informacje</MudText>
-                        </MudStack>
-                        
-                        <MudGrid Spacing="3">
-                            <MudItem xs="12" md="8">
-                                <MudTextField @bind-Value="model.Name" 
-                                              Label="Nazwa produktu" 
-                                              Placeholder="np. Narty Atomic Redster X9"
-                                              Required="true"
-                                              Variant="Variant.Outlined"
-                                              Adornment="Adornment.Start"
-                                              AdornmentIcon="@Icons.Material.Filled.Label"
-                                              Class="rounded-lg" />
-                            </MudItem>
-                            <MudItem xs="12" md="4">
-                                <MudTextField @bind-Value="model.Sku" 
-                                              Label="Kod SKU" 
-                                              Placeholder="np. NAR-001"
-                                              Required="true"
-                                              Variant="Variant.Outlined"
-                                              Adornment="Adornment.Start"
-                                              AdornmentIcon="@Icons.Material.Filled.QrCode"
-                                              Class="rounded-lg" />
-                            </MudItem>
-                            <MudItem xs="12">
-                                <MudTextField @bind-Value="model.Description" 
-                                              Label="Opis produktu" 
-                                              Placeholder="Krótki opis sprzętu..."
-                                              Lines="3"
-                                              Variant="Variant.Outlined"
-                                              Class="rounded-lg" />
-                            </MudItem>
-                        </MudGrid>
+@* ==================== DIALOG (wspólny) ==================== *@
+<MudDialog @bind-Visible="dialogOpen" Options="@productDialogOptions">
+    <TitleContent>
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudAvatar Color="Color.Info" Size="Size.Large" Style="background: linear-gradient(135deg, #4fc3f7 0%, #29b6f6 100%);">
+                <MudIcon Icon="@Icons.Material.Filled.Inventory2" />
+            </MudAvatar>
+            <div>
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">
+                    @(model.Id == Guid.Empty ? "Nowy produkt" : "Edytuj produkt")
+                </MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">
+                    @(model.Id == Guid.Empty ? "Dodaj nowy sprzęt do wypożyczalni" : "Zaktualizuj informacje o produkcie")
+                </MudText>
+            </div>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="4" Class="pa-2">
+            @* SEKCJA: PODSTAWOWE INFORMACJE *@
+            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);">
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Podstawowe informacje</MudText>
                     </MudStack>
-                </MudPaper>
-
-                @* SEKCJA: CENA I DOSTĘPNOŚĆ *@
-                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
-                    <MudStack Spacing="3">
-                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                            <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Success" />
-                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Cena i dostępność</MudText>
-                        </MudStack>
-                        
-                        <MudGrid Spacing="3">
-                            <MudItem xs="12" md="3">
-                                <MudNumericField T="decimal" @bind-Value="model.DailyPrice" 
-                                                  Label="Cena za dzień" 
-                                                  Min="0" 
-                                                  Format="0.00"
-                                                  Adornment="Adornment.End"
-                                                  AdornmentText="zł"
-                                                  Variant="Variant.Outlined"
-                                                  Class="rounded-lg" />
-                            </MudItem>
-                            <MudItem xs="12" md="3">
-                                <MudNumericField T="decimal?" @bind-Value="model.HourlyPrice" 
-                                                  Label="Cena za godzinę" 
-                                                  Min="0" 
-                                                  Format="0.00"
-                                                  Adornment="Adornment.End"
-                                                  AdornmentText="zł"
-                                                  Variant="Variant.Outlined"
-                                                  HelperText="Opcjonalne"
-                                                  Class="rounded-lg" />
-                            </MudItem>
-                            <MudItem xs="12" md="3">
-                                <MudNumericField T="int" @bind-Value="model.AvailableQuantity" 
-                                                  Label="Dostępna ilość" 
-                                                  Min="0"
-                                                  Adornment="Adornment.End"
-                                                  AdornmentText="szt."
-                                                  Variant="Variant.Outlined"
-                                                  Class="rounded-lg" />
-                            </MudItem>
-                            <MudItem xs="12" md="4">
-                                <MudSelect T="string" @bind-Value="model.Category" 
-                                           Label="Kategoria"
-                                           Variant="Variant.Outlined"
-                                           Adornment="Adornment.Start"
-                                           AdornmentIcon="@Icons.Material.Filled.Category"
-                                           Class="rounded-lg">
-                                    <MudSelectItem Value="@("Narty")">🎿 Narty</MudSelectItem>
-                                    <MudSelectItem Value="@("Snowboard")">🏂 Snowboard</MudSelectItem>
-                                    <MudSelectItem Value="@("Buty narciarskie")">👟 Buty narciarskie</MudSelectItem>
-                                    <MudSelectItem Value="@("Buty snowboardowe")">👢 Buty snowboardowe</MudSelectItem>
-                                    <MudSelectItem Value="@("Kije")">🥢 Kije</MudSelectItem>
-                                    <MudSelectItem Value="@("Kask")">⛑️ Kask</MudSelectItem>
-                                    <MudSelectItem Value="@("Gogle")">🥽 Gogle</MudSelectItem>
-                                    <MudSelectItem Value="@("Rower")">🚴 Rower</MudSelectItem>
-                                    <MudSelectItem Value="@("SUP")">🏄 SUP</MudSelectItem>
-                                    <MudSelectItem Value="@("Kajak")">🛶 Kajak</MudSelectItem>
-                                    <MudSelectItem Value="@("Inne")">📦 Inne</MudSelectItem>
-                                </MudSelect>
-                            </MudItem>
-                        </MudGrid>
-
-                        <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                            <MudSwitch @bind-Value="model.IsActive" 
-                                       Color="Color.Success" 
-                                       Label="Produkt aktywny" />
-                            @if (model.IsActive)
-                            {
-                                <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
-                                    <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
-                                    Widoczny dla klientów
-                                </MudChip>
-                            }
-                            else
-                            {
-                                <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
-                                    <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small" Class="mr-1" />
-                                    Ukryty
-                                </MudChip>
-                            }
-                        </MudStack>
-                    </MudStack>
-                </MudPaper>
-
-                @* SEKCJA: ZDJĘCIE *@
-                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);">
-                    <MudStack Spacing="3">
-                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                            <MudIcon Icon="@Icons.Material.Filled.Image" Color="Color.Warning" />
-                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Zdjęcie produktu</MudText>
-                        </MudStack>
-                        
-                        @if (!string.IsNullOrEmpty(model.ImageUrl))
-                        {
-                            <MudPaper Elevation="2" Class="pa-3" Style="border-radius: 12px; background: white;">
-                                <MudStack Row="true" Spacing="3" Class="mud-align-center">
-                                    <MudImage Src="@model.ImageUrl" 
-                                              Alt="@model.Name" 
-                                              Width="100" 
-                                              Height="100" 
-                                              ObjectFit="ObjectFit.Cover"
-                                              Style="border-radius: 8px;" />
-                                    <MudStack Spacing="1">
-                                        <MudText Typo="Typo.body2" Style="font-weight: 500;">Aktualne zdjęcie</MudText>
-                                        <MudButton Size="Size.Small" 
-                                                   Variant="Variant.Text" 
-                                                   Color="Color.Error"
-                                                   StartIcon="@Icons.Material.Filled.Delete"
-                                                   OnClick="() => model.ImageUrl = null">
-                                            Usuń zdjęcie
-                                        </MudButton>
-                                    </MudStack>
-                                </MudStack>
-                            </MudPaper>
-                        }
-                        
-                        <MudTextField @bind-Value="model.ImageUrl" 
-                                      Label="URL zdjęcia (opcjonalnie)" 
-                                      Placeholder="https://..."
-                                      Variant="Variant.Outlined"
-                                      Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Link"
-                                      Class="rounded-lg" />
-                        
-                        <MudDivider />
-                        
-                        <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-2">
-                            <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Small" Class="mr-1" />
-                            Lub wgraj zdjęcie z dysku:
-                        </MudText>
-                        
-                        <ImageCropper MaxSizeMB="8" 
-                                      OnImageReady="OnImageReadySkipCrop"
-                                      OnBase64ImageReady="OnImageReadyCropped" />
-                    </MudStack>
-                </MudPaper>
-            </MudStack>
-        </DialogContent>
-        <DialogActions>
-            <MudPaper Elevation="0" Class="pa-4 mud-width-full" Style="background: #f5f5f5; border-top: 1px solid #e0e0e0;">
-                <MudStack Row="true" Class="mud-width-full mud-justify-space-between">
-                    <MudButton Variant="Variant.Text" 
-                               Color="Color.Default"
-                               StartIcon="@Icons.Material.Filled.Close"
-                               OnClick="() => dialogOpen=false">
-                        Anuluj
-                    </MudButton>
-                    <MudButton Variant="Variant.Filled" 
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Save"
-                               Disabled="@(string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Sku))"
-                               OnClick="Save"
-                               Class="rounded-pill px-6">
-                        @(model.Id == Guid.Empty ? "✨ Dodaj produkt" : "💾 Zapisz zmiany")
-                    </MudButton>
+                    
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="model.Name" 
+                                          Label="Nazwa produktu" 
+                                          Placeholder="np. Narty Atomic Redster X9"
+                                          Required="true"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Label"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="model.Sku" 
+                                          Label="Kod SKU" 
+                                          Placeholder="np. NAR-001"
+                                          Required="true"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.QrCode"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="model.Description" 
+                                          Label="Opis produktu" 
+                                          Placeholder="Krótki opis sprzętu..."
+                                          Lines="3"
+                                          Variant="Variant.Outlined"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                    </MudGrid>
                 </MudStack>
             </MudPaper>
-        </DialogActions>
-    </MudDialog>
-</MudContainer>
+
+            @* SEKCJA: CENA I DOSTĘPNOŚĆ *@
+            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Color="Color.Success" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Cena i dostępność</MudText>
+                    </MudStack>
+                    
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="3">
+                            <MudNumericField T="decimal" @bind-Value="model.DailyPrice" 
+                                              Label="Cena za dzień" 
+                                              Min="0" 
+                                              Format="0.00"
+                                              Adornment="Adornment.End"
+                                              AdornmentText="zł"
+                                              Variant="Variant.Outlined"
+                                              Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudNumericField T="decimal?" @bind-Value="model.HourlyPrice" 
+                                              Label="Cena za godzinę" 
+                                              Min="0" 
+                                              Format="0.00"
+                                              Adornment="Adornment.End"
+                                              AdornmentText="zł"
+                                              Variant="Variant.Outlined"
+                                              HelperText="Opcjonalne"
+                                              Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudNumericField T="int" @bind-Value="model.AvailableQuantity" 
+                                              Label="Dostępna ilość" 
+                                              Min="0"
+                                              Adornment="Adornment.End"
+                                              AdornmentText="szt."
+                                              Variant="Variant.Outlined"
+                                              Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudSelect T="string" @bind-Value="model.Category" 
+                                       Label="Kategoria"
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Category"
+                                       Class="rounded-lg">
+                                <MudSelectItem Value="@("Narty")">🎿 Narty</MudSelectItem>
+                                <MudSelectItem Value="@("Snowboard")">🏂 Snowboard</MudSelectItem>
+                                <MudSelectItem Value="@("Buty narciarskie")">👟 Buty narciarskie</MudSelectItem>
+                                <MudSelectItem Value="@("Buty snowboardowe")">👢 Buty snowboardowe</MudSelectItem>
+                                <MudSelectItem Value="@("Kije")">🥢 Kije</MudSelectItem>
+                                <MudSelectItem Value="@("Kask")">⛑️ Kask</MudSelectItem>
+                                <MudSelectItem Value="@("Gogle")">🥽 Gogle</MudSelectItem>
+                                <MudSelectItem Value="@("Rower")">🚴 Rower</MudSelectItem>
+                                <MudSelectItem Value="@("SUP")">🏄 SUP</MudSelectItem>
+                                <MudSelectItem Value="@("Kajak")">🛶 Kajak</MudSelectItem>
+                                <MudSelectItem Value="@("Inne")">📦 Inne</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                        <MudSwitch @bind-Value="model.IsActive" 
+                                   Color="Color.Success" 
+                                   Label="Produkt aktywny" />
+                        @if (model.IsActive)
+                        {
+                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                                <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
+                                Widoczny dla klientów
+                            </MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
+                                <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small" Class="mr-1" />
+                                Ukryty
+                            </MudChip>
+                        }
+                    </MudStack>
+                </MudStack>
+            </MudPaper>
+
+            @* SEKCJA: ZDJĘCIE *@
+            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);">
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Image" Color="Color.Warning" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Zdjęcie produktu</MudText>
+                    </MudStack>
+                    
+                    @if (!string.IsNullOrEmpty(model.ImageUrl))
+                    {
+                        <MudPaper Elevation="2" Class="pa-3" Style="border-radius: 12px; background: white;">
+                            <MudStack Row="true" Spacing="3" Class="mud-align-center">
+                                <MudImage Src="@model.ImageUrl" 
+                                          Alt="@model.Name" 
+                                          Width="100" 
+                                          Height="100" 
+                                          ObjectFit="ObjectFit.Cover"
+                                          Style="border-radius: 8px;" />
+                                <MudStack Spacing="1">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 500;">Aktualne zdjęcie</MudText>
+                                    <MudButton Size="Size.Small" 
+                                               Variant="Variant.Text" 
+                                               Color="Color.Error"
+                                               StartIcon="@Icons.Material.Filled.Delete"
+                                               OnClick="() => model.ImageUrl = null">
+                                        Usuń zdjęcie
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+                    }
+                    
+                    <MudTextField @bind-Value="model.ImageUrl" 
+                                  Label="URL zdjęcia (opcjonalnie)" 
+                                  Placeholder="https://..."
+                                  Variant="Variant.Outlined"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Link"
+                                  Class="rounded-lg" />
+                    
+                    <MudDivider />
+                    
+                    <MudText Typo="Typo.body2" Color="Color.Default" Class="mb-2">
+                        <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Small" Class="mr-1" />
+                        Lub wgraj zdjęcie z dysku:
+                    </MudText>
+                    
+                    <ImageCropper MaxSizeMB="8" 
+                                  OnImageReady="OnImageReadySkipCrop"
+                                  OnBase64ImageReady="OnImageReadyCropped" />
+                </MudStack>
+            </MudPaper>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudPaper Elevation="0" Class="pa-4 mud-width-full" Style="background: #f5f5f5; border-top: 1px solid #e0e0e0;">
+            <MudStack Row="true" Class="mud-width-full mud-justify-space-between">
+                <MudButton Variant="Variant.Text" 
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Filled.Close"
+                           OnClick="() => dialogOpen=false">
+                    Anuluj
+                </MudButton>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           Disabled="@(string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Sku))"
+                           OnClick="Save"
+                           Class="rounded-pill px-6">
+                    @(model.Id == Guid.Empty ? "✨ Dodaj produkt" : "💾 Zapisz zmiany")
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    </DialogActions>
+</MudDialog>
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
 @code {
+    // ==================== BREAKPOINT ====================
+    private bool _isMobile = false;
+    
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        _isMobile = breakpoint < Breakpoint.Md;
+        StateHasChanged();
+    }
+
+    // ==================== DATA ====================
     private List<Product> products = new();
     private IEnumerable<Product> filtered => FilteredProducts();
     private HashSet<Guid> currentlyRentedProductIds = new();
@@ -509,7 +630,7 @@
     private bool cbRented = true;
     private bool gridView = true;
     private bool dialogOpen;
-    private readonly DialogOptions productDialogOptions = new() { MaxWidth = MaxWidth.Medium };
+    private readonly DialogOptions productDialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
     private Product model = new();
     private string? _selectedImageName;
 
@@ -517,7 +638,6 @@
     {
         var query = products.AsEnumerable();
         
-        // Filtr wyszukiwania
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(p => 
@@ -526,24 +646,13 @@
                 (p.Category?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
         }
         
-        // Filtr dostępności i wynajęcia
         if (!cbAvailable && !cbRented)
-        {
-            // Jeśli oba filtry są wyłączone, nic nie pokazuj
             return Enumerable.Empty<Product>();
-        }
         
         if (cbAvailable && !cbRented)
-        {
-            // Tylko dostępne (nie wypożyczone)
             query = query.Where(p => !IsCurrentlyRented(p.Id));
-        }
         else if (!cbAvailable && cbRented)
-        {
-            // Tylko wypożyczone
             query = query.Where(p => IsCurrentlyRented(p.Id));
-        }
-        // Jeśli oba są zaznaczone, pokazuj wszystkie (bez filtrowania)
         
         return query;
     }
@@ -573,19 +682,13 @@
             .ToHashSetAsync();
     }
 
-    private bool IsCurrentlyRented(Guid productId)
-    {
-        return currentlyRentedProductIds.Contains(productId);
-    }
+    private bool IsCurrentlyRented(Guid productId) => currentlyRentedProductIds.Contains(productId);
 
     private void CreateNew()
     {
         model = new Product { Id = Guid.Empty, TenantId = CurrentTenantId(), IsActive = true };
         dialogOpen = true;
-        Snackbar.Add("Otwieram formularz dodawania produktu", MudBlazor.Severity.Info);
-        StateHasChanged();
     }
-
 
     private void Edit(Product p)
     {
@@ -597,9 +700,11 @@
             Sku = p.Sku,
             Category = p.Category,
             DailyPrice = p.DailyPrice,
+            HourlyPrice = p.HourlyPrice,
             IsActive = p.IsActive,
             ImageUrl = p.ImageUrl,
-            AvailableQuantity = p.AvailableQuantity
+            AvailableQuantity = p.AvailableQuantity,
+            Description = p.Description
         };
         dialogOpen = true;
     }
@@ -621,14 +726,12 @@
         }
         await Db.SaveChangesAsync();
         
-        // Upload image (either cropped or original)
         if (!string.IsNullOrEmpty(_croppedBase64Image) || _selectedImage is not null)
         {
             using var content = new MultipartFormDataContent();
             
             if (!string.IsNullOrEmpty(_croppedBase64Image))
             {
-                // Use cropped image (base64)
                 var base64Data = _croppedBase64Image.Contains(",") 
                     ? _croppedBase64Image.Split(',')[1] 
                     : _croppedBase64Image;
@@ -639,7 +742,6 @@
             }
             else if (_selectedImage is not null)
             {
-                // Use original image (no crop)
                 content.Add(new StreamContent(_selectedImage.OpenReadStream(10 * 1024 * 1024)), "file", _selectedImage.Name);
             }
             
@@ -650,27 +752,16 @@
             {
                 var json = await res.Content.ReadFromJsonAsync<ImageResponse>();
                 model.ImageUrl = json?.imageUrl;
-                Snackbar.Add("Zdjęcie zapisane pomyślnie!", Severity.Success);
-            }
-            else
-            {
-                Snackbar.Add("Błąd podczas zapisywania zdjęcia", Severity.Error);
+                Snackbar.Add("Zdjęcie zapisane!", Severity.Success);
             }
             
-            // Clear after upload
             _selectedImage = null;
             _croppedBase64Image = null;
             _selectedImageName = null;
         }
         products = await Db.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
         dialogOpen = false;
-        StateHasChanged();
-    }
-
-    private void Cancel()
-    {
-        dialogOpen = false;
-        StateHasChanged();
+        Snackbar.Add("Produkt zapisany!", Severity.Success);
     }
 
     [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
@@ -698,8 +789,7 @@
         Db.Products.Remove(p);
         await Db.SaveChangesAsync();
         products.RemoveAll(x => x.Id == p.Id);
-        Snackbar.Add($"Produkt '{p.Name}' został usunięty", Severity.Success);
-        StateHasChanged();
+        Snackbar.Add($"Produkt '{p.Name}' usunięty", Severity.Success);
     }
 
     private async Task ToggleActive(Product p)
@@ -710,90 +800,28 @@
         Db.Products.Update(p);
         await Db.SaveChangesAsync();
         
-        // Aktualizuj lokalną listę
         var localProduct = products.FirstOrDefault(x => x.Id == p.Id);
-        if (localProduct != null)
-        {
-            localProduct.IsActive = p.IsActive;
-        }
+        if (localProduct != null) localProduct.IsActive = p.IsActive;
         
-        Snackbar.Add($"Produkt '{p.Name}' został {(p.IsActive ? "aktywowany" : "deaktywowany")}", Severity.Success);
-        StateHasChanged();
+        Snackbar.Add($"Produkt '{p.Name}' {(p.IsActive ? "aktywowany" : "deaktywowany")}", Severity.Success);
     }
+
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     private IBrowserFile? _selectedImage;
     private string? _croppedBase64Image;
     private class ImageResponse { public string? imageUrl { get; set; } }
     
-    // Called when user skips crop
     private void OnImageReadySkipCrop(IBrowserFile file)
     {
         _selectedImage = file;
         _selectedImageName = file?.Name;
-        _croppedBase64Image = null; // Use original file
+        _croppedBase64Image = null;
     }
 
-    // Called when user crops image
     private void OnImageReadyCropped(string base64Image)
     {
         _croppedBase64Image = base64Image;
         _selectedImageName = "cropped-image.jpg";
-        _selectedImage = null; // Will use base64 instead
-    }
-
-    private static string Alt(Product p) => string.IsNullOrWhiteSpace(p.ImageAlt) ? p.Name : p.ImageAlt!;
-    
-    private static string Img(Product p, int width)
-    {
-        if (string.IsNullOrWhiteSpace(p.ImageUrl))
-            return string.Empty;
-
-        // Check if ImageUrl is a full URL (Azure Blob, S3, etc.)
-        if (p.ImageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
-            p.ImageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-        {
-            // Replace w800 (or any wXXX) with requested width in the URL
-            var ext = Path.GetExtension(p.ImageUrl);
-            var urlWithoutFilename = p.ImageUrl.Substring(0, p.ImageUrl.LastIndexOf('/') + 1);
-            return $"{urlWithoutFilename}w{width}{ext}";
-        }
-
-        // Fallback to relative path (for local storage)
-        if (!string.IsNullOrWhiteSpace(p.ImageBasePath))
-        {
-            return $"/{p.ImageBasePath}/w{width}{Path.GetExtension(p.ImageUrl)}";
-        }
-
-        return p.ImageUrl;
-    }
-    
-    private static string SrcSet(Product p)
-    {
-        if (string.IsNullOrWhiteSpace(p.ImageUrl))
-            return string.Empty;
-
-        var ext = Path.GetExtension(p.ImageUrl);
-        
-        // Check if ImageUrl is a full URL (Azure Blob, S3, etc.)
-        if (!string.IsNullOrEmpty(p.ImageUrl) &&
-            (p.ImageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
-            p.ImageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
-        {
-            // Build srcset with full URLs
-            var lastSlashIndex = p.ImageUrl.LastIndexOf('/');
-            if (lastSlashIndex > 0)
-            {
-                var urlWithoutFilename = p.ImageUrl.Substring(0, lastSlashIndex + 1);
-                return $"{urlWithoutFilename}w400{ext} 400w, {urlWithoutFilename}w800{ext} 800w, {urlWithoutFilename}w1280{ext} 1280w";
-            }
-        }
-
-        // Fallback to relative paths (for local storage)
-        if (!string.IsNullOrWhiteSpace(p.ImageBasePath))
-        {
-            return $"/{p.ImageBasePath}/w400{ext} 400w, /{p.ImageBasePath}/w800{ext} 800w, /{p.ImageBasePath}/w1280{ext} 1280w";
-        }
-
-        return string.Empty;
+        _selectedImage = null;
     }
 }

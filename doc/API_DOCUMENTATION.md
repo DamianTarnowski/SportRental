@@ -1,14 +1,23 @@
 # SportRental API Documentation
 
+> **Ostatnia aktualizacja:** Grudzień 2025
+
+## ⚠️ Aktualna architektura
+
+**WAŻNE:** API jest obecnie hostowane w projekcie **SportRental.Admin** (Blazor Server).
+Projekt **SportRental.Api** jest wyłączony - przygotowany na przyszłość.
+
 ## Podstawowe informacje
-- **Base URL (dev):** `https://localhost:7142`
+- **Base URL (dev):** `http://localhost:5001` (SportRental.Admin)
+- **Base URL (prod):** `https://sradmin2.azurewebsites.net`
 - **Wersja:** v1 (minimal API)
 - **Naglowek tenant:** wszystkie zapytania, poza `GET /`, `OPTIONS` i `swagger`, wymagaja `X-Tenant-Id: <guid>`.
 - **Format danych:** JSON UTF-8 (camelCase).
-- **Uwierzytelnianie:** JWT bearer tokens (access + refresh tokens) dla klienta WASM. Rejestracja/logowanie przez `/api/auth/register` i `/api/auth/login`.
-- **Płatności:** Integracja Stripe (Checkout Sessions + Payment Intents + Webhooks).
+- **Uwierzytelnianie:** Cookie-based auth dla klienta WASM. Rejestracja/logowanie przez `/api/auth/register` i `/api/auth/login`.
+- **Płatności:** Integracja Stripe (Checkout Sessions + Webhooks).
 - **Email:** Powiadomienia o wynajmie z załącznikami PDF (kontrakty).
-- **Media storage:** Azure Blob Storage dla produkcji, upload/serving plikow odbywa sie przez dedykowane endpointy API.
+- **SMS:** Powiadomienia przez SMSAPI.pl.
+- **Media storage:** Azure Blob Storage - pliki przechowywane bezpośrednio w Azure.
 - **Sekrety:** Wszystkie dane wrażliwe (connection strings, API keys) przechowywane w Azure Key Vault - zero hardcoded secrets w kodzie!
 
 ## Wspolne naglowki
@@ -172,7 +181,12 @@ API korzysta z `ProblemDetails`:
 - Dev UI: `https://localhost:7142/swagger`.
 - Dokument opisuje wymagany naglowek `X-Tenant-Id`; w UI nalezy dodac go recznie (Authorize -> ApiKey).
 
-## MediaStorage API (skrot)
+## MediaStorage API (⏸️ WYŁĄCZONY)
+
+> **UWAGA:** Projekt `SportRental.MediaStorage` jest obecnie wyłączony.
+> Pliki (zdjęcia produktów) są przechowywane bezpośrednio w **Azure Blob Storage**.
+> Ta sekcja jest zachowana dla przyszłego użycia gdy zmiana hostingu (np. self-hosted bez Azure).
+
 Magazyn plikow dziala pod domyslnym adresem `https://localhost:7002`.
 
 | Metoda | Endpoint | Opis | Uwagi |
@@ -182,30 +196,6 @@ Magazyn plikow dziala pod domyslnym adresem `https://localhost:7002`.
 | `DELETE` | `/api/files/{id}` | Usuniecie pliku | Wymaga `X-Api-Key`. |
 | `GET` | `/files/{**relativePath}` | Pobranie pliku | Zwraca strumien + MIME. |
 | `HEAD` | `/files/{**relativePath}` | Sprawdzenie dostepnosci | `200`, `404` lub `400`. |
-
-Przyklad uploadu zdjecia produktu:
-```http
-POST /api/files HTTP/1.1
-Host: localhost:7002
-X-Api-Key: local-dev-key
-Content-Type: multipart/form-data; boundary=---123
-
----123
-Content-Disposition: form-data; name="tenantId"
-
-00000000-0000-0000-0000-000000000000
----123
-Content-Disposition: form-data; name="path"
-
-images/products/0000/product-123/original.jpg
----123
-Content-Disposition: form-data; name="file"; filename="original.jpg"
-Content-Type: image/jpeg
-
-(binary)
----123--
-```
-Odpowiedz `201 Created` zawiera guid oraz `downloadUrl`, ktory jest nastepnie zapisywany przy produkcie.
 
 ## Rate limiting i headery odpowiedzi
 - Brak limitow (planowane w roadmapie: `AspNetCore.RateLimiting` na poziomie API publicznego).

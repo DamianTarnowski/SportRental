@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Admin + Client",
+    "Projects": [
+      {
+        "Path": "SportRental.Admin\\SportRental.Admin.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "SportRental.Client\\SportRental.Client.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

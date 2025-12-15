@@ -2,9 +2,18 @@
 
 Get SportRental up and running in **5 minutes**!
 
+> **Ostatnia aktualizacja:** Grudzień 2025
+
+## ⚠️ Aktualna architektura
+
+- **SportRental.Admin** - Panel + API (jedyny backend do uruchomienia)
+- **SportRental.Client** - Blazor WASM
+- **SportRental.Api** - ⏸️ WYŁĄCZONY
+- **SportRental.MediaStorage** - ⏸️ WYŁĄCZONY (pliki w Azure Blob)
+
 ## Prerequisites
 
-- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [PostgreSQL 14+](https://www.postgresql.org/download/)
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) (for Key Vault)
 - [Node.js 18+](https://nodejs.org/) (for Blazor WASM)
@@ -64,33 +73,25 @@ cd ..
 
 ## Step 4: Run the Applications
 
-### Terminal 1: Admin Panel
+### Option A: Visual Studio (Recommended)
+1. Open `SportRentalHybrid.sln`
+2. Click dropdown next to Start button
+3. Select **"Admin + Client"** profile
+4. Press F5 - both projects will start
+
+### Option B: Terminal
 ```bash
+# Terminal 1: Admin Panel + API
 cd SportRental.Admin
-dotnet run
-```
-Open: https://localhost:7142
+dotnet run --urls "http://localhost:5001"
 
-### Terminal 2: Public API
-```bash
-cd SportRental.Api
-dotnet run
-```
-Open: https://localhost:5001
-
-### Terminal 3: Media Storage
-```bash
-cd SportRental.MediaStorage
-dotnet run
-```
-Open: https://localhost:5014
-
-### Terminal 4: Client (Optional)
-```bash
+# Terminal 2: Client WASM
 cd SportRental.Client
-npm install
-dotnet run
+dotnet run --urls "http://localhost:5014"
 ```
+
+> **Note:** `SportRental.Api` and `SportRental.MediaStorage` are **DISABLED**.
+> API is hosted in Admin, files are stored in Azure Blob Storage.
 
 ## Step 5: Test the System
 

@@ -1,5 +1,5 @@
 @page "/checkout"
-@implements IDisposable
+@implements IAsyncDisposable
 @using System.ComponentModel.DataAnnotations
 @using SportRental.Shared.Models
 @using CartModel = SportRental.Shared.Models.Cart
@@ -13,9 +13,169 @@
 @inject NavigationManager Nav
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
 
 <PageTitle>Finalizacja zamówienia - SportRental</PageTitle>
 
+@* Payment loading overlay - shared *@
+@if (_isPaymentInProgress)
+{
+    <div class="checkout-overlay">
+        <div class="checkout-overlay-content">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+            <h2>Przekierowanie do płatności...</h2>
+            <p>Proszę czekać</p>
+        </div>
+    </div>
+}
+
+@* ============================================
+   MOBILE UI - Step-by-step checkout
+   ============================================ *@
+@if (_isMobile)
+{
+    <div class="checkout-mobile">
+        <!-- Mobile Header -->
+        <div class="checkout-mobile-header">
+            <div class="checkout-mobile-title">
+                <span>💳</span>
+                <h1>Zamówienie</h1>
+            </div>
+            <div class="checkout-mobile-steps">
+                <span class="step done">🛒</span>
+                <span class="step-line"></span>
+                <span class="step active">📝</span>
+                <span class="step-line"></span>
+                <span class="step">💳</span>
+            </div>
+        </div>
+
+        @if (_cart.Items.Count == 0)
+        {
+            <div class="checkout-mobile-empty">
+                <span class="empty-icon">🛒</span>
+                <h3>Pusty koszyk</h3>
+                <p>Dodaj produkty do koszyka</p>
+                <a href="/products" class="checkout-mobile-cta">📦 Przeglądaj katalog</a>
+            </div>
+        }
+        else
+        {
+            <!-- Cart Summary - Collapsible -->
+            <div class="checkout-mobile-section">
+                <button class="checkout-mobile-section-header" @onclick="() => _showMobileItems = !_showMobileItems">
+                    <span>📦 Produkty (@_cart.TotalItems)</span>
+                    <span class="section-toggle">@(_showMobileItems ? "▲" : "▼")</span>
+                </button>
+                @if (_showMobileItems)
+                {
+                    <div class="checkout-mobile-items">
+                        @foreach (var item in _cart.Items)
+                        {
+                            <div class="checkout-mobile-item">
+                                <span class="item-name">@item.ProductName</span>
+                                <span class="item-qty">x@item.Quantity</span>
+                                <span class="item-price">@item.TotalPrice.ToString("C")</span>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (_hasMixedDates)
+                {
+                    <div class="checkout-mobile-warning">
+                        ⚠️ Różne daty w produktach
+                    </div>
+                }
+            </div>
+
+            <!-- Customer Form -->
+            <div class="checkout-mobile-section">
+                <div class="checkout-mobile-section-title">👤 Twoje dane</div>
+                <EditForm Model="_customer">
+                    <DataAnnotationsValidator />
+                    <div class="checkout-mobile-form">
+                        <div class="form-group">
+                            <label>Imię i nazwisko *</label>
+                            <InputText @bind-Value="_customer.FullName" placeholder="Jan Kowalski" />
+                        </div>
+                        <div class="form-group-row">
+                            <div class="form-group flex-1">
+                                <label>Email *</label>
+                                <InputText @bind-Value="_customer.Email" type="email" 
+                                           @onfocusout="HandleEmailBlur" placeholder="jan@example.com" />
+                            </div>
+                            <button type="button" class="lookup-btn" 
+                                    disabled="@(!CanSearchExisting || _isLookupInProgress)"
+                                    @onclick="LookupCustomerButtonAsync">
+                                @(_isLookupInProgress ? "🔄" : "🔍")
+                            </button>
+                        </div>
+                        <div class="form-group">
+                            <label>Telefon *</label>
+                            <PhoneInput @bind-Value="_customer.PhoneNumber" Label="" Required="true" 
+                                        Variant="MudBlazor.Variant.Outlined" />
+                        </div>
+                        <div class="form-group">
+                            <label>Adres</label>
+                            <InputTextArea @bind-Value="_customer.Address" rows="2" placeholder="ul. Sportowa 123" />
+                        </div>
+                        <div class="form-group">
+                            <label>Uwagi</label>
+                            <InputTextArea @bind-Value="_notes" rows="2" placeholder="Dodatkowe informacje..." />
+                        </div>
+                    </div>
+                </EditForm>
+            </div>
+
+            <!-- Payment Summary - Sticky Bottom -->
+            <div class="checkout-mobile-summary">
+                @if (_quoteError is not null)
+                {
+                    <div class="checkout-mobile-error">
+                        ⚠️ @_quoteError
+                        <button @onclick="RefreshPaymentSummaryAsync">Odśwież</button>
+                    </div>
+                }
+                else if (_quote is null)
+                {
+                    <div class="checkout-mobile-loading">
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" Color="Color.Primary" />
+                        Obliczanie...
+                    </div>
+                }
+                else
+                {
+                    <div class="checkout-mobile-summary-row">
+                        <span>Razem</span>
+                        <span>@_quote.TotalAmount.ToString("C")</span>
+                    </div>
+                    <div class="checkout-mobile-summary-row highlight">
+                        <span>Do zapłaty teraz (depozyt)</span>
+                        <span class="summary-amount">@_quote.DepositAmount.ToString("C")</span>
+                    </div>
+                }
+                <button class="checkout-mobile-submit" 
+                        disabled="@(_isSubmitting || _isPaymentInProgress || _cart.Items.Count == 0 || _hasMixedDates || _quote is null || _quoteError is not null)"
+                        @onclick="SubmitAsync">
+                    @if (_isSubmitting)
+                    {
+                        <span>⏳ Przetwarzanie...</span>
+                    }
+                    else
+                    {
+                        <span>✅ Zapłać @_quote?.DepositAmount.ToString("C")</span>
+                    }
+                </button>
+                <p class="checkout-mobile-secure">🔒 Bezpieczna płatność Stripe</p>
+            </div>
+        }
+    </div>
+}
+@* ============================================
+   DESKTOP UI - Original design
+   ============================================ *@
+else
+{
 <div class="checkout-container">
     <div class="max-w-6xl mx-auto">
         <!-- Header -->
@@ -37,17 +197,6 @@
                 </div>
             </div>
         </div>
-
-        @if (_isPaymentInProgress)
-        {
-            <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-                <div class="bg-white rounded-3xl p-10 text-center shadow-2xl">
-                    <div class="w-20 h-20 border-4 border-blue-200 border-t-blue-500 rounded-full animate-spin mx-auto mb-6"></div>
-                    <h2 class="text-2xl font-bold text-gray-800 mb-2">Przekierowanie do płatności...</h2>
-                    <p class="text-gray-600">Proszę czekać, nie zamykaj okna</p>
-                </div>
-            </div>
-        }
 
         @if (_cart.Items.Count == 0)
         {
@@ -73,8 +222,15 @@
                             <div>
                                 <div class="checkout-item-name">@item.ProductName</div>
                                 <div class="checkout-item-details">
-                                    @item.Quantity szt. × @item.TotalDays dni
-                                    (@item.StartDate.ToShortDateString() - @item.EndDate.ToShortDateString())
+                                    @if (item.RentalType == RentalTypeDto.Hourly && item.HoursRented.HasValue)
+                                    {
+                                        <span>@item.Quantity szt. × @item.HoursRented.Value godz. (⏰ godzinowy)</span>
+                                    }
+                                    else
+                                    {
+                                        <span>@item.Quantity szt. × @item.TotalDays dni</span>
+                                    }
+                                    <span class="ml-2">(@item.StartDate.ToShortDateString() - @item.EndDate.ToShortDateString())</span>
                                 </div>
                                 @if (item.HoldId is not null)
                                 {
@@ -217,6 +373,7 @@
         }
     </div>
 </div>
+} @* End of Desktop UI *@
 
 @code {
     private CartModel _cart = new();
@@ -232,6 +389,11 @@
     private PaymentQuoteResponse? _quote;
     private string? _quoteError;
     private bool _isPaymentInProgress;
+    
+    // Mobile state
+    private bool _isMobile = false;
+    private bool _showMobileItems = true;
+    private DotNetObjectReference<Checkout>? _dotNetRef;
 
     private bool CanSearchExisting => !string.IsNullOrWhiteSpace(_customer.Email);
 
@@ -243,6 +405,25 @@
         await PrefillFromSessionAsync();
         _ = RefreshPaymentSummaryAsync();
         StartRefreshLoop();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("setupMobileDetection", _dotNetRef);
+        }
+    }
+    
+    [JSInvokable]
+    public void OnScreenResize(bool isMobile)
+    {
+        if (_isMobile != isMobile)
+        {
+            _isMobile = isMobile;
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task PrefillFromSessionAsync()
@@ -628,10 +809,16 @@
         }, token);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         CartService.CartChanged -= OnCartChanged;
         _refreshCts?.Cancel();
+        try
+        {
+            await JS.InvokeVoidAsync("removeMobileDetection");
+        }
+        catch { }
+        _dotNetRef?.Dispose();
     }
 
     private class CheckoutCustomerModel

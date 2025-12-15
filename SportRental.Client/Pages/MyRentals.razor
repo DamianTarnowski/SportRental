@@ -5,9 +5,114 @@
 @inject IApiService Api
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Moje wypożyczenia - SportRental</PageTitle>
 
+@* ============================================
+   MOBILE UI - Compact rental cards
+   ============================================ *@
+@if (_isMobile)
+{
+    <div class="rentals-mobile">
+        <!-- Mobile Header -->
+        <div class="rentals-mobile-header">
+            <div class="rentals-mobile-title">
+                <span>📋</span>
+                <h1>Wypożyczenia</h1>
+                @if (_rentals?.Count > 0)
+                {
+                    <span class="rentals-mobile-count">@_rentals.Count</span>
+                }
+            </div>
+        </div>
+
+        @if (_isLoading)
+        {
+            <div class="rentals-mobile-loading">
+                <MudProgressCircular Indeterminate="true" Color="Color.Secondary" />
+                <span>Ładowanie...</span>
+            </div>
+        }
+        else if (_rentals == null || !_rentals.Any())
+        {
+            <div class="rentals-mobile-empty">
+                <span class="empty-icon">📭</span>
+                <h3>Brak wypożyczeń</h3>
+                <p>Zacznij swoją przygodę ze sportem!</p>
+                <a href="/products" class="rentals-mobile-cta">🎿 Przeglądaj sprzęt</a>
+            </div>
+        }
+        else
+        {
+            <div class="rentals-mobile-list">
+                @foreach (var rental in _rentals.OrderByDescending(r => r.StartDateUtc))
+                {
+                    <div class="rental-mobile-card @(rental.IsOverdue ? "overdue" : "")">
+                        <!-- Status badges -->
+                        <div class="rental-mobile-badges">
+                            <span class="rental-mobile-status @GetStatusClass(rental.Status)">
+                                @GetStatusEmoji(rental.Status) @GetStatusText(rental.Status)
+                            </span>
+                            <span class="rental-mobile-equip @GetEquipmentStatusClass(rental)">
+                                @GetEquipmentStatusEmoji(rental)
+                            </span>
+                        </div>
+
+                        @if (rental.IsOverdue)
+                        {
+                            <div class="rental-mobile-overdue">
+                                ⚠️ Termin minął!
+                            </div>
+                        }
+
+                        <!-- Dates -->
+                        <div class="rental-mobile-dates">
+                            <div class="rental-mobile-date-item">
+                                <span class="date-label">Od</span>
+                                <span class="date-value">@rental.StartDateUtc.ToLocalTime().ToString("dd.MM")</span>
+                            </div>
+                            <span class="date-arrow">→</span>
+                            <div class="rental-mobile-date-item">
+                                <span class="date-label">Do</span>
+                                <span class="date-value">@rental.EndDateUtc.ToLocalTime().ToString("dd.MM")</span>
+                            </div>
+                        </div>
+
+                        <!-- Products preview -->
+                        <div class="rental-mobile-products">
+                            @foreach (var item in rental.Items.Take(2))
+                            {
+                                <span class="rental-mobile-product">📦 @item.ProductName x@item.Quantity</span>
+                            }
+                            @if (rental.Items.Count > 2)
+                            {
+                                <span class="rental-mobile-more">+@(rental.Items.Count - 2) więcej</span>
+                            }
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="rental-mobile-footer">
+                            <div class="rental-mobile-amount">
+                                <span class="amount-value">@rental.TotalAmount.ToString("C")</span>
+                                <span class="amount-deposit">dep. @rental.DepositAmount.ToString("C")</span>
+                            </div>
+                            <button class="rental-mobile-btn" @onclick="@(() => ViewDetails(rental.Id))">
+                                Szczegóły →
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+@* ============================================
+   DESKTOP UI - Original design
+   ============================================ *@
+else
+{
 <div class="rentals-container">
     <div class="max-w-5xl mx-auto">
         <!-- Header -->
@@ -110,14 +215,46 @@
         }
     </div>
 </div>
+} @* End of Desktop UI *@
 
 @code {
     private bool _isLoading = true;
     private List<MyRentalDto>? _rentals;
+    private bool _isMobile = false;
+    private DotNetObjectReference<MyRentals>? _dotNetRef;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadRentalsAsync();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("setupMobileDetection", _dotNetRef);
+        }
+    }
+    
+    [JSInvokable]
+    public void OnScreenResize(bool isMobile)
+    {
+        if (_isMobile != isMobile)
+        {
+            _isMobile = isMobile;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("removeMobileDetection");
+        }
+        catch { }
+        _dotNetRef?.Dispose();
     }
 
     private async Task LoadRentalsAsync()

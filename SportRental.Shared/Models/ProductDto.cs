@@ -1,5 +1,54 @@
 namespace SportRental.Shared.Models
 {
+    public class ProductsPagedResponse
+    {
+        public List<ProductDto> Items { get; set; } = new();
+        public int TotalCount { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages { get; set; }
+    }
+
+    public class ProductFilterRequest
+    {
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 12;
+        public string? Search { get; set; }
+        public string? Category { get; set; }
+        public string? City { get; set; }
+        public string? Voivodeship { get; set; }
+        public string? Tenant { get; set; }
+        public decimal? MinPrice { get; set; }
+        public decimal? MaxPrice { get; set; }
+        public bool? Available { get; set; }
+        public string? Sort { get; set; }
+        public double? UserLat { get; set; }
+        public double? UserLon { get; set; }
+
+        public string ToQueryString()
+        {
+            var parts = new List<string>
+            {
+                $"page={Page}",
+                $"pageSize={PageSize}"
+            };
+
+            if (!string.IsNullOrWhiteSpace(Search)) parts.Add($"search={Uri.EscapeDataString(Search)}");
+            if (!string.IsNullOrWhiteSpace(Category)) parts.Add($"category={Uri.EscapeDataString(Category)}");
+            if (!string.IsNullOrWhiteSpace(City)) parts.Add($"city={Uri.EscapeDataString(City)}");
+            if (!string.IsNullOrWhiteSpace(Voivodeship)) parts.Add($"voivodeship={Uri.EscapeDataString(Voivodeship)}");
+            if (!string.IsNullOrWhiteSpace(Tenant)) parts.Add($"tenant={Uri.EscapeDataString(Tenant)}");
+            if (MinPrice.HasValue) parts.Add($"minPrice={MinPrice.Value}");
+            if (MaxPrice.HasValue) parts.Add($"maxPrice={MaxPrice.Value}");
+            if (Available.HasValue) parts.Add($"available={Available.Value}");
+            if (!string.IsNullOrWhiteSpace(Sort)) parts.Add($"sort={Uri.EscapeDataString(Sort)}");
+            if (UserLat.HasValue) parts.Add($"userLat={UserLat.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            if (UserLon.HasValue) parts.Add($"userLon={UserLon.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+
+            return string.Join("&", parts);
+        }
+    }
+
     public class ProductDto
     {
         public Guid Id { get; set; }
@@ -17,6 +66,15 @@ namespace SportRental.Shared.Models
         public string? FullImageUrl { get; set; }
         public bool IsAvailable { get; set; } = true;
         public int AvailableQuantity { get; set; }
+        
+        // Location
+        public string? City { get; set; }
+        public string? Voivodeship { get; set; }
+        public double? Lat { get; set; }
+        public double? Lon { get; set; }
+        
+        // Tenant (wypożyczalnia)
+        public string? TenantName { get; set; }
 
         // Helper methods for responsive images
         public string GetImageUrl(int width = 800)

@@ -36,12 +36,26 @@ public class ApiService : IApiService
         try
         {
             var url = $"/api/products?page={page}&pageSize={pageSize}";
-            var products = await _httpClient.GetFromJsonAsync<List<ProductDto>>(url);
-            return products ?? new List<ProductDto>();
+            var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url);
+            return response?.Items ?? new List<ProductDto>();
         }
         catch (Exception)
         {
             return new List<ProductDto>();
+        }
+    }
+
+    public async Task<ProductsPagedResponse> GetProductsPagedAsync(ProductFilterRequest filter)
+    {
+        try
+        {
+            var url = $"/api/products?{filter.ToQueryString()}";
+            var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url);
+            return response ?? new ProductsPagedResponse();
+        }
+        catch (Exception)
+        {
+            return new ProductsPagedResponse();
         }
     }
 

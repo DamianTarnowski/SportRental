@@ -96,18 +96,11 @@
 flowchart TB
     subgraph Client["🌐 Frontend Layer"]
         WASM["🎨 Blazor WASM<br/>Public Client"]
-        Admin["⚙️ Blazor Server<br/>Admin Panel"]
-    end
-    
-    subgraph API["🔌 API Layer"]
-        PublicAPI["📡 Public API<br/>Minimal APIs"]
-        AdminAPI["🔐 Admin API<br/>Internal"]
-        MediaAPI["📸 Media Service<br/>Microservice"]
+        Admin["⚙️ Blazor Server<br/>Admin Panel + API"]
     end
     
     subgraph Data["💾 Data Layer"]
         PostgreSQL[("🐘 PostgreSQL<br/>Main Database")]
-        SQLite[("📦 SQLite<br/>Media Metadata")]
         Blob["☁️ Azure Blob<br/>File Storage"]
     end
     
@@ -115,30 +108,25 @@ flowchart TB
         Stripe["💳 Stripe<br/>Payments"]
         KeyVault["🔑 Azure Key Vault<br/>Secrets"]
         SMTP["📧 SMTP<br/>Email"]
+        SMSAPI["📱 SMSAPI<br/>SMS Notifications"]
     end
     
-    WASM -->|REST + X-Tenant-Id| PublicAPI
-    Admin --> AdminAPI
-    PublicAPI --> PostgreSQL
-    AdminAPI --> PostgreSQL
-    PublicAPI -->|HTTP + X-Api-Key| MediaAPI
-    AdminAPI -->|HTTP + X-Api-Key| MediaAPI
-    MediaAPI --> SQLite
-    MediaAPI --> Blob
-    PublicAPI --> Stripe
-    AdminAPI --> KeyVault
-    PublicAPI --> KeyVault
-    AdminAPI --> SMTP
+    WASM -->|REST + X-Tenant-Id| Admin
+    Admin --> PostgreSQL
+    Admin --> Blob
+    Admin --> Stripe
+    Admin --> KeyVault
+    Admin --> SMTP
+    Admin --> SMSAPI
     
     style WASM fill:#512BD4,stroke:#fff,stroke-width:2px,color:#fff
     style Admin fill:#512BD4,stroke:#fff,stroke-width:2px,color:#fff
-    style PublicAPI fill:#0078D4,stroke:#fff,stroke-width:2px,color:#fff
-    style AdminAPI fill:#0078D4,stroke:#fff,stroke-width:2px,color:#fff
-    style MediaAPI fill:#0078D4,stroke:#fff,stroke-width:2px,color:#fff
     style PostgreSQL fill:#316192,stroke:#fff,stroke-width:2px,color:#fff
     style Stripe fill:#635BFF,stroke:#fff,stroke-width:2px,color:#fff
     style KeyVault fill:#FF6F00,stroke:#fff,stroke-width:2px,color:#fff
 ```
+
+> **📝 Uwaga:** Aktualnie API dla klienta WASM jest hostowane w projekcie **SportRental.Admin** (Blazor Server). Projekt **SportRental.Api** jest wyłączony - przygotowany na przyszłość gdy będzie potrzeba osobnego serwera API. Projekt **SportRental.MediaStorage** również nie jest używany - pliki są przechowywane bezpośrednio w Azure Blob Storage.
 
 </div>
 
@@ -148,13 +136,13 @@ flowchart TB
 
 | Module | Description | Tech Stack | Status |
 |--------|-------------|------------|--------|
-| **🎨 SportRental.Admin** | Blazor Server admin panel with MudBlazor | C# 12, Blazor Server, MudBlazor | ✅ Production |
-| **📡 SportRental.Api** | Public REST API with minimal APIs | ASP.NET Core 10, Minimal APIs | ✅ Production |
+| **🎨 SportRental.Admin** | Blazor Server admin panel + API dla klienta WASM | C# 12, Blazor Server, MudBlazor | ✅ Production |
+| **📡 SportRental.Api** | Public REST API (obecnie wyłączone - na przyszłość) | ASP.NET Core 10, Minimal APIs | ⏸️ Disabled |
 | **💻 SportRental.Client** | Blazor WebAssembly public client | Blazor WASM, TailwindCSS | ✅ Production |
-| **📸 SportRental.MediaStorage** | Media microservice with chunked uploads | Minimal APIs, SQLite | ✅ Production |
+| **📸 SportRental.MediaStorage** | Media microservice (obecnie wyłączone - Azure Blob) | Minimal APIs, SQLite | ⏸️ Disabled |
 | **🔧 SportRental.Infrastructure** | EF Core, domain models, migrations | Entity Framework Core 10 | ✅ Production |
 | **📦 SportRental.Shared** | Shared DTOs, components, HTTP clients | Razor Class Library | ✅ Production |
-| **🧪 *.Tests** | 356 automated tests (100% pass rate) | xUnit, bUnit, Moq | ✅ Passing |
+| **🧪 *.Tests** | Automated tests | xUnit, bUnit, Moq | ✅ Passing |
 
 ---
 
@@ -219,11 +207,14 @@ cd ..
 az login
 # Add your secrets to Key Vault (see SECURITY.md)
 
-# 5️⃣ Run the services (separate terminals)
-dotnet run --project SportRental.Admin --urls "https://localhost:7142"
-dotnet run --project SportRental.Api --urls "https://localhost:5001"
-dotnet run --project SportRental.MediaStorage --urls "https://localhost:5014"
-dotnet run --project SportRental.Client --urls "http://localhost:5173"
+# 5️⃣ Run the services
+# Opcja A: Visual Studio - użyj profilu "Admin + Client" (uruchamia oba projekty)
+# Opcja B: Ręcznie w terminalu:
+dotnet run --project SportRental.Admin --urls "http://localhost:5001"
+dotnet run --project SportRental.Client --urls "http://localhost:5014"
+
+# UWAGA: SportRental.Api i SportRental.MediaStorage są obecnie WYŁĄCZONE
+# API jest hostowane w SportRental.Admin, pliki w Azure Blob Storage
 ```
 
 **🎉 Done!** Open https://localhost:7142 for the admin panel.
@@ -304,21 +295,26 @@ dotnet test
 
 ### **✅ Completed (2025)**
 - ✅ Multi-tenant architecture
-- ✅ Blazor Server admin panel
+- ✅ Blazor Server admin panel + API
 - ✅ Blazor WASM client
-- ✅ Stripe payment integration
+- ✅ Stripe payment integration (Checkout Sessions)
 - ✅ Azure Key Vault integration
-- ✅ Azure Blob Storage
-- ✅ PDF contract generation
-- ✅ Email notifications
-- ✅ 356 automated tests
-- ✅ Media storage microservice
+- ✅ Azure Blob Storage (zdjęcia produktów)
+- ✅ PDF contract generation (QuestPDF)
+- ✅ Email notifications (SMTP)
+- ✅ SMS notifications (SMSAPI.pl)
+- ✅ **Wynajem godzinowy** - obsługa HourlyPrice, RentalType, HoursRented
+- ✅ Reservation holds (tymczasowe rezerwacje w koszyku)
+- ✅ Customer session management
+- ✅ Visual Studio multi-project launch (Admin + Client)
 
-### **🚧 In Progress (Q4 2025)**
+### **🚧 In Progress / Planned**
 - 🚧 Docker & Docker Compose setup
 - 🚧 GitHub Actions CI/CD pipeline
 - 🚧 Application Insights monitoring
 - 🚧 CloudFlare CDN integration
+- 🚧 Reaktywacja SportRental.Api jako osobny serwer (gdy potrzeba skalowania)
+- 🚧 Reaktywacja SportRental.MediaStorage (gdy zmiana hostingu z Azure)
 
 ### **📅 Planned (2025-2026)**
 - 📅 Rate limiting & throttling

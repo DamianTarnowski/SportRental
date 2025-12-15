@@ -2,11 +2,20 @@
 
 > See `docs/SHOWCASE.md` for an English showcase, demo script, and talking points.
 
+## ⚠️ Aktualna architektura (grudzień 2025)
+
+**WAŻNE:** Obecna architektura jest uproszczona w stosunku do pierwotnego planu:
+
+- **SportRental.Admin** - Blazor Server hostujący panel administracyjny **ORAZ API dla klienta WASM**
+- **SportRental.Client** - Blazor WASM łączący się z API w Admin
+- **SportRental.Api** - ⏸️ **WYŁĄCZONY** - przygotowany na przyszłość gdy potrzeba osobnego serwera API
+- **SportRental.MediaStorage** - ⏸️ **WYŁĄCZONY** - pliki są przechowywane bezpośrednio w Azure Blob Storage
+
 ## Cele architektury
 - Separacja domeny biznesowej, interfejsu administracyjnego i kanalu klienckiego.
 - Latwe powielanie instancji (multi-tenant) przy zachowaniu izolacji danych.
 - Maksymalne ponowne uzycie komponentow (biblioteka `SportRental.Shared`).
-- Modularnosc pozwalajaca w przyszlosci wydzielac mikroserwisy (MediaStorage jest pierwszym przykladem).
+- Modularnosc pozwalajaca w przyszlosci wydzielac mikroserwisy.
 - Wysoka testowalnosc (xUnit, bUnit, WebApplicationFactory) oraz latwe uruchamianie w srodowisku deweloperskim.
 
 ## Projekty w rozwiazaniu
@@ -16,17 +25,22 @@
 - Hosted services: `MediaStorageProcessHostedService` (autostart mikroserwisu plikow), przypomnienia e-mail/SMS.
 - Konfiguracja w `Program.cs` oplata DI, Swagger panelowy, Rate Limiting, Health Checks.
 
-### SportRental.Api (publiczne REST API)
-- Minimal API wystawiajace zasoby dla klienta zewn?trznego (produkty, holdy, wynajmy, uploady).
+### SportRental.Api (publiczne REST API) - ⏸️ WYŁĄCZONY
+> **Uwaga:** Ten projekt jest obecnie wyłączony. API dla klienta WASM jest hostowane w SportRental.Admin.
+> Projekt jest przygotowany na przyszłość gdy będzie potrzeba osobnego serwera API (np. skalowanie, microservices).
+
+- Minimal API wystawiajace zasoby dla klienta zewnętrznego (produkty, holdy, wynajmy, uploady).
 - Buduje sie na `ApplicationDbContext` z projektu `SportRental.Infrastructure` (PostgreSQL) i wymaganym naglowku `X-Tenant-Id`.
-- Uzywa `IHttpClientFactory` do komunikacji z `SportRental.MediaStorage` (upload zdjec/plikow) oraz waliduje rozszerzenia.
 
 ### SportRental.Client (Blazor WebAssembly)
   - Moduly: Pages/ (landing, katalog, koszyk, konto klienta), Layout/, Components/, Services/, wwwroot/ (Tailwind), Program.cs (rejestracja serwisow).
   - ApiService zapewnia jednolity dostďż˝p do REST API i magazynu plikďż˝w, a CustomerSessionService przechowuje dane klienta w localStorage.
   - Funkcje UI: rejestracja/logowanie po emailu + telefonie, edycja profilu, historia wynajmďż˝w z informacjďż˝ o pďż˝atnoďż˝ciach/depozytach.
 
-### SportRental.MediaStorage (mikroserwis plikow)
+### SportRental.MediaStorage (mikroserwis plikow) - ⏸️ WYŁĄCZONY
+> **Uwaga:** Ten projekt jest obecnie wyłączony. Pliki (zdjęcia produktów) są przechowywane bezpośrednio w Azure Blob Storage.
+> Projekt jest przygotowany na przyszłość gdy zmiana hostingu (np. self-hosted bez Azure).
+
 - Minimal API na SQLite (`MediaStorageDbContext`), konfiguracja `StorageOptions` i `SecurityOptions`.
 - Endpointy: upload (`POST /api/files`), metadane (`GET /api/files/{id}`), usuwanie (`DELETE /api/files/{id}`), serwowanie (`GET/HEAD /files/...`).
 - Walidacja rozmiaru, rozszerzen i nadawanie sciezek per tenant.
@@ -38,7 +52,34 @@
 - Projekt Razor Class Library z DTO, serwisami HTTP (`IApiService`, `CartService`), komponentami UI i pomocniczym JS interop.
 - Wspoldzielony pomiedzy panel, klientem WASM oraz testami.
 
-## Warstwy i przeplyw
+## Warstwy i przeplyw (aktualna architektura)
+```mermaid
+flowchart LR
+    subgraph Client
+        Wasm[Blazor WASM]
+        AdminUI[Blazor Server UI]
+    end
+    subgraph Backend
+        Admin[SportRental.Admin<br/>Panel + API]
+        Db[(PostgreSQL)]
+        Blob[Azure Blob Storage]
+    end
+    subgraph External
+        Stripe[Stripe Payments]
+        SMTP[Email SMTP]
+        SMSAPI[SMSAPI.pl]
+    end
+
+    Wasm -->|REST + X-Tenant-Id| Admin
+    AdminUI --> Admin
+    Admin --> Db
+    Admin --> Blob
+    Admin --> Stripe
+    Admin --> SMTP
+    Admin --> SMSAPI
+```
+
+### Diagram oryginalnej architektury (na przyszłość)
 ```mermaid
 flowchart LR
     subgraph Client
@@ -107,10 +148,18 @@ flowchart LR
 - Planowane: Serilog + Application Insights (opisane w `ROADMAP.md`).
 
 ## Kierunki rozwoju architektury
-- Rozszerzenie API o autoryzacje klientow i platnosci (JWT, bramka platnosci).
+- Reaktywacja SportRental.Api jako osobny serwer gdy potrzeba skalowania
+- Reaktywacja SportRental.MediaStorage gdy zmiana hostingu z Azure
 - Wyodrebnienie kolejnych uslug (np. powiadomienia) przy uzyciu kolejek.
 - MAUI front-end wykorzystujacy `SportRental.Shared` (opis w roadmapie).
-- Stabilizacja na finalnym .NET 9 i przygotowanie obrazow Docker dla kazdej uslugi.
+- Przygotowanie obrazow Docker dla kazdej uslugi.
+
+## Nowe funkcje (grudzień 2025)
+- **Wynajem godzinowy** - obsługa `HourlyPrice`, `RentalType`, `HoursRented` w produktach i wynajmach
+- **SMS notifications** - integracja z SMSAPI.pl (potwierdzenia, przypomnienia)
+- **Reservation holds** - tymczasowe rezerwacje w koszyku z TTL
+- **Stripe Checkout Sessions** - pełna integracja płatności z depozytami
+- **Visual Studio multi-project launch** - profil "Admin + Client" uruchamia oba projekty
 
 
 
