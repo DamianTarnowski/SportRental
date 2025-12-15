@@ -1,0 +1,214 @@
+@using SportRental.Infrastructure.Domain
+@using SportRental.Admin.Services
+@inject IQrLabelGenerator LabelGenerator
+@inject ISnackbar Snackbar
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.QrCode2" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Generuj etykiety QR</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <!-- Label Size Selection -->
+            <MudSelect T="LabelSize" @bind-Value="_selectedSize" Label="Rozmiar etykiet" Variant="Variant.Outlined">
+                <MudSelectItem Value="LabelSize.Small">Małe (38×30mm) - 45 na stronę</MudSelectItem>
+                <MudSelectItem Value="LabelSize.Medium">Średnie (62×50mm) - 15 na stronę</MudSelectItem>
+                <MudSelectItem Value="LabelSize.Large">Duże (92×70mm) - 8 na stronę</MudSelectItem>
+            </MudSelect>
+            
+            <!-- Product Selection -->
+            <MudText Typo="Typo.subtitle2" Class="mt-2">Wybierz produkty:</MudText>
+            
+            <MudPaper Elevation="0" Class="pa-2" Style="max-height: 300px; overflow-y: auto; border: 1px solid var(--mud-palette-lines-default); border-radius: 4px;">
+                @if (Products == null || !Products.Any())
+                {
+                    <MudText Color="Color.Secondary" Class="pa-2">Brak produktów</MudText>
+                }
+                else
+                {
+                    <MudList T="string" Dense="true">
+                        @foreach (var product in Products)
+                        {
+                            var isSelected = _selectedProducts.ContainsKey(product.Id);
+                            <MudListItem @key="product.Id">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="width: 100%;">
+                                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                        <MudCheckBox T="bool" Value="isSelected" 
+                                                     ValueChanged="(val) => ToggleProduct(product, val)" 
+                                                     Color="Color.Primary" />
+                                        <MudStack Spacing="0">
+                                            <MudText Typo="Typo.body2" Class="fw-bold">@product.Name</MudText>
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                @(product.Sku ?? "Brak SKU")
+                                            </MudText>
+                                        </MudStack>
+                                    </MudStack>
+                                    @if (isSelected)
+                                    {
+                                        <MudNumericField T="int" @bind-Value="_selectedProducts[product.Id]" 
+                                                         Label="Ilość" Variant="Variant.Outlined" 
+                                                         Min="1" Max="100" Style="width: 80px;"
+                                                         Margin="Margin.Dense" />
+                                    }
+                                </MudStack>
+                            </MudListItem>
+                        }
+                    </MudList>
+                }
+            </MudPaper>
+            
+            <!-- Summary -->
+            <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                <MudText Typo="Typo.body2">
+                    Wybrano <strong>@_selectedProducts.Count</strong> produktów, 
+                    łącznie <strong>@_selectedProducts.Values.Sum()</strong> etykiet
+                </MudText>
+            </MudAlert>
+            
+            <!-- Preview -->
+            @if (_selectedProducts.Any())
+            {
+                <MudExpansionPanels>
+                    <MudExpansionPanel Text="Podgląd etykiety" IsInitiallyExpanded="false">
+                        <div class="label-preview">
+                            <div class="label-preview-qr">
+                                <MudIcon Icon="@Icons.Material.Filled.QrCode2" Size="Size.Large" />
+                            </div>
+                            <div class="label-preview-text">
+                                <strong>@(Products?.FirstOrDefault(p => _selectedProducts.ContainsKey(p.Id))?.Name ?? "Nazwa produktu")</strong>
+                                <br />
+                                <small>@(Products?.FirstOrDefault(p => _selectedProducts.ContainsKey(p.Id))?.Sku ?? "SKU")</small>
+                            </div>
+                        </div>
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Cancel" Disabled="_isGenerating">Anuluj</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" 
+                   OnClick="GenerateLabels" Disabled="!_selectedProducts.Any() || _isGenerating"
+                   StartIcon="@(_isGenerating ? null : Icons.Material.Filled.Download)">
+            @if (_isGenerating)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Generowanie...</span>
+            }
+            else
+            {
+                <span>Pobierz PDF</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .label-preview {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border: 1px dashed var(--mud-palette-lines-default);
+        border-radius: 8px;
+        background: var(--mud-palette-background-grey);
+    }
+    
+    .label-preview-qr {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: white;
+        border-radius: 4px;
+    }
+    
+    .label-preview-text {
+        font-size: 0.875rem;
+    }
+</style>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    
+    [Parameter] public IEnumerable<Product>? Products { get; set; }
+    [Parameter] public IEnumerable<Guid>? PreselectedProductIds { get; set; }
+    
+    private LabelSize _selectedSize = LabelSize.Medium;
+    private Dictionary<Guid, int> _selectedProducts = new();
+    private bool _isGenerating;
+    
+    protected override void OnParametersSet()
+    {
+        if (PreselectedProductIds != null)
+        {
+            foreach (var id in PreselectedProductIds)
+            {
+                if (!_selectedProducts.ContainsKey(id))
+                {
+                    _selectedProducts[id] = 1;
+                }
+            }
+        }
+    }
+    
+    private void ToggleProduct(Product product, bool selected)
+    {
+        if (selected)
+        {
+            _selectedProducts[product.Id] = 1;
+        }
+        else
+        {
+            _selectedProducts.Remove(product.Id);
+        }
+    }
+    
+    private async Task GenerateLabels()
+    {
+        if (!_selectedProducts.Any() || Products == null)
+            return;
+        
+        _isGenerating = true;
+        StateHasChanged();
+        
+        try
+        {
+            var productsWithQuantities = Products
+                .Where(p => _selectedProducts.ContainsKey(p.Id))
+                .Select(p => (p, _selectedProducts[p.Id]))
+                .ToList();
+            
+            var pdfBytes = await LabelGenerator.GenerateLabelsAsync(productsWithQuantities, _selectedSize);
+            
+            // Download the PDF
+            var fileName = $"etykiety-qr-{DateTime.Now:yyyyMMdd-HHmmss}.pdf";
+            await DownloadFile(pdfBytes, fileName, "application/pdf");
+            
+            Snackbar.Add($"Wygenerowano {_selectedProducts.Values.Sum()} etykiet", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd generowania: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isGenerating = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task DownloadFile(byte[] fileBytes, string fileName, string contentType)
+    {
+        var base64 = Convert.ToBase64String(fileBytes);
+        await JS.InvokeVoidAsync("downloadFile", fileName, contentType, base64);
+    }
+    
+    private void Cancel() => MudDialog.Cancel();
+}

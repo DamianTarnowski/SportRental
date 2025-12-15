@@ -1,0 +1,265 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="qr-scanner-container">
+    @if (_isLoading)
+    {
+        <div class="qr-scanner-loading">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body1" Class="mt-2">Uruchamianie kamery...</MudText>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="qr-scanner-error">
+            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large" />
+            <MudText Typo="Typo.body1" Color="Color.Error" Class="mt-2">@_error</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartScanning" Class="mt-3">
+                Spróbuj ponownie
+            </MudButton>
+        </div>
+    }
+    
+    <div id="@_scannerId" class="qr-scanner-video @(_isScanning ? "" : "hidden")"></div>
+    
+    @if (_isScanning)
+    {
+        <div class="qr-scanner-controls">
+            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="ToggleFlash" 
+                       StartIcon="@(_flashOn ? Icons.Material.Filled.FlashOff : Icons.Material.Filled.FlashOn)"
+                       Size="Size.Small">
+                @(_flashOn ? "Wyłącz" : "Latarka")
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="SwitchCamera"
+                       StartIcon="@Icons.Material.Filled.Cameraswitch"
+                       Size="Size.Small">
+                Przełącz
+            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="StopScanning"
+                       StartIcon="@Icons.Material.Filled.Stop"
+                       Size="Size.Small">
+                Stop
+            </MudButton>
+        </div>
+    }
+    else if (!_isLoading && string.IsNullOrEmpty(_error))
+    {
+        <div class="qr-scanner-start">
+            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Class="mt-2">Skaner kodów QR</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Skieruj kamerę na kod QR produktu
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartScanning"
+                       StartIcon="@Icons.Material.Filled.CameraAlt" Size="Size.Large">
+                Uruchom kamerę
+            </MudButton>
+        </div>
+    }
+</div>
+
+<style>
+    .qr-scanner-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 350px;
+        background: var(--mud-palette-background-grey);
+        border-radius: 12px;
+        padding: 1rem;
+    }
+    
+    .qr-scanner-video {
+        width: 100%;
+        max-width: 400px;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    
+    .qr-scanner-video.hidden {
+        display: none;
+    }
+    
+    .qr-scanner-loading,
+    .qr-scanner-error,
+    .qr-scanner-start {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    .qr-scanner-controls {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    /* Style the html5-qrcode scanner */
+    :deep(#qr-shaded-region) {
+        border-color: var(--mud-palette-primary) !important;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public EventCallback<string> OnScanned { get; set; }
+    
+    [Parameter]
+    public bool AutoStart { get; set; } = false;
+    
+    private string _scannerId = $"qr-scanner-{Guid.NewGuid():N}";
+    private DotNetObjectReference<QrScanner>? _dotNetRef;
+    private bool _isLoading;
+    private bool _isScanning;
+    private bool _flashOn;
+    private string? _error;
+    private bool _initialized;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            var result = await JS.InvokeAsync<InitResult>("QrScanner.init", _scannerId, _dotNetRef);
+            
+            if (!result.Success)
+            {
+                _error = result.Error ?? "Nie udało się zainicjalizować skanera";
+                StateHasChanged();
+                return;
+            }
+            
+            _initialized = true;
+            
+            if (AutoStart)
+            {
+                await StartScanning();
+            }
+            
+            StateHasChanged();
+        }
+    }
+    
+    private async Task StartScanning()
+    {
+        if (!_initialized)
+        {
+            _error = "Skaner nie został zainicjalizowany";
+            return;
+        }
+        
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+        
+        try
+        {
+            var result = await JS.InvokeAsync<InitResult>("QrScanner.start", true);
+            
+            if (!result.Success)
+            {
+                _error = result.Error ?? "Nie udało się uruchomić kamery";
+            }
+            else
+            {
+                _isScanning = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Błąd: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task StopScanning()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("QrScanner.stop");
+            _isScanning = false;
+            _flashOn = false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error stopping scanner: {ex.Message}");
+        }
+        StateHasChanged();
+    }
+    
+    private async Task ToggleFlash()
+    {
+        try
+        {
+            var result = await JS.InvokeAsync<FlashResult>("QrScanner.toggleFlash");
+            if (result.Success)
+            {
+                _flashOn = result.FlashOn;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling flash: {ex.Message}");
+        }
+        StateHasChanged();
+    }
+    
+    private async Task SwitchCamera()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("QrScanner.switchCamera");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error switching camera: {ex.Message}");
+        }
+    }
+    
+    [JSInvokable]
+    public async Task OnQrCodeScanned(string qrData)
+    {
+        // Stop scanning after successful scan
+        await StopScanning();
+        
+        // Notify parent
+        if (OnScanned.HasDelegate)
+        {
+            await OnScanned.InvokeAsync(qrData);
+        }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("QrScanner.dispose");
+        }
+        catch { }
+        
+        _dotNetRef?.Dispose();
+    }
+    
+    private class InitResult
+    {
+        public bool Success { get; set; }
+        public string? Error { get; set; }
+    }
+    
+    private class FlashResult
+    {
+        public bool Success { get; set; }
+        public bool FlashOn { get; set; }
+        public string? Error { get; set; }
+    }
+}

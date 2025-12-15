@@ -94,6 +94,7 @@
                                 </div>
                                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
                                     <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => Edit(product)">Edytuj</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.QrCode2" OnClick="() => ShowProductQr(product)">Kod QR</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="() => Delete(product)">Usuń</MudMenuItem>
                                     @if (product.IsActive)
                                     {
@@ -125,14 +126,24 @@ else
                         <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj sprzętem sportowym</MudText>
                     </div>
                 </MudStack>
-                <MudButton Variant="Variant.Filled" 
-                           Color="Color.Surface" 
-                           StartIcon="@Icons.Material.Filled.Add"
-                           OnClick="CreateNew"
-                           Size="Size.Large"
-                           Class="rounded-pill px-6">
-                    Nowy produkt
-                </MudButton>
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Surface" 
+                               StartIcon="@Icons.Material.Filled.QrCode2"
+                               OnClick="OpenQrLabelsDialog"
+                               Size="Size.Large"
+                               Class="rounded-pill px-4">
+                        Etykiety QR
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Surface" 
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="CreateNew"
+                               Size="Size.Large"
+                               Class="rounded-pill px-6">
+                        Nowy produkt
+                    </MudButton>
+                </MudStack>
             </MudStack>
         </MudPaper>
         
@@ -823,5 +834,43 @@ else
         _croppedBase64Image = base64Image;
         _selectedImageName = "cropped-image.jpg";
         _selectedImage = null;
+    }
+    
+    // QR Code functionality
+    private async Task OpenQrLabelsDialog()
+    {
+        var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.QrLabelsDialog>
+        {
+            { x => x.Products, products }
+        };
+        
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+        
+        await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.QrLabelsDialog>(
+            "Generuj etykiety QR", parameters, options);
+    }
+    
+    private async Task ShowProductQr(Product product)
+    {
+        var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.QrLabelsDialog>
+        {
+            { x => x.Products, products },
+            { x => x.PreselectedProductIds, new[] { product.Id } }
+        };
+        
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+        
+        await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.QrLabelsDialog>(
+            "Generuj etykietę QR", parameters, options);
     }
 }
