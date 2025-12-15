@@ -1,5 +1,18 @@
 # SportRental.Api — dokumentacja projektu
 
+> **⚠️ UWAGA: Ten projekt jest obecnie WYŁĄCZONY (grudzień 2025)**
+>
+> API dla klienta WASM jest hostowane w projekcie **SportRental.Admin**.
+> Ten projekt jest przygotowany na przyszłość gdy będzie potrzeba osobnego serwera API (np. skalowanie, microservices).
+>
+> Aby uruchomić aplikację, użyj profilu **"Admin + Client"** w Visual Studio lub uruchom:
+> - `SportRental.Admin` (panel + API) na `http://localhost:5001`
+> - `SportRental.Client` (WASM) na `http://localhost:5014`
+
+---
+
+## Archiwalna dokumentacja (dla przyszłego użycia)
+
 ## TL;DR / Quick Start
 - Uruchom Postgresa i ustaw connection string (z hasłem) lub `ConnectionStrings__DefaultConnection`.
 - Migracje (jeśli potrzeba):

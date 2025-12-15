@@ -4,10 +4,137 @@
 @inject ICartService CartService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
-@implements IDisposable
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Koszyk - SportRental</PageTitle>
 
+@* ============================================
+   MOBILE UI - Compact cart view
+   ============================================ *@
+@if (_isMobile)
+{
+    <div class="cart-mobile">
+        <!-- Mobile Header -->
+        <div class="cart-mobile-header">
+            <div class="cart-mobile-title">
+                <span>🛒</span>
+                <h1>Koszyk</h1>
+                @if (_cart.TotalItems > 0)
+                {
+                    <span class="cart-mobile-count">@_cart.TotalItems</span>
+                }
+            </div>
+        </div>
+
+        @if (_cart.Items.Count == 0)
+        {
+            <div class="cart-mobile-empty">
+                <span class="empty-icon">🛒</span>
+                <h3>Pusty koszyk</h3>
+                <p>Dodaj sprzęt sportowy do koszyka</p>
+                <a href="/products" class="cart-mobile-cta">📦 Przeglądaj katalog</a>
+            </div>
+        }
+        else
+        {
+            <!-- Mobile Cart Items -->
+            <div class="cart-mobile-items">
+                @foreach (var item in _cart.Items)
+                {
+                    <div class="cart-mobile-item">
+                        <div class="cart-mobile-item-header">
+                            @if (!string.IsNullOrEmpty(item.ProductImageUrl))
+                            {
+                                <img src="@item.ProductImageUrl" alt="@item.ProductName" class="cart-mobile-item-image" />
+                            }
+                            else
+                            {
+                                <div class="cart-mobile-item-placeholder">📦</div>
+                            }
+                            <div class="cart-mobile-item-info">
+                                <h4>@item.ProductName</h4>
+                                <span class="cart-mobile-item-price">@item.DailyPrice.ToString("C")/dzień</span>
+                            </div>
+                            <button class="cart-mobile-remove" @onclick="@(() => RemoveFromCart(item.ProductId))">✕</button>
+                        </div>
+                        
+                        <div class="cart-mobile-item-dates">
+                            <div class="cart-mobile-date">
+                                <label>📅 Od</label>
+                                <input type="date" 
+                                       value="@item.StartDate.ToString("yyyy-MM-dd")" 
+                                       min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                       @onchange="@((e) => OnStartDateChanged(item, e))" />
+                            </div>
+                            <div class="cart-mobile-date">
+                                <label>📅 Do</label>
+                                <input type="date" 
+                                       value="@item.EndDate.ToString("yyyy-MM-dd")" 
+                                       min="@item.StartDate.AddDays(1).ToString("yyyy-MM-dd")"
+                                       @onchange="@((e) => OnEndDateChanged(item, e))" />
+                            </div>
+                        </div>
+
+                        <div class="cart-mobile-item-options">
+                            <select value="@((int)item.RentalType)"
+                                    @onchange="@((e) => OnRentalTypeChanged(item, e))"
+                                    class="cart-mobile-select">
+                                <option value="0">📅 Dzienny</option>
+                                @if (item.HourlyPrice.HasValue && item.HourlyPrice.Value > 0)
+                                {
+                                    <option value="1">⏰ Godzinowy</option>
+                                }
+                            </select>
+                            @if (item.RentalType == RentalTypeDto.Hourly)
+                            {
+                                <input type="number" 
+                                       value="@(item.HoursRented ?? 1)"
+                                       min="1" max="24"
+                                       @onchange="@((e) => OnHoursChanged(item, e))"
+                                       class="cart-mobile-hours" 
+                                       placeholder="Godz." />
+                            }
+                        </div>
+
+                        <div class="cart-mobile-item-footer">
+                            <div class="cart-mobile-quantity">
+                                <button @onclick="@(() => UpdateQuantity(item, item.Quantity - 1))">−</button>
+                                <span>@item.Quantity</span>
+                                <button @onclick="@(() => UpdateQuantity(item, item.Quantity + 1))">+</button>
+                            </div>
+                            <div class="cart-mobile-total">@item.TotalPrice.ToString("C")</div>
+                        </div>
+
+                        @if (item.HoldId is not null)
+                        {
+                            <div class="cart-mobile-hold">
+                                ✅ Rezerwacja do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm")
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- Mobile Summary - Sticky Bottom -->
+            <div class="cart-mobile-summary">
+                <div class="cart-mobile-summary-row">
+                    <span>@_cart.TotalItems produktów</span>
+                    <span class="cart-mobile-summary-total">@_cart.TotalAmount.ToString("C")</span>
+                </div>
+                <button class="cart-mobile-checkout" @onclick="ProceedToCheckout">
+                    💳 Zamów • @_cart.TotalAmount.ToString("C")
+                </button>
+                <a href="/products" class="cart-mobile-continue">🛒 Kontynuuj zakupy</a>
+            </div>
+        }
+    </div>
+}
+@* ============================================
+   DESKTOP UI - Original design
+   ============================================ *@
+else
+{
 <div class="cart-container">
     <div class="max-w-6xl mx-auto">
         <!-- Header -->
@@ -167,9 +294,12 @@
         }
     </div>
 </div>
+} @* End of Desktop UI *@
 
 @code {
     private SportRental.Shared.Models.Cart _cart = new();
+    private bool _isMobile = false;
+    private DotNetObjectReference<Cart>? _dotNetRef;
 
     private CancellationTokenSource? _refreshCts;
     private Task? _refreshLoop;
@@ -179,6 +309,25 @@
         _cart = CartService.GetCart();
         CartService.CartChanged += OnCartChanged;
         StartRefreshLoop();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("setupMobileDetection", _dotNetRef);
+        }
+    }
+    
+    [JSInvokable]
+    public void OnScreenResize(bool isMobile)
+    {
+        if (_isMobile != isMobile)
+        {
+            _isMobile = isMobile;
+            InvokeAsync(StateHasChanged);
+        }
     }
 
     private void OnCartChanged(object? sender, EventArgs e)
@@ -331,9 +480,15 @@
         }, token);
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         CartService.CartChanged -= OnCartChanged;
         _refreshCts?.Cancel();
+        try
+        {
+            await JS.InvokeVoidAsync("removeMobileDetection");
+        }
+        catch { }
+        _dotNetRef?.Dispose();
     }
 }

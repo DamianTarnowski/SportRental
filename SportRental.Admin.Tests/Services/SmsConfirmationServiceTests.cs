@@ -16,6 +16,7 @@ public class SmsConfirmationServiceTests : IDisposable
     private readonly Mock<IDbContextFactory<ApplicationDbContext>> _contextFactoryMock;
     private readonly Mock<ITenantProvider> _tenantProviderMock;
     private readonly Mock<ILogger<SmsConfirmationService>> _loggerMock;
+    private readonly Mock<ISmsSender> _smsSenderMock;
     private readonly SmsConfirmationService _smsConfirmationService;
 
     public SmsConfirmationServiceTests()
@@ -32,6 +33,7 @@ public class SmsConfirmationServiceTests : IDisposable
 
         _tenantProviderMock = new Mock<ITenantProvider>();
         _loggerMock = new Mock<ILogger<SmsConfirmationService>>();
+        _smsSenderMock = new Mock<ISmsSender>();
 
         using var init = CreateContext();
         init.Database.EnsureCreated();
@@ -39,7 +41,8 @@ public class SmsConfirmationServiceTests : IDisposable
         _smsConfirmationService = new SmsConfirmationService(
             _contextFactoryMock.Object,
             _tenantProviderMock.Object,
-            _loggerMock.Object);
+            _loggerMock.Object,
+            _smsSenderMock.Object);
     }
 
     [Fact]

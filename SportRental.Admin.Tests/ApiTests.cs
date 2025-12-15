@@ -375,6 +375,12 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         public Task SendThanksMessageAsync(string phoneNumber, string customerName, string? customMessage = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendReminderAsync(string phoneNumber, string customerName, string? customMessage = null, CancellationToken ct = default) => Task.CompletedTask;
         public Task SendConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, CancellationToken ct = default) => Task.CompletedTask;
+
+        public Task SendContractConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, CancellationToken ct = default)
+            => Task.CompletedTask;
+
+        public Task SendContractConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, string? customerEmail, CancellationToken ct = default)
+            => Task.CompletedTask;
     }
 }
 

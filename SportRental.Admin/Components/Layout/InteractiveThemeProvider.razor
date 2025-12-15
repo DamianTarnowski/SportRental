@@ -1,0 +1,57 @@
+@rendermode InteractiveServer
+@implements IDisposable
+
+@inject SportRental.Admin.Services.UI.ThemeService Theme
+
+<MudThemeProvider @ref="_mudThemeProvider" @bind-IsDarkMode="_isDarkMode" Theme="@Theme.CurrentTheme" />
+
+@code {
+    private MudThemeProvider? _mudThemeProvider;
+    private bool _isDarkMode;
+    
+    protected override void OnInitialized()
+    {
+        _isDarkMode = Theme.IsDarkMode;
+        Theme.OnChanged += HandleThemeChanged;
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _mudThemeProvider != null)
+        {
+            try
+            {
+                var systemPreference = await _mudThemeProvider.GetSystemPreference();
+                if (systemPreference != _isDarkMode)
+                {
+                    _isDarkMode = systemPreference;
+                    Theme.IsDarkMode = _isDarkMode;
+                    StateHasChanged();
+                }
+                await _mudThemeProvider.WatchSystemPreference(OnSystemPreferenceChanged);
+            }
+            catch
+            {
+                // Ignore JS interop errors during prerendering
+            }
+        }
+    }
+    
+    private async Task OnSystemPreferenceChanged(bool newValue)
+    {
+        _isDarkMode = newValue;
+        Theme.IsDarkMode = newValue;
+        await InvokeAsync(StateHasChanged);
+    }
+    
+    private void HandleThemeChanged()
+    {
+        _isDarkMode = Theme.IsDarkMode;
+        InvokeAsync(StateHasChanged);
+    }
+    
+    public void Dispose()
+    {
+        Theme.OnChanged -= HandleThemeChanged;
+    }
+}

@@ -7,180 +7,266 @@
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@if (_isMobile)
+{
+    @* ==================== MOBILE UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-2 px-2">
+        @* Nagłówek mobilny *@
+        <MudPaper Class="pa-3 mb-2" Elevation="2" Style="background: linear-gradient(135deg, #ab47bc 0%, #8e24aa 100%); color: white; border-radius: 12px;">
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">👥 Klienci</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" 
+                               Color="Color.Inherit" 
+                               OnClick="OpenCreateDialog" />
+            </div>
+        </MudPaper>
+        
+        @* Wyszukiwarka mobilna *@
+        <MudTextField @bind-Value="search"
+                      Placeholder="Szukaj klienta..." 
+                      Immediate="true" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      Clearable="true"
+                      Variant="Variant.Outlined"
+                      Dense="true"
+                      Class="mb-2" />
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-    <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #ab47bc 0%, #8e24aa 100%); color: white; border-radius: 20px;">
-        <MudStack Row="true" Class="mud-space-between">
-            <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Large" />
-                <div>
-                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Klienci</MudText>
-                    <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj bazą klientów wypożyczalni</MudText>
-                </div>
-            </MudStack>
-                       <MudButton Variant="Variant.Filled" 
-                                  Color="Color.Surface" 
-                                  StartIcon="@Icons.Material.Filled.PersonAdd"
-                       OnClick="OpenCreateDialog"
-                       Size="Size.Large"
-                       Class="rounded-pill px-6">
-                Nowy klient
-            </MudButton>
-        </MudStack>
-    </MudPaper>
-    <MudCard Elevation="4" Class="mb-4" Style="border-radius: 16px;">
-        <MudCardContent Class="pa-4">
-            <MudGrid Class="mud-align-end" Spacing="3">
-                <MudItem xs="12" md="8">
-                    <MudTextField 
-                        @bind-Value="search"
-                        Placeholder="Wyszukaj klienta po nazwie, email lub telefonie..." 
-                        Immediate="true" 
-                        Adornment="Adornment.Start" 
-                        AdornmentIcon="@Icons.Material.Filled.Search" 
-                        Clearable="true"
-                        Variant="Variant.Outlined"
-                        Class="rounded-lg" />
-                </MudItem>
-                <MudItem xs="12" md="4">
-                    <MudStack Row="true" Spacing="1" Class="mud-justify-end">
-                        <MudTooltip Text="Odśwież listę klientów">
-                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
-                                           Color="Color.Primary" 
-                                           OnClick="() => InvokeAsync(StateHasChanged)"
-                                           Size="Size.Large" />
-                        </MudTooltip>
-                        <MudTooltip Text="Eksportuj do CSV">
-                            <MudIconButton Icon="@Icons.Material.Filled.FileDownload" 
-                                           Color="Color.Success" 
-                                           OnClick="ExportToCSV"
-                                           Size="Size.Large" />
-                        </MudTooltip>
-                        <MudTooltip Text="Statystyki klientów">
-                            <MudIconButton Icon="@Icons.Material.Filled.Analytics" 
-                                           Color="Color.Info" 
-                                           OnClick="ShowStatistics"
-                                           Size="Size.Large" />
-                        </MudTooltip>
-                    </MudStack>
-                </MudItem>
-            </MudGrid>
-        </MudCardContent>
-    </MudCard>
-
-    @if (!filtered.Any())
-    {
-        <MudCard Elevation="2" Class="text-center pa-8" Style="border-radius: 16px;">
-            <MudCardContent>
-                <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" Class="mb-3" />
-                <MudText Typo="Typo.h6" Color="Color.Default">Brak klientów do wyświetlenia</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Default">Zmień filtry lub dodaj nowego klienta</MudText>
-            </MudCardContent>
-        </MudCard>
-    }
-    else
-    {
-        <MudGrid Spacing="3">
-            @foreach (var customer in filtered)
-            {
-                <MudItem xs="12" sm="6" md="4" lg="3">
-                    <MudCard Elevation="6" Class="customer-card h-100" Style="border-radius: 16px; transition: all 0.3s ease;">
-                        <MudCardContent Class="pa-5">
-                            <MudStack Spacing="3">
-                                <div Class="d-flex align-center">
-                                    <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-3">
-                                        <MudIcon Icon="@Icons.Material.Filled.Person" />
-                                    </MudAvatar>
-                                    <div Class="flex-1">
-                                        <MudText Typo="Typo.h6" Style="font-weight: 600;" Class="mb-1">
-                                            @customer.FullName
-                                        </MudText>
-                                        <MudText Typo="Typo.body2" Color="Color.Default">
-                                            <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
-                                            Utworzony: @customer.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")
-                                        </MudText>
-                                    </div>
-                                </div>
-
-                                <MudStack Spacing="2">
-                                    @if (!string.IsNullOrEmpty(customer.Email))
-                                    {
-                                        <div Class="d-flex align-center">
-                                            <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Info" Size="Size.Small" Class="mr-2" />
-                                            <MudText Typo="Typo.body2">@customer.Email</MudText>
-                                        </div>
-                                    }
+        @if (!filtered.Any())
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">Brak klientów</MudAlert>
+        }
+        else
+        {
+            @* Lista klientów mobilna *@
+            <MudStack Spacing="1">
+                @foreach (var customer in filtered)
+                {
+                    <MudCard Elevation="2" Style="border-radius: 10px;">
+                        <MudCardContent Class="pa-2">
+                            <div class="d-flex align-center gap-2">
+                                <MudAvatar Color="Color.Primary" Size="Size.Medium">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                </MudAvatar>
+                                <div class="flex-1 overflow-hidden">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        @customer.FullName
+                                    </MudText>
                                     @if (!string.IsNullOrEmpty(customer.PhoneNumber))
                                     {
-                                        <div Class="d-flex align-center">
-                                            <MudIcon Icon="@Icons.Material.Filled.Phone" Color="Color.Success" Size="Size.Small" Class="mr-2" />
-                                            <MudText Typo="Typo.body2">@customer.PhoneNumber</MudText>
-                                        </div>
+                                        <MudText Typo="Typo.caption" Color="Color.Success">
+                                            📞 @customer.PhoneNumber
+                                        </MudText>
                                     }
-                                    @if (!string.IsNullOrEmpty(customer.Address))
+                                    else if (!string.IsNullOrEmpty(customer.Email))
                                     {
-                                        <div Class="d-flex align-center">
-                                            <MudIcon Icon="@Icons.Material.Filled.LocationOn" Color="Color.Warning" Size="Size.Small" Class="mr-2" />
-                                            <MudText Typo="Typo.body2" Style="line-height: 1.4;">
-                                                @(customer.Address.Length > 50 ? customer.Address.Substring(0, 50) + "..." : customer.Address)
+                                        <MudText Typo="Typo.caption" Color="Color.Info" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                            ✉️ @customer.Email
+                                        </MudText>
+                                    }
+                                </div>
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="async () => await OpenEditDialog(customer)">Edytuj</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Assignment" OnClick="async () => await ViewRentals(customer)">Wynajmy</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="async () => await Delete(customer)">Usuń</MudMenuItem>
+                                </MudMenu>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+        }
+    </MudContainer>
+}
+else
+{
+    @* ==================== DESKTOP UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #ab47bc 0%, #8e24aa 100%); color: white; border-radius: 20px;">
+            <MudStack Row="true" Class="mud-space-between">
+                <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                    <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Large" />
+                    <div>
+                        <MudText Typo="Typo.h4" Style="font-weight: 700;">Klienci</MudText>
+                        <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj bazą klientów wypożyczalni</MudText>
+                    </div>
+                </MudStack>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Surface" 
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           OnClick="OpenCreateDialog"
+                           Size="Size.Large"
+                           Class="rounded-pill px-6">
+                    Nowy klient
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+        
+        <MudCard Elevation="4" Class="mb-4" Style="border-radius: 16px;">
+            <MudCardContent Class="pa-4">
+                <MudGrid Class="mud-align-end" Spacing="3">
+                    <MudItem xs="12" md="8">
+                        <MudTextField 
+                            @bind-Value="search"
+                            Placeholder="Wyszukaj klienta po nazwie, email lub telefonie..." 
+                            Immediate="true" 
+                            Adornment="Adornment.Start" 
+                            AdornmentIcon="@Icons.Material.Filled.Search" 
+                            Clearable="true"
+                            Variant="Variant.Outlined"
+                            Class="rounded-lg" />
+                    </MudItem>
+                    <MudItem xs="12" md="4">
+                        <MudStack Row="true" Spacing="1" Class="mud-justify-end">
+                            <MudTooltip Text="Odśwież listę klientów">
+                                <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                                               Color="Color.Primary" 
+                                               OnClick="() => InvokeAsync(StateHasChanged)"
+                                               Size="Size.Large" />
+                            </MudTooltip>
+                            <MudTooltip Text="Eksportuj do CSV">
+                                <MudIconButton Icon="@Icons.Material.Filled.FileDownload" 
+                                               Color="Color.Success" 
+                                               OnClick="ExportToCSV"
+                                               Size="Size.Large" />
+                            </MudTooltip>
+                            <MudTooltip Text="Statystyki klientów">
+                                <MudIconButton Icon="@Icons.Material.Filled.Analytics" 
+                                               Color="Color.Info" 
+                                               OnClick="ShowStatistics"
+                                               Size="Size.Large" />
+                            </MudTooltip>
+                        </MudStack>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+
+        @if (!filtered.Any())
+        {
+            <MudCard Elevation="2" Class="text-center pa-8" Style="border-radius: 16px;">
+                <MudCardContent>
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Color="Color.Default" Class="mb-3" />
+                    <MudText Typo="Typo.h6" Color="Color.Default">Brak klientów do wyświetlenia</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">Zmień filtry lub dodaj nowego klienta</MudText>
+                </MudCardContent>
+            </MudCard>
+        }
+        else
+        {
+            <MudGrid Spacing="3">
+                @foreach (var customer in filtered)
+                {
+                    <MudItem xs="12" sm="6" md="4" lg="3">
+                        <MudCard Elevation="6" Class="customer-card h-100" Style="border-radius: 16px; transition: all 0.3s ease;">
+                            <MudCardContent Class="pa-5">
+                                <MudStack Spacing="3">
+                                    <div Class="d-flex align-center">
+                                        <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-3">
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" />
+                                        </MudAvatar>
+                                        <div Class="flex-1">
+                                            <MudText Typo="Typo.h6" Style="font-weight: 600;" Class="mb-1">
+                                                @customer.FullName
+                                            </MudText>
+                                            <MudText Typo="Typo.body2" Color="Color.Default">
+                                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
+                                                Utworzony: @customer.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")
                                             </MudText>
                                         </div>
-                                    }
-                                    @if (!string.IsNullOrEmpty(customer.DocumentNumber))
+                                    </div>
+
+                                    <MudStack Spacing="2">
+                                        @if (!string.IsNullOrEmpty(customer.Email))
+                                        {
+                                            <div Class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Info" Size="Size.Small" Class="mr-2" />
+                                                <MudText Typo="Typo.body2">@customer.Email</MudText>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(customer.PhoneNumber))
+                                        {
+                                            <div Class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.Phone" Color="Color.Success" Size="Size.Small" Class="mr-2" />
+                                                <MudText Typo="Typo.body2">@customer.PhoneNumber</MudText>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(customer.Address))
+                                        {
+                                            <div Class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.LocationOn" Color="Color.Warning" Size="Size.Small" Class="mr-2" />
+                                                <MudText Typo="Typo.body2" Style="line-height: 1.4;">
+                                                    @(customer.Address.Length > 50 ? customer.Address.Substring(0, 50) + "..." : customer.Address)
+                                                </MudText>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(customer.DocumentNumber))
+                                        {
+                                            <div Class="d-flex align-center">
+                                                <MudIcon Icon="@Icons.Material.Filled.Badge" Color="Color.Secondary" Size="Size.Small" Class="mr-2" />
+                                                <MudText Typo="Typo.body2">@customer.DocumentNumber</MudText>
+                                            </div>
+                                        }
+                                    </MudStack>
+
+                                    @if (!string.IsNullOrWhiteSpace(customer.Notes))
                                     {
-                                        <div Class="d-flex align-center">
-                                            <MudIcon Icon="@Icons.Material.Filled.Badge" Color="Color.Secondary" Size="Size.Small" Class="mr-2" />
-                                            <MudText Typo="Typo.body2">@customer.DocumentNumber</MudText>
-                                        </div>
+                                        <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="pa-2">
+                                            <MudText Typo="Typo.caption">
+                                                <MudIcon Icon="@Icons.Material.Filled.StickyNote2" Size="Size.Small" Class="mr-1" />
+                                                @(customer.Notes.Length > 60 ? customer.Notes.Substring(0, 60) + "..." : customer.Notes)
+                                            </MudText>
+                                        </MudAlert>
                                     }
                                 </MudStack>
-
-                                @if (!string.IsNullOrWhiteSpace(customer.Notes))
-                                {
-                                    <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="pa-2">
-                                        <MudText Typo="Typo.caption">
-                                            <MudIcon Icon="@Icons.Material.Filled.StickyNote2" Size="Size.Small" Class="mr-1" />
-                                            @(customer.Notes.Length > 60 ? customer.Notes.Substring(0, 60) + "..." : customer.Notes)
-                                        </MudText>
-                                    </MudAlert>
-                                }
-                            </MudStack>
-                        </MudCardContent>
-                        
-                        <MudCardActions Class="pa-3 pt-0">
-                            <MudStack Spacing="1" Class="w-100">
-                                <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" FullWidth="true">
-                                    <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                               OnClick="async () => await OpenEditDialog(customer)"
-                                               Size="Size.Small">
-                                        Edytuj
+                            </MudCardContent>
+                            
+                            <MudCardActions Class="pa-3 pt-0">
+                                <MudStack Spacing="1" Class="w-100">
+                                    <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" FullWidth="true">
+                                        <MudButton StartIcon="@Icons.Material.Filled.Edit" 
+                                                   OnClick="async () => await OpenEditDialog(customer)"
+                                                   Size="Size.Small">
+                                            Edytuj
+                                        </MudButton>
+                                        <MudButton StartIcon="@Icons.Material.Filled.Assignment" 
+                                                   OnClick="async () => await ViewRentals(customer)"
+                                                   Color="Color.Info"
+                                                   Size="Size.Small">
+                                            Wynajmy
+                                        </MudButton>
+                                    </MudButtonGroup>
+                                    <MudButton StartIcon="@Icons.Material.Filled.Delete" 
+                                               OnClick="async () => await Delete(customer)"
+                                               Color="Color.Error"
+                                               Variant="Variant.Outlined"
+                                               Size="Size.Small"
+                                               FullWidth="true">
+                                        Usuń klienta
                                     </MudButton>
-                                    <MudButton StartIcon="@Icons.Material.Filled.Assignment" 
-                                               OnClick="async () => await ViewRentals(customer)"
-                                               Color="Color.Info"
-                                               Size="Size.Small">
-                                        Wynajmy
-                                    </MudButton>
-                                </MudButtonGroup>
-                                <MudButton StartIcon="@Icons.Material.Filled.Delete" 
-                                           OnClick="async () => await Delete(customer)"
-                                           Color="Color.Error"
-                                           Variant="Variant.Outlined"
-                                           Size="Size.Small"
-                                           FullWidth="true">
-                                    Usuń klienta
-                                </MudButton>
-                            </MudStack>
-                        </MudCardActions>
-                    </MudCard>
-                </MudItem>
-            }
-        </MudGrid>
-    }
+                                </MudStack>
+                            </MudCardActions>
+                        </MudCard>
+                    </MudItem>
+                }
+            </MudGrid>
+        }
+    </MudContainer>
+}
 
-</MudContainer>
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
 @code {
+    // ==================== BREAKPOINT ====================
+    private bool _isMobile = false;
+    
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        _isMobile = breakpoint < Breakpoint.Md;
+        StateHasChanged();
+    }
+
+    // ==================== DATA ====================
     private List<Customer> customers = new();
     private IEnumerable<Customer> filtered => string.IsNullOrWhiteSpace(search)
         ? customers
@@ -256,7 +342,6 @@
 
     private async Task SaveCustomerAsync(Customer model, bool isNew)
     {
-        // Walidacja i normalizacja numeru telefonu jak w starym projekcie
         model.PhoneNumber = NormalizePhone(model.PhoneNumber);
         model.FullName = model.FullName?.Trim() ?? string.Empty;
         model.Email = model.Email?.Trim();

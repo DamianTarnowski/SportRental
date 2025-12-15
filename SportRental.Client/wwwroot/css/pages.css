@@ -377,6 +377,311 @@
 }
 
 /* ============================================
+   CART MOBILE UI
+   ============================================ */
+.cart-mobile {
+    min-height: calc(100vh - 72px);
+    background: #f8fafc;
+    padding-bottom: 180px; /* Space for sticky summary */
+}
+
+.cart-mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.cart-mobile-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.cart-mobile-title span:first-child {
+    font-size: 1.5rem;
+}
+
+.cart-mobile-title h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.cart-mobile-count {
+    background: rgba(255,255,255,0.25);
+    padding: 0.125rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.cart-mobile-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    background: white;
+    margin: 1rem;
+    border-radius: 16px;
+}
+
+.cart-mobile-empty .empty-icon {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.cart-mobile-empty h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.cart-mobile-empty p {
+    color: #64748b;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+}
+
+.cart-mobile-cta {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.cart-mobile-items {
+    padding: 0.75rem;
+}
+
+.cart-mobile-item {
+    background: white;
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.cart-mobile-item-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.cart-mobile-item-image {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.cart-mobile-item-placeholder {
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e2e8f0 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.cart-mobile-item-info {
+    flex: 1;
+}
+
+.cart-mobile-item-info h4 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0 0 0.25rem 0;
+    line-height: 1.3;
+}
+
+.cart-mobile-item-price {
+    font-size: 0.8rem;
+    color: #667eea;
+    font-weight: 600;
+}
+
+.cart-mobile-remove {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #fee2e2;
+    border: none;
+    color: #ef4444;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.cart-mobile-item-dates {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.cart-mobile-date {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.cart-mobile-date label {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.cart-mobile-date input {
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.cart-mobile-item-options {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.cart-mobile-select {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    background: white;
+}
+
+.cart-mobile-hours {
+    width: 70px;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.cart-mobile-item-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.cart-mobile-quantity {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f1f5f9;
+    border-radius: 10px;
+    padding: 0.25rem;
+}
+
+.cart-mobile-quantity button {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: white;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    color: #667eea;
+    cursor: pointer;
+}
+
+.cart-mobile-quantity span {
+    min-width: 32px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.cart-mobile-total {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.cart-mobile-hold {
+    margin-top: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #dbeafe;
+    color: #2563eb;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Mobile Summary - Fixed Bottom */
+.cart-mobile-summary {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    z-index: 30;
+}
+
+.cart-mobile-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.cart-mobile-summary-row span:first-child {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.cart-mobile-summary-total {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.cart-mobile-checkout {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+}
+
+.cart-mobile-continue {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 0.75rem;
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* ============================================
    PROFILE PAGE
    ============================================ */
 .profile-container {
@@ -732,6 +1037,250 @@
 }
 
 /* ============================================
+   MY RENTALS MOBILE UI
+   ============================================ */
+.rentals-mobile {
+    min-height: calc(100vh - 72px);
+    background: #f8fafc;
+}
+
+.rentals-mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.rentals-mobile-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rentals-mobile-title span:first-child {
+    font-size: 1.5rem;
+}
+
+.rentals-mobile-title h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.rentals-mobile-count {
+    background: rgba(255,255,255,0.25);
+    padding: 0.125rem 0.5rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.rentals-mobile-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 4rem 1rem;
+    color: #64748b;
+}
+
+.rentals-mobile-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    background: white;
+    margin: 1rem;
+    border-radius: 16px;
+}
+
+.rentals-mobile-empty .empty-icon {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.rentals-mobile-empty h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.rentals-mobile-empty p {
+    color: #64748b;
+    margin-bottom: 1.25rem;
+    font-size: 0.9rem;
+}
+
+.rentals-mobile-cta {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.rentals-mobile-list {
+    padding: 0.75rem;
+}
+
+.rental-mobile-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.rental-mobile-card.overdue {
+    border: 2px solid #ef4444;
+}
+
+.rental-mobile-badges {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.rental-mobile-status {
+    padding: 0.375rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.rental-mobile-status.pending { background: #fef3c7; color: #d97706; }
+.rental-mobile-status.reserved { background: #e0e7ff; color: #4f46e5; }
+.rental-mobile-status.active { background: #d1fae5; color: #059669; }
+.rental-mobile-status.completed { background: #f3e8ff; color: #7c3aed; }
+.rental-mobile-status.cancelled { background: #fee2e2; color: #dc2626; }
+.rental-mobile-status.overdue { background: #fee2e2; color: #dc2626; }
+
+.rental-mobile-equip {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+
+.rental-mobile-equip.pending { background: #fef3c7; }
+.rental-mobile-equip.active { background: #d1fae5; }
+.rental-mobile-equip.completed { background: #f3e8ff; }
+.rental-mobile-equip.overdue { background: #fee2e2; }
+
+.rental-mobile-overdue {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+    color: #dc2626;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 0.75rem;
+}
+
+.rental-mobile-dates {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+    border-radius: 12px;
+    margin-bottom: 0.75rem;
+}
+
+.rental-mobile-date-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.rental-mobile-date-item .date-label {
+    font-size: 0.65rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.rental-mobile-date-item .date-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.date-arrow {
+    color: #94a3b8;
+    font-size: 1.25rem;
+}
+
+.rental-mobile-products {
+    margin-bottom: 0.75rem;
+}
+
+.rental-mobile-product {
+    display: block;
+    font-size: 0.85rem;
+    color: #475569;
+    padding: 0.25rem 0;
+}
+
+.rental-mobile-more {
+    display: block;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.rental-mobile-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.rental-mobile-amount {
+    display: flex;
+    flex-direction: column;
+}
+
+.rental-mobile-amount .amount-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.rental-mobile-amount .amount-deposit {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.rental-mobile-btn {
+    padding: 0.5rem 1rem;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* ============================================
    CHECKOUT PAGE
    ============================================ */
 .checkout-container {
@@ -920,6 +1469,364 @@
 .checkout-submit-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+/* Checkout Overlay */
+.checkout-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.checkout-overlay-content {
+    background: white;
+    border-radius: 24px;
+    padding: 2.5rem;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+
+.checkout-overlay-content h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 1rem 0 0.5rem;
+}
+
+.checkout-overlay-content p {
+    color: #64748b;
+}
+
+/* ============================================
+   CHECKOUT MOBILE UI
+   ============================================ */
+.checkout-mobile {
+    min-height: calc(100vh - 72px);
+    background: #f8fafc;
+    padding-bottom: 200px;
+}
+
+.checkout-mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 1rem;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.checkout-mobile-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.checkout-mobile-title span:first-child {
+    font-size: 1.5rem;
+}
+
+.checkout-mobile-title h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.checkout-mobile-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.checkout-mobile-steps .step {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+
+.checkout-mobile-steps .step.done {
+    background: rgba(255,255,255,0.5);
+}
+
+.checkout-mobile-steps .step.active {
+    background: white;
+    color: #4facfe;
+}
+
+.checkout-mobile-steps .step-line {
+    width: 24px;
+    height: 2px;
+    background: rgba(255,255,255,0.5);
+}
+
+.checkout-mobile-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    background: white;
+    margin: 1rem;
+    border-radius: 16px;
+}
+
+.checkout-mobile-empty .empty-icon {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.checkout-mobile-empty h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.checkout-mobile-empty p {
+    color: #64748b;
+    margin-bottom: 1.25rem;
+}
+
+.checkout-mobile-cta {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.checkout-mobile-section {
+    background: white;
+    margin: 0.75rem;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.checkout-mobile-section-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: white;
+    border: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1f2937;
+    cursor: pointer;
+}
+
+.section-toggle {
+    color: #94a3b8;
+}
+
+.checkout-mobile-section-title {
+    padding: 1rem 1rem 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.checkout-mobile-items {
+    padding: 0 1rem 1rem;
+}
+
+.checkout-mobile-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.checkout-mobile-item:last-child {
+    border-bottom: none;
+}
+
+.checkout-mobile-item .item-name {
+    flex: 1;
+    font-size: 0.9rem;
+    color: #475569;
+}
+
+.checkout-mobile-item .item-qty {
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.checkout-mobile-item .item-price {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.checkout-mobile-warning {
+    padding: 0.75rem 1rem;
+    background: #fef3c7;
+    color: #d97706;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.checkout-mobile-form {
+    padding: 0 1rem 1rem;
+}
+
+.checkout-mobile-form .form-group {
+    margin-bottom: 0.75rem;
+}
+
+.checkout-mobile-form .form-group-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.checkout-mobile-form label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+}
+
+.checkout-mobile-form input,
+.checkout-mobile-form textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.95rem;
+}
+
+.checkout-mobile-form input:focus,
+.checkout-mobile-form textarea:focus {
+    outline: none;
+    border-color: #4facfe;
+}
+
+.checkout-mobile-form .lookup-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: #f1f5f9;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    align-self: flex-end;
+}
+
+.checkout-mobile-form .lookup-btn:disabled {
+    opacity: 0.5;
+}
+
+/* Mobile Checkout Summary - Fixed Bottom */
+.checkout-mobile-summary {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    z-index: 30;
+}
+
+.checkout-mobile-error {
+    background: #fef3c7;
+    color: #d97706;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.checkout-mobile-error button {
+    background: none;
+    border: none;
+    color: #d97706;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.checkout-mobile-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #64748b;
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+}
+
+.checkout-mobile-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.25rem 0;
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.checkout-mobile-summary-row.highlight {
+    padding: 0.5rem 0;
+    margin: 0.5rem 0;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.checkout-mobile-summary-row.highlight span:first-child {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.checkout-mobile-summary-row .summary-amount {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #4facfe;
+}
+
+.checkout-mobile-submit {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+}
+
+.checkout-mobile-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.checkout-mobile-secure {
+    text-align: center;
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-top: 0.5rem;
 }
 
 /* ============================================
@@ -1226,6 +2133,325 @@
 .related-product-price {
     color: #667eea;
     font-weight: 600;
+}
+
+/* ============================================
+   PRODUCT DETAILS MOBILE UI
+   ============================================ */
+.product-mobile {
+    min-height: calc(100vh - 72px);
+    background: #f8fafc;
+    padding-bottom: 80px;
+}
+
+.product-mobile-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 4rem 1rem;
+    color: #64748b;
+}
+
+.product-mobile-empty {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    background: white;
+    margin: 1rem;
+    border-radius: 16px;
+}
+
+.product-mobile-empty .empty-icon {
+    font-size: 3.5rem;
+    display: block;
+    margin-bottom: 0.75rem;
+}
+
+.product-mobile-empty h3 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.25rem;
+}
+
+.product-mobile-empty p {
+    color: #64748b;
+    margin-bottom: 1.25rem;
+}
+
+.product-mobile-cta {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.product-mobile-image {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    background: #f1f5f9;
+}
+
+.product-mobile-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.product-mobile-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    color: #94a3b8;
+}
+
+.product-mobile-back {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.product-mobile-image-badges {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+.product-mobile-image-badges .badge-available {
+    padding: 0.375rem 0.75rem;
+    background: #10b981;
+    color: white;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.product-mobile-image-badges .badge-unavailable {
+    padding: 0.375rem 0.75rem;
+    background: #ef4444;
+    color: white;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.product-mobile-content {
+    padding: 1.25rem;
+    background: white;
+}
+
+.product-mobile-category {
+    display: inline-block;
+    padding: 0.375rem 0.75rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.product-mobile-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 0.75rem;
+    line-height: 1.3;
+}
+
+.product-mobile-prices {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.5rem;
+}
+
+.product-mobile-prices .price-main {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
+}
+
+.product-mobile-prices .price-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #667eea;
+}
+
+.product-mobile-prices .price-period {
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+.product-mobile-prices .price-hourly {
+    font-size: 0.9rem;
+    color: #64748b;
+    padding: 0.25rem 0.5rem;
+    background: #f1f5f9;
+    border-radius: 8px;
+}
+
+.product-mobile-stock {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-bottom: 1rem;
+}
+
+.product-mobile-dates {
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.product-mobile-dates h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.75rem;
+}
+
+.product-mobile-dates .dates-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.product-mobile-dates .date-input {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.product-mobile-dates .date-input label {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.product-mobile-dates .date-input input {
+    padding: 0.625rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+}
+
+.product-mobile-dates .rental-type-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.product-mobile-dates .rental-type-select {
+    flex: 1;
+    padding: 0.625rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    background: white;
+}
+
+.product-mobile-dates .hours-input {
+    width: 80px;
+    padding: 0.625rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.product-mobile-dates .price-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: #ede9fe;
+    border-radius: 10px;
+    font-size: 0.9rem;
+}
+
+.product-mobile-dates .price-summary .price-total {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #7c3aed;
+}
+
+.product-mobile-description {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+}
+
+.product-mobile-description h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 0.5rem;
+}
+
+.product-mobile-description p {
+    font-size: 0.9rem;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+/* Mobile Add to Cart - Fixed Bottom */
+.product-mobile-actions {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 1rem;
+    background: white;
+    border-top: 1px solid #e5e7eb;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    z-index: 30;
+}
+
+.product-mobile-add {
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.product-mobile-add:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 /* ============================================

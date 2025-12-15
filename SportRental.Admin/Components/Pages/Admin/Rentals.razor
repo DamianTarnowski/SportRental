@@ -6,714 +6,803 @@
 @inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
 @inject SportRental.Admin.Services.Sms.ISmsConfirmationService SmsConfirmationService
 @inject ILogger<Rentals> Logger
-
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-    <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px;">
-        <MudStack Row="true" Class="mud-space-between">
-            <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Large" />
-                <div>
-                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Wynajmy</MudText>
-                    <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj wypożyczeniami sprzętu sportowego</MudText>
-                </div>
-            </MudStack>
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Surface" 
-                       StartIcon="@Icons.Material.Filled.Add"
-                       OnClick="CreateNew"
-                       Size="Size.Large"
-                       Class="rounded-pill px-6">
-                Nowy wynajem
-            </MudButton>
-        </MudStack>
-    </MudPaper>
-
-    @if (!string.IsNullOrWhiteSpace(CustomerId) && Guid.TryParse(CustomerId, out var customerGuid))
-    {
-        var customerName = customersDict.GetValueOrDefault(customerGuid)?.FullName ?? "Nieznany klient";
-        <MudAlert Severity="Severity.Info" Class="mb-4" Elevation="2" Style="border-radius: 12px;">
-            <div Class="d-flex align-center justify-space-between">
-                <div Class="d-flex align-center">
-                    <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Class="mr-2" />
-                    <MudText>Wyświetlane wynajmy dla klienta: <strong>@customerName</strong></MudText>
-                </div>
-                <MudButton Href="/admin/rentals" 
-                           Size="Size.Small" 
-                           Variant="Variant.Outlined" 
-                           StartIcon="@Icons.Material.Filled.Clear"
-                           Class="rounded-pill">
-                    Pokaż wszystkie
-                </MudButton>
+@if (_isMobile)
+{
+    @* ==================== MOBILE UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-2 px-2">
+        @* Nagłówek mobilny *@
+        <MudPaper Class="pa-3 mb-2" Elevation="2" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">📋 Wynajmy</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Add" 
+                               Color="Color.Inherit" 
+                               OnClick="CreateNew" />
             </div>
-        </MudAlert>
-    }
-    
-    @if (!string.IsNullOrEmpty(loadError))
-    {
-        <MudAlert Severity="Severity.Error" Elevation="0" Class="mb-4">
-            @loadError
-        </MudAlert>
-    }
+        </MudPaper>
 
-    <MudCard Elevation="4" Class="mb-4" Style="border-radius: 16px;">
-        <MudCardContent Class="pa-4">
-            <MudGrid Class="mud-align-end" Spacing="3">
-                <MudItem xs="12" md="4">
-                    <MudTextField 
-                        @bind-Value="searchTerm"
-                        Placeholder="Wyszukaj wynajem..." 
-                        Immediate="true" 
-                        Adornment="Adornment.Start" 
-                        AdornmentIcon="@Icons.Material.Filled.Search" 
-                        Clearable="true"
-                        Variant="Variant.Outlined"
-                        Class="rounded-lg" />
-                </MudItem>
-                <MudItem xs="12" md="6">
-                    <MudStack Row="true" Spacing="4" Class="mud-align-center">
-                        <MudSwitch @bind-Value="cbStarted" 
-                                   Label="Rozpoczęte" 
-                                   Color="Color.Success"
-                                   ThumbIcon="@Icons.Material.Filled.PlayArrow" />
-                        <MudSwitch @bind-Value="cbEnded" 
-                                   Label="Zakończone" 
-                                   Color="Color.Warning"
-                                   ThumbIcon="@Icons.Material.Filled.CheckCircle" />
-                        <MudSwitch @bind-Value="cbIncoming" 
-                                   Label="Nadchodzące" 
-                                   Color="Color.Info"
-                                   ThumbIcon="@Icons.Material.Filled.Schedule" />
+        @* Wyszukiwarka mobilna *@
+        <MudTextField @bind-Value="searchTerm"
+                      Placeholder="Szukaj..." 
+                      Immediate="true" 
+                      Adornment="Adornment.Start" 
+                      AdornmentIcon="@Icons.Material.Filled.Search" 
+                      Clearable="true"
+                      Variant="Variant.Outlined"
+                      Dense="true"
+                      Class="mb-2" />
+        
+        @* Filtry mobilne *@
+        <div class="d-flex gap-1 mb-2 flex-wrap">
+            <MudChip T="string" 
+                     Color="@(cbStarted ? Color.Success : Color.Default)" 
+                     Variant="@(cbStarted ? Variant.Filled : Variant.Outlined)"
+                     Size="Size.Small"
+                     OnClick="() => cbStarted = !cbStarted">
+                Aktywne
+            </MudChip>
+            <MudChip T="string" 
+                     Color="@(cbEnded ? Color.Warning : Color.Default)" 
+                     Variant="@(cbEnded ? Variant.Filled : Variant.Outlined)"
+                     Size="Size.Small"
+                     OnClick="() => cbEnded = !cbEnded">
+                Zakończone
+            </MudChip>
+            <MudChip T="string" 
+                     Color="@(cbIncoming ? Color.Info : Color.Default)" 
+                     Variant="@(cbIncoming ? Variant.Filled : Variant.Outlined)"
+                     Size="Size.Small"
+                     OnClick="() => cbIncoming = !cbIncoming">
+                Nadchodzące
+            </MudChip>
+        </div>
+
+        @if (!filteredRentals.Any())
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">Brak wynajmów</MudAlert>
+        }
+        else
+        {
+            @* Lista wynajmów mobilna *@
+            <MudStack Spacing="1">
+                @foreach (var rental in filteredRentals)
+                {
+                    <MudCard Elevation="2" Style="@($"border-radius: 10px; border-left: 3px solid {GetStatusColorHex(rental.Status)};")">
+                        <MudCardContent Class="pa-2">
+                            <div class="d-flex align-center gap-2">
+                                <MudAvatar Color="@GetStatusColor(rental.Status)" Size="Size.Medium">
+                                    <MudIcon Icon="@GetStatusIcon(rental.Status)" Size="Size.Small" />
+                                </MudAvatar>
+                                <div class="flex-1 overflow-hidden">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        @(customersDict.GetValueOrDefault(rental.CustomerId)?.FullName ?? "—")
+                                    </MudText>
+                                    <div class="d-flex align-center gap-1 flex-wrap">
+                                        <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">
+                                            @rental.TotalAmount.ToString("0") zł
+                                        </MudText>
+                                        <MudText Typo="Typo.caption">•</MudText>
+                                        <MudText Typo="Typo.caption">
+                                            @rental.StartDateUtc.ToLocalTime().ToString("dd.MM") - @rental.EndDateUtc.ToLocalTime().ToString("dd.MM")
+                                        </MudText>
+                                    </div>
+                                </div>
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => Edit(rental)">Edytuj</MudMenuItem>
+                                    @if (!string.IsNullOrWhiteSpace(rental.ContractUrl))
+                                    {
+                                        <MudMenuItem Icon="@Icons.Material.Filled.Description" Href="@rental.ContractUrl" Target="_blank">Umowa</MudMenuItem>
+                                    }
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Email" OnClick="() => SendContractByEmail(rental)">Email</MudMenuItem>
+                                    @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
+                                    {
+                                        <MudMenuItem Icon="@Icons.Material.Filled.CheckCircle" OnClick="() => CompleteRental(rental)">Zakończ</MudMenuItem>
+                                    }
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="() => Delete(rental)">Usuń</MudMenuItem>
+                                </MudMenu>
+                            </div>
+                            @if (IsOverdue(rental))
+                            {
+                                <MudChip T="string" Color="Color.Error" Size="Size.Small" Class="mt-1">
+                                    ⚠️ Przeterminowany (@GetOverdueDays(rental) dni)
+                                </MudChip>
+                            }
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+        }
+    </MudContainer>
+}
+else
+{
+    @* ==================== DESKTOP UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px;">
+            <MudStack Row="true" Class="mud-space-between">
+                <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                    <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Large" />
+                    <div>
+                        <MudText Typo="Typo.h4" Style="font-weight: 700;">Wynajmy</MudText>
+                        <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj wypożyczeniami sprzętu sportowego</MudText>
+                    </div>
+                </MudStack>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Surface" 
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="CreateNew"
+                           Size="Size.Large"
+                           Class="rounded-pill px-6">
+                    Nowy wynajem
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        @if (!string.IsNullOrWhiteSpace(CustomerId) && Guid.TryParse(CustomerId, out var customerGuid))
+        {
+            var customerName = customersDict.GetValueOrDefault(customerGuid)?.FullName ?? "Nieznany klient";
+            <MudAlert Severity="Severity.Info" Class="mb-4" Elevation="2" Style="border-radius: 12px;">
+                <div Class="d-flex align-center justify-space-between">
+                    <div Class="d-flex align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.FilterAlt" Class="mr-2" />
+                        <MudText>Wyświetlane wynajmy dla klienta: <strong>@customerName</strong></MudText>
+                    </div>
+                    <MudButton Href="/admin/rentals" 
+                               Size="Size.Small" 
+                               Variant="Variant.Outlined" 
+                               StartIcon="@Icons.Material.Filled.Clear"
+                               Class="rounded-pill">
+                        Pokaż wszystkie
+                    </MudButton>
+                </div>
+            </MudAlert>
+        }
+        
+        @if (!string.IsNullOrEmpty(loadError))
+        {
+            <MudAlert Severity="Severity.Error" Elevation="0" Class="mb-4">
+                @loadError
+            </MudAlert>
+        }
+
+        <MudCard Elevation="4" Class="mb-4" Style="border-radius: 16px;">
+            <MudCardContent Class="pa-4">
+                <MudGrid Class="mud-align-end" Spacing="3">
+                    <MudItem xs="12" md="4">
+                        <MudTextField 
+                            @bind-Value="searchTerm"
+                            Placeholder="Wyszukaj wynajem..." 
+                            Immediate="true" 
+                            Adornment="Adornment.Start" 
+                            AdornmentIcon="@Icons.Material.Filled.Search" 
+                            Clearable="true"
+                            Variant="Variant.Outlined"
+                            Class="rounded-lg" />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudStack Row="true" Spacing="4" Class="mud-align-center">
+                            <MudSwitch @bind-Value="cbStarted" 
+                                       Label="Rozpoczęte" 
+                                       Color="Color.Success"
+                                       ThumbIcon="@Icons.Material.Filled.PlayArrow" />
+                            <MudSwitch @bind-Value="cbEnded" 
+                                       Label="Zakończone" 
+                                       Color="Color.Warning"
+                                       ThumbIcon="@Icons.Material.Filled.CheckCircle" />
+                            <MudSwitch @bind-Value="cbIncoming" 
+                                       Label="Nadchodzące" 
+                                       Color="Color.Info"
+                                       ThumbIcon="@Icons.Material.Filled.Schedule" />
+                        </MudStack>
+                    </MudItem>
+                    <MudItem xs="12" md="2">
+                        <MudTooltip Text="Odśwież listę wynajmów">
+                            <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                                           Color="Color.Primary" 
+                                           OnClick="RefreshRentals"
+                                           Size="Size.Large" />
+                        </MudTooltip>
+                    </MudItem>
+                </MudGrid>
+            </MudCardContent>
+        </MudCard>
+        
+        @if (!filteredRentals.Any())
+        {
+            <MudAlert Severity="Severity.Info">Brak wynajmów do wyświetlenia</MudAlert>
+        }
+        else
+        {
+            <MudStack Spacing="3">
+                @foreach (var rental in filteredRentals)
+                {
+                    <MudCard Elevation="6" Class="@GetRentalCardClass(rental)" Style="@GetRentalCardStyle(rental)">
+                        <MudCardContent Class="pa-5">
+                            <MudGrid Spacing="3" Class="mud-align-center">
+                                <MudItem xs="12" md="8">
+                                    <MudStack Spacing="2">
+                                        <div Class="d-flex align-center mb-2">
+                                            <MudAvatar Color="@GetStatusColor(rental.Status)" Size="Size.Large" Class="mr-3">
+                                                <MudIcon Icon="@GetStatusIcon(rental.Status)" />
+                                            </MudAvatar>
+                                            <div>
+                                                <MudText Typo="Typo.h6" Style="font-weight: 600;">
+                                                    @GetRentalTitle(rental)
+                                                </MudText>
+                                                <MudText Typo="Typo.body2" Color="Color.Default">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
+                                                    @(customersDict.GetValueOrDefault(rental.CustomerId)?.FullName ?? "brak")
+                                                </MudText>
+                                            </div>
+                                        </div>
+                                        
+                                        <MudGrid Spacing="2">
+                                            <MudItem xs="12" sm="6">
+                                                <MudPaper Class="pa-3" Elevation="1" Style="border-radius: 8px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);">
+                                                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                                        <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Primary" />
+                                                        <div>
+                                                            <MudText Typo="Typo.caption" Color="Color.Default">Początek</MudText>
+                                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                                                                @rental.StartDateUtc.ToLocalTime().ToString("dd.MM HH:mm")
+                                                            </MudText>
+                                                        </div>
+                                                    </MudStack>
+                                                </MudPaper>
+                                            </MudItem>
+                                            <MudItem xs="12" sm="6">
+                                                <MudPaper Class="pa-3" Elevation="1" Style="border-radius: 8px; background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);">
+                                                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                                        <MudIcon Icon="@Icons.Material.Filled.Stop" Color="Color.Warning" />
+                                                        <div>
+                                                            <MudText Typo="Typo.caption" Color="Color.Default">Koniec</MudText>
+                                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                                                                @rental.EndDateUtc.ToLocalTime().ToString("dd.MM HH:mm")
+                                                            </MudText>
+                                                        </div>
+                                                    </MudStack>
+                                                </MudPaper>
+                                            </MudItem>
+                                        </MudGrid>
+
+                                        <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                                            <MudChip T="string" Icon="@Icons.Material.Filled.AttachMoney" 
+                                                     Color="Color.Success" 
+                                                     Variant="Variant.Filled"
+                                                     Size="Size.Small">
+                                                @rental.TotalAmount.ToString("0.00") zł
+                                            </MudChip>
+                                            <MudChip T="string" Icon="@GetStatusIcon(rental.Status)" 
+                                                     Color="@GetStatusColor(rental.Status)" 
+                                                     Variant="Variant.Text"
+                                                     Size="Size.Small">
+                                                @GetStatusText(rental.Status)
+                                            </MudChip>
+                                            <MudChip T="string" Icon="@Icons.Material.Filled.Email" 
+                                                     Color="@(rental.IsEmailSent ? Color.Success : Color.Default)" 
+                                                     Variant="Variant.Text"
+                                                     Size="Size.Small">
+                                                Email: @(rental.IsEmailSent ? "✓" : "✗")
+                                            </MudChip>
+                                            <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
+                                                     Color="@GetSourceColor(rental.Source)" 
+                                                     Variant="Variant.Text"
+                                                     Size="Size.Small">
+                                                @GetSourceText(rental.Source)
+                                            </MudChip>
+                                            <MudChip T="string" Icon="@GetEquipmentStatusIcon(rental)" 
+                                                     Color="@GetEquipmentStatusColor(rental)" 
+                                                     Variant="Variant.Filled"
+                                                     Size="Size.Small">
+                                                @GetEquipmentStatusText(rental)
+                                            </MudChip>
+                                            @if (IsOverdue(rental))
+                                            {
+                                                <MudChip T="string" Icon="@Icons.Material.Filled.Warning" 
+                                                         Color="Color.Error" 
+                                                         Variant="Variant.Filled"
+                                                         Size="Size.Small">
+                                                    PRZETERMINOWANE (@GetOverdueDays(rental) dni)
+                                                </MudChip>
+                                            }
+                                        </MudStack>
+
+                                        @if (!string.IsNullOrEmpty(rental.Notes))
+                                        {
+                                            <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="mt-2">
+                                                <MudText Typo="Typo.caption">
+                                                    <MudIcon Icon="@Icons.Material.Filled.StickyNote2" Size="Size.Small" Class="mr-1" />
+                                                    @rental.Notes
+                                                </MudText>
+                                            </MudAlert>
+                                        }
+                                    </MudStack>
+                                </MudItem>
+                                
+                                <MudItem xs="12" md="4">
+                                    <MudStack Spacing="2">
+                                        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false">
+                                            <MudButton StartIcon="@Icons.Material.Filled.Edit" 
+                                                       OnClick="() => Edit(rental)"
+                                                       Size="Size.Small">
+                                                Edytuj
+                                            </MudButton>
+                                            <MudButton StartIcon="@Icons.Material.Filled.Delete" 
+                                                       OnClick="() => Delete(rental)"
+                                                       Color="Color.Error"
+                                                       Size="Size.Small">
+                                                Usuń
+                                            </MudButton>
+                                        </MudButtonGroup>
+                                        
+                                        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Secondary" OverrideStyles="false">
+                                            @if (!string.IsNullOrWhiteSpace(rental.ContractUrl))
+                                            {
+                                                <MudButton StartIcon="@Icons.Material.Filled.Description" 
+                                                           Href="@rental.ContractUrl" 
+                                                           Target="_blank"
+                                                           Size="Size.Small">
+                                                    Umowa
+                                                </MudButton>
+                                            }
+                                            <MudButton StartIcon="@Icons.Material.Filled.FileDownload" 
+                                                       OnClick="() => GenerateContract(rental)"
+                                                       Size="Size.Small">
+                                                Generuj
+                                            </MudButton>
+                                            <MudButton StartIcon="@Icons.Material.Filled.Email" 
+                                                       OnClick="() => SendContractByEmail(rental)"
+                                                       Size="Size.Small">
+                                                Email
+                                            </MudButton>
+                                        </MudButtonGroup>
+                                        
+                                        <MudStack Row="true" Spacing="1">
+                                            @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
+                                            {
+                                                <MudButton StartIcon="@Icons.Material.Filled.CheckCircle" 
+                                                           OnClick="() => CompleteRental(rental)"
+                                                           Color="Color.Success"
+                                                           Variant="Variant.Filled"
+                                                           Size="Size.Small"
+                                                           Class="flex-1">
+                                                    Zakończ
+                                                </MudButton>
+                                            }
+                                        </MudStack>
+                                        @if (IsOverdue(rental))
+                                        {
+                                            <MudButton StartIcon="@Icons.Material.Filled.Update" 
+                                                       OnClick="() => ExtendRental(rental)"
+                                                       Color="Color.Error"
+                                                       Variant="Variant.Filled"
+                                                       FullWidth="true"
+                                                       Size="Size.Small">
+                                                ⚠️ Przedłuż wynajem
+                                            </MudButton>
+                                        }
+                                    </MudStack>
+                                </MudItem>
+                            </MudGrid>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+        }
+    </MudContainer>
+}
+
+@* ==================== DIALOG (wspólny) ==================== *@
+<MudDialog @bind-Visible="dialogOpen" Options="@rentalDialogOptions">
+    <TitleContent>
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudAvatar Color="Color.Primary" Size="Size.Large" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" />
+            </MudAvatar>
+            <div>
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">@(editModel.Id == Guid.Empty ? "Nowy wynajem" : "Edytuj wynajem")</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Default">Wypełnij dane wynajmu sprzętu</MudText>
+            </div>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="4" Class="pa-2">
+            @* SEKCJA: KLIENT I DATY *@
+            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);">
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Dane podstawowe</MudText>
                     </MudStack>
-                </MudItem>
-                <MudItem xs="12" md="2">
-                    <MudTooltip Text="Odśwież listę wynajmów">
-                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
-                                       Color="Color.Primary" 
-                                       OnClick="RefreshRentals"
-                                       Size="Size.Large" />
-                    </MudTooltip>
-                </MudItem>
-            </MudGrid>
-        </MudCardContent>
-    </MudCard>
-    
-    <MudGrid>
-        <MudItem xs="12" lg="8">
+                    
+                    <MudAutocomplete T="Customer"
+                                     Label="Wybierz klienta"
+                                     Placeholder="Zacznij pisać imię lub email..."
+                                     Value="@(customers.FirstOrDefault(c => c.Id == editModel.CustomerId))"
+                                     ValueChanged="@(c => { if (c != null) editModel.CustomerId = c.Id; })"
+                                     SearchFunc="@((string s, CancellationToken ct) => Task.FromResult(customers.Where(c => string.IsNullOrWhiteSpace(s) || (c.FullName?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) || (c.Email?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false))))"
+                                     ToStringFunc="@(c => c?.FullName ?? "")"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.Start"
+                                     AdornmentIcon="@Icons.Material.Filled.PersonSearch"
+                                     Class="rounded-lg">
+                        <ItemTemplate>
+                            <MudStack Row="true" Spacing="2" Class="mud-align-center pa-1">
+                                <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                </MudAvatar>
+                                <div>
+                                    <MudText Typo="Typo.body1">@context.FullName</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Default">
+                                        @(context.Email ?? context.PhoneNumber ?? "brak kontaktu")
+                                    </MudText>
+                                </div>
+                            </MudStack>
+                        </ItemTemplate>
+                    </MudAutocomplete>
+                    
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Date="@startDate" 
+                                           DateChanged="OnStartDateChanged" 
+                                           Label="📅 Data rozpoczęcia"
+                                           Variant="Variant.Outlined"
+                                           Editable="true"
+                                           DateFormat="dd.MM.yyyy"
+                                           Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker Date="@endDate" 
+                                           DateChanged="OnEndDateChanged" 
+                                           Label="📅 Data zakończenia"
+                                           Variant="Variant.Outlined"
+                                           Editable="true"
+                                           DateFormat="dd.MM.yyyy"
+                                           Class="rounded-lg" />
+                        </MudItem>
+                    </MudGrid>
+                    
+                    <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="RentalType" @bind-Value="editModel.RentalType" 
+                                       Label="Typ wynajmu"
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.AccessTime"
+                                       Class="rounded-lg">
+                                <MudSelectItem Value="RentalType.Daily">📅 Dzienny</MudSelectItem>
+                                <MudSelectItem Value="RentalType.Hourly">⏰ Godzinowy</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        @if (editModel.RentalType == RentalType.Hourly)
+                        {
+                            <MudItem xs="12" md="6">
+                                <MudNumericField T="int?" @bind-Value="editModel.HoursRented" 
+                                                  Label="Liczba godzin"
+                                                  Min="1"
+                                                  Max="24"
+                                                  Variant="Variant.Outlined"
+                                                  Adornment="Adornment.End"
+                                                  AdornmentText="godz."
+                                                  Class="rounded-lg" />
+                            </MudItem>
+                        }
+                    </MudGrid>
+                    
+                    @if (startDate.HasValue && endDate.HasValue)
+                    {
+                        @if (editModel.RentalType == RentalType.Hourly && editModel.HoursRented.HasValue)
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="rounded-lg">
+                                <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2">Czas trwania: <strong>@editModel.HoursRented.Value godzin</strong></MudText>
+                                </MudStack>
+                            </MudAlert>
+                        }
+                        else
+                        {
+                            var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
+                            <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="rounded-lg">
+                                <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                                    <MudText Typo="Typo.body2">Czas trwania: <strong>@days dni</strong></MudText>
+                                </MudStack>
+                            </MudAlert>
+                        }
+                    }
+                </MudStack>
+            </MudPaper>
 
-            @if (!filteredRentals.Any())
+            @* SEKCJA: DODAWANIE PRODUKTÓW *@
+            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Class="mud-align-center mud-justify-space-between">
+                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Success" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Dodaj sprzęt</MudText>
+                        </MudStack>
+                        <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">
+                            @editItems.Count pozycji
+                        </MudChip>
+                    </MudStack>
+                    
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" md="6">
+                            <MudAutocomplete T="Product"
+                                              Label="Wyszukaj produkt"
+                                              Placeholder="Nazwa, SKU lub kategoria..."
+                                              Adornment="Adornment.Start" 
+                                              AdornmentIcon="@Icons.Material.Filled.Search"
+                                              Variant="Variant.Outlined"
+                                              Value="@selectedProduct"
+                                              ValueChanged="@(p => selectedProduct = p)"
+                                              SearchFunc="SearchProducts"
+                                              ToStringFunc="@(p => p is null ? string.Empty : $"{p.Name}")"
+                                              Class="rounded-lg">
+                                <ItemTemplate>
+                                    <MudStack Row="true" Spacing="2" Class="mud-align-center pa-1">
+                                        @if (!string.IsNullOrWhiteSpace(context.ImageUrl))
+                                        {
+                                            <MudAvatar Size="Size.Medium" Style="border-radius: 8px;">
+                                                <MudImage Src="@context.ImageUrl" Alt="@context.Name" />
+                                            </MudAvatar>
+                                        }
+                                        else
+                                        {
+                                            <MudAvatar Color="Color.Default" Size="Size.Medium">
+                                                <MudIcon Icon="@Icons.Material.Filled.SportsTennis" />
+                                            </MudAvatar>
+                                        }
+                                        <div class="flex-1">
+                                            <MudText Typo="Typo.body1" Style="font-weight: 500;">@context.Name</MudText>
+                                            <MudStack Row="true" Spacing="1" Class="mud-align-center">
+                                                <MudText Typo="Typo.caption" Color="Color.Default">@context.Sku</MudText>
+                                                <MudText Typo="Typo.caption">•</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">@context.DailyPrice.ToString("0.00") zł/dzień</MudText>
+                                                <MudText Typo="Typo.caption">•</MudText>
+                                                <MudChip T="string" Size="Size.Small" Color="@(GetAvail(context.Id) > 0 ? Color.Success : Color.Error)" Variant="Variant.Text">
+                                                    @GetAvail(context.Id) szt.
+                                                </MudChip>
+                                            </MudStack>
+                                        </div>
+                                    </MudStack>
+                                </ItemTemplate>
+                            </MudAutocomplete>
+                        </MudItem>
+                        <MudItem xs="6" md="2">
+                            <MudNumericField T="int" @bind-Value="selectedQty" 
+                                              Label="Ilość" 
+                                              Min="1" 
+                                              Max="@CurrentAvail"
+                                              Variant="Variant.Outlined"
+                                              Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="6" md="2">
+                            <MudStack Class="h-100 mud-justify-center">
+                                <MudChip T="string" Color="@(CurrentAvail > 0 ? Color.Success : Color.Error)" 
+                                         Variant="Variant.Outlined" 
+                                         Style="height: 40px;">
+                                    <MudIcon Icon="@Icons.Material.Filled.Warehouse" Size="Size.Small" Class="mr-1" />
+                                    @CurrentAvail dostępne
+                                </MudChip>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" md="2">
+                            <MudButton FullWidth="true" 
+                                       Variant="Variant.Filled" 
+                                       Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.Add" 
+                                       Disabled="@(selectedProduct is null || CurrentAvail == 0)" 
+                                       OnClick="AddSelectedProduct"
+                                       Style="height: 56px;"
+                                       Class="rounded-lg">
+                                Dodaj
+                            </MudButton>
+                        </MudItem>
+                    </MudGrid>
+
+                    @* Szybkie dodawanie po SKU *@
+                    <MudExpansionPanels Elevation="0">
+                        <MudExpansionPanel Text="⚡ Szybkie dodawanie po SKU / kamerą" Style="background: transparent;">
+                            <MudGrid Spacing="2">
+                                <MudItem xs="12" md="5">
+                                    <MudTextField @bind-Value="skuInput" 
+                                                  Label="Kod SKU" 
+                                                  Placeholder="Wpisz lub zeskanuj..." 
+                                                  Variant="Variant.Outlined"
+                                                  Adornment="Adornment.Start"
+                                                  AdornmentIcon="@Icons.Material.Filled.QrCode"
+                                                  Class="rounded-lg" />
+                                </MudItem>
+                                <MudItem xs="6" md="2">
+                                    <MudNumericField T="int" @bind-Value="skuQty" Label="Ilość" Min="1" Variant="Variant.Outlined" Class="rounded-lg" />
+                                </MudItem>
+                                <MudItem xs="6" md="2">
+                                    <MudButton FullWidth="true" 
+                                               Variant="Variant.Outlined" 
+                                               Color="Color.Primary"
+                                               StartIcon="@Icons.Material.Filled.Add" 
+                                               OnClick="AddItemBySku"
+                                               Style="height: 56px;"
+                                               Class="rounded-lg">
+                                        Dodaj
+                                    </MudButton>
+                                </MudItem>
+                                <MudItem xs="12" md="3">
+                                    <MudStack Row="true" Spacing="1">
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="StartScanner" StartIcon="@Icons.Material.Filled.CameraAlt">Kamera</MudButton>
+                                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="StopScanner">Stop</MudButton>
+                                    </MudStack>
+                                </MudItem>
+                            </MudGrid>
+                            <video id="videoScanner" width="200" height="120" autoplay muted playsinline style="border-radius:12px; border:2px solid #e0e0e0; margin-top: 12px; display: none;"></video>
+                        </MudExpansionPanel>
+                    </MudExpansionPanels>
+                </MudStack>
+            </MudPaper>
+
+            @* SEKCJA: LISTA PRODUKTÓW *@
+            @if (editItems.Any())
             {
-                <MudAlert Severity="Severity.Info">Brak wynajmów do wyświetlenia</MudAlert>
+                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; border: 1px solid #e0e0e0;">
+                    <MudStack Spacing="3">
+                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                            <MudIcon Icon="@Icons.Material.Filled.ListAlt" Color="Color.Primary" />
+                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Koszyk (@editItems.Count)</MudText>
+                        </MudStack>
+
+                        <MudTable Items="editItems" Dense="true" Hover="true" Elevation="0" Class="rounded-lg">
+                            <HeaderContent>
+                                <MudTh Style="font-weight: 600;">Produkt</MudTh>
+                                <MudTh Style="font-weight: 600; text-align: center;">Ilość</MudTh>
+                                <MudTh Style="font-weight: 600; text-align: right;">Cena/dzień</MudTh>
+                                <MudTh Style="font-weight: 600; text-align: right;">Suma</MudTh>
+                                <MudTh Style="width: 50px;"></MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>
+                                    <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                                        <MudAvatar Size="Size.Small" Color="Color.Default">
+                                            <MudIcon Icon="@Icons.Material.Filled.SportsTennis" Size="Size.Small" />
+                                        </MudAvatar>
+                                        <MudText>@(products.FirstOrDefault(p => p.Id == context.ProductId)?.Name ?? "—")</MudText>
+                                    </MudStack>
+                                </MudTd>
+                                <MudTd Style="text-align: center;">
+                                    <MudNumericField T="int" @bind-Value="context.Quantity" Min="1" Variant="Variant.Text" Style="width: 60px; text-align: center;" />
+                                </MudTd>
+                                <MudTd Style="text-align: right;">
+                                    <MudText Color="Color.Default">@context.PricePerDay.ToString("0.00") zł</MudText>
+                                </MudTd>
+                                <MudTd Style="text-align: right;">
+                                    <MudText Color="Color.Success" Style="font-weight: 600;">@context.Subtotal.ToString("0.00") zł</MudText>
+                                </MudTd>
+                                <MudTd>
+                                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" 
+                                                   Color="Color.Error" 
+                                                   Size="Size.Small"
+                                                   OnClick="() => RemoveItem(context)" />
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+
+                        <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <MudStack Row="true" Class="mud-justify-space-between mud-align-center">
+                                <MudStack Spacing="0">
+                                    <MudText Typo="Typo.body2" Style="opacity: 0.9;">Do zapłaty</MudText>
+                                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@total.ToString("0.00") zł</MudText>
+                                </MudStack>
+                                <MudStack Spacing="0" Class="text-right">
+                                    <MudText Typo="Typo.caption" Style="opacity: 0.8;">@editItems.Sum(i => i.Quantity) produktów</MudText>
+                                    @if (startDate.HasValue && endDate.HasValue)
+                                    {
+                                        var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
+                                        <MudText Typo="Typo.caption" Style="opacity: 0.8;">@days dni</MudText>
+                                    }
+                                </MudStack>
+                            </MudStack>
+                        </MudPaper>
+                    </MudStack>
+                </MudPaper>
             }
             else
             {
-                <MudStack Spacing="3">
-                    @foreach (var rental in filteredRentals)
-                    {
-                        <MudCard Elevation="6" Class="@GetRentalCardClass(rental)" Style="@GetRentalCardStyle(rental)">
-                            <MudCardContent Class="pa-5">
-                                <MudGrid Spacing="3" Class="mud-align-center">
-                                    <MudItem xs="12" md="8">
-                                        <MudStack Spacing="2">
-                                            <div Class="d-flex align-center mb-2">
-                                                <MudAvatar Color="@GetStatusColor(rental.Status)" Size="Size.Large" Class="mr-3">
-                                                    <MudIcon Icon="@GetStatusIcon(rental.Status)" />
-                                                </MudAvatar>
-                                                <div>
-                                                    <MudText Typo="Typo.h6" Style="font-weight: 600;">
-                                                        @GetRentalTitle(rental)
-                                                    </MudText>
-                                                    <MudText Typo="Typo.body2" Color="Color.Default">
-                                                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
-                                                        @(customersDict.GetValueOrDefault(rental.CustomerId)?.FullName ?? "brak")
-                                                    </MudText>
-                                                </div>
-                                            </div>
-                                            
-                                            <MudGrid Spacing="2">
-                                                <MudItem xs="12" sm="6">
-                                                    <MudPaper Class="pa-3" Elevation="1" Style="border-radius: 8px; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);">
-                                                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                                            <MudIcon Icon="@Icons.Material.Filled.PlayArrow" Color="Color.Primary" />
-                                                            <div>
-                                                                <MudText Typo="Typo.caption" Color="Color.Default">Początek</MudText>
-                                                                <MudText Typo="Typo.body2" Style="font-weight: 600;">
-                                                                    @rental.StartDateUtc.ToLocalTime().ToString("dd.MM HH:mm")
-                                                                </MudText>
-                                                            </div>
-                                                        </MudStack>
-                                                    </MudPaper>
-                                                </MudItem>
-                                                <MudItem xs="12" sm="6">
-                                                    <MudPaper Class="pa-3" Elevation="1" Style="border-radius: 8px; background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);">
-                                                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                                            <MudIcon Icon="@Icons.Material.Filled.Stop" Color="Color.Warning" />
-                                                            <div>
-                                                                <MudText Typo="Typo.caption" Color="Color.Default">Koniec</MudText>
-                                                                <MudText Typo="Typo.body2" Style="font-weight: 600;">
-                                                                    @rental.EndDateUtc.ToLocalTime().ToString("dd.MM HH:mm")
-                                                                </MudText>
-                                                            </div>
-                                                        </MudStack>
-                                                    </MudPaper>
-                                                </MudItem>
-                                            </MudGrid>
-
-                                            <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
-                                                <MudChip T="string" Icon="@Icons.Material.Filled.AttachMoney" 
-                                                         Color="Color.Success" 
-                                                         Variant="Variant.Filled"
-                                                         Size="Size.Small">
-                                                    @rental.TotalAmount.ToString("0.00") zł
-                                                </MudChip>
-                                                <MudChip T="string" Icon="@GetStatusIcon(rental.Status)" 
-                                                         Color="@GetStatusColor(rental.Status)" 
-                                                         Variant="Variant.Text"
-                                                         Size="Size.Small">
-                                                    @GetStatusText(rental.Status)
-                                                </MudChip>
-@*                                                <MudChip T="string" Icon="@Icons.Material.Filled.Sms" 
-                                                         Color="@GetSmsStatusColor(rental)" 
-                                                         Variant="@(rental.IsSmsConfirmed ? Variant.Filled : Variant.Text)"
-                                                         Size="Size.Small">
-                                                    @GetSmsStatusText(rental)
-                                                </MudChip> *@
-                                                <MudChip T="string" Icon="@Icons.Material.Filled.Email" 
-                                                         Color="@(rental.IsEmailSent ? Color.Success : Color.Default)" 
-                                                         Variant="Variant.Text"
-                                                         Size="Size.Small">
-                                                    Email: @(rental.IsEmailSent ? "✓" : "✗")
-                                                </MudChip>
-                                                @* Źródło wypożyczenia *@
-                                                <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
-                                                         Color="@GetSourceColor(rental.Source)" 
-                                                         Variant="Variant.Text"
-                                                         Size="Size.Small">
-                                                    @GetSourceText(rental.Source)
-                                                </MudChip>
-                                                @* Status wydania/zwrotu *@
-                                                <MudChip T="string" Icon="@GetEquipmentStatusIcon(rental)" 
-                                                         Color="@GetEquipmentStatusColor(rental)" 
-                                                         Variant="Variant.Filled"
-                                                         Size="Size.Small">
-                                                    @GetEquipmentStatusText(rental)
-                                                </MudChip>
-                                                @* Ostrzeżenie o przeterminowaniu *@
-                                                @if (IsOverdue(rental))
-                                                {
-                                                    <MudChip T="string" Icon="@Icons.Material.Filled.Warning" 
-                                                             Color="Color.Error" 
-                                                             Variant="Variant.Filled"
-                                                             Size="Size.Small">
-                                                        PRZETERMINOWANE (@GetOverdueDays(rental) dni)
-                                                    </MudChip>
-                                                }
-                                            </MudStack>
-
-                                            @if (!string.IsNullOrEmpty(rental.Notes))
-                                            {
-                                                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="mt-2">
-                                                    <MudText Typo="Typo.caption">
-                                                        <MudIcon Icon="@Icons.Material.Filled.StickyNote2" Size="Size.Small" Class="mr-1" />
-                                                        @rental.Notes
-                                                    </MudText>
-                                                </MudAlert>
-                                            }
-                                        </MudStack>
-                                    </MudItem>
-                                    
-                                    <MudItem xs="12" md="4">
-                                        <MudStack Spacing="2">
-                                            <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false">
-                                                <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                                           OnClick="() => Edit(rental)"
-                                                           Size="Size.Small">
-                                                    Edytuj
-                                                </MudButton>
-                                                <MudButton StartIcon="@Icons.Material.Filled.Delete" 
-                                                           OnClick="() => Delete(rental)"
-                                                           Color="Color.Error"
-                                                           Size="Size.Small">
-                                                    Usuń
-                                                </MudButton>
-                                            </MudButtonGroup>
-                                            
-                                            <MudButtonGroup Variant="Variant.Outlined" Color="Color.Secondary" OverrideStyles="false">
-                                                @if (!string.IsNullOrWhiteSpace(rental.ContractUrl))
-                                                {
-                                                    <MudButton StartIcon="@Icons.Material.Filled.Description" 
-                                                               Href="@rental.ContractUrl" 
-                                                               Target="_blank"
-                                                               Size="Size.Small">
-                                                        Umowa
-                                                    </MudButton>
-                                                }
-                                                <MudButton StartIcon="@Icons.Material.Filled.FileDownload" 
-                                                           OnClick="() => GenerateContract(rental)"
-                                                           Size="Size.Small">
-                                                    Generuj
-                                                </MudButton>
-                                                <MudButton StartIcon="@Icons.Material.Filled.Email" 
-                                                           OnClick="() => SendContractByEmail(rental)"
-                                                           Size="Size.Small">
-                                                    Email
-                                                </MudButton>
-                                            </MudButtonGroup>
-                                            
-                                            <MudStack Row="true" Spacing="1">
-                                                @* SMS buttons - tymczasowo ukryte (brak aktywnego konta SMS)
-                                                <MudButton StartIcon="@Icons.Material.Filled.Sms" 
-                                                           OnClick="() => SendSmsConfirmation(rental)"
-                                                           Color="@GetSmsButtonColor(rental)"
-                                                           Variant="@GetSmsButtonVariant(rental)"
-                                                           Disabled="@(rental.IsSmsConfirmed)"
-                                                           Size="Size.Small"
-                                                           Class="flex-1">
-                                                    @GetSmsButtonText(rental)
-                                                </MudButton>
-                                                <MudTooltip Text="Wyślij własny SMS do klienta">
-                                                    <MudIconButton Icon="@Icons.Material.Filled.Message" 
-                                                                   OnClick="() => OpenCustomSmsDialog(rental)"
-                                                                   Color="Color.Secondary"
-                                                                   Size="Size.Small" />
-                                                </MudTooltip>
-                                                *@
-                                                @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
-                                                {
-                                                    <MudButton StartIcon="@Icons.Material.Filled.CheckCircle" 
-                                                               OnClick="() => CompleteRental(rental)"
-                                                               Color="Color.Success"
-                                                               Variant="Variant.Filled"
-                                                               Size="Size.Small"
-                                                               Class="flex-1">
-                                                        Zakończ
-                                                    </MudButton>
-                                                }
-                                            </MudStack>
-                                            @* Przycisk przedłużenia dla przeterminowanych *@
-                                            @if (IsOverdue(rental))
-                                            {
-                                                <MudButton StartIcon="@Icons.Material.Filled.Update" 
-                                                           OnClick="() => ExtendRental(rental)"
-                                                           Color="Color.Error"
-                                                           Variant="Variant.Filled"
-                                                           FullWidth="true"
-                                                           Size="Size.Small">
-                                                    ⚠️ Przedłuż wynajem
-                                                </MudButton>
-                                            }
-                                        </MudStack>
-                                    </MudItem>
-                                </MudGrid>
-                            </MudCardContent>
-                        </MudCard>
-                    }
-                </MudStack>
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="rounded-lg">
+                    <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                        <MudIcon Icon="@Icons.Material.Filled.Info" />
+                        <MudText>Dodaj produkty do wynajmu używając wyszukiwarki powyżej</MudText>
+                    </MudStack>
+                </MudAlert>
             }
-        </MudItem>
-    </MudGrid>
-
-    <MudDialog @bind-Visible="dialogOpen" Options="@rentalDialogOptions">
-        <TitleContent>
-            <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                <MudAvatar Color="Color.Primary" Size="Size.Large" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                    <MudIcon Icon="@Icons.Material.Filled.ShoppingCart" />
-                </MudAvatar>
-                <div>
-                    <MudText Typo="Typo.h5" Style="font-weight: 700;">@(editModel.Id == Guid.Empty ? "Nowy wynajem" : "Edytuj wynajem")</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Default">Wypełnij dane wynajmu sprzętu</MudText>
-                </div>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudPaper Elevation="0" Class="pa-4 mud-width-full" Style="background: #f5f5f5; border-top: 1px solid #e0e0e0;">
+            <MudStack Row="true" Class="mud-width-full mud-justify-space-between">
+                <MudButton Variant="Variant.Text" 
+                           Color="Color.Default"
+                           StartIcon="@Icons.Material.Filled.Close"
+                           OnClick="() => dialogOpen=false">
+                    Anuluj
+                </MudButton>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           Disabled="@(editModel.CustomerId == Guid.Empty || !editItems.Any())"
+                           OnClick="Save"
+                           Class="rounded-pill px-6">
+                    @(editModel.Id == Guid.Empty ? "Utwórz wynajem" : "Zapisz zmiany")
+                </MudButton>
             </MudStack>
-        </TitleContent>
-        <DialogContent>
-            <MudStack Spacing="4" Class="pa-2">
-                @* SEKCJA: KLIENT I DATY *@
-                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);">
-                    <MudStack Spacing="3">
-                        <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                            <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
-                            <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Dane podstawowe</MudText>
-                        </MudStack>
-                        
-                        <MudAutocomplete T="Customer"
-                                         Label="Wybierz klienta"
-                                         Placeholder="Zacznij pisać imię lub email..."
-                                         Value="@(customers.FirstOrDefault(c => c.Id == editModel.CustomerId))"
-                                         ValueChanged="@(c => { if (c != null) editModel.CustomerId = c.Id; })"
-                                         SearchFunc="@((string s, CancellationToken ct) => Task.FromResult(customers.Where(c => string.IsNullOrWhiteSpace(s) || (c.FullName?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) || (c.Email?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false))))"
-                                         ToStringFunc="@(c => c?.FullName ?? "")"
-                                         Variant="Variant.Outlined"
-                                         Adornment="Adornment.Start"
-                                         AdornmentIcon="@Icons.Material.Filled.PersonSearch"
-                                         Class="rounded-lg">
-                            <ItemTemplate>
-                                <MudStack Row="true" Spacing="2" Class="mud-align-center pa-1">
-                                    <MudAvatar Color="Color.Primary" Size="Size.Small">
-                                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
-                                    </MudAvatar>
-                                    <div>
-                                        <MudText Typo="Typo.body1">@context.FullName</MudText>
-                                        <MudText Typo="Typo.caption" Color="Color.Default">
-                                            @(context.Email ?? context.PhoneNumber ?? "brak kontaktu")
-                                        </MudText>
-                                    </div>
-                                </MudStack>
-                            </ItemTemplate>
-                        </MudAutocomplete>
-                        
-                        <MudGrid Spacing="3">
-                            <MudItem xs="12" md="6">
-                                <MudDatePicker Date="@startDate" 
-                                               DateChanged="OnStartDateChanged" 
-                                               Label="📅 Data rozpoczęcia"
-                                               Variant="Variant.Outlined"
-                                               Editable="true"
-                                               DateFormat="dd.MM.yyyy"
-                                               Class="rounded-lg" />
-                            </MudItem>
-                            <MudItem xs="12" md="6">
-                                <MudDatePicker Date="@endDate" 
-                                               DateChanged="OnEndDateChanged" 
-                                               Label="📅 Data zakończenia"
-                                               Variant="Variant.Outlined"
-                                               Editable="true"
-                                               DateFormat="dd.MM.yyyy"
-                                               Class="rounded-lg" />
-                            </MudItem>
-                        </MudGrid>
-                        
-                        @* Typ wynajmu *@
-                        <MudGrid Spacing="3">
-                            <MudItem xs="12" md="6">
-                                <MudSelect T="RentalType" @bind-Value="editModel.RentalType" 
-                                           Label="Typ wynajmu"
-                                           Variant="Variant.Outlined"
-                                           Adornment="Adornment.Start"
-                                           AdornmentIcon="@Icons.Material.Filled.AccessTime"
-                                           Class="rounded-lg">
-                                    <MudSelectItem Value="RentalType.Daily">📅 Dzienny</MudSelectItem>
-                                    <MudSelectItem Value="RentalType.Hourly">⏰ Godzinowy</MudSelectItem>
-                                </MudSelect>
-                            </MudItem>
-                            @if (editModel.RentalType == RentalType.Hourly)
-                            {
-                                <MudItem xs="12" md="6">
-                                    <MudNumericField T="int?" @bind-Value="editModel.HoursRented" 
-                                                      Label="Liczba godzin"
-                                                      Min="1"
-                                                      Max="24"
-                                                      Variant="Variant.Outlined"
-                                                      Adornment="Adornment.End"
-                                                      AdornmentText="godz."
-                                                      Class="rounded-lg" />
-                                </MudItem>
-                            }
-                        </MudGrid>
-                        
-                        @if (startDate.HasValue && endDate.HasValue)
-                        {
-                            @if (editModel.RentalType == RentalType.Hourly && editModel.HoursRented.HasValue)
-                            {
-                                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="rounded-lg">
-                                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
-                                        <MudText Typo="Typo.body2">Czas trwania: <strong>@editModel.HoursRented.Value godzin</strong></MudText>
-                                    </MudStack>
-                                </MudAlert>
-                            }
-                            else
-                            {
-                                var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
-                                <MudAlert Severity="Severity.Info" Dense="true" NoIcon="true" Class="rounded-lg">
-                                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                        <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
-                                        <MudText Typo="Typo.body2">Czas trwania: <strong>@days dni</strong></MudText>
-                                    </MudStack>
-                                </MudAlert>
-                            }
-                        }
-                    </MudStack>
-                </MudPaper>
+        </MudPaper>
+    </DialogActions>
+</MudDialog>
 
-                @* SEKCJA: DODAWANIE PRODUKTÓW *@
-                <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
-                    <MudStack Spacing="3">
-                        <MudStack Row="true" Class="mud-align-center mud-justify-space-between">
-                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.Inventory2" Color="Color.Success" />
-                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Dodaj sprzęt</MudText>
-                            </MudStack>
-                            <MudChip T="string" Color="Color.Success" Variant="Variant.Filled" Size="Size.Small">
-                                @editItems.Count pozycji
-                            </MudChip>
-                        </MudStack>
-                        
-                        <MudGrid Spacing="2">
-                            <MudItem xs="12" md="6">
-                                <MudAutocomplete T="Product"
-                                                  Label="Wyszukaj produkt"
-                                                  Placeholder="Nazwa, SKU lub kategoria..."
-                                                  Adornment="Adornment.Start" 
-                                                  AdornmentIcon="@Icons.Material.Filled.Search"
-                                                  Variant="Variant.Outlined"
-                                                  Value="@selectedProduct"
-                                                  ValueChanged="@(p => selectedProduct = p)"
-                                                  SearchFunc="SearchProducts"
-                                                  ToStringFunc="@(p => p is null ? string.Empty : $"{p.Name}")"
-                                                  Class="rounded-lg">
-                                    <ItemTemplate>
-                                        <MudStack Row="true" Spacing="2" Class="mud-align-center pa-1">
-                                            @if (!string.IsNullOrWhiteSpace(context.ImageUrl))
-                                            {
-                                                <MudAvatar Size="Size.Medium" Style="border-radius: 8px;">
-                                                    <MudImage Src="@context.ImageUrl" Alt="@context.Name" />
-                                                </MudAvatar>
-                                            }
-                                            else
-                                            {
-                                                <MudAvatar Color="Color.Default" Size="Size.Medium">
-                                                    <MudIcon Icon="@Icons.Material.Filled.SportsTennis" />
-                                                </MudAvatar>
-                                            }
-                                            <div class="flex-1">
-                                                <MudText Typo="Typo.body1" Style="font-weight: 500;">@context.Name</MudText>
-                                                <MudStack Row="true" Spacing="1" Class="mud-align-center">
-                                                    <MudText Typo="Typo.caption" Color="Color.Default">@context.Sku</MudText>
-                                                    <MudText Typo="Typo.caption">•</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">@context.DailyPrice.ToString("0.00") zł/dzień</MudText>
-                                                    <MudText Typo="Typo.caption">•</MudText>
-                                                    <MudChip T="string" Size="Size.Small" Color="@(GetAvail(context.Id) > 0 ? Color.Success : Color.Error)" Variant="Variant.Text">
-                                                        @GetAvail(context.Id) szt.
-                                                    </MudChip>
-                                                </MudStack>
-                                            </div>
-                                        </MudStack>
-                                    </ItemTemplate>
-                                </MudAutocomplete>
-                            </MudItem>
-                            <MudItem xs="6" md="2">
-                                <MudNumericField T="int" @bind-Value="selectedQty" 
-                                                  Label="Ilość" 
-                                                  Min="1" 
-                                                  Max="@CurrentAvail"
-                                                  Variant="Variant.Outlined"
-                                                  Class="rounded-lg" />
-                            </MudItem>
-                            <MudItem xs="6" md="2">
-                                <MudStack Class="h-100 mud-justify-center">
-                                    <MudChip T="string" Color="@(CurrentAvail > 0 ? Color.Success : Color.Error)" 
-                                             Variant="Variant.Outlined" 
-                                             Style="height: 40px;">
-                                        <MudIcon Icon="@Icons.Material.Filled.Warehouse" Size="Size.Small" Class="mr-1" />
-                                        @CurrentAvail dostępne
-                                    </MudChip>
-                                </MudStack>
-                            </MudItem>
-                            <MudItem xs="12" md="2">
-                                <MudButton FullWidth="true" 
-                                           Variant="Variant.Filled" 
-                                           Color="Color.Success"
-                                           StartIcon="@Icons.Material.Filled.Add" 
-                                           Disabled="@(selectedProduct is null || CurrentAvail == 0)" 
-                                           OnClick="AddSelectedProduct"
-                                           Style="height: 56px;"
-                                           Class="rounded-lg">
-                                    Dodaj
-                                </MudButton>
-                            </MudItem>
-                        </MudGrid>
+@* Dialog do wysyłania customowego SMS *@
+<MudDialog @bind-Visible="customSmsDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Sms" Color="Color.Info" />
+            <MudText Typo="Typo.h6">Wyślij SMS do klienta</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            @if (customSmsRental != null)
+            {
+                var customer = customersDict.GetValueOrDefault(customSmsRental.CustomerId);
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    <MudText Typo="Typo.body2">
+                        <strong>Odbiorca:</strong> @(customer?.FullName ?? "Nieznany")<br/>
+                        <strong>Telefon:</strong> @(customer?.PhoneNumber ?? "Brak numeru")
+                    </MudText>
+                </MudAlert>
+            }
+            <MudTextField @bind-Value="customSmsMessage"
+                          Label="Treść wiadomości SMS"
+                          Placeholder="Wpisz treść SMS..."
+                          Variant="Variant.Outlined"
+                          Lines="4"
+                          MaxLength="480"
+                          Counter="480"
+                          HelperText="Maksymalnie 480 znaków (3 SMS-y)" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="CloseCustomSmsDialog">
+            Anuluj
+        </MudButton>
+        <MudButton Variant="Variant.Filled" 
+                   Color="Color.Info"
+                   StartIcon="@Icons.Material.Filled.Send"
+                   Disabled="@(string.IsNullOrWhiteSpace(customSmsMessage) || sendingCustomSms)"
+                   OnClick="SendCustomSms">
+            @if (sendingCustomSms)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <span>Wysyłanie...</span>
+            }
+            else
+            {
+                <span>Wyślij SMS</span>
+            }
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
-                        @* Szybkie dodawanie po SKU *@
-                        <MudExpansionPanels Elevation="0">
-                            <MudExpansionPanel Text="⚡ Szybkie dodawanie po SKU / kamerą" Style="background: transparent;">
-                                <MudGrid Spacing="2">
-                                    <MudItem xs="12" md="5">
-                                        <MudTextField @bind-Value="skuInput" 
-                                                      Label="Kod SKU" 
-                                                      Placeholder="Wpisz lub zeskanuj..." 
-                                                      Variant="Variant.Outlined"
-                                                      Adornment="Adornment.Start"
-                                                      AdornmentIcon="@Icons.Material.Filled.QrCode"
-                                                      Class="rounded-lg" />
-                                    </MudItem>
-                                    <MudItem xs="6" md="2">
-                                        <MudNumericField T="int" @bind-Value="skuQty" Label="Ilość" Min="1" Variant="Variant.Outlined" Class="rounded-lg" />
-                                    </MudItem>
-                                    <MudItem xs="6" md="2">
-                                        <MudButton FullWidth="true" 
-                                                   Variant="Variant.Outlined" 
-                                                   Color="Color.Primary"
-                                                   StartIcon="@Icons.Material.Filled.Add" 
-                                                   OnClick="AddItemBySku"
-                                                   Style="height: 56px;"
-                                                   Class="rounded-lg">
-                                            Dodaj
-                                        </MudButton>
-                                    </MudItem>
-                                    <MudItem xs="12" md="3">
-                                        <MudStack Row="true" Spacing="1">
-                                            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="StartScanner" StartIcon="@Icons.Material.Filled.CameraAlt">Kamera</MudButton>
-                                            <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="StopScanner">Stop</MudButton>
-                                        </MudStack>
-                                    </MudItem>
-                                </MudGrid>
-                                <video id="videoScanner" width="200" height="120" autoplay muted playsinline style="border-radius:12px; border:2px solid #e0e0e0; margin-top: 12px; display: none;"></video>
-                            </MudExpansionPanel>
-                        </MudExpansionPanels>
-                    </MudStack>
-                </MudPaper>
-
-                @* SEKCJA: LISTA PRODUKTÓW *@
-                @if (editItems.Any())
-                {
-                    <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; border: 1px solid #e0e0e0;">
-                        <MudStack Spacing="3">
-                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                <MudIcon Icon="@Icons.Material.Filled.ListAlt" Color="Color.Primary" />
-                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Koszyk (@editItems.Count)</MudText>
-                            </MudStack>
-
-                            <MudTable Items="editItems" Dense="true" Hover="true" Elevation="0" Class="rounded-lg">
-                                <HeaderContent>
-                                    <MudTh Style="font-weight: 600;">Produkt</MudTh>
-                                    <MudTh Style="font-weight: 600; text-align: center;">Ilość</MudTh>
-                                    <MudTh Style="font-weight: 600; text-align: right;">Cena/dzień</MudTh>
-                                    <MudTh Style="font-weight: 600; text-align: right;">Suma</MudTh>
-                                    <MudTh Style="width: 50px;"></MudTh>
-                                </HeaderContent>
-                                <RowTemplate>
-                                    <MudTd>
-                                        <MudStack Row="true" Spacing="2" Class="mud-align-center">
-                                            <MudAvatar Size="Size.Small" Color="Color.Default">
-                                                <MudIcon Icon="@Icons.Material.Filled.SportsTennis" Size="Size.Small" />
-                                            </MudAvatar>
-                                            <MudText>@(products.FirstOrDefault(p => p.Id == context.ProductId)?.Name ?? "—")</MudText>
-                                        </MudStack>
-                                    </MudTd>
-                                    <MudTd Style="text-align: center;">
-                                        <MudNumericField T="int" @bind-Value="context.Quantity" Min="1" Variant="Variant.Text" Style="width: 60px; text-align: center;" />
-                                    </MudTd>
-                                    <MudTd Style="text-align: right;">
-                                        <MudText Color="Color.Default">@context.PricePerDay.ToString("0.00") zł</MudText>
-                                    </MudTd>
-                                    <MudTd Style="text-align: right;">
-                                        <MudText Color="Color.Success" Style="font-weight: 600;">@context.Subtotal.ToString("0.00") zł</MudText>
-                                    </MudTd>
-                                    <MudTd>
-                                        <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" 
-                                                       Color="Color.Error" 
-                                                       Size="Size.Small"
-                                                       OnClick="() => RemoveItem(context)" />
-                                    </MudTd>
-                                </RowTemplate>
-                            </MudTable>
-
-                            @* PODSUMOWANIE *@
-                            <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                                <MudStack Row="true" Class="mud-justify-space-between mud-align-center">
-                                    <MudStack Spacing="0">
-                                        <MudText Typo="Typo.body2" Style="opacity: 0.9;">Do zapłaty</MudText>
-                                        <MudText Typo="Typo.h4" Style="font-weight: 700;">@total.ToString("0.00") zł</MudText>
-                                    </MudStack>
-                                    <MudStack Spacing="0" Class="text-right">
-                                        <MudText Typo="Typo.caption" Style="opacity: 0.8;">@editItems.Sum(i => i.Quantity) produktów</MudText>
-                                        @if (startDate.HasValue && endDate.HasValue)
-                                        {
-                                            var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
-                                            <MudText Typo="Typo.caption" Style="opacity: 0.8;">@days dni</MudText>
-                                        }
-                                    </MudStack>
-                                </MudStack>
-                            </MudPaper>
-                        </MudStack>
-                    </MudPaper>
-                }
-                else
-                {
-                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="rounded-lg">
-                        <MudStack Row="true" Spacing="2" Class="mud-align-center">
-                            <MudIcon Icon="@Icons.Material.Filled.Info" />
-                            <MudText>Dodaj produkty do wynajmu używając wyszukiwarki powyżej</MudText>
-                        </MudStack>
-                    </MudAlert>
-                }
-            </MudStack>
-        </DialogContent>
-        <DialogActions>
-            <MudPaper Elevation="0" Class="pa-4 mud-width-full" Style="background: #f5f5f5; border-top: 1px solid #e0e0e0;">
-                <MudStack Row="true" Class="mud-width-full mud-justify-space-between">
-                    <MudButton Variant="Variant.Text" 
-                               Color="Color.Default"
-                               StartIcon="@Icons.Material.Filled.Close"
-                               OnClick="() => dialogOpen=false">
-                        Anuluj
-                    </MudButton>
-                    <MudButton Variant="Variant.Filled" 
-                               Color="Color.Primary"
-                               StartIcon="@Icons.Material.Filled.Save"
-                               Disabled="@(editModel.CustomerId == Guid.Empty || !editItems.Any())"
-                               OnClick="Save"
-                               Class="rounded-pill px-6">
-                        @(editModel.Id == Guid.Empty ? "Utwórz wynajem" : "Zapisz zmiany")
-                    </MudButton>
-                </MudStack>
-            </MudPaper>
-        </DialogActions>
-    </MudDialog>
-    
-    @* Dialog do wysyłania customowego SMS *@
-    <MudDialog @bind-Visible="customSmsDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small })">
-        <TitleContent>
-            <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                <MudIcon Icon="@Icons.Material.Filled.Sms" Color="Color.Info" />
-                <MudText Typo="Typo.h6">Wyślij SMS do klienta</MudText>
-            </MudStack>
-        </TitleContent>
-        <DialogContent>
-            <MudStack Spacing="3">
-                @if (customSmsRental != null)
-                {
-                    var customer = customersDict.GetValueOrDefault(customSmsRental.CustomerId);
-                    <MudAlert Severity="Severity.Info" Dense="true">
-                        <MudText Typo="Typo.body2">
-                            <strong>Odbiorca:</strong> @(customer?.FullName ?? "Nieznany")<br/>
-                            <strong>Telefon:</strong> @(customer?.PhoneNumber ?? "Brak numeru")
-                        </MudText>
-                    </MudAlert>
-                }
-                <MudTextField @bind-Value="customSmsMessage"
-                              Label="Treść wiadomości SMS"
-                              Placeholder="Wpisz treść SMS..."
-                              Variant="Variant.Outlined"
-                              Lines="4"
-                              MaxLength="480"
-                              Counter="480"
-                              HelperText="Maksymalnie 480 znaków (3 SMS-y)" />
-            </MudStack>
-        </DialogContent>
-        <DialogActions>
-            <MudButton Variant="Variant.Text" Color="Color.Default" OnClick="CloseCustomSmsDialog">
-                Anuluj
-            </MudButton>
-            <MudButton Variant="Variant.Filled" 
-                       Color="Color.Info"
-                       StartIcon="@Icons.Material.Filled.Send"
-                       Disabled="@(string.IsNullOrWhiteSpace(customSmsMessage) || sendingCustomSms)"
-                       OnClick="SendCustomSms">
-                @if (sendingCustomSms)
-                {
-                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
-                    <span>Wysyłanie...</span>
-                }
-                else
-                {
-                    <span>Wyślij SMS</span>
-                }
-            </MudButton>
-        </DialogActions>
-    </MudDialog>
-</MudContainer>
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
 @code {
+    // ==================== BREAKPOINT ====================
+    private bool _isMobile = false;
+    
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        _isMobile = breakpoint < Breakpoint.Md;
+        StateHasChanged();
+    }
+
+    // ==================== DATA ====================
     [Parameter] [SupplyParameterFromQuery] public string? CustomerId { get; set; }
 
     private List<Rental> rentals = new();
@@ -723,7 +812,7 @@
     private Dictionary<Guid, int> reservedByProduct = new();
 
     private bool dialogOpen;
-    private readonly DialogOptions rentalDialogOptions = new() { MaxWidth = MaxWidth.Medium };
+    private readonly DialogOptions rentalDialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
     private Rental editModel = new();
     private List<RentalItem> editItems = new();
     private DateTime? startDate;
@@ -734,14 +823,12 @@
     private Product? selectedProduct;
     private int selectedQty = 1;
     private int CurrentAvail => selectedProduct is null ? 0 : GetAvail(selectedProduct.Id);
-    // Nowe pola dla stylu ze starego projektu
     private string? searchTerm;
     private bool cbStarted = true;
     private bool cbEnded = true; 
     private bool cbIncoming = true;
     private IEnumerable<Rental> filteredRentals => FilterRentals();
     
-    // Custom SMS dialog
     private bool customSmsDialogOpen;
     private Rental? customSmsRental;
     private string customSmsMessage = "";
@@ -750,6 +837,7 @@
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Inject] private SportRental.Admin.Services.Contracts.IContractGenerator ContractGenerator { get; set; } = default!;
     [Inject] private SportRental.Admin.Services.Email.IEmailSender EmailSender { get; set; } = default!;
+    [Inject] private MudBlazor.ISnackbar Snackbar { get; set; } = default!;
 
     private string? loadError;
 
@@ -881,8 +969,6 @@
         Recalculate();
     }
 
-    [Inject] private MudBlazor.ISnackbar Snackbar { get; set; } = default!;
-
     private async Task StartScanner()
     {
         await JS.InvokeAsync<bool>("srBarcode.start", "videoScanner");
@@ -912,14 +998,12 @@
             
             if (editModel.RentalType == RentalType.Hourly && product?.HourlyPrice.HasValue == true)
             {
-                // Wynajem godzinowy
                 item.PricePerHour = product.HourlyPrice;
                 item.PricePerDay = product.DailyPrice;
                 item.Subtotal = product.HourlyPrice.Value * item.Quantity * hours;
             }
             else
             {
-                // Wynajem dzienny (domyślny)
                 var price = product?.DailyPrice ?? item.PricePerDay;
                 item.PricePerDay = price;
                 item.PricePerHour = product?.HourlyPrice;
@@ -931,9 +1015,7 @@
     private int GetAvail(Guid productId)
     {
         var baseQty = products.FirstOrDefault(p => p.Id == productId)?.AvailableQuantity ?? 0;
-        // Rezerwacje istniejące w bazie dla zakresu
         var alreadyReserved = reservedByProduct.GetValueOrDefault(productId);
-        // zsumuj ilości już dodane w edytowanym koszyku (lokalnie)
         var inCart = editItems.Where(i => i.ProductId == productId).Sum(i => i.Quantity);
         return Math.Max(0, baseQty - alreadyReserved - inCart);
     }
@@ -984,7 +1066,6 @@
     {
         try
         {
-            // Walidacja
             if (editModel.CustomerId == Guid.Empty)
             {
                 Snackbar.Add("Wybierz klienta!", MudBlazor.Severity.Error);
@@ -1014,14 +1095,12 @@
                 editModel.TenantId = CurrentTenantId();
                 editModel.Status = RentalStatus.Confirmed;
                 await Db.Rentals.AddAsync(editModel);
-                Logger.LogInformation("Creating new rental {RentalId} for customer {CustomerId}", editModel.Id, editModel.CustomerId);
             }
             else
             {
                 Db.Rentals.Update(editModel);
                 var existing = Db.RentalItems.Where(i => i.RentalId == editModel.Id);
                 Db.RentalItems.RemoveRange(existing);
-                Logger.LogInformation("Updating rental {RentalId}", editModel.Id);
             }
 
             foreach (var item in editItems)
@@ -1032,15 +1111,12 @@
             }
 
             await Db.SaveChangesAsync();
-            Logger.LogInformation("Rental {RentalId} saved successfully with {ItemCount} items", editModel.Id, editItems.Count);
             
-            // Pobierz dane potrzebne do umowy
             var customer = await Db.Customers.FindAsync(editModel.CustomerId);
             var productIds = editItems.Select(i => i.ProductId).ToList();
             var productsForContract = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
             var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             
-            // Generuj umowę
             try
             {
                 var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(
@@ -1048,7 +1124,6 @@
                 editModel.ContractUrl = contractUrl;
                 Db.Rentals.Update(editModel);
                 await Db.SaveChangesAsync();
-                Logger.LogInformation("Contract generated for rental {RentalId}: {ContractUrl}", editModel.Id, contractUrl);
                 Snackbar.Add("📄 Umowa została wygenerowana", MudBlazor.Severity.Success);
             }
             catch (Exception contractEx)
@@ -1057,7 +1132,6 @@
                 Snackbar.Add($"⚠️ Wynajem zapisany, ale błąd generowania umowy: {contractEx.Message}", MudBlazor.Severity.Warning);
             }
             
-            // Wyślij email z umową (jeśli klient ma email)
             if (customer != null && !string.IsNullOrWhiteSpace(customer.Email))
             {
                 try
@@ -1067,7 +1141,6 @@
                     editModel.IsEmailSent = true;
                     Db.Rentals.Update(editModel);
                     await Db.SaveChangesAsync();
-                    Logger.LogInformation("Email sent for rental {RentalId} to {Email}", editModel.Id, customer.Email);
                     Snackbar.Add($"📧 Email wysłany do {customer.Email}", MudBlazor.Severity.Success);
                 }
                 catch (Exception emailEx)
@@ -1076,36 +1149,24 @@
                     Snackbar.Add($"⚠️ Błąd wysyłania emaila: {emailEx.Message}", MudBlazor.Severity.Warning);
                 }
             }
-            else
-            {
-                Snackbar.Add("ℹ️ Klient nie ma adresu email - email nie został wysłany", MudBlazor.Severity.Info);
-            }
             
-            // Automatyczne wysyłanie SMS z prośbą o potwierdzenie (jeśli włączone w ustawieniach)
-            // Jeśli SMS wyłączone - status pozostaje "Confirmed", można ręcznie wysłać SMS przyciskiem
-            // Jeśli SMS włączone - automatycznie wysyła i zmienia status na "Pending" (oczekuje na potwierdzenie)
             if (companyInfo?.SmsConfirmationEnabled == true && customer != null && !string.IsNullOrWhiteSpace(customer.PhoneNumber))
             {
                 try
                 {
-                    // Generate confirmation code
                     await SmsConfirmationService.GenerateConfirmationCodeAsync(editModel.Id);
-                    
-                    // Send SMS with contract confirmation request
                     await SmsSender.SendContractConfirmationRequestAsync(
                         customer.PhoneNumber, 
                         customer.FullName ?? "Klient", 
                         editModel.Id,
                         customer.Email);
                     
-                    // Mark SMS as sent and change status to Pending (awaiting SMS confirmation)
                     editModel.IsSmsConfirmationSent = true;
-                    editModel.Status = RentalStatus.Pending; // Oczekuje na potwierdzenie SMS
+                    editModel.Status = RentalStatus.Pending;
                     Db.Rentals.Update(editModel);
                     await Db.SaveChangesAsync();
                     
-                    Logger.LogInformation("SMS confirmation sent for rental {RentalId} to {Phone}", editModel.Id, customer.PhoneNumber);
-                    Snackbar.Add($"📱 SMS z prośbą o potwierdzenie wysłany do {customer.PhoneNumber}. Wynajem oczekuje na potwierdzenie.", MudBlazor.Severity.Info);
+                    Snackbar.Add($"📱 SMS z prośbą o potwierdzenie wysłany do {customer.PhoneNumber}", MudBlazor.Severity.Info);
                 }
                 catch (Exception smsEx)
                 {
@@ -1113,13 +1174,7 @@
                     Snackbar.Add($"⚠️ Błąd wysyłania SMS: {smsEx.Message}", MudBlazor.Severity.Warning);
                 }
             }
-            else if (companyInfo?.SmsConfirmationEnabled != true)
-            {
-                // SMS wyłączone - status pozostaje "Confirmed", nie wymaga potwierdzenia SMS
-                Logger.LogInformation("SMS confirmation disabled for tenant, rental {RentalId} confirmed without SMS", editModel.Id);
-            }
             
-            // Odśwież listę
             rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             dialogOpen = false;
             Snackbar.Add("✅ Wynajem został zapisany!", MudBlazor.Severity.Success);
@@ -1156,13 +1211,11 @@
     {
         var query = rentals.AsEnumerable();
         
-        // Filtr dla konkretnego klienta (z URL)
         if (!string.IsNullOrWhiteSpace(CustomerId) && Guid.TryParse(CustomerId, out var customerGuid))
         {
             query = query.Where(r => r.CustomerId == customerGuid);
         }
         
-        // Filtr wyszukiwania
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
             query = query.Where(r => 
@@ -1171,7 +1224,6 @@
                 (r.Notes?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
         }
         
-        // Filtr statusu
         var statusFilter = new List<RentalStatus>();
         if (cbStarted) statusFilter.Add(RentalStatus.Active);
         if (cbEnded) statusFilter.Add(RentalStatus.Completed);
@@ -1208,7 +1260,6 @@
 
     private bool IsOverdue(Rental rental)
     {
-        // Przeterminowane = aktywne lub potwierdzone, sprzęt wydany, nie zwrócony, termin minął
         return (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
                && rental.IssuedAtUtc.HasValue
                && !rental.ReturnedAtUtc.HasValue
@@ -1221,7 +1272,6 @@
         return (int)Math.Ceiling((DateTime.UtcNow - rental.EndDateUtc).TotalDays);
     }
 
-    // Źródło wypożyczenia
     private string GetSourceIcon(RentalSource source) => source switch
     {
         RentalSource.Online => Icons.Material.Filled.Language,
@@ -1243,7 +1293,6 @@
         _ => "Nieznane"
     };
 
-    // Status wydania/zwrotu sprzętu
     private string GetEquipmentStatusIcon(Rental rental)
     {
         if (rental.ReturnedAtUtc.HasValue)
@@ -1336,12 +1385,10 @@
             
             var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(rental, items, customer, products, companyInfo);
             
-            // Zapisz URL umowy w bazie
             rental.ContractUrl = contractUrl;
             Db.Rentals.Update(rental);
             await Db.SaveChangesAsync();
             
-            // Odśwież listę wynajmów
             rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
             
@@ -1378,10 +1425,8 @@
                 return;
             }
             
-            // Użyj nowej metody która wysyła piękny email z załącznikiem PDF
             await ContractGenerator.SendRentalConfirmationEmailAsync(rental, items, customer, products, companyInfo);
             
-            // Oznacz że email został wysłany
             rental.IsEmailSent = true;
             Db.Rentals.Update(rental);
             await Db.SaveChangesAsync();
@@ -1394,96 +1439,6 @@
         }
     }
 
-    private async Task SendSmsConfirmation(Rental rental)
-    {
-        try
-        {
-            await using var Db = await DbFactory.CreateDbContextAsync();
-            Db.SetTenant(CurrentTenantId());
-            
-            var customer = await Db.Customers.FindAsync(rental.CustomerId);
-            if (customer == null)
-            {
-                Snackbar.Add("Nie znaleziono klienta", MudBlazor.Severity.Error);
-                return;
-            }
-            
-            if (string.IsNullOrWhiteSpace(customer.PhoneNumber))
-            {
-                Snackbar.Add($"Klient {customer.FullName} nie ma numeru telefonu", MudBlazor.Severity.Warning);
-                return;
-            }
-            
-            // Generate confirmation code
-            await SmsConfirmationService.GenerateConfirmationCodeAsync(rental.Id);
-            
-            // Send SMS with contract confirmation request (includes email info)
-            await SmsSender.SendContractConfirmationRequestAsync(
-                customer.PhoneNumber, 
-                customer.FullName ?? "Klient", 
-                rental.Id,
-                customer.Email);
-            
-            // Mark SMS as sent and update status
-            var dbRental = await Db.Rentals.FindAsync(rental.Id);
-            if (dbRental != null)
-            {
-                dbRental.IsSmsConfirmationSent = true;
-                if (dbRental.Status == RentalStatus.Draft)
-                {
-                    dbRental.Status = RentalStatus.Pending;
-                }
-                await Db.SaveChangesAsync();
-            }
-            
-            Snackbar.Add($"📱 SMS z prośbą o potwierdzenie wysłany do {customer.PhoneNumber}", MudBlazor.Severity.Success);
-            
-            // Refresh rentals list
-            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Snackbar.Add($"Błąd podczas wysyłania SMS: {ex.Message}", MudBlazor.Severity.Error);
-        }
-    }
-    
-    // SMS Status helpers
-    private Color GetSmsStatusColor(Rental rental)
-    {
-        if (rental.IsSmsConfirmed) return Color.Success;
-        if (rental.IsSmsConfirmationSent) return Color.Warning;
-        return Color.Default;
-    }
-    
-    private string GetSmsStatusText(Rental rental)
-    {
-        if (rental.IsSmsConfirmed) return "SMS ✓ Potwierdzone";
-        if (rental.IsSmsConfirmationSent) return "SMS wysłany";
-        return "SMS: —";
-    }
-    
-    private Color GetSmsButtonColor(Rental rental)
-    {
-        if (rental.IsSmsConfirmed) return Color.Success;
-        if (rental.IsSmsConfirmationSent) return Color.Warning;
-        return Color.Info;
-    }
-    
-    private Variant GetSmsButtonVariant(Rental rental)
-    {
-        if (rental.IsSmsConfirmed) return Variant.Text;
-        if (rental.IsSmsConfirmationSent) return Variant.Outlined;
-        return Variant.Filled;
-    }
-    
-    private string GetSmsButtonText(Rental rental)
-    {
-        if (rental.IsSmsConfirmed) return "✓ Potwierdzone";
-        if (rental.IsSmsConfirmationSent) return "Wyślij ponownie";
-        return "Wyślij SMS";
-    }
-
     private async Task CompleteRental(Rental rental)
     {
         try
@@ -1491,14 +1446,12 @@
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
             
-            // Update rental status to completed
             rental.Status = RentalStatus.Completed;
             Db.Rentals.Update(rental);
             await Db.SaveChangesAsync();
             
             Snackbar.Add($"Wynajem został zakończony", MudBlazor.Severity.Success);
             
-            // Refresh rentals list
             rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
         }
@@ -1515,17 +1468,14 @@
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
             
-            // Remove rental items first
             var items = await Db.RentalItems.Where(i => i.RentalId == rental.Id).ToListAsync();
             Db.RentalItems.RemoveRange(items);
             
-            // Remove rental
             Db.Rentals.Remove(rental);
             await Db.SaveChangesAsync();
             
             Snackbar.Add($"Wynajem został usunięty", MudBlazor.Severity.Success);
             
-            // Refresh rentals list
             rentals.RemoveAll(r => r.Id == rental.Id);
             StateHasChanged();
         }
@@ -1537,10 +1487,8 @@
 
     private void ExtendRental(Rental rental)
     {
-        // Otwórz dialog edycji z sugerowaną nową datą końcową
         Edit(rental);
         
-        // Ustaw nową datę końcową na tydzień od teraz
         var newEndDate = DateTime.Now.AddDays(7);
         endDate = newEndDate;
         editModel.EndDateUtc = DateTime.SpecifyKind(newEndDate, DateTimeKind.Utc);
@@ -1548,7 +1496,6 @@
         Snackbar.Add("Zmień datę zakończenia aby przedłużyć wynajem", MudBlazor.Severity.Warning);
     }
     
-    // Custom SMS dialog methods
     private void OpenCustomSmsDialog(Rental rental)
     {
         var customer = customersDict.GetValueOrDefault(rental.CustomerId);

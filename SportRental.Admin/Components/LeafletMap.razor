@@ -1,0 +1,102 @@
+@inject IJSRuntime JS
+
+<div id="@MapId" style="height: @Height; width: 100%; border-radius: 8px; z-index: 1;"></div>
+
+@code {
+    [Parameter] public string MapId { get; set; } = "leaflet-map";
+    [Parameter] public string Height { get; set; } = "400px";
+    [Parameter] public double Latitude { get; set; } = 52.0; // Default: Poland center
+    [Parameter] public double Longitude { get; set; } = 19.0;
+    [Parameter] public int Zoom { get; set; } = 6;
+    [Parameter] public bool AllowMarkerDrag { get; set; } = true;
+    [Parameter] public EventCallback<(double Lat, double Lon)> OnLocationChanged { get; set; }
+    [Parameter] public EventCallback<LocationDetails> OnLocationDetailsChanged { get; set; }
+
+    private DotNetObjectReference<LeafletMap>? _objRef;
+    private bool _mapInitialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await InitializeMap();
+        }
+    }
+
+    private async Task InitializeMap()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("leafletInterop.initMap", MapId, Latitude, Longitude, Zoom, AllowMarkerDrag, _objRef);
+            _mapInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing map: {ex.Message}");
+        }
+    }
+
+    public async Task SetMarkerPosition(double lat, double lon)
+    {
+        if (_mapInitialized)
+        {
+            await JS.InvokeVoidAsync("leafletInterop.setMarkerPosition", MapId, lat, lon);
+        }
+    }
+
+    public async Task CenterMap(double lat, double lon, int? zoom = null)
+    {
+        if (_mapInitialized)
+        {
+            await JS.InvokeVoidAsync("leafletInterop.centerMap", MapId, lat, lon, zoom ?? Zoom);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnMarkerDragged(double lat, double lon)
+    {
+        await OnLocationChanged.InvokeAsync((lat, lon));
+    }
+
+    [JSInvokable]
+    public async Task OnLocationWithDetails(double lat, double lon, string? city, string? voivodeship, string? address)
+    {
+        // Call both callbacks for compatibility
+        await OnLocationChanged.InvokeAsync((lat, lon));
+        
+        if (OnLocationDetailsChanged.HasDelegate)
+        {
+            await OnLocationDetailsChanged.InvokeAsync(new LocationDetails
+            {
+                Lat = lat,
+                Lon = lon,
+                City = city,
+                Voivodeship = voivodeship,
+                Address = address
+            });
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_mapInitialized)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("leafletInterop.destroyMap", MapId);
+            }
+            catch { }
+        }
+        _objRef?.Dispose();
+    }
+
+    public class LocationDetails
+    {
+        public double Lat { get; set; }
+        public double Lon { get; set; }
+        public string? City { get; set; }
+        public string? Voivodeship { get; set; }
+        public string? Address { get; set; }
+    }
+}

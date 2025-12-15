@@ -5,79 +5,86 @@
 
 <MudDialog>
     <DialogContent>
-        <MudStack Spacing="3">
-            <MudStack Row="true" Class="mud-align-center mud-justify-space-between">
-                <MudStack Spacing="1">
-                    <MudText Typo="Typo.h6" Style="font-weight:600;">
-                        @(IsNew ? "Nowy klient" : "Edytuj klienta")
+        <MudStack Spacing="2">
+            @* Nagłówek - kompaktowy *@
+            <div class="d-flex align-center justify-space-between flex-wrap gap-1">
+                <div>
+                    <MudText Typo="Typo.h6" Style="font-weight: 600;">
+                        @(IsNew ? "👤 Nowy klient" : "✏️ Edytuj klienta")
                     </MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Default">
+                    <MudText Typo="Typo.caption" Color="Color.Default" Class="d-none d-sm-block">
                         Wypełnij podstawowe dane kontaktowe klienta.
                     </MudText>
-                </MudStack>
-                <MudChip T="string" Color="Color.Primary" Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Badge">
-                    @(IsNew ? "Dodawanie" : "Edycja")
-                </MudChip>
-            </MudStack>
+                </div>
+            </div>
 
             <MudForm @ref="form">
-                <MudGrid Spacing="3">
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="Customer.FullName"
-                                      Label="Imię i nazwisko"
-                                      Required="true"
-                                      RequiredError="Imię i nazwisko jest wymagane"
-                                      Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Person"
-                                      Variant="Variant.Outlined" />
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudTextField @bind-Value="Customer.Email"
-                                      Label="Email"
-                                      InputType="InputType.Email"
-                                      Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Email"
-                                      Variant="Variant.Outlined" />
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <PhoneInput @bind-Value="Customer.PhoneNumber"
-                                    Label="Numer telefonu"
-                                    Variant="Variant.Outlined" />
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudTextField @bind-Value="Customer.DocumentNumber"
-                                      Label="Numer dokumentu"
-                                      Adornment="Adornment.Start"
-                                      AdornmentIcon="@Icons.Material.Filled.Badge"
-                                      Variant="Variant.Outlined" />
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudTextField @bind-Value="Customer.Address"
-                                      Label="Adres"
-                                      Lines="2"
-                                      Variant="Variant.Outlined" />
-                    </MudItem>
-                    <MudItem xs="12">
-                        <MudTextField @bind-Value="Customer.Notes"
-                                      Label="Notatki"
-                                      Lines="3"
-                                      Variant="Variant.Outlined" />
-                    </MudItem>
-                </MudGrid>
+                <MudStack Spacing="2">
+                    <MudTextField @bind-Value="Customer.FullName"
+                                  Label="Imię i nazwisko"
+                                  Required="true"
+                                  RequiredError="Wymagane"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Person"
+                                  Variant="Variant.Outlined"
+                                  Dense="true" />
+                    
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="Customer.Email"
+                                          Label="Email"
+                                          InputType="InputType.Email"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Email"
+                                          Variant="Variant.Outlined"
+                                          Dense="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <PhoneInput @bind-Value="Customer.PhoneNumber"
+                                        Label="Telefon"
+                                        Variant="Variant.Outlined" />
+                        </MudItem>
+                    </MudGrid>
+                    
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="Customer.DocumentNumber"
+                                          Label="Nr dokumentu"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Badge"
+                                          Variant="Variant.Outlined"
+                                          Dense="true" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="Customer.Address"
+                                          Label="Adres"
+                                          Variant="Variant.Outlined"
+                                          Dense="true" />
+                        </MudItem>
+                    </MudGrid>
+                    
+                    <MudTextField @bind-Value="Customer.Notes"
+                                  Label="Notatki"
+                                  Lines="2"
+                                  Variant="Variant.Outlined"
+                                  Dense="true" />
+                </MudStack>
             </MudForm>
         </MudStack>
     </DialogContent>
     <DialogActions>
         <MudButton Variant="Variant.Text"
                    Color="Color.Secondary"
-                   OnClick="Cancel">
+                   OnClick="Cancel"
+                   Size="Size.Small">
             Anuluj
         </MudButton>
         <MudButton Variant="Variant.Filled"
                    Color="Color.Primary"
                    StartIcon="@Icons.Material.Filled.CheckCircle"
-                   OnClick="Submit">
-            @(IsNew ? "Dodaj klienta" : "Zapisz zmiany")
+                   OnClick="Submit"
+                   Size="Size.Small">
+            @(IsNew ? "Dodaj" : "Zapisz")
         </MudButton>
     </DialogActions>
 </MudDialog>

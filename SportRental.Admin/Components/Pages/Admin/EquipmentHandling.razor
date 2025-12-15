@@ -11,9 +11,164 @@
 @inject ISnackbar Snackbar
 @inject ILogger<EquipmentHandling> Logger
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-    <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border-radius: 20px;">
-        <MudStack Row="true" Class="mud-space-between">
+@if (_isMobile)
+{
+    @* ==================== MOBILE UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-2 px-2">
+        @* Nagłówek mobilny *@
+        <MudPaper Class="pa-3 mb-2" Elevation="2" Style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border-radius: 12px;">
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">📦 Obsługa sprzętu</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                               Color="Color.Inherit" 
+                               OnClick="LoadData" />
+            </div>
+        </MudPaper>
+
+        @* Taby mobilne *@
+        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Style="border-radius: 12px;">
+            <MudTabPanel Text="Wydanie" Icon="@Icons.Material.Filled.Output" BadgeData="@_toIssueCount" BadgeColor="Color.Warning">
+                @if (_toIssueRentals == null)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                }
+                else if (!_toIssueRentals.Any())
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true">✓ Brak do wydania</MudAlert>
+                }
+                else
+                {
+                    <MudStack Spacing="1">
+                        @foreach (var rental in _toIssueRentals)
+                        {
+                            <MudCard Elevation="2" Style="border-radius: 10px; border-left: 3px solid #ff9800;">
+                                <MudCardContent Class="pa-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudAvatar Color="Color.Warning" Size="Size.Medium">
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                        </MudAvatar>
+                                        <div class="flex-1 overflow-hidden">
+                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                                                @(rental.Customer?.FullName ?? "—")
+                                            </MudText>
+                                            <div class="d-flex align-center gap-1 flex-wrap">
+                                                <MudText Typo="Typo.caption">@rental.StartDateUtc.ToLocalTime().ToString("dd.MM HH:mm")</MudText>
+                                                <MudText Typo="Typo.caption">•</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Success">@rental.TotalAmount.ToString("0") zł</MudText>
+                                            </div>
+                                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                                                @string.Join(", ", rental.Items.Select(i => $"{i.Product?.Name} x{i.Quantity}").Take(2))
+                                                @if (rental.Items.Count > 2) { <text>...</text> }
+                                            </MudText>
+                                        </div>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Output" 
+                                                       Color="Color.Success" 
+                                                       OnClick="() => IssueEquipment(rental)" />
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </MudStack>
+                }
+            </MudTabPanel>
+            
+            <MudTabPanel Text="Zwrot" Icon="@Icons.Material.Filled.Input" BadgeData="@_toReturnCount" BadgeColor="Color.Error">
+                @if (_toReturnRentals == null)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                }
+                else if (!_toReturnRentals.Any())
+                {
+                    <MudAlert Severity="Severity.Success" Dense="true">✓ Brak do zwrotu</MudAlert>
+                }
+                else
+                {
+                    <MudStack Spacing="1">
+                        @foreach (var rental in _toReturnRentals)
+                        {
+                            var isOverdue = rental.EndDateUtc < DateTime.UtcNow;
+                            <MudCard Elevation="2" Style="@($"border-radius: 10px; border-left: 3px solid {(isOverdue ? "#f44336" : "#4caf50")};")">
+                                <MudCardContent Class="pa-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudAvatar Color="@(isOverdue ? Color.Error : Color.Success)" Size="Size.Medium">
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                        </MudAvatar>
+                                        <div class="flex-1 overflow-hidden">
+                                            <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                                                @(rental.Customer?.FullName ?? "—")
+                                            </MudText>
+                                            <div class="d-flex align-center gap-1 flex-wrap">
+                                                @if (isOverdue)
+                                                {
+                                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">⚠️ Przeterminowane</MudChip>
+                                                }
+                                                else
+                                                {
+                                                    <MudText Typo="Typo.caption">Zwrot do: @rental.EndDateUtc.ToLocalTime().ToString("dd.MM HH:mm")</MudText>
+                                                }
+                                            </div>
+                                            <MudText Typo="Typo.caption" Style="color: var(--mud-palette-text-secondary);">
+                                                @string.Join(", ", rental.Items.Select(i => i.Product?.Name).Take(2))
+                                                @if (rental.Items.Count > 2) { <text>...</text> }
+                                            </MudText>
+                                        </div>
+                                        <MudIconButton Icon="@Icons.Material.Filled.Input" 
+                                                       Color="@(isOverdue ? Color.Error : Color.Primary)" 
+                                                       OnClick="() => ReturnEquipment(rental)" />
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </MudStack>
+                }
+            </MudTabPanel>
+            
+            <MudTabPanel Text="Historia" Icon="@Icons.Material.Filled.History">
+                @if (_historyRentals == null)
+                {
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                }
+                else if (!_historyRentals.Any())
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">Brak historii</MudAlert>
+                }
+                else
+                {
+                    <MudStack Spacing="1">
+                        @foreach (var rental in _historyRentals.Take(20))
+                        {
+                            <MudCard Elevation="1" Style="border-radius: 8px;">
+                                <MudCardContent Class="pa-2">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudAvatar Color="@GetStatusColor(rental.Status)" Size="Size.Small">
+                                            <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                        </MudAvatar>
+                                        <div class="flex-1">
+                                            <MudText Typo="Typo.body2">@(rental.Customer?.FullName ?? "—")</MudText>
+                                            <div class="d-flex align-center gap-1">
+                                                <MudText Typo="Typo.caption">
+                                                    @(rental.ReturnedAtUtc?.ToLocalTime().ToString("dd.MM") ?? rental.IssuedAtUtc?.ToLocalTime().ToString("dd.MM") ?? "—")
+                                                </MudText>
+                                                <MudChip T="string" Color="@GetStatusColor(rental.Status)" Size="Size.Small">
+                                                    @GetStatusText(rental.Status)
+                                                </MudChip>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </MudStack>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    </MudContainer>
+}
+else
+{
+    @* ==================== DESKTOP UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border-radius: 20px;">
             <MudStack Row="true" Class="mud-align-center" Spacing="3">
                 <MudIcon Icon="@Icons.Material.Filled.Inventory" Size="Size.Large" />
                 <div>
@@ -21,259 +176,271 @@
                     <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Wydawanie i przyjmowanie zwrotów sprzętu</MudText>
                 </div>
             </MudStack>
-        </MudStack>
-    </MudPaper>
+        </MudPaper>
 
-    <MudTabs Elevation="4" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Style="border-radius: 16px;">
-        <MudTabPanel Text="Do wydania" Icon="@Icons.Material.Filled.Output" BadgeData="@_toIssueCount" BadgeColor="Color.Warning">
-            <MudText Typo="Typo.h6" Class="mb-4">
-                <MudIcon Icon="@Icons.Material.Filled.Output" Class="mr-2" />
-                Wypożyczenia oczekujące na wydanie sprzętu
-            </MudText>
-            
-            @if (_toIssueRentals == null)
-            {
-                <MudProgressCircular Indeterminate="true" />
-            }
-            else if (!_toIssueRentals.Any())
-            {
-                <MudAlert Severity="Severity.Info" Elevation="0">
-                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
-                    Brak wypożyczeń oczekujących na wydanie sprzętu
-                </MudAlert>
-            }
-            else
-            {
-                <MudStack Spacing="3">
-                    @foreach (var rental in _toIssueRentals)
-                    {
-                        <MudCard Elevation="3" Style="border-radius: 12px; border-left: 4px solid #ff9800;">
-                            <MudCardContent>
-                                <MudGrid Spacing="2" Class="mud-align-center">
-                                    <MudItem xs="12" md="6">
-                                        <MudStack Spacing="1">
-                                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                                <MudAvatar Color="Color.Warning" Size="Size.Medium">
-                                                    <MudIcon Icon="@Icons.Material.Filled.Person" />
-                                                </MudAvatar>
-                                                <div>
-                                                    <MudText Typo="Typo.h6">@(rental.Customer?.FullName ?? "Nieznany klient")</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Default">
-                                                        @(rental.Customer?.Email ?? rental.Customer?.PhoneNumber ?? "")
-                                                    </MudText>
-                                                </div>
-                                            </MudStack>
-                                            
-                                            <MudStack Row="true" Spacing="2" Class="mt-2">
-                                                <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
-                                                         Color="@GetSourceColor(rental.Source)" 
-                                                         Size="Size.Small"
-                                                         Variant="Variant.Filled">
-                                                    @GetSourceText(rental.Source)
-                                                </MudChip>
-                                                <MudChip T="string" Icon="@Icons.Material.Filled.CalendarMonth" 
-                                                         Color="Color.Info" 
-                                                         Size="Size.Small">
-                                                    @rental.StartDateUtc.ToLocalTime().ToString("dd.MM HH:mm") - @rental.EndDateUtc.ToLocalTime().ToString("dd.MM HH:mm")
-                                                </MudChip>
-                                            </MudStack>
-                                            
-                                            <MudText Typo="Typo.body2" Class="mt-2">
-                                                <strong>Produkty:</strong>
-                                                @string.Join(", ", rental.Items.Select(i => $"{i.Product?.Name} x{i.Quantity}"))
-                                            </MudText>
-                                        </MudStack>
-                                    </MudItem>
-                                    
-                                    <MudItem xs="12" md="3">
-                                        <MudStack Spacing="1">
-                                            <MudText Typo="Typo.body2">
-                                                <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" />
-                                                Kwota: <strong>@rental.TotalAmount.ToString("C")</strong>
-                                            </MudText>
-                                            <MudText Typo="Typo.body2">
-                                                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" />
-                                                Depozyt: <strong>@rental.DepositAmount.ToString("C")</strong>
-                                            </MudText>
-                                            <MudText Typo="Typo.body2">
-                                                <MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Small" />
-                                                Płatność: <strong>@rental.PaymentStatus</strong>
-                                            </MudText>
-                                        </MudStack>
-                                    </MudItem>
-                                    
-                                    <MudItem xs="12" md="3">
-                                        <MudButton Variant="Variant.Filled" 
-                                                   Color="Color.Success" 
-                                                   StartIcon="@Icons.Material.Filled.Output"
-                                                   OnClick="() => IssueEquipment(rental)"
-                                                   FullWidth="true"
-                                                   Size="Size.Large"
-                                                   Class="rounded-lg">
-                                            Wydaj sprzęt
-                                        </MudButton>
-                                    </MudItem>
-                                </MudGrid>
-                            </MudCardContent>
-                        </MudCard>
-                    }
-                </MudStack>
-            }
-        </MudTabPanel>
-        
-        <MudTabPanel Text="Do zwrotu" Icon="@Icons.Material.Filled.Input" BadgeData="@_toReturnCount" BadgeColor="Color.Error">
-            <MudText Typo="Typo.h6" Class="mb-4">
-                <MudIcon Icon="@Icons.Material.Filled.Input" Class="mr-2" />
-                Wypożyczenia oczekujące na zwrot sprzętu
-            </MudText>
-            
-            @if (_toReturnRentals == null)
-            {
-                <MudProgressCircular Indeterminate="true" />
-            }
-            else if (!_toReturnRentals.Any())
-            {
-                <MudAlert Severity="Severity.Info" Elevation="0">
-                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
-                    Brak wypożyczeń oczekujących na zwrot
-                </MudAlert>
-            }
-            else
-            {
-                <MudStack Spacing="3">
-                    @foreach (var rental in _toReturnRentals)
-                    {
-                        var isOverdue = rental.EndDateUtc < DateTime.UtcNow;
-                        <MudCard Elevation="3" Style="@($"border-radius: 12px; border-left: 4px solid {(isOverdue ? "#f44336" : "#4caf50")};")">
-                            <MudCardContent>
-                                <MudGrid Spacing="2" Class="mud-align-center">
-                                    <MudItem xs="12" md="5">
-                                        <MudStack Spacing="1">
-                                            <MudStack Row="true" Class="mud-align-center" Spacing="2">
-                                                <MudAvatar Color="@(isOverdue ? Color.Error : Color.Success)" Size="Size.Medium">
-                                                    <MudIcon Icon="@Icons.Material.Filled.Person" />
-                                                </MudAvatar>
-                                                <div>
-                                                    <MudText Typo="Typo.h6">@(rental.Customer?.FullName ?? "Nieznany klient")</MudText>
-                                                    <MudText Typo="Typo.caption" Color="Color.Default">
-                                                        @(rental.Customer?.Email ?? rental.Customer?.PhoneNumber ?? "")
-                                                    </MudText>
-                                                </div>
-                                            </MudStack>
-                                            
-                                            <MudStack Row="true" Spacing="2" Class="mt-2">
-                                                <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
-                                                         Color="@GetSourceColor(rental.Source)" 
-                                                         Size="Size.Small"
-                                                         Variant="Variant.Filled">
-                                                    @GetSourceText(rental.Source)
-                                                </MudChip>
-                                                @if (isOverdue)
-                                                {
-                                                    <MudChip T="string" Icon="@Icons.Material.Filled.Warning" 
-                                                             Color="Color.Error" 
+        <MudTabs Elevation="4" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Style="border-radius: 16px;">
+            <MudTabPanel Text="Do wydania" Icon="@Icons.Material.Filled.Output" BadgeData="@_toIssueCount" BadgeColor="Color.Warning">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Output" Class="mr-2" />
+                    Wypożyczenia oczekujące na wydanie sprzętu
+                </MudText>
+                
+                @if (_toIssueRentals == null)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (!_toIssueRentals.Any())
+                {
+                    <MudAlert Severity="Severity.Info" Elevation="0">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+                        Brak wypożyczeń oczekujących na wydanie sprzętu
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudStack Spacing="3">
+                        @foreach (var rental in _toIssueRentals)
+                        {
+                            <MudCard Elevation="3" Style="border-radius: 12px; border-left: 4px solid #ff9800;">
+                                <MudCardContent>
+                                    <MudGrid Spacing="2" Class="mud-align-center">
+                                        <MudItem xs="12" md="6">
+                                            <MudStack Spacing="1">
+                                                <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                                    <MudAvatar Color="Color.Warning" Size="Size.Medium">
+                                                        <MudIcon Icon="@Icons.Material.Filled.Person" />
+                                                    </MudAvatar>
+                                                    <div>
+                                                        <MudText Typo="Typo.h6">@(rental.Customer?.FullName ?? "Nieznany klient")</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Default">
+                                                            @(rental.Customer?.Email ?? rental.Customer?.PhoneNumber ?? "")
+                                                        </MudText>
+                                                    </div>
+                                                </MudStack>
+                                                
+                                                <MudStack Row="true" Spacing="2" Class="mt-2">
+                                                    <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
+                                                             Color="@GetSourceColor(rental.Source)" 
                                                              Size="Size.Small"
                                                              Variant="Variant.Filled">
-                                                        PRZETERMINOWANE
+                                                        @GetSourceText(rental.Source)
                                                     </MudChip>
-                                                }
+                                                    <MudChip T="string" Icon="@Icons.Material.Filled.CalendarMonth" 
+                                                             Color="Color.Info" 
+                                                             Size="Size.Small">
+                                                        @rental.StartDateUtc.ToLocalTime().ToString("dd.MM HH:mm") - @rental.EndDateUtc.ToLocalTime().ToString("dd.MM HH:mm")
+                                                    </MudChip>
+                                                </MudStack>
+                                                
+                                                <MudText Typo="Typo.body2" Class="mt-2">
+                                                    <strong>Produkty:</strong>
+                                                    @string.Join(", ", rental.Items.Select(i => $"{i.Product?.Name} x{i.Quantity}"))
+                                                </MudText>
                                             </MudStack>
-                                            
-                                            <MudText Typo="Typo.body2" Class="mt-2">
-                                                <strong>Produkty:</strong>
-                                                @string.Join(", ", rental.Items.Select(i => $"{i.Product?.Name} x{i.Quantity}"))
-                                            </MudText>
-                                        </MudStack>
-                                    </MudItem>
-                                    
-                                    <MudItem xs="12" md="4">
-                                        <MudStack Spacing="1">
-                                            <MudText Typo="Typo.body2">
-                                                <MudIcon Icon="@Icons.Material.Filled.Output" Size="Size.Small" />
-                                                Wydano: <strong>@(rental.IssuedAtUtc?.ToLocalTime().ToString("dd.MM HH:mm") ?? "-")</strong>
-                                            </MudText>
-                                            <MudText Typo="Typo.body2">
-                                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
-                                                Termin zwrotu: <strong>@rental.EndDateUtc.ToLocalTime().ToString("dd.MM HH:mm")</strong>
-                                            </MudText>
-                                            <MudText Typo="Typo.body2">
-                                                <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" />
-                                                Depozyt: <strong>@rental.DepositAmount.ToString("C")</strong>
-                                            </MudText>
-                                        </MudStack>
-                                    </MudItem>
-                                    
-                                    <MudItem xs="12" md="3">
-                                        <MudButton Variant="Variant.Filled" 
-                                                   Color="@(isOverdue ? Color.Error : Color.Primary)" 
-                                                   StartIcon="@Icons.Material.Filled.Input"
-                                                   OnClick="() => ReturnEquipment(rental)"
-                                                   FullWidth="true"
-                                                   Size="Size.Large"
-                                                   Class="rounded-lg">
-                                            Przyjmij zwrot
-                                        </MudButton>
-                                    </MudItem>
-                                </MudGrid>
-                            </MudCardContent>
-                        </MudCard>
-                    }
-                </MudStack>
-            }
-        </MudTabPanel>
-        
-        <MudTabPanel Text="Historia" Icon="@Icons.Material.Filled.History">
-            <MudText Typo="Typo.h6" Class="mb-4">
-                <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
-                Historia wydań i zwrotów (ostatnie 30 dni)
-            </MudText>
+                                        </MudItem>
+                                        
+                                        <MudItem xs="12" md="3">
+                                            <MudStack Spacing="1">
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.AttachMoney" Size="Size.Small" />
+                                                    Kwota: <strong>@rental.TotalAmount.ToString("C")</strong>
+                                                </MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" />
+                                                    Depozyt: <strong>@rental.DepositAmount.ToString("C")</strong>
+                                                </MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Payment" Size="Size.Small" />
+                                                    Płatność: <strong>@rental.PaymentStatus</strong>
+                                                </MudText>
+                                            </MudStack>
+                                        </MudItem>
+                                        
+                                        <MudItem xs="12" md="3">
+                                            <MudButton Variant="Variant.Filled" 
+                                                       Color="Color.Success" 
+                                                       StartIcon="@Icons.Material.Filled.Output"
+                                                       OnClick="() => IssueEquipment(rental)"
+                                                       FullWidth="true"
+                                                       Size="Size.Large"
+                                                       Class="rounded-lg">
+                                                Wydaj sprzęt
+                                            </MudButton>
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </MudStack>
+                }
+            </MudTabPanel>
             
-            @if (_historyRentals == null)
-            {
-                <MudProgressCircular Indeterminate="true" />
-            }
-            else if (!_historyRentals.Any())
-            {
-                <MudAlert Severity="Severity.Info" Elevation="0">
-                    Brak historii wydań i zwrotów
-                </MudAlert>
-            }
-            else
-            {
-                <MudTable Items="@_historyRentals" Hover="true" Striped="true" Dense="true" Elevation="2" Style="border-radius: 12px;">
-                    <HeaderContent>
-                        <MudTh>Klient</MudTh>
-                        <MudTh>Źródło</MudTh>
-                        <MudTh>Wydano</MudTh>
-                        <MudTh>Zwrócono</MudTh>
-                        <MudTh>Status</MudTh>
-                        <MudTh>Depozyt zwrócony</MudTh>
-                    </HeaderContent>
-                    <RowTemplate>
-                        <MudTd>@(context.Customer?.FullName ?? "-")</MudTd>
-                        <MudTd>
-                            <MudChip T="string" Icon="@GetSourceIcon(context.Source)" 
-                                     Color="@GetSourceColor(context.Source)" 
-                                     Size="Size.Small">
-                                @GetSourceText(context.Source)
-                            </MudChip>
-                        </MudTd>
-                        <MudTd>@(context.IssuedAtUtc?.ToLocalTime().ToString("dd.MM HH:mm") ?? "-")</MudTd>
-                        <MudTd>@(context.ReturnedAtUtc?.ToLocalTime().ToString("dd.MM HH:mm") ?? "-")</MudTd>
-                        <MudTd>
-                            <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">
-                                @GetStatusText(context.Status)
-                            </MudChip>
-                        </MudTd>
-                        <MudTd>@(context.ReturnDepositRefund?.ToString("C") ?? "-")</MudTd>
-                    </RowTemplate>
-                </MudTable>
-            }
-        </MudTabPanel>
-    </MudTabs>
-</MudContainer>
+            <MudTabPanel Text="Do zwrotu" Icon="@Icons.Material.Filled.Input" BadgeData="@_toReturnCount" BadgeColor="Color.Error">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.Input" Class="mr-2" />
+                    Wypożyczenia oczekujące na zwrot sprzętu
+                </MudText>
+                
+                @if (_toReturnRentals == null)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (!_toReturnRentals.Any())
+                {
+                    <MudAlert Severity="Severity.Info" Elevation="0">
+                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Class="mr-2" />
+                        Brak wypożyczeń oczekujących na zwrot
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudStack Spacing="3">
+                        @foreach (var rental in _toReturnRentals)
+                        {
+                            var isOverdue = rental.EndDateUtc < DateTime.UtcNow;
+                            <MudCard Elevation="3" Style="@($"border-radius: 12px; border-left: 4px solid {(isOverdue ? "#f44336" : "#4caf50")};")">
+                                <MudCardContent>
+                                    <MudGrid Spacing="2" Class="mud-align-center">
+                                        <MudItem xs="12" md="5">
+                                            <MudStack Spacing="1">
+                                                <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                                    <MudAvatar Color="@(isOverdue ? Color.Error : Color.Success)" Size="Size.Medium">
+                                                        <MudIcon Icon="@Icons.Material.Filled.Person" />
+                                                    </MudAvatar>
+                                                    <div>
+                                                        <MudText Typo="Typo.h6">@(rental.Customer?.FullName ?? "Nieznany klient")</MudText>
+                                                        <MudText Typo="Typo.caption" Color="Color.Default">
+                                                            @(rental.Customer?.Email ?? rental.Customer?.PhoneNumber ?? "")
+                                                        </MudText>
+                                                    </div>
+                                                </MudStack>
+                                                
+                                                <MudStack Row="true" Spacing="2" Class="mt-2">
+                                                    <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
+                                                             Color="@GetSourceColor(rental.Source)" 
+                                                             Size="Size.Small"
+                                                             Variant="Variant.Filled">
+                                                        @GetSourceText(rental.Source)
+                                                    </MudChip>
+                                                    @if (isOverdue)
+                                                    {
+                                                        <MudChip T="string" Icon="@Icons.Material.Filled.Warning" 
+                                                                 Color="Color.Error" 
+                                                                 Size="Size.Small"
+                                                                 Variant="Variant.Filled">
+                                                            PRZETERMINOWANE
+                                                        </MudChip>
+                                                    }
+                                                </MudStack>
+                                                
+                                                <MudText Typo="Typo.body2" Class="mt-2">
+                                                    <strong>Produkty:</strong>
+                                                    @string.Join(", ", rental.Items.Select(i => $"{i.Product?.Name} x{i.Quantity}"))
+                                                </MudText>
+                                            </MudStack>
+                                        </MudItem>
+                                        
+                                        <MudItem xs="12" md="4">
+                                            <MudStack Spacing="1">
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Output" Size="Size.Small" />
+                                                    Wydano: <strong>@(rental.IssuedAtUtc?.ToLocalTime().ToString("dd.MM HH:mm") ?? "-")</strong>
+                                                </MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" />
+                                                    Termin zwrotu: <strong>@rental.EndDateUtc.ToLocalTime().ToString("dd.MM HH:mm")</strong>
+                                                </MudText>
+                                                <MudText Typo="Typo.body2">
+                                                    <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" />
+                                                    Depozyt: <strong>@rental.DepositAmount.ToString("C")</strong>
+                                                </MudText>
+                                            </MudStack>
+                                        </MudItem>
+                                        
+                                        <MudItem xs="12" md="3">
+                                            <MudButton Variant="Variant.Filled" 
+                                                       Color="@(isOverdue ? Color.Error : Color.Primary)" 
+                                                       StartIcon="@Icons.Material.Filled.Input"
+                                                       OnClick="() => ReturnEquipment(rental)"
+                                                       FullWidth="true"
+                                                       Size="Size.Large"
+                                                       Class="rounded-lg">
+                                                Przyjmij zwrot
+                                            </MudButton>
+                                        </MudItem>
+                                    </MudGrid>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    </MudStack>
+                }
+            </MudTabPanel>
+            
+            <MudTabPanel Text="Historia" Icon="@Icons.Material.Filled.History">
+                <MudText Typo="Typo.h6" Class="mb-4">
+                    <MudIcon Icon="@Icons.Material.Filled.History" Class="mr-2" />
+                    Historia wydań i zwrotów (ostatnie 30 dni)
+                </MudText>
+                
+                @if (_historyRentals == null)
+                {
+                    <MudProgressCircular Indeterminate="true" />
+                }
+                else if (!_historyRentals.Any())
+                {
+                    <MudAlert Severity="Severity.Info" Elevation="0">
+                        Brak historii wydań i zwrotów
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="@_historyRentals" Hover="true" Striped="true" Dense="true" Elevation="2" Style="border-radius: 12px;">
+                        <HeaderContent>
+                            <MudTh>Klient</MudTh>
+                            <MudTh>Źródło</MudTh>
+                            <MudTh>Wydano</MudTh>
+                            <MudTh>Zwrócono</MudTh>
+                            <MudTh>Status</MudTh>
+                            <MudTh>Depozyt zwrócony</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@(context.Customer?.FullName ?? "-")</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Icon="@GetSourceIcon(context.Source)" 
+                                         Color="@GetSourceColor(context.Source)" 
+                                         Size="Size.Small">
+                                    @GetSourceText(context.Source)
+                                </MudChip>
+                            </MudTd>
+                            <MudTd>@(context.IssuedAtUtc?.ToLocalTime().ToString("dd.MM HH:mm") ?? "-")</MudTd>
+                            <MudTd>@(context.ReturnedAtUtc?.ToLocalTime().ToString("dd.MM HH:mm") ?? "-")</MudTd>
+                            <MudTd>
+                                <MudChip T="string" Color="@GetStatusColor(context.Status)" Size="Size.Small">
+                                    @GetStatusText(context.Status)
+                                </MudChip>
+                            </MudTd>
+                            <MudTd>@(context.ReturnDepositRefund?.ToString("C") ?? "-")</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudTabPanel>
+        </MudTabs>
+    </MudContainer>
+}
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
 @code {
+    // ==================== BREAKPOINT ====================
+    private bool _isMobile = false;
+    
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        _isMobile = breakpoint < Breakpoint.Md;
+        StateHasChanged();
+    }
+
+    // ==================== DATA ====================
     private List<Rental>? _toIssueRentals;
     private List<Rental>? _toReturnRentals;
     private List<Rental>? _historyRentals;
@@ -290,26 +457,22 @@
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         
-        // Pobierz tenant ID z kontekstu użytkownika
-        // TODO: Użyj ITenantProvider
         var tenants = await db.Tenants.ToListAsync();
         _tenantId = tenants.FirstOrDefault()?.Id ?? Guid.Empty;
         
         var now = DateTime.UtcNow;
         
-        // Do wydania: Confirmed + płatność OK + nie wydano jeszcze
         _toIssueRentals = await db.Rentals
             .Include(r => r.Customer)
             .Include(r => r.Items).ThenInclude(i => i.Product)
             .Where(r => r.TenantId == _tenantId)
             .Where(r => r.Status == RentalStatus.Confirmed)
             .Where(r => r.IssuedAtUtc == null)
-            .Where(r => r.StartDateUtc <= now.AddHours(24)) // Tylko te które zaczynają się w ciągu 24h
+            .Where(r => r.StartDateUtc <= now.AddHours(24))
             .OrderBy(r => r.StartDateUtc)
             .ToListAsync();
         _toIssueCount = _toIssueRentals.Count;
         
-        // Do zwrotu: Active + wydano + nie zwrócono
         _toReturnRentals = await db.Rentals
             .Include(r => r.Customer)
             .Include(r => r.Items).ThenInclude(i => i.Product)
@@ -321,7 +484,6 @@
             .ToListAsync();
         _toReturnCount = _toReturnRentals.Count;
         
-        // Historia: ostatnie 30 dni
         var thirtyDaysAgo = now.AddDays(-30);
         _historyRentals = await db.Rentals
             .Include(r => r.Customer)

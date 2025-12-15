@@ -3,11 +3,15 @@
 @using System.ComponentModel.DataAnnotations
 @using System.Text
 @using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using Microsoft.EntityFrameworkCore
 @using SportRental.Infrastructure.Data
 @using SportRental.Infrastructure.Domain
+@using SportRental.Shared.Identity
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
@@ -15,6 +19,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject ILogger<RegisterOwner> Logger
 @inject NavigationManager NavigationManager
+@inject RegistrationFeatureFlags RegistrationFlags
 
 <PageTitle>Rejestracja właściciela - SportRental</PageTitle>
 
@@ -26,7 +31,7 @@
             <p>Rejestracja właściciela wypożyczalni</p>
         </div>
 
-        @if (invitation == null)
+        @if (!RegistrationFlags.AllowOwnerSelfRegistration && invitation == null)
         {
             <div class="error-state">
                 <div class="error-icon">❌</div>
@@ -40,21 +45,24 @@
             <div class="success-state">
                 <div class="success-icon">🎉</div>
                 <h2>Konto utworzone!</h2>
-                <p>Twoja wypożyczalnia <strong>@invitation.TenantName</strong> została utworzona.</p>
+                <p>Twoja wypożyczalnia <strong>@(RegistrationFlags.AllowOwnerSelfRegistration ? Input.TenantName : invitation!.TenantName)</strong> została utworzona.</p>
                 <p>Za chwilę zostaniesz przekierowany do panelu...</p>
                 <a href="/" class="btn-primary">Przejdź do panelu</a>
             </div>
         }
         else
         {
-            <div class="invite-info">
-                <div class="invite-badge">✨ Zaproszenie aktywne</div>
-                @if (!string.IsNullOrEmpty(invitation.TenantName))
-                {
-                    <p>Wypożyczalnia: <strong>@invitation.TenantName</strong></p>
-                }
-                <p class="invite-email">Email: <strong>@invitation.Email</strong></p>
-            </div>
+            @if (!RegistrationFlags.AllowOwnerSelfRegistration)
+            {
+                <div class="invite-info">
+                    <div class="invite-badge">✨ Zaproszenie aktywne</div>
+                    @if (!string.IsNullOrEmpty(invitation?.TenantName))
+                    {
+                        <p>Wypożyczalnia: <strong>@invitation!.TenantName</strong></p>
+                    }
+                    <p class="invite-email">Email: <strong>@invitation!.Email</strong></p>
+                </div>
+            }
 
             <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
                 <DataAnnotationsValidator />
@@ -67,7 +75,7 @@
 
                 <div class="form-group">
                     <label for="email">Email</label>
-                    <InputText id="email" @bind-Value="Input.Email" class="form-input" disabled="true" />
+                    <InputText id="email" @bind-Value="Input.Email" class="form-input" disabled="@(!RegistrationFlags.AllowOwnerSelfRegistration)" />
                 </div>
 
                 <div class="form-row">
@@ -363,6 +371,11 @@
 
     protected override async Task OnInitializedAsync()
     {
+        if (RegistrationFlags.AllowOwnerSelfRegistration)
+        {
+            return;
+        }
+
         if (string.IsNullOrEmpty(Token))
         {
             errorMessage = "Brak tokenu zaproszenia w linku.";
@@ -404,7 +417,7 @@
 
     public async Task RegisterUser()
     {
-        if (invitation == null) return;
+        if (!RegistrationFlags.AllowOwnerSelfRegistration && invitation == null) return;
         
         isSubmitting = true;
         registerError = null;
@@ -412,6 +425,16 @@
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
+
+            if (RegistrationFlags.AllowOwnerSelfRegistration)
+            {
+                if (string.IsNullOrWhiteSpace(Input.Email))
+                {
+                    registerError = "Email jest wymagany.";
+                    return;
+                }
+                Input.Email = Input.Email.Trim().ToLowerInvariant();
+            }
 
             // Create new tenant
             var tenantId = Guid.NewGuid();
@@ -457,15 +480,18 @@
             }
 
             // Add Owner role
-            await UserManager.AddToRoleAsync(user, "Owner");
-            await UserManager.AddToRoleAsync(user, "Client");
+            await UserManager.AddToRoleAsync(user, RoleNames.Owner);
+            await UserManager.AddToRoleAsync(user, RoleNames.Client);
 
             // Mark invitation as used
-            invitation.IsUsed = true;
-            invitation.UsedAtUtc = DateTime.UtcNow;
-            invitation.CreatedTenantId = tenantId;
-            db.TenantInvitations.Update(invitation);
-            await db.SaveChangesAsync();
+            if (!RegistrationFlags.AllowOwnerSelfRegistration)
+            {
+                invitation!.IsUsed = true;
+                invitation.UsedAtUtc = DateTime.UtcNow;
+                invitation.CreatedTenantId = tenantId;
+                db.TenantInvitations.Update(invitation);
+                await db.SaveChangesAsync();
+            }
 
             Logger.LogInformation("New owner registered: {Email}, Tenant: {TenantName}", Input.Email, Input.TenantName);
 

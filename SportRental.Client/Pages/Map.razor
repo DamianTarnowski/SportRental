@@ -1,0 +1,450 @@
+@page "/map"
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@implements IAsyncDisposable
+
+<PageTitle>Mapa wypożyczalni - SportRental</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+    @* Header *@
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 16px;">
+        <MudGrid>
+            <MudItem xs="12" md="8">
+                <MudText Typo="Typo.h4" Style="color: white; font-weight: 700;">🗺️ Mapa wypożyczalni</MudText>
+                <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.85);" Class="mt-1">
+                    Kliknij na mapie aby ustawić swoją lokalizację, a następnie wybierz promień wyszukiwania
+                </MudText>
+            </MudItem>
+            <MudItem xs="12" md="4" Class="d-flex align-center justify-end">
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Surface" 
+                           StartIcon="@Icons.Material.Filled.List"
+                           Href="/products"
+                           Size="Size.Large">
+                    Lista produktów
+                </MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudGrid Spacing="3">
+        @* Sidebar *@
+        <MudItem xs="12" md="4" lg="3">
+            <MudStack Spacing="3">
+                @* Location controls *@
+                <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">📍 Twoja lokalizacja</MudText>
+                    
+                    @if (userLat.HasValue && userLon.HasValue)
+                    {
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                            Lokalizacja ustawiona!
+                        </MudAlert>
+                        
+                        <MudStack Spacing="2">
+                            <MudSelect T="int" 
+                                       Label="Promień wyszukiwania" 
+                                       @bind-Value="selectedRadius" 
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.RadioButtonChecked">
+                                <MudSelectItem Value="0">Pokaż wszystkie</MudSelectItem>
+                                <MudSelectItem Value="5">Do 5 km</MudSelectItem>
+                                <MudSelectItem Value="10">Do 10 km</MudSelectItem>
+                                <MudSelectItem Value="25">Do 25 km</MudSelectItem>
+                                <MudSelectItem Value="50">Do 50 km</MudSelectItem>
+                                <MudSelectItem Value="100">Do 100 km</MudSelectItem>
+                            </MudSelect>
+                            
+                            <MudButtonGroup OverrideStyles="false" Class="d-flex">
+                                <MudButton Variant="Variant.Outlined" 
+                                           Color="Color.Primary" 
+                                           StartIcon="@Icons.Material.Filled.MyLocation"
+                                           OnClick="CenterOnUser"
+                                           Style="flex: 1;">
+                                    Centruj
+                                </MudButton>
+                                <MudButton Variant="Variant.Outlined" 
+                                           Color="Color.Error" 
+                                           StartIcon="@Icons.Material.Filled.Clear"
+                                           OnClick="ClearUserLocation">
+                                    Wyczyść
+                                </MudButton>
+                            </MudButtonGroup>
+                        </MudStack>
+                    }
+                    else
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
+                            <MudText Typo="Typo.body2">Kliknij na mapie lub użyj geolokalizacji</MudText>
+                        </MudAlert>
+                        
+                        <MudButton Variant="Variant.Filled" 
+                                   Color="Color.Primary" 
+                                   FullWidth="true"
+                                   StartIcon="@Icons.Material.Filled.GpsFixed"
+                                   OnClick="RequestGeolocation">
+                            Użyj mojej lokalizacji
+                        </MudButton>
+                    }
+                </MudPaper>
+
+                @* Rental shops list *@
+                <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+                        <MudText Typo="Typo.h6">🏪 Wypożyczalnie</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@filteredLocations.Count</MudChip>
+                    </MudStack>
+                    
+                    @if (isLoading)
+                    {
+                        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+                        <MudText Typo="Typo.body2" Class="mt-2" Color="Color.Secondary">Ładowanie wypożyczalni...</MudText>
+                    }
+                    else if (!filteredLocations.Any())
+                    {
+                        <MudAlert Severity="Severity.Warning" Dense="true">
+                            @if (selectedRadius > 0)
+                            {
+                                <span>Brak wypożyczalni w promieniu @selectedRadius km</span>
+                            }
+                            else
+                            {
+                                <span>Brak dostępnych wypożyczalni</span>
+                            }
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <div style="max-height: 450px; overflow-y: auto;">
+                            @foreach (var loc in filteredLocations)
+                            {
+                                <MudCard Elevation="1" Class="mb-2 pa-3" Style="cursor: pointer; transition: all 0.2s;" @onclick="() => SelectLocation(loc)">
+                                    <MudStack Spacing="1">
+                                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
+                                            <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">@loc.TenantName</MudText>
+                                            @if (loc.Distance.HasValue)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">
+                                                    @FormatDistance(loc.Distance.Value)
+                                                </MudChip>
+                                            }
+                                        </MudStack>
+                                        @if (!string.IsNullOrEmpty(loc.Address))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                📍 @TruncateAddress(loc.Address, 50)
+                                            </MudText>
+                                        }
+                                        @if (!string.IsNullOrEmpty(loc.City) || !string.IsNullOrEmpty(loc.Voivodeship))
+                                        {
+                                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                🏙️ @loc.City@((!string.IsNullOrEmpty(loc.City) && !string.IsNullOrEmpty(loc.Voivodeship)) ? ", " : "")@loc.Voivodeship
+                                            </MudText>
+                                        }
+                                    </MudStack>
+                                </MudCard>
+                            }
+                        </div>
+                    }
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+
+        @* Map *@
+        <MudItem xs="12" md="8" lg="9">
+            <MudPaper Elevation="3" Style="border-radius: 12px; overflow: hidden; position: relative;">
+                <div id="rental-map" style="height: 650px; width: 100%;"></div>
+                
+                @* Map legend *@
+                <div style="position: absolute; bottom: 20px; left: 20px; background: white; padding: 12px 16px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000;">
+                    <MudText Typo="Typo.caption" Style="font-weight: 600; margin-bottom: 8px;">Legenda</MudText>
+                    <MudStack Spacing="1">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 20px; height: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center;">🏪</div>
+                            <MudText Typo="Typo.caption">Wypożyczalnia</MudText>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 16px; height: 16px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); border-radius: 50% 50% 50% 0; transform: rotate(-45deg);"></div>
+                            <MudText Typo="Typo.caption">Twoja lokalizacja</MudText>
+                        </div>
+                    </MudStack>
+                </div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudContainer>
+
+@code {
+    private List<TenantLocation> allLocations = new();
+    private List<TenantLocation> filteredLocations = new();
+    private bool isLoading = true;
+    private int _selectedRadius = 0;
+    private double? userLat;
+    private double? userLon;
+    private DotNetObjectReference<Map>? _objRef;
+    private bool _mapInitialized = false;
+
+    private int selectedRadius
+    {
+        get => _selectedRadius;
+        set
+        {
+            if (_selectedRadius != value)
+            {
+                _selectedRadius = value;
+                ApplyRadiusFilter();
+                _ = UpdateMapDisplay();
+            }
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLocations();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            await InitializeMap();
+        }
+    }
+
+    private async Task LoadLocations()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<List<TenantLocation>>("api/tenants/locations");
+            if (response != null)
+            {
+                allLocations = response.Where(l => l.Lat.HasValue && l.Lon.HasValue && l.Lat != 0 && l.Lon != 0).ToList();
+                filteredLocations = allLocations.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading locations: {ex.Message}");
+            Snackbar.Add($"Błąd ładowania lokalizacji: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task InitializeMap()
+    {
+        try
+        {
+            // Default center: Poland
+            await JS.InvokeVoidAsync("leafletMap.initMap", "rental-map", 52.0, 19.0, 6, _objRef);
+            _mapInitialized = true;
+            
+            // Add shop markers after map is ready
+            await Task.Delay(100); // Small delay to ensure map is ready
+            await UpdateMapDisplay();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Map init error: {ex.Message}");
+        }
+    }
+
+    private async Task UpdateMapDisplay()
+    {
+        if (!_mapInitialized) return;
+
+        try
+        {
+            // Prepare locations for JavaScript
+            var locationsForMap = filteredLocations.Select(l => new
+            {
+                tenantId = l.TenantId.ToString(),
+                tenantName = l.TenantName ?? "Wypożyczalnia",
+                lat = l.Lat,
+                lon = l.Lon,
+                address = l.Address,
+                phoneNumber = l.PhoneNumber,
+                distance = l.Distance.HasValue ? FormatDistance(l.Distance.Value) : null
+            }).ToList();
+
+            await JS.InvokeVoidAsync("leafletMap.addShopMarkers", "rental-map", locationsForMap);
+
+            // Draw radius circle if user location is set and radius is selected
+            if (userLat.HasValue && userLon.HasValue && selectedRadius > 0)
+            {
+                await JS.InvokeVoidAsync("leafletMap.setRadiusCircle", "rental-map", userLat.Value, userLon.Value, selectedRadius);
+            }
+            else
+            {
+                await JS.InvokeVoidAsync("leafletMap.clearRadiusCircle", "rental-map");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating map: {ex.Message}");
+        }
+    }
+
+    private async Task RequestGeolocation()
+    {
+        if (_mapInitialized)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("leafletMap.requestGeolocation", "rental-map");
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add("Nie udało się pobrać lokalizacji", Severity.Warning);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnUserLocationChanged(double lat, double lon)
+    {
+        userLat = lat;
+        userLon = lon;
+        
+        // Calculate distances to all locations
+        foreach (var loc in allLocations)
+        {
+            if (loc.Lat.HasValue && loc.Lon.HasValue)
+            {
+                loc.Distance = CalculateDistance(lat, lon, loc.Lat.Value, loc.Lon.Value);
+            }
+        }
+        
+        // Sort by distance
+        allLocations = allLocations.OrderBy(l => l.Distance ?? double.MaxValue).ToList();
+        
+        ApplyRadiusFilter();
+        await UpdateMapDisplay();
+        
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnGeolocationError(string message)
+    {
+        Snackbar.Add($"Błąd lokalizacji: {message}. Kliknij na mapie aby ustawić lokalizację ręcznie.", Severity.Warning);
+    }
+
+    private void ApplyRadiusFilter()
+    {
+        if (selectedRadius == 0 || !userLat.HasValue || !userLon.HasValue)
+        {
+            filteredLocations = allLocations.ToList();
+        }
+        else
+        {
+            filteredLocations = allLocations
+                .Where(l => l.Distance.HasValue && l.Distance.Value <= selectedRadius)
+                .ToList();
+        }
+    }
+
+    private async Task SelectLocation(TenantLocation loc)
+    {
+        if (loc.Lat.HasValue && loc.Lon.HasValue && _mapInitialized)
+        {
+            await JS.InvokeVoidAsync("leafletMap.centerMap", "rental-map", loc.Lat.Value, loc.Lon.Value, 14);
+        }
+    }
+
+    private async Task CenterOnUser()
+    {
+        if (userLat.HasValue && userLon.HasValue && _mapInitialized)
+        {
+            await JS.InvokeVoidAsync("leafletMap.centerMap", "rental-map", userLat.Value, userLon.Value, 11);
+        }
+    }
+
+    private async Task ClearUserLocation()
+    {
+        userLat = null;
+        userLon = null;
+        _selectedRadius = 0;
+        
+        // Reset distances
+        foreach (var loc in allLocations)
+        {
+            loc.Distance = null;
+        }
+        
+        filteredLocations = allLocations.ToList();
+        
+        if (_mapInitialized)
+        {
+            await JS.InvokeVoidAsync("leafletMap.clearRadiusCircle", "rental-map");
+            await UpdateMapDisplay();
+        }
+        
+        StateHasChanged();
+    }
+
+    private double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
+    {
+        // Haversine formula
+        const double R = 6371; // Earth's radius in km
+        var dLat = ToRad(lat2 - lat1);
+        var dLon = ToRad(lon2 - lon1);
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRad(lat1)) * Math.Cos(ToRad(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return R * c;
+    }
+
+    private double ToRad(double deg) => deg * Math.PI / 180;
+
+    private string FormatDistance(double km)
+    {
+        if (km < 1)
+            return $"{(int)(km * 1000)} m";
+        if (km < 10)
+            return $"{km:F1} km";
+        return $"{km:F0} km";
+    }
+
+    private string TruncateAddress(string? address, int maxLength = 40)
+    {
+        if (string.IsNullOrEmpty(address)) return "";
+        return address.Length > maxLength ? address.Substring(0, maxLength - 3) + "..." : address;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_mapInitialized)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("leafletMap.destroyMap", "rental-map");
+            }
+            catch { }
+        }
+        _objRef?.Dispose();
+    }
+
+    private class TenantLocation
+    {
+        public Guid TenantId { get; set; }
+        public string? TenantName { get; set; }
+        public double? Lat { get; set; }
+        public double? Lon { get; set; }
+        public string? Address { get; set; }
+        public string? City { get; set; }
+        public string? Voivodeship { get; set; }
+        public string? PhoneNumber { get; set; }
+        public string? Email { get; set; }
+        public string? OpeningHours { get; set; }
+        public string? LogoUrl { get; set; }
+        public double? Distance { get; set; }
+    }
+}

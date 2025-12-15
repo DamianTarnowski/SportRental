@@ -95,6 +95,13 @@ namespace SportRental.Infrastructure.Domain
         public double? Lat { get; set; } = 0;
         public double? Lon { get; set; } = 0;
 
+        // Location (auto-filled from reverse geocoding)
+        [MaxLength(100)]
+        public string? City { get; set; }
+
+        [MaxLength(100)]
+        public string? Voivodeship { get; set; }
+
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAtUtc { get; set; }
 

@@ -52,6 +52,13 @@ namespace SportRental.Infrastructure.Domain
         public double? Lat { get; set; } = 0;
         public double? Lon { get; set; } = 0;
         
+        // Location
+        [MaxLength(100)]
+        public string? City { get; set; }
+        
+        [MaxLength(100)]
+        public string? Voivodeship { get; set; }
+        
         public Guid? CategoryId { get; set; }
         public string? UserId { get; set; }
         public bool IsDeleted { get; set; } = false;

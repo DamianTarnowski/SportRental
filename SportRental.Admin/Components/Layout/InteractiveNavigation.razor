@@ -1,0 +1,50 @@
+@rendermode InteractiveServer
+
+@inject SportRental.Admin.Services.UI.ThemeService Theme
+
+<MudAppBar Elevation="1" Color="Color.Primary" Fixed="true">
+    @if (_breakpoint < Breakpoint.Md)
+    {
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" 
+                       Color="Color.Inherit" 
+                       Edge="Edge.Start" 
+                       OnClick="ToggleDrawer" />
+    }
+    <MudText Class="ms-2" Typo="Typo.h6">🎿 SportRental</MudText>
+    <MudSpacer />
+    <ThemeSwitcher />
+</MudAppBar>
+
+<MudDrawer @bind-Open="_drawerOpen" 
+           ClipMode="DrawerClipMode.Always" 
+           Elevation="2"
+           Variant="@(_breakpoint >= Breakpoint.Md ? DrawerVariant.Responsive : DrawerVariant.Temporary)"
+           Breakpoint="Breakpoint.Md"
+           Class="pt-14">
+    <NavMenu />
+</MudDrawer>
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+@code {
+    private bool _drawerOpen = true;
+    private Breakpoint _breakpoint = Breakpoint.Md;
+    
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        _breakpoint = breakpoint;
+
+        // Na mobile drawer zamknięty domyślnie, na desktop otwarty
+        if (_breakpoint < Breakpoint.Md)
+        {
+            _drawerOpen = false;
+        }
+
+        StateHasChanged();
+    }
+}

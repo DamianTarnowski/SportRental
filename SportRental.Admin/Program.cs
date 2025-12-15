@@ -201,6 +201,11 @@ static RemoteFileStorage CreateRemoteFileStorage(IConfiguration cfg, IServicePro
 builder.Services.AddSingleton<ThemeService>();
 builder.Services.AddSingleton<ImageVariantService>();
 
+builder.Services.AddSingleton(new RegistrationFeatureFlags
+{
+    AllowOwnerSelfRegistration = builder.Configuration.GetValue<bool?>("Features:AllowOwnerSelfRegistration") ?? true
+});
+
 // Background services
 builder.Services.AddHostedService<SportRental.Admin.Services.Email.RentalReminderService>();
 builder.Services.AddHostedService<ExpiredHoldsCleaner>();
@@ -320,7 +325,11 @@ else
 // Ujednolicone odpowiedzi ProblemDetails takĹĽe w dev
 app.UseExceptionHandler();
 
-app.UseHttpsRedirection();
+// HTTPS redirect tylko w produkcji - w dev klient WASM łączy się po HTTP
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 // Swagger UI dla API
 app.UseSwagger();
@@ -595,3 +604,8 @@ using (var scope = app.Services.CreateScope())
 app.Run();
 
 public partial class Program { }
+
+public sealed class RegistrationFeatureFlags
+{
+    public bool AllowOwnerSelfRegistration { get; init; }
+}

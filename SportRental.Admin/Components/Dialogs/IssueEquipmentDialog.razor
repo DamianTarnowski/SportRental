@@ -8,57 +8,67 @@
 
 <MudDialog>
     <TitleContent>
-        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+        <div class="d-flex align-center gap-2">
             <MudIcon Icon="@Icons.Material.Filled.Output" Color="Color.Success" />
-            <MudText Typo="Typo.h6">Wydanie sprzętu</MudText>
-        </MudStack>
+            <MudText Typo="Typo.h6">📦 Wydanie sprzętu</MudText>
+        </div>
     </TitleContent>
     <DialogContent>
-        <MudStack Spacing="3">
-            <MudAlert Severity="Severity.Info" Dense="true">
-                <MudText Typo="Typo.body2">
-                    Klient: <strong>@(Rental?.Customer?.FullName ?? "Nieznany")</strong>
-                </MudText>
+        <MudStack Spacing="2">
+            @* Info o kliencie - kompaktowe *@
+            <MudAlert Severity="Severity.Info" Dense="true" Class="pa-2">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                    <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                        @(Rental?.Customer?.FullName ?? "Nieznany klient")
+                    </MudText>
+                </div>
             </MudAlert>
             
-            <MudText Typo="Typo.subtitle2">Produkty do wydania:</MudText>
-            <MudList T="string" Dense="true">
+            @* Lista produktów - kompaktowa *@
+            <MudText Typo="Typo.caption" Style="font-weight: 600;">Produkty:</MudText>
+            <MudStack Spacing="1">
                 @if (Rental?.Items != null)
                 {
                     @foreach (var item in Rental.Items)
                     {
-                        <MudListItem Icon="@Icons.Material.Filled.SportsSoccer">
-                            @(item.Product?.Name ?? "Produkt") × @item.Quantity
-                        </MudListItem>
+                        <div class="d-flex align-center gap-2 pa-1" style="background: var(--mud-palette-background-grey); border-radius: 6px;">
+                            <MudIcon Icon="@Icons.Material.Filled.SportsSoccer" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2">@(item.Product?.Name ?? "Produkt")</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">×@item.Quantity</MudChip>
+                        </div>
                     }
                 }
-            </MudList>
+            </MudStack>
             
-            <MudDivider />
-            
+            @* Uwagi *@
             <MudTextField @bind-Value="_issueNotes" 
-                          Label="Uwagi do wydania (opcjonalne)"
+                          Label="Uwagi (opcjonalne)"
                           Variant="Variant.Outlined"
-                          Lines="3"
-                          Placeholder="Np. stan sprzętu, dodatkowe informacje..." />
+                          Lines="2"
+                          Dense="true"
+                          Placeholder="Stan sprzętu, dodatkowe info..." />
             
+            @* Checkbox potwierdzenia *@
             <MudCheckBox @bind-Value="_confirmChecklist" 
-                         Label="Potwierdzam sprawdzenie stanu sprzętu przed wydaniem"
-                         Color="Color.Success" />
+                         Label="Potwierdzam sprawdzenie stanu sprzętu"
+                         Color="Color.Success"
+                         Dense="true" />
         </MudStack>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Anuluj</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Size="Size.Small">Anuluj</MudButton>
         <MudButton OnClick="Submit" 
                    Variant="Variant.Filled" 
                    Color="Color.Success"
                    Disabled="@(!_confirmChecklist || _isProcessing)"
-                   StartIcon="@Icons.Material.Filled.Check">
+                   StartIcon="@Icons.Material.Filled.Check"
+                   Size="Size.Small">
             @if (_isProcessing)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
             }
-            Potwierdź wydanie
+            Wydaj
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -97,7 +107,6 @@
             rental.IssuedAtUtc = DateTime.UtcNow;
             rental.IssueNotes = _issueNotes;
             rental.Status = RentalStatus.Active;
-            // TODO: Dodać IssuedByEmployeeId z kontekstu użytkownika
             
             await db.SaveChangesAsync();
             
@@ -105,7 +114,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Błąd podczas wydawania sprzętu: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
             MudDialog?.Cancel();
         }
         finally

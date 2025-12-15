@@ -1,36 +1,23 @@
 @inherits LayoutComponentBase
-@implements IDisposable
 
-@inject SportRental.Admin.Services.UI.ThemeService Theme
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject SportRental.Admin.Services.UI.ThemeService Theme
 
-<MudAppBar Elevation="1" Color="Color.Primary">
-    <MudText Class="ms-2" Typo="Typo.h6">🎿 SportRental</MudText>
-    <MudSpacer />
-    <ThemeSwitcher />
-</MudAppBar>
+<InteractiveThemeProvider />
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+<MudLayout>
+    <InteractiveNavigation />
 
-    <main>
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+    <MudMainContent Class="pt-16 px-2 px-sm-4">
+        @Body
+    </MudMainContent>
+</MudLayout>
 
 @code {
     protected override void OnInitialized()
     {
         _ = LoadBranding();
-    }
-    
-    public void Dispose()
-    {
     }
 
     private async Task LoadBranding()
@@ -43,7 +30,6 @@
         if (t != null)
         {
             Theme.SetColors(t.PrimaryColorHex, t.SecondaryColorHex);
-            StateHasChanged();
         }
     }
 }

@@ -1,0 +1,27 @@
+@page "/Account/Logout"
+@using Microsoft.AspNetCore.Identity
+@using SportRental.Infrastructure.Data
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Wylogowanie</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Class="pa-6 text-center" Elevation="4" Style="border-radius: 16px;">
+        <MudIcon Icon="@Icons.Material.Filled.Logout" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
+        <MudText Typo="Typo.h5" Class="mb-2">Wylogowywanie...</MudText>
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SignInManager.SignOutAsync();
+        NavigationManager.NavigateTo(ReturnUrl ?? "/", forceLoad: true);
+    }
+}

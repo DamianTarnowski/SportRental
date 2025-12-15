@@ -3,7 +3,6 @@
 
 @inject SportRental.Admin.Services.UI.ThemeService Theme
 
-<MudThemeProvider @bind-IsDarkMode="_isDarkMode" Theme="@Theme.CurrentTheme" />
 <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
                Color="Color.Inherit" 
                OnClick="ToggleTheme" 
@@ -26,8 +25,7 @@
     
     private void ToggleTheme()
     {
-        _isDarkMode = !_isDarkMode;
-        Theme.IsDarkMode = _isDarkMode;
+        Theme.Toggle();
     }
     
     public void Dispose()
@@ -35,11 +33,3 @@
         Theme.OnChanged -= HandleThemeChanged;
     }
 }
-
-
-
-
-
-
-
-

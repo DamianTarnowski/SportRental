@@ -5,9 +5,165 @@
 @inject ICartService CartService
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>@(product?.Name ?? "Szczegóły produktu") - SportRental</PageTitle>
 
+@* ============================================
+   MOBILE UI - Single column product view
+   ============================================ *@
+@if (_isMobile)
+{
+    <div class="product-mobile">
+        @if (isLoading)
+        {
+            <div class="product-mobile-loading">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                <span>Ładowanie produktu...</span>
+            </div>
+        }
+        else if (notFound || product is null)
+        {
+            <div class="product-mobile-empty">
+                <span class="empty-icon">😔</span>
+                <h3>Produkt nie znaleziony</h3>
+                <p>Produkt mógł zostać usunięty</p>
+                <button class="product-mobile-cta" @onclick="GoBack">← Wróć do katalogu</button>
+            </div>
+        }
+        else
+        {
+            <!-- Mobile Image -->
+            <div class="product-mobile-image">
+                @if (!string.IsNullOrWhiteSpace(product.GetImageUrl(800)))
+                {
+                    <img src="@product.GetImageUrl(800)" alt="@product.Name" />
+                }
+                else
+                {
+                    <div class="product-mobile-image-placeholder">📷</div>
+                }
+                
+                <!-- Back button -->
+                <button class="product-mobile-back" @onclick="GoBack">←</button>
+                
+                <!-- Badges -->
+                <div class="product-mobile-image-badges">
+                    @if (product.IsAvailable && product.AvailableQuantity > 0)
+                    {
+                        <span class="badge-available">✓ Dostępny</span>
+                    }
+                    else
+                    {
+                        <span class="badge-unavailable">✗ Niedostępny</span>
+                    }
+                </div>
+            </div>
+
+            <!-- Mobile Info -->
+            <div class="product-mobile-content">
+                @if (!string.IsNullOrWhiteSpace(product.Category))
+                {
+                    <span class="product-mobile-category">🏷️ @product.Category</span>
+                }
+                
+                <h1 class="product-mobile-title">@product.Name</h1>
+                
+                <div class="product-mobile-prices">
+                    <div class="price-main">
+                        <span class="price-value">@product.DailyPrice.ToString("N0") zł</span>
+                        <span class="price-period">/ dzień</span>
+                    </div>
+                    @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
+                    {
+                        <div class="price-hourly">
+                            <span>@product.HourlyPrice.Value.ToString("N0") zł</span>
+                            <span>/ godz.</span>
+                        </div>
+                    }
+                </div>
+
+                <div class="product-mobile-stock">📦 @product.AvailableQuantity szt. w magazynie</div>
+
+                <!-- Dates selection -->
+                <div class="product-mobile-dates">
+                    <h3>📅 Okres wypożyczenia</h3>
+                    <div class="dates-row">
+                        <div class="date-input">
+                            <label>Od</label>
+                            <input type="date" @bind="startDate" min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                        </div>
+                        <div class="date-input">
+                            <label>Do</label>
+                            <input type="date" @bind="endDate" min="@startDate?.AddDays(1).ToString("yyyy-MM-dd")" />
+                        </div>
+                    </div>
+                    
+                    <div class="rental-type-row">
+                        <select @bind="selectedRentalType" class="rental-type-select">
+                            <option value="0">📅 Wynajem dzienny</option>
+                            @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
+                            {
+                                <option value="1">⏰ Wynajem godzinowy</option>
+                            }
+                        </select>
+                        @if (selectedRentalType == 1)
+                        {
+                            <input type="number" @bind="selectedHours" min="1" max="24" 
+                                   class="hours-input" placeholder="Godz." />
+                        }
+                    </div>
+
+                    @if (startDate.HasValue && endDate.HasValue && endDate > startDate)
+                    {
+                        var days = (endDate.Value - startDate.Value).Days;
+                        decimal totalPrice;
+                        string priceDescription;
+                        
+                        if (selectedRentalType == 1 && product.HourlyPrice.HasValue)
+                        {
+                            totalPrice = product.HourlyPrice.Value * selectedHours;
+                            priceDescription = $"{selectedHours} godz. × {product.HourlyPrice.Value.ToString("N0")} zł";
+                        }
+                        else
+                        {
+                            totalPrice = product.DailyPrice * days;
+                            priceDescription = $"{days} dni × {product.DailyPrice.ToString("N0")} zł";
+                        }
+                        
+                        <div class="price-summary">
+                            <span>@priceDescription</span>
+                            <span class="price-total">= @totalPrice.ToString("N0") zł</span>
+                        </div>
+                    }
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(product.Description))
+                {
+                    <div class="product-mobile-description">
+                        <h3>📝 Opis</h3>
+                        <p>@product.Description</p>
+                    </div>
+                }
+            </div>
+
+            <!-- Mobile Add to Cart - Sticky -->
+            <div class="product-mobile-actions">
+                <button class="product-mobile-add" 
+                        disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
+                        @onclick="AddToCart">
+                    🛒 Dodaj do koszyka
+                </button>
+            </div>
+        }
+    </div>
+}
+@* ============================================
+   DESKTOP UI - Original two-column layout
+   ============================================ *@
+else
+{
 <div class="product-details-container">
     <div class="max-w-6xl mx-auto">
         <!-- Breadcrumbs -->
@@ -100,6 +256,10 @@
 
                     <div class="product-details-price-row">
                         <span class="product-details-price">@product.DailyPrice.ToString("C") / dzień</span>
+                        @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
+                        {
+                            <span class="product-details-price-hourly">@product.HourlyPrice.Value.ToString("C") / godz.</span>
+                        }
                         @if (product.IsAvailable && product.AvailableQuantity > 0)
                         {
                             <span class="product-details-availability available">✅ Dostępny</span>
@@ -130,13 +290,52 @@
                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
                             </div>
                         </div>
+                        
+                        @* Typ wynajmu *@
+                        <div class="mt-4 flex items-center gap-4">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-600 mb-2">🕐 Typ wynajmu</label>
+                                <select @bind="selectedRentalType"
+                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none">
+                                    <option value="0">📅 Dzienny</option>
+                                    @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
+                                    {
+                                        <option value="1">⏰ Godzinowy</option>
+                                    }
+                                </select>
+                            </div>
+                            @if (selectedRentalType == 1)
+                            {
+                                <div class="flex-1">
+                                    <label class="block text-sm font-medium text-gray-600 mb-2">Liczba godzin</label>
+                                    <input type="number" 
+                                           @bind="selectedHours"
+                                           min="1" max="24"
+                                           class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
+                                </div>
+                            }
+                        </div>
+                        
                         @if (startDate.HasValue && endDate.HasValue && endDate > startDate)
                         {
                             var days = (endDate.Value - startDate.Value).Days;
-                            var totalPrice = product.DailyPrice * days;
+                            decimal totalPrice;
+                            string priceDescription;
+                            
+                            if (selectedRentalType == 1 && product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
+                            {
+                                totalPrice = product.HourlyPrice.Value * selectedHours;
+                                priceDescription = $"⏱️ {selectedHours} godz. × {product.HourlyPrice.Value.ToString("C")}";
+                            }
+                            else
+                            {
+                                totalPrice = product.DailyPrice * days;
+                                priceDescription = $"⏱️ {days} dni × {product.DailyPrice.ToString("C")}";
+                            }
+                            
                             <div class="mt-4 p-4 bg-purple-50 rounded-xl">
                                 <div class="flex justify-between items-center">
-                                    <span class="text-gray-600">⏱️ @days dni × @product.DailyPrice.ToString("C")</span>
+                                    <span class="text-gray-600">@priceDescription</span>
                                     <span class="text-xl font-bold text-purple-600">= @totalPrice.ToString("C")</span>
                                 </div>
                             </div>
@@ -195,6 +394,7 @@
         }
     </div>
 </div>
+} @* End of Desktop UI *@
 
 <!-- Lightbox Dialog -->
 <MudDialog @bind-Visible="_showLightbox" Options="@(new DialogOptions { FullWidth = true, MaxWidth = MaxWidth.ExtraExtraLarge, CloseButton = true, CloseOnEscapeKey = true })">
@@ -221,6 +421,12 @@
     private bool notFound;
     private DateTime? startDate;
     private DateTime? endDate;
+    private int selectedRentalType = 0; // 0 = Daily, 1 = Hourly
+    private int selectedHours = 1;
+    
+    // Mobile state
+    private bool _isMobile = false;
+    private DotNetObjectReference<ProductDetails>? _dotNetRef;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -252,6 +458,35 @@
         {
             isLoading = false;
         }
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("setupMobileDetection", _dotNetRef);
+        }
+    }
+    
+    [JSInvokable]
+    public void OnScreenResize(bool isMobile)
+    {
+        if (_isMobile != isMobile)
+        {
+            _isMobile = isMobile;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("removeMobileDetection");
+        }
+        catch { }
+        _dotNetRef?.Dispose();
     }
 
     private async Task LoadRelatedProductsAsync(ProductDto current)
@@ -298,6 +533,12 @@
         }
 
         await CartService.AddToCartAsync(product, 1, startDate, endDate);
+        
+        // Ustaw typ wynajmu i godziny
+        var rentalType = (RentalTypeDto)selectedRentalType;
+        var hours = selectedRentalType == 1 ? selectedHours : (int?)null;
+        await CartService.UpdateRentalTypeAsync(product.Id, rentalType, hours);
+        
         var holdSecured = await CartService.EnsureHoldsAsync();
         if (!holdSecured)
         {

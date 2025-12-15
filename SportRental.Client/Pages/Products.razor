@@ -1,4 +1,4 @@
-﻿@page "/products"
+@page "/products"
 @using MudBlazor
 @using Microsoft.AspNetCore.Components.Web
 @using SportRental.Shared.Models
@@ -7,9 +7,198 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>SportRental - Katalog produktów</PageTitle>
 
+@* ============================================
+   MOBILE UI - Compact cards, bottom sheet filters
+   ============================================ *@
+@if (_isMobile)
+{
+    <div class="products-mobile">
+        <!-- Mobile Header - Sticky -->
+        <div class="products-mobile-header">
+            <div class="products-mobile-title">
+                <span>🎿</span>
+                <h1>Katalog</h1>
+                <span class="products-mobile-count">@totalProductCount</span>
+            </div>
+            <button class="products-mobile-filter-btn" @onclick="ToggleMobileFilters">
+                <span>🔍</span>
+                @if (HasActiveFilters())
+                {
+                    <span class="filter-badge">!</span>
+                }
+            </button>
+        </div>
+
+        <!-- Mobile Quick Stats -->
+        <div class="products-mobile-stats">
+            <div class="mobile-stat">
+                <span>✅</span>
+                <span>@availableProductCount dostępnych</span>
+            </div>
+            <div class="mobile-stat">
+                <span>💰</span>
+                <span>od @minPrice.ToString("N0") zł</span>
+            </div>
+        </div>
+
+        <!-- Mobile Filters Panel -->
+        @if (_showMobileFilters)
+        {
+            <div class="products-mobile-filters">
+                <!-- Search -->
+                <MudTextField @bind-Value="searchText"
+                              Placeholder="Szukaj produktów..."
+                              Variant="Variant.Outlined"
+                              Margin="Margin.Dense"
+                              Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              OnKeyDown="OnSearchKeyDown"
+                              Class="mb-2" />
+
+                <!-- Category chips - horizontal scroll -->
+                <div class="mobile-filter-chips">
+                    <div class="filter-chip-mobile @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")" 
+                         @onclick="@(() => SelectCategory(string.Empty))">
+                        🎯 Wszystkie
+                    </div>
+                    @foreach (var cat in GetCategoryChips())
+                    {
+                        <div class="filter-chip-mobile @(selectedCategory == cat.Name ? "active" : "")"
+                             @onclick="@(() => SelectCategory(cat.Name))">
+                            @cat.Icon @cat.Name
+                        </div>
+                    }
+                </div>
+
+                <!-- Location selects -->
+                <div class="mobile-filter-row">
+                    <MudSelect T="string" Label="Województwo" @bind-Value="SelectedVoivodeship" 
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Clearable="true">
+                        @foreach (var v in voivodeships)
+                        {
+                            <MudSelectItem Value="@v">@v</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="string" Label="Miasto" @bind-Value="SelectedCity" 
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense" Clearable="true">
+                        @foreach (var c in filteredCities)
+                        {
+                            <MudSelectItem Value="@c">@c</MudSelectItem>
+                        }
+                    </MudSelect>
+                </div>
+
+                <!-- Availability & Sort -->
+                <div class="mobile-filter-row">
+                    <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="Dostępne" />
+                    <MudSelect T="string" Label="Sortuj" @bind-Value="SelectedSort" 
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
+                        <MudSelectItem Value="@("featured")">⭐ Polecane</MudSelectItem>
+                        @if (userLat.HasValue && userLon.HasValue)
+                        {
+                            <MudSelectItem Value="@("distance")">📍 Najbliżej</MudSelectItem>
+                        }
+                        <MudSelectItem Value="@("price-asc")">💵 Najtańsze</MudSelectItem>
+                        <MudSelectItem Value="@("price-desc")">💎 Najdroższe</MudSelectItem>
+                    </MudSelect>
+                </div>
+
+                <MudButton Variant="Variant.Text" Color="Color.Secondary" 
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="ClearFilters" Size="Size.Small" FullWidth="true">
+                    Resetuj filtry
+                </MudButton>
+            </div>
+        }
+
+        <!-- Mobile Products Grid -->
+        @if (isLoading)
+        {
+            <div class="products-mobile-loading">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                <span>Ładowanie...</span>
+            </div>
+        }
+        else if (!filteredProducts.Any())
+        {
+            <div class="products-mobile-empty">
+                <span class="empty-icon">🔍</span>
+                <h3>Brak produktów</h3>
+                <p>Zmień kryteria wyszukiwania</p>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ClearFilters">
+                    Resetuj filtry
+                </MudButton>
+            </div>
+        }
+        else
+        {
+            <div class="products-mobile-grid">
+                @foreach (var product in filteredProducts)
+                {
+                    var imageUrl = product.GetImageUrl(300);
+                    var categoryIcon = GetCategoryIcon(product.Category);
+                    
+                    <div class="product-mobile-card" @onclick="@(() => NavigateToProduct(product.Id))">
+                        <div class="product-mobile-image">
+                            @if (!string.IsNullOrEmpty(imageUrl))
+                            {
+                                <img src="@imageUrl" alt="@product.Name" loading="lazy" />
+                            }
+                            else
+                            {
+                                <div class="product-mobile-placeholder">📷</div>
+                            }
+                            @if (product.IsAvailable && product.AvailableQuantity > 0)
+                            {
+                                <span class="product-mobile-badge available">✓</span>
+                            }
+                            else
+                            {
+                                <span class="product-mobile-badge unavailable">✗</span>
+                            }
+                        </div>
+                        <div class="product-mobile-info">
+                            <span class="product-mobile-category">@categoryIcon @product.Category</span>
+                            <h4 class="product-mobile-name">@product.Name</h4>
+                            <div class="product-mobile-price">
+                                <span class="price-main">@product.DailyPrice.ToString("N0") zł</span>
+                                <span class="price-period">/dzień</span>
+                            </div>
+                        </div>
+                        <button class="product-mobile-cart-btn" 
+                                disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
+                                @onclick="@(async () => await AddToCart(product))"
+                                @onclick:stopPropagation="true">
+                            🛒
+                        </button>
+                    </div>
+                }
+            </div>
+
+            @if (totalPages > 1)
+            {
+                <div class="products-mobile-pagination">
+                    <MudPagination Count="totalPages"
+                                   @bind-Selected="CurrentPage"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   BoundaryCount="1"
+                                   MiddleCount="1" />
+                </div>
+            }
+        }
+    </div>
+}
+@* ============================================
+   DESKTOP UI - Original design with full features
+   ============================================ *@
+else
+{
 <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="py-4">
     
     <!-- =============================================
@@ -24,17 +213,17 @@
             <div class="products-stats">
                 <div class="products-stat">
                     <span class="products-stat-icon">📦</span>
-                    <span class="products-stat-value">@products.Count</span>
+                    <span class="products-stat-value">@totalProductCount</span>
                     <span class="products-stat-label">produktów</span>
                 </div>
                 <div class="products-stat">
                     <span class="products-stat-icon">✅</span>
-                    <span class="products-stat-value">@availableCount</span>
+                    <span class="products-stat-value">@availableProductCount</span>
                     <span class="products-stat-label">dostępnych</span>
                 </div>
                 <div class="products-stat">
                     <span class="products-stat-icon">💰</span>
-                    <span class="products-stat-value">@averagePrice.ToString("C")</span>
+                    <span class="products-stat-value">@avgPrice.ToString("C")</span>
                     <span class="products-stat-label">śr. cena</span>
                 </div>
             </div>
@@ -76,10 +265,42 @@
                 </div>
             </MudItem>
             
+            <!-- Location filters -->
+            <MudItem xs="12" md="3">
+                <MudSelect T="string" Label="📍 Województwo" @bind-Value="SelectedVoivodeship" Variant="Variant.Outlined" Clearable="true">
+                    @foreach (var v in voivodeships)
+                    {
+                        <MudSelectItem Value="@v">@v</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            
+            <MudItem xs="12" md="3">
+                <MudSelect T="string" Label="🏙️ Miasto" @bind-Value="SelectedCity" Variant="Variant.Outlined" Clearable="true">
+                    @foreach (var c in filteredCities)
+                    {
+                        <MudSelectItem Value="@c">@c</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            
+            <MudItem xs="12" md="3">
+                <MudSelect T="string" Label="🏪 Wypożyczalnia" @bind-Value="SelectedTenant" Variant="Variant.Outlined" Clearable="true">
+                    @foreach (var t in filteredTenants)
+                    {
+                        <MudSelectItem Value="@t">@t</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            
             <!-- Additional filters row -->
             <MudItem xs="12" md="3">
                 <MudSelect T="string" Label="Sortuj" @bind-Value="SelectedSort" Variant="Variant.Outlined">
                     <MudSelectItem Value="@("featured")">⭐ Polecane</MudSelectItem>
+                    @if (userLat.HasValue && userLon.HasValue)
+                    {
+                        <MudSelectItem Value="@("distance")">📍 Najbliżej mnie</MudSelectItem>
+                    }
                     <MudSelectItem Value="@("price-asc")">💵 Najtańsze</MudSelectItem>
                     <MudSelectItem Value="@("price-desc")">💎 Najdroższe</MudSelectItem>
                     <MudSelectItem Value="@("name")">🔤 Nazwa A-Z</MudSelectItem>
@@ -220,6 +441,13 @@
                         <div class="product-card-price">
                             <span class="product-price-amount">@product.DailyPrice.ToString("N0") zł</span>
                             <span class="product-price-period">/ dzień</span>
+                            @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
+                            {
+                                <div class="product-price-hourly">
+                                    <span class="product-price-amount-small">@product.HourlyPrice.Value.ToString("N0") zł</span>
+                                    <span class="product-price-period-small">/ godz.</span>
+                                </div>
+                            }
                         </div>
                         
                         <div class="product-card-meta">
@@ -257,9 +485,22 @@
         }
     }
 </MudContainer>
+} @* End of Desktop UI *@
 
 @code {
-    private readonly List<ProductDto> products = new();
+    // Mobile detection
+    private bool _isMobile = false;
+    private bool _showMobileFilters = false;
+    private DotNetObjectReference<Products>? _dotNetRef;
+    
+    private void ToggleMobileFilters() => _showMobileFilters = !_showMobileFilters;
+    
+    private bool HasActiveFilters() => 
+        !string.IsNullOrEmpty(searchText) || 
+        !string.IsNullOrEmpty(selectedCategory) || 
+        !string.IsNullOrEmpty(selectedVoivodeship) || 
+        !string.IsNullOrEmpty(selectedCity) ||
+        showOnlyAvailable;
     private List<ProductDto> filteredProducts = new();
     private List<string> categories = new();
     private bool isLoading = true;
@@ -276,9 +517,27 @@
     private decimal maxPrice;
     private decimal selectedMinPrice;
     private decimal selectedMaxPrice;
-
-    private int availableCount => products.Count(p => p.IsAvailable && p.AvailableQuantity > 0);
-    private decimal averagePrice => products.Any() ? Math.Round(products.Average(p => p.DailyPrice), 2) : 0m;
+    
+    // Location filters
+    private List<string> voivodeships = new();
+    private List<string> cities = new();
+    private List<string> filteredCities = new();
+    private string? selectedVoivodeship;
+    private string? selectedCity;
+    
+    // Tenant (wypożyczalnia) filter
+    private List<string> tenants = new();
+    private List<string> filteredTenants = new();
+    private string? selectedTenant;
+    
+    // User location (from localStorage - set on map page)
+    private double? userLat;
+    private double? userLon;
+    
+    // Stats (loaded once at init)
+    private int totalProductCount;
+    private int availableProductCount;
+    private decimal avgPrice;
 
     private record CategoryChip(string Name, string Icon);
 
@@ -303,7 +562,7 @@
     {
         selectedCategory = category;
         currentPage = 1;
-        ApplyFilters();
+        _ = LoadProductsAsync();
     }
 
     private string SelectedSort
@@ -316,7 +575,7 @@
             {
                 selectedSort = newValue;
                 currentPage = 1;
-                ApplyFilters();
+                _ = LoadProductsAsync();
             }
         }
     }
@@ -330,7 +589,7 @@
             {
                 showOnlyAvailable = value;
                 currentPage = 1;
-                ApplyFilters();
+                _ = LoadProductsAsync();
             }
         }
     }
@@ -344,41 +603,137 @@
             if (currentPage != clamped)
             {
                 currentPage = clamped;
-                ApplyFilters();
+                _ = LoadProductsAsync();
             }
         }
     }
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadProducts();
+        await LoadInitialData();
     }
 
-    private async Task LoadProducts()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Setup mobile detection
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("setupMobileDetection", _dotNetRef);
+            
+            await LoadUserLocationFromStorage();
+        }
+    }
+    
+    [JSInvokable]
+    public void OnScreenResize(bool isMobile)
+    {
+        if (_isMobile != isMobile)
+        {
+            _isMobile = isMobile;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("removeMobileDetection");
+        }
+        catch { }
+        _dotNetRef?.Dispose();
+    }
+
+    private async Task LoadUserLocationFromStorage()
+    {
+        try
+        {
+            var location = await JS.InvokeAsync<UserLocationData?>("leafletMap.getUserLocation");
+            if (location != null && location.Lat != 0 && location.Lon != 0)
+            {
+                userLat = location.Lat;
+                userLon = location.Lon;
+                
+                // If user has location, default to distance sorting
+                if (selectedSort == "featured")
+                {
+                    selectedSort = "distance";
+                }
+                
+                await LoadProductsAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading user location: {ex.Message}");
+        }
+    }
+
+    private class UserLocationData
+    {
+        public double Lat { get; set; }
+        public double Lon { get; set; }
+    }
+
+    private async Task LoadInitialData()
     {
         isLoading = true;
         try
         {
-            var loaded = await ApiService.GetProductsAsync(1, 200);
-            products.Clear();
-            products.AddRange(loaded);
-
-            categories = products
+            // Load first page and get filter options from a larger sample
+            var initialResponse = await ApiService.GetProductsPagedAsync(new ProductFilterRequest { Page = 1, PageSize = 200 });
+            
+            // Extract filter options from initial load
+            var allProducts = initialResponse.Items;
+            
+            categories = allProducts
                 .Where(p => !string.IsNullOrWhiteSpace(p.Category))
                 .Select(p => p.Category!)
                 .Distinct()
                 .OrderBy(c => c)
                 .ToList();
 
-            if (products.Any())
+            voivodeships = allProducts
+                .Where(p => !string.IsNullOrWhiteSpace(p.Voivodeship))
+                .Select(p => p.Voivodeship!)
+                .Distinct()
+                .OrderBy(v => v)
+                .ToList();
+
+            cities = allProducts
+                .Where(p => !string.IsNullOrWhiteSpace(p.City))
+                .Select(p => p.City!)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToList();
+            
+            filteredCities = cities;
+
+            tenants = allProducts
+                .Where(p => !string.IsNullOrWhiteSpace(p.TenantName))
+                .Select(p => p.TenantName!)
+                .Distinct()
+                .OrderBy(t => t)
+                .ToList();
+            
+            filteredTenants = tenants;
+
+            if (allProducts.Any())
             {
-                minPrice = products.Min(p => p.DailyPrice);
-                maxPrice = products.Max(p => p.DailyPrice);
+                minPrice = allProducts.Min(p => p.DailyPrice);
+                maxPrice = allProducts.Max(p => p.DailyPrice);
                 selectedMinPrice = minPrice;
                 selectedMaxPrice = maxPrice;
             }
 
-            ApplyFilters();
+            // Store for stats
+            totalProductCount = initialResponse.TotalCount;
+            availableProductCount = allProducts.Count(p => p.IsAvailable && p.AvailableQuantity > 0);
+            avgPrice = allProducts.Any() ? Math.Round(allProducts.Average(p => p.DailyPrice), 2) : 0m;
+
+            // Now load first page with actual filters
+            await LoadProductsAsync();
         }
         catch (Exception ex)
         {
@@ -390,94 +745,127 @@
         }
     }
 
-    private void ApplyFilters()
+    private async Task LoadProductsAsync()
     {
-        IEnumerable<ProductDto> query = products;
-
-        if (!string.IsNullOrWhiteSpace(searchText))
+        isLoading = true;
+        try
         {
-            query = query.Where(p =>
-                p.Name.Contains(searchText, StringComparison.OrdinalIgnoreCase) ||
-                (p.Description?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false));
-        }
+            var filter = new ProductFilterRequest
+            {
+                Page = currentPage,
+                PageSize = PageSize,
+                Search = string.IsNullOrWhiteSpace(searchText) ? null : searchText,
+                Category = string.IsNullOrWhiteSpace(selectedCategory) ? null : selectedCategory,
+                City = string.IsNullOrWhiteSpace(selectedCity) ? null : selectedCity,
+                Voivodeship = string.IsNullOrWhiteSpace(selectedVoivodeship) ? null : selectedVoivodeship,
+                Tenant = string.IsNullOrWhiteSpace(selectedTenant) ? null : selectedTenant,
+                MinPrice = selectedMinPrice > minPrice ? selectedMinPrice : null,
+                MaxPrice = selectedMaxPrice < maxPrice ? selectedMaxPrice : null,
+                Available = showOnlyAvailable ? true : null,
+                Sort = selectedSort,
+                UserLat = userLat,
+                UserLon = userLon
+            };
 
-        if (!string.IsNullOrWhiteSpace(selectedCategory))
+            var response = await ApiService.GetProductsPagedAsync(filter);
+            
+            filteredProducts = response.Items;
+            totalPages = response.TotalPages > 0 ? response.TotalPages : 1;
+            currentPage = Math.Clamp(response.Page, 1, totalPages);
+        }
+        catch (Exception ex)
         {
-            query = query.Where(p => string.Equals(p.Category, selectedCategory, StringComparison.OrdinalIgnoreCase));
+            Snackbar.Add($"Błąd ładowania: {ex.Message}", Severity.Error);
         }
-
-        if (ShowOnlyAvailable)
+        finally
         {
-            query = query.Where(p => p.IsAvailable && p.AvailableQuantity > 0);
+            isLoading = false;
+            StateHasChanged();
         }
-
-        if (products.Any())
-        {
-            var min = Math.Min(selectedMinPrice, selectedMaxPrice);
-            var max = Math.Max(selectedMinPrice, selectedMaxPrice);
-            query = query.Where(p => p.DailyPrice >= min && p.DailyPrice <= max);
-        }
-
-        query = SortProducts(query);
-
-        var list = query.ToList();
-        totalPages = list.Count == 0 ? 1 : (int)Math.Ceiling(list.Count / (double)PageSize);
-        currentPage = Math.Clamp(currentPage, 1, totalPages);
-        filteredProducts = list
-            .Skip((currentPage - 1) * PageSize)
-            .Take(PageSize)
-            .ToList();
     }
-
-    private IEnumerable<ProductDto> SortProducts(IEnumerable<ProductDto> source) => SelectedSort switch
-    {
-        "price-asc" => source.OrderBy(p => p.DailyPrice),
-        "price-desc" => source.OrderByDescending(p => p.DailyPrice),
-        "name" => source.OrderBy(p => p.Name),
-        _ => source.OrderByDescending(p => p.IsAvailable).ThenBy(p => p.Name)
-    };
 
     private void SearchProducts()
     {
         currentPage = 1;
-        ApplyFilters();
+        _ = LoadProductsAsync();
     }
 
     private void ClearFilters()
     {
         searchText = string.Empty;
         selectedCategory = string.Empty;
-        SelectedSort = "featured";
-        ShowOnlyAvailable = false;
+        selectedVoivodeship = null;
+        selectedCity = null;
+        selectedTenant = null;
+        filteredCities = cities;
+        filteredTenants = tenants;
+        selectedSort = "featured";
+        showOnlyAvailable = false;
         currentPage = 1;
+        selectedMinPrice = minPrice;
+        selectedMaxPrice = maxPrice;
+        _ = LoadProductsAsync();
+    }
 
-        if (products.Any())
+    private string? SelectedVoivodeship
+    {
+        get => selectedVoivodeship;
+        set
         {
-            selectedMinPrice = minPrice;
-            selectedMaxPrice = maxPrice;
+            if (selectedVoivodeship != value)
+            {
+                selectedVoivodeship = value;
+                // Clear city if voivodeship changed
+                if (!string.IsNullOrWhiteSpace(selectedCity))
+                {
+                    selectedCity = null;
+                }
+                currentPage = 1;
+                _ = LoadProductsAsync();
+            }
         }
+    }
 
-        ApplyFilters();
+    private string? SelectedCity
+    {
+        get => selectedCity;
+        set
+        {
+            if (selectedCity != value)
+            {
+                selectedCity = value;
+                currentPage = 1;
+                _ = LoadProductsAsync();
+            }
+        }
+    }
+
+    private string? SelectedTenant
+    {
+        get => selectedTenant;
+        set
+        {
+            if (selectedTenant != value)
+            {
+                selectedTenant = value;
+                currentPage = 1;
+                _ = LoadProductsAsync();
+            }
+        }
     }
 
     private void OnMinPriceChanged(decimal value)
     {
-        selectedMinPrice = ClampPrice(value);
+        selectedMinPrice = Math.Clamp(value, minPrice, maxPrice);
         currentPage = 1;
-        ApplyFilters();
+        _ = LoadProductsAsync();
     }
 
     private void OnMaxPriceChanged(decimal value)
     {
-        selectedMaxPrice = ClampPrice(value);
+        selectedMaxPrice = Math.Clamp(value, minPrice, maxPrice);
         currentPage = 1;
-        ApplyFilters();
-    }
-
-    private decimal ClampPrice(decimal value)
-    {
-        if (!products.Any()) return value;
-        return Math.Clamp(value, minPrice, maxPrice);
+        _ = LoadProductsAsync();
     }
 
     private async Task OnSearchKeyDown(KeyboardEventArgs args)

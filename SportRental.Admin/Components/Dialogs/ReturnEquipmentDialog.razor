@@ -8,89 +8,117 @@
 
 <MudDialog>
     <TitleContent>
-        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+        <div class="d-flex align-center gap-2">
             <MudIcon Icon="@Icons.Material.Filled.Input" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">Przyjęcie zwrotu sprzętu</MudText>
-        </MudStack>
+            <MudText Typo="Typo.h6">📥 Przyjęcie zwrotu</MudText>
+        </div>
     </TitleContent>
     <DialogContent>
-        <MudStack Spacing="3">
-            <MudAlert Severity="Severity.Info" Dense="true">
-                <MudText Typo="Typo.body2">
-                    Klient: <strong>@(Rental?.Customer?.FullName ?? "Nieznany")</strong>
-                </MudText>
+        <MudStack Spacing="2">
+            @* Info o kliencie *@
+            <MudAlert Severity="Severity.Info" Dense="true" Class="pa-2">
+                <div class="d-flex align-center gap-2">
+                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                    <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                        @(Rental?.Customer?.FullName ?? "Nieznany klient")
+                    </MudText>
+                </div>
             </MudAlert>
             
-            <MudText Typo="Typo.subtitle2">Produkty do zwrotu:</MudText>
-            <MudList T="string" Dense="true">
+            @* Lista produktów - kompaktowa *@
+            <MudText Typo="Typo.caption" Style="font-weight: 600;">Produkty:</MudText>
+            <MudStack Spacing="1">
                 @if (Rental?.Items != null)
                 {
                     @foreach (var item in Rental.Items)
                     {
-                        <MudListItem Icon="@Icons.Material.Filled.SportsSoccer">
-                            @(item.Product?.Name ?? "Produkt") × @item.Quantity
-                        </MudListItem>
+                        <div class="d-flex align-center gap-2 pa-1" style="background: var(--mud-palette-background-grey); border-radius: 6px;">
+                            <MudIcon Icon="@Icons.Material.Filled.SportsSoccer" Size="Size.Small" Color="Color.Primary" />
+                            <MudText Typo="Typo.body2">@(item.Product?.Name ?? "Produkt")</MudText>
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary">×@item.Quantity</MudChip>
+                        </div>
                     }
                 }
-            </MudList>
+            </MudStack>
             
-            <MudDivider />
-            
-            <MudText Typo="Typo.subtitle2">Rozliczenie depozytu</MudText>
-            
-            <MudAlert Severity="Severity.Warning" Dense="true">
-                Depozyt pobrany: <strong>@(Rental?.DepositAmount.ToString("C") ?? "0 zł")</strong>
+            @* Depozyt *@
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="pa-2">
+                <div class="d-flex align-center justify-space-between">
+                    <MudText Typo="Typo.body2">Depozyt pobrany:</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@(Rental?.DepositAmount.ToString("0.00") ?? "0") zł</MudText>
+                </div>
             </MudAlert>
             
-            <MudNumericField @bind-Value="_depositRefund" 
-                             Label="Kwota depozytu do zwrotu"
-                             Variant="Variant.Outlined"
-                             Adornment="Adornment.End"
-                             AdornmentText="zł"
-                             Min="0"
-                             Max="@(Rental?.DepositAmount ?? 0)" />
+            <MudGrid Spacing="2">
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_depositRefund" 
+                                     Label="Do zwrotu"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.End"
+                                     AdornmentText="zł"
+                                     Min="0"
+                                     Max="@(Rental?.DepositAmount ?? 0)"
+                                     Dense="true" />
+                </MudItem>
+                <MudItem xs="6">
+                    <MudNumericField @bind-Value="_damageCharge" 
+                                     Label="Za uszkodzenia"
+                                     Variant="Variant.Outlined"
+                                     Adornment="Adornment.End"
+                                     AdornmentText="zł"
+                                     Min="0"
+                                     Dense="true" />
+                </MudItem>
+            </MudGrid>
             
-            <MudNumericField @bind-Value="_damageCharge" 
-                             Label="Opłata za uszkodzenia (opcjonalne)"
-                             Variant="Variant.Outlined"
-                             Adornment="Adornment.End"
-                             AdornmentText="zł"
-                             Min="0" />
+            @* Stan sprzętu *@
+            <MudText Typo="Typo.caption" Style="font-weight: 600;">Stan sprzętu:</MudText>
+            <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                <MudChip T="string" 
+                         Color="@(_equipmentCondition == "good" ? Color.Success : Color.Default)" 
+                         Variant="@(_equipmentCondition == "good" ? Variant.Filled : Variant.Outlined)"
+                         Size="Size.Small"
+                         OnClick="SetConditionGood">
+                    ✅ Dobry
+                </MudChip>
+                <MudChip T="string" 
+                         Color="@(_equipmentCondition == "minor" ? Color.Warning : Color.Default)" 
+                         Variant="@(_equipmentCondition == "minor" ? Variant.Filled : Variant.Outlined)"
+                         Size="Size.Small"
+                         OnClick="SetConditionMinor">
+                    ⚠️ Drobne
+                </MudChip>
+                <MudChip T="string" 
+                         Color="@(_equipmentCondition == "damaged" ? Color.Error : Color.Default)" 
+                         Variant="@(_equipmentCondition == "damaged" ? Variant.Filled : Variant.Outlined)"
+                         Size="Size.Small"
+                         OnClick="SetConditionDamaged">
+                    ❌ Uszkodzony
+                </MudChip>
+            </MudStack>
             
+            @* Uwagi *@
             <MudTextField @bind-Value="_returnNotes" 
-                          Label="Uwagi do zwrotu (opcjonalne)"
+                          Label="Uwagi (opcjonalne)"
                           Variant="Variant.Outlined"
-                          Lines="3"
-                          Placeholder="Np. stan sprzętu po zwrocie, uszkodzenia..." />
-            
-            <MudRadioGroup @bind-Value="_equipmentCondition">
-                <MudRadio Value="@("good")" Color="Color.Success">
-                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Class="mr-1" />
-                    Sprzęt w dobrym stanie
-                </MudRadio>
-                <MudRadio Value="@("minor")" Color="Color.Warning">
-                    <MudIcon Icon="@Icons.Material.Filled.Warning" Color="Color.Warning" Class="mr-1" />
-                    Drobne uszkodzenia
-                </MudRadio>
-                <MudRadio Value="@("damaged")" Color="Color.Error">
-                    <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Class="mr-1" />
-                    Poważne uszkodzenia
-                </MudRadio>
-            </MudRadioGroup>
+                          Lines="2"
+                          Dense="true"
+                          Placeholder="Stan sprzętu, uszkodzenia..." />
         </MudStack>
     </DialogContent>
     <DialogActions>
-        <MudButton OnClick="Cancel" Variant="Variant.Text">Anuluj</MudButton>
+        <MudButton OnClick="Cancel" Variant="Variant.Text" Size="Size.Small">Anuluj</MudButton>
         <MudButton OnClick="Submit" 
                    Variant="Variant.Filled" 
                    Color="Color.Primary"
                    Disabled="@(string.IsNullOrEmpty(_equipmentCondition) || _isProcessing)"
-                   StartIcon="@Icons.Material.Filled.Check">
+                   StartIcon="@Icons.Material.Filled.Check"
+                   Size="Size.Small">
             @if (_isProcessing)
             {
-                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
             }
-            Potwierdź zwrot
+            Potwierdź
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -110,11 +138,14 @@
 
     protected override void OnParametersSet()
     {
-        // Domyślnie zwracamy cały depozyt
         _depositRefund = Rental?.DepositAmount ?? 0;
     }
 
     private void Cancel() => MudDialog?.Cancel();
+    
+    private void SetConditionGood() => _equipmentCondition = "good";
+    private void SetConditionMinor() => _equipmentCondition = "minor";
+    private void SetConditionDamaged() => _equipmentCondition = "damaged";
 
     private async Task Submit()
     {
@@ -140,7 +171,6 @@
             rental.DamageCharge = _damageCharge > 0 ? _damageCharge : null;
             rental.Status = RentalStatus.Completed;
             
-            // Dodaj informację o stanie sprzętu do notatek
             var conditionText = _equipmentCondition switch
             {
                 "good" => "Stan: dobry",
@@ -156,15 +186,13 @@
                     : $"{conditionText}. {rental.ReturnNotes}";
             }
             
-            // TODO: Dodać ReturnedByEmployeeId z kontekstu użytkownika
-            
             await db.SaveChangesAsync();
             
             MudDialog?.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Błąd podczas przyjmowania zwrotu: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
             MudDialog?.Cancel();
         }
         finally

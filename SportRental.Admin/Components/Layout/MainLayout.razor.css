@@ -1,77 +1,4 @@
-.page {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    padding-top: 64px; /* Wysokość MudAppBar */
-}
-
-main {
-    flex: 1;
-}
-
-.sidebar {
-    background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
-}
-
-.top-row {
-    display: none;
-}
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
-        text-decoration: none;
-    }
-
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
-
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-@media (max-width: 640.98px) {
-    .top-row {
-        justify-content: space-between;
-    }
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
-    }
-}
-
-@media (min-width: 641px) {
-    .page {
-        flex-direction: row;
-        padding-top: 64px; /* Wysokość MudAppBar */
-    }
-
-    .sidebar {
-        width: 250px;
-        height: calc(100vh - 64px);
-        position: sticky;
-        top: 64px;
-    }
-
-    .top-row {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-
-    .top-row.auth ::deep a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
-    }
-
-    .top-row, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
-    }
-}
+/* MudBlazor handles layout - minimal custom styles needed */
 
 #blazor-error-ui {
     color-scheme: light only;
@@ -93,6 +20,7 @@ main {
         right: 0.75rem;
         top: 0.5rem;
     }
+
 
 
 

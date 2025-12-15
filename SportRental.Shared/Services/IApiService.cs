@@ -10,6 +10,7 @@ public interface IApiService
 
     // Produkty
     Task<List<ProductDto>> GetProductsAsync(int page = 1, int pageSize = 50);
+    Task<ProductsPagedResponse> GetProductsPagedAsync(ProductFilterRequest filter);
     Task<ProductDto?> GetProductAsync(Guid id);
 
     // Klienci
