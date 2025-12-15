@@ -7,6 +7,8 @@
 @inject MudBlazor.ISnackbar Snackbar
 @inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
 @inject IDialogService DialogService
+@inject SportRental.Admin.Services.QrCode.IQrCodeGenerator QrCodeGenerator
+@inject IJSRuntime JS
 @if (_isMobile)
 {
     @* ==================== MOBILE UI ==================== *@
@@ -93,7 +95,7 @@
                                     </div>
                                 </div>
                                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
-                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => Edit(product)">Edytuj</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="async () => await Edit(product)">Edytuj</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.QrCode2" OnClick="() => ShowProductQr(product)">Kod QR</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="() => Delete(product)">Usuń</MudMenuItem>
                                     @if (product.IsActive)
@@ -281,8 +283,8 @@ else
                                 <MudCardActions Class="pa-3 pt-0">
                                     <MudStack Spacing="1" Class="w-100">
                                         <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" FullWidth="true">
-                                            <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                                       OnClick="() => Edit(product)"
+                                            <MudButton StartIcon="@Icons.Material.Filled.Edit"
+                                                       OnClick="async () => await Edit(product)"
                                                        Size="Size.Small">
                                                 Edytuj
                                             </MudButton>
@@ -358,8 +360,8 @@ else
                                     </MudItem>
                                     <MudItem xs="12" md="4">
                                         <MudStack Row="true" Spacing="1" Class="mud-justify-end">
-                                            <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                                       OnClick="() => Edit(product)"
+                                            <MudButton StartIcon="@Icons.Material.Filled.Edit"
+                                                       OnClick="async () => await Edit(product)"
                                                        Color="Color.Primary"
                                                        Size="Size.Small">
                                                 Edytuj
@@ -595,6 +597,68 @@ else
                                   OnBase64ImageReady="OnImageReadyCropped" />
                 </MudStack>
             </MudPaper>
+
+            @* SEKCJA: KOD QR *@
+            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);">
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.QrCode2" Color="Color.Secondary" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Kod QR produktu</MudText>
+                    </MudStack>
+                    
+                    @if (model.Id == Guid.Empty)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="rounded-lg">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-2" />
+                            Kod QR zostanie automatycznie wygenerowany po zapisaniu produktu.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center" Class="flex-wrap">
+                            @* Obrazek QR *@
+                            <MudPaper Elevation="2" Class="pa-3" Style="border-radius: 12px; background: white;">
+                                @if (!string.IsNullOrEmpty(_currentProductQrCode))
+                                {
+                                    <img src="@_currentProductQrCode" alt="QR Code" style="width: 150px; height: 150px;" />
+                                }
+                                else
+                                {
+                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="150px" Height="150px" />
+                                }
+                            </MudPaper>
+                            
+                            @* Info i akcje *@
+                            <MudStack Spacing="2" Style="flex: 1; min-width: 200px;">
+                                <MudText Typo="Typo.body2">
+                                    <strong>ID produktu:</strong><br/>
+                                    <code style="font-size: 0.75rem; word-break: break-all;">@model.Id</code>
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Zeskanuj kod QR telefonem aby szybko znaleźć ten produkt w systemie.
+                                </MudText>
+                                
+                                <MudStack Row="true" Spacing="2" Class="mt-2 flex-wrap">
+                                    <MudButton Variant="Variant.Outlined" 
+                                               Color="Color.Primary" 
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Download"
+                                               OnClick="DownloadProductQr">
+                                        Pobierz PNG
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" 
+                                               Color="Color.Secondary" 
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Print"
+                                               OnClick="() => ShowProductQr(model)">
+                                        Drukuj etykietę
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </MudStack>
+                    }
+                </MudStack>
+            </MudPaper>
         </MudStack>
     </DialogContent>
     <DialogActions>
@@ -644,6 +708,7 @@ else
     private readonly DialogOptions productDialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
     private Product model = new();
     private string? _selectedImageName;
+    private string? _currentProductQrCode;
 
     private IEnumerable<Product> FilteredProducts()
     {
@@ -698,10 +763,11 @@ else
     private void CreateNew()
     {
         model = new Product { Id = Guid.Empty, TenantId = CurrentTenantId(), IsActive = true };
+        _currentProductQrCode = null;
         dialogOpen = true;
     }
 
-    private void Edit(Product p)
+    private async Task Edit(Product p)
     {
         model = new Product
         {
@@ -717,7 +783,30 @@ else
             AvailableQuantity = p.AvailableQuantity,
             Description = p.Description
         };
+        
+        // Generate QR code for existing product
+        await GenerateProductQrCode(p.Id);
+        
         dialogOpen = true;
+    }
+    
+    private async Task GenerateProductQrCode(Guid productId)
+    {
+        var qrData = QrCodeGenerator.GenerateProductQrCodeData(productId, model.Name, model.Sku ?? "");
+        _currentProductQrCode = await QrCodeGenerator.GenerateQrCodeAsync(qrData, 300);
+    }
+    
+    private async Task DownloadProductQr()
+    {
+        if (model.Id == Guid.Empty) return;
+        
+        var qrData = QrCodeGenerator.GenerateProductQrCodeData(model.Id, model.Name, model.Sku ?? "");
+        var qrBytes = await QrCodeGenerator.GenerateQrCodeBytesAsync(qrData, 400);
+        var base64 = Convert.ToBase64String(qrBytes);
+        var fileName = $"QR-{model.Sku ?? model.Id.ToString()}.png";
+        
+        await JS.InvokeVoidAsync("downloadFile", fileName, "image/png", base64);
+        Snackbar.Add($"Pobrano kod QR: {fileName}", Severity.Success);
     }
 
     private async Task Save()
