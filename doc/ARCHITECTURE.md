@@ -161,6 +161,67 @@ flowchart LR
 - **Stripe Checkout Sessions** - pełna integracja płatności z depozytami
 - **Visual Studio multi-project launch** - profil "Admin + Client" uruchamia oba projekty
 
+## 📱 Responsywne UI (Mobile-First)
+
+### Dual UI Strategy
+Projekt wykorzystuje strategię **dual UI** - osobne widoki dla urządzeń mobilnych (<768px) i desktopowych:
+
+```
+@if (_isMobile)
+{
+    <!-- Mobile UI - kompaktowe karty, sticky headers -->
+}
+else
+{
+    <!-- Desktop UI - pełne tabele, side panels -->
+}
+```
+
+### Admin Panel (SportRental.Admin)
+- **Dashboard** - kompaktowe statystyki na mobile
+- **Products** - karty produktów zamiast tabeli
+- **Rentals** - karty wypożyczeń z akcjami swipe
+- **Customers** - kompaktowa lista klientów
+- **Schedule** - uproszczony kalendarz
+- **Dialogi** - pełnoekranowe na mobile
+- **Dark Mode** - ThemeSwitcher z persystencją
+
+### Client WASM (SportRental.Client)
+- **Products** - siatka 2-kolumnowa, slidable filters
+- **ProductDetails** - pełnoekranowe zdjęcie, sticky "Dodaj do koszyka"
+- **Cart** - kompaktowe pozycje, sticky summary
+- **Checkout** - formularz krokowy, sticky payment
+- **MyRentals** - kolorowe karty statusów
+
+### Mobile Detection (JS Interop)
+Plik `wwwroot/js/mobile-detection.js` wykrywa szerokość ekranu i powiadamia komponenty Blazor:
+
+```javascript
+window.setupMobileDetection = function(dotNetRef) {
+    // Nasłuchuje na zmiany rozmiaru i wywołuje OnScreenResize
+    dotNetRef.invokeMethodAsync('OnScreenResize', isMobile);
+};
+```
+
+Komponenty implementują:
+```csharp
+[JSInvokable]
+public void OnScreenResize(bool isMobile) {
+    _isMobile = isMobile;
+    StateHasChanged();
+}
+```
+
+### Mapa Leaflet
+- **Client:** `/map` - interaktywna mapa wypożyczalni
+- **Admin:** `LeafletMap.razor` - komponent do wyświetlania lokalizacji
+- **JS Interop:** `leaflet-map.js`, `leaflet-interop.js`
+
+### Lokalizacja
+- Model `Product` i `CompanyInfo` mają pola `City` i `Voivodeship`
+- Filtrowanie produktów po lokalizacji w UI
+- API endpoint `/api/locations` zwraca listę województw/miast
+
 
 
 

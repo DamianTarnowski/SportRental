@@ -28,7 +28,7 @@ Projekt **SportRental.Api** jest wyłączony - przygotowany na przyszłość.
 | `Authorization` | Nie | Pole do przyszlej integracji (JWT/bearer). |
 
 ## Modele
-- `ProductDto`: `id`, `name`, `sku`, `category`, `imageUrl`, `fullImageUrl`, `description`, `dailyPrice`, `isAvailable`, `availableQuantity`.
+- `ProductDto`: `id`, `name`, `sku`, `category`, `imageUrl`, `fullImageUrl`, `description`, `dailyPrice`, `hourlyPrice`, `isAvailable`, `availableQuantity`, `city`, `voivodeship`.
 - `CreateHoldRequest`: `productId`, `quantity`, `startDateUtc`, `endDateUtc`, `ttlMinutes?`, `customerId?`, `sessionId?`.
 - `CreateHoldResponse`: `id`, `expiresAtUtc`.
 - `CreateRentalRequest`: `customerId`, `startDateUtc`, `endDateUtc`, `items[] { productId, quantity }`, `paymentIntentId`, `notes?`, `idempotencyKey?`.
@@ -65,8 +65,11 @@ X-Tenant-Id: 00000000-0000-0000-0000-000000000000
     "fullImageUrl": "https://cdn.local/files/images/products/.../w800.jpg",
     "description": "All-mountain, dlugosc 168 cm",
     "dailyPrice": 120.0,
+    "hourlyPrice": 25.0,
     "isAvailable": true,
-    "availableQuantity": 6
+    "availableQuantity": 6,
+    "city": "Zakopane",
+    "voivodeship": "małopolskie"
   }
 ]
 ```
@@ -76,11 +79,33 @@ X-Tenant-Id: 00000000-0000-0000-0000-000000000000
 - **Statusy:** `200 OK`, `404 Not Found` (gdy brak w danym tenancie).
 
 ### POST /api/products/{id}/image
-- **Opis:** upload zdjecia produktu do MediaStorage (multipart).
+- **Opis:** upload zdjecia produktu do Azure Blob Storage (multipart).
 - **Naglowki:** `X-Tenant-Id`, `Content-Type: multipart/form-data`.
 - **Body:** pole `file` (obowiazkowe). Obslugiwane rozszerzenia: `.jpg`, `.jpeg`, `.png`, `.webp`.
 - **Odpowiedz 200:** `{ "imageUrl": "...", "basePath": "images/products/..." }`.
 - **Bledy:** `400` (brak pliku/niepoprawne rozszerzenie), `404` (produkt nie istnieje).
+
+### GET /api/tenants/locations
+- **Opis:** lista lokalizacji wypożyczalni z koordynatami GPS (dla mapy).
+- **Naglowki:** brak wymaganych.
+- **Odpowiedz 200:** tablica obiektów lokalizacji.
+```json
+[
+  {
+    "tenantId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "tenantName": "Ski Rental Zakopane",
+    "lat": 49.2992,
+    "lon": 19.9496,
+    "address": "ul. Krupówki 10",
+    "city": "Zakopane",
+    "voivodeship": "małopolskie",
+    "phoneNumber": "+48 123 456 789",
+    "email": "kontakt@skirental.pl",
+    "openingHours": "8:00-20:00",
+    "logoUrl": "https://blob.../logo.png"
+  }
+]
+```
 
 ### POST /api/tenants/{id}/logo
 - **Opis:** upload logotypu firmy. Nie wymaga `X-Tenant-Id` (identyfikacja po id tenanta).

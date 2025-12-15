@@ -66,7 +66,9 @@
 - ✅ Blazor Server admin panel
 - ✅ Blazor WASM client app
 - ✅ MudBlazor & TailwindCSS
-- ✅ Fully responsive design
+- ✅ **📱 Mobile-First Dual UI** - osobne widoki mobile/desktop
+- ✅ **🌙 Dark Mode** - przełącznik motywu
+- ✅ **🗺️ Mapa Leaflet** - interaktywna mapa wypożyczalni
 - ✅ Real-time updates with SignalR
 
 ### 🔒 **Enterprise Security**
@@ -136,9 +138,9 @@ flowchart TB
 
 | Module | Description | Tech Stack | Status |
 |--------|-------------|------------|--------|
-| **🎨 SportRental.Admin** | Blazor Server admin panel + API dla klienta WASM | C# 12, Blazor Server, MudBlazor | ✅ Production |
+| **🎨 SportRental.Admin** | Blazor Server admin panel + API dla klienta WASM | C# 12, Blazor Server, MudBlazor, **📱 Dual UI** | ✅ Production |
 | **📡 SportRental.Api** | Public REST API (obecnie wyłączone - na przyszłość) | ASP.NET Core 10, Minimal APIs | ⏸️ Disabled |
-| **💻 SportRental.Client** | Blazor WebAssembly public client | Blazor WASM, TailwindCSS | ✅ Production |
+| **💻 SportRental.Client** | Blazor WebAssembly public client | Blazor WASM, TailwindCSS, **📱 Mobile-First** | ✅ Production |
 | **📸 SportRental.MediaStorage** | Media microservice (obecnie wyłączone - Azure Blob) | Minimal APIs, SQLite | ⏸️ Disabled |
 | **🔧 SportRental.Infrastructure** | EF Core, domain models, migrations | Entity Framework Core 10 | ✅ Production |
 | **📦 SportRental.Shared** | Shared DTOs, components, HTTP clients | Razor Class Library | ✅ Production |
@@ -307,6 +309,10 @@ dotnet test
 - ✅ Reservation holds (tymczasowe rezerwacje w koszyku)
 - ✅ Customer session management
 - ✅ Visual Studio multi-project launch (Admin + Client)
+- ✅ **📱 Mobile-First Responsive UI** - dual UI strategy (mobile/desktop)
+- ✅ **🌙 Dark Mode** - przełącznik motywu w Admin
+- ✅ **🗺️ Mapa wypożyczalni** - Leaflet integration
+- ✅ **📍 Lokalizacja** - City/Voivodeship filtering
 
 ### **🚧 In Progress / Planned**
 - 🚧 Docker & Docker Compose setup

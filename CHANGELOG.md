@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### ✨ Added (Grudzień 2025)
 
+#### 📱 Responsywne UI Mobile-First
+- **Dual UI Strategy** - osobne widoki dla mobile (<768px) i desktop
+- **Admin Panel:**
+  - Responsywne wszystkie strony: Dashboard, Products, Rentals, Customers, Schedule, CompanySettings
+  - Responsywne dialogi: CustomerEdit, CustomerRentals, IssueEquipment, ReturnEquipment
+  - Mobile drawer z nawigacją
+  - Dark mode z ThemeSwitcher
+  - Sticky headers i kompaktowe karty na mobile
+- **Client WASM:**
+  - Mobile-first UI: Products, ProductDetails, Cart, Checkout, MyRentals
+  - JS interop do wykrywania rozmiaru ekranu (`mobile-detection.js`)
+  - Sticky bottom summaries (koszyk, checkout)
+  - Kompaktowa siatka produktów 2-kolumnowa
+  - Slidable filter panels na mobile
+  - Usunięty TenantSelector z nagłówka (dostępny w filtrach)
+
+#### 🗺️ Mapa wypożyczalni
+- Nowa strona `/map` w Client z interaktywną mapą Leaflet
+- LeafletMap component w Admin do wyświetlania lokalizacji
+- JS interop dla Leaflet (`leaflet-map.js`, `leaflet-interop.js`)
+
+#### 📍 Lokalizacja
+- Dodano `City` i `Voivodeship` do modelu `Product`
+- Dodano `City` i `Voivodeship` do modelu `CompanyInfo`
+- Migracje DB: `AddCityAndVoivodeshipToProduct`, `AddCityAndVoivodeshipToCompanyInfo`
+- API endpoint `/api/locations` - lista województw i miast
+- Filtrowanie produktów po lokalizacji
+
 #### 🕐 Wynajem godzinowy
 - Dodano `HourlyPrice` do modelu `Product` - opcjonalna cena za godzinę
 - Dodano `RentalType` enum (`Daily`, `Hourly`) do `Rental` i `RentalItem`
@@ -16,10 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dodano `PricePerHour` do `RentalItem` - cena za godzinę w momencie wynajmu
 - Zaktualizowano `PaymentCalculator` - obsługa kalkulacji cen godzinowych
 - Zaktualizowano UI w Admin - wybór typu wynajmu przy tworzeniu wynajmu
-- Zaktualizowano UI w Client:
-  - `Products.razor` - wyświetlanie ceny godzinowej
-  - `ProductDetails.razor` - wybór typu wynajmu i liczby godzin
-  - `Cart.razor` - zmiana typu wynajmu per pozycja
+- Zaktualizowano UI w Client (z responsywnym UI):
+  - `Products.razor` - wyświetlanie ceny godzinowej, mobile/desktop views
+  - `ProductDetails.razor` - wybór typu wynajmu, sticky "Dodaj do koszyka"
+  - `Cart.razor` - zmiana typu wynajmu per pozycja, mobile summary
   - `Checkout.razor` - wyświetlanie i przekazywanie typu wynajmu do API
 
 #### 🛠️ Usprawnienia developerskie
@@ -28,15 +56,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Wyłączono HTTPS redirect w Development - poprawka CORS dla lokalnego testowania
 - Zaktualizowano `appsettings.Development.json` w Client - poprawny port API
 
-#### 📡 Zmiany w architekturze
-- **SportRental.Api** - projekt wyłączony, API hostowane w SportRental.Admin
-- **SportRental.MediaStorage** - projekt wyłączony, pliki w Azure Blob Storage
-- Dodano `HourlyPrice` do endpointów `/api/products` i `/api/products/{id}`
+#### 📡 Architektura (przypomnienie)
+- **SportRental.Admin** - Blazor Server hostujący panel **ORAZ API dla klienta WASM**
+- **SportRental.Client** - Blazor WASM łączący się z endpointami w Admin
+- **SportRental.Api** - ⏸️ WYŁĄCZONY (przygotowany na przyszłość)
+- **SportRental.MediaStorage** - ⏸️ WYŁĄCZONY (pliki w Azure Blob Storage)
 
 #### 📚 Dokumentacja
-- Zaktualizowano README.md - nowa architektura, wyłączone projekty
-- Zaktualizowano ARCHITECTURE.md - aktualne diagramy i opisy
-- Dodano informacje o nowych funkcjach (wynajem godzinowy, SMS, holds)
+- Zaktualizowano README.md - nowa architektura, responsywne UI
+- Zaktualizowano ARCHITECTURE.md - dual UI strategy, aktualne diagramy
+- Zaktualizowano DEVELOPER_GUIDE.md - mobile detection, JS interop
+- Dodano informacje o nowych funkcjach (lokalizacja, mapa, responsive)
 
 ---
 

@@ -1,12 +1,12 @@
 # SportRental Roadmap
 
-## Status projektu (październik 2025)
-- **Panel administracyjny (SportRental.Admin):** ✅ Kompletne moduly CRUD, raporty, upload zdjęć z croppierem, konfiguracja firmy dla umów. Testy: 290+ scenariusze xUnit/bUnit.
-- **Publiczne API (SportRental.Api):** ✅ JWT autoryzacja (access + refresh tokens), ✅ Stripe payment intents + webhooks, ✅ Email notifications z PDF, ✅ Multi-tenant.
-- **Klient WASM (SportRental.Client):** ✅ Pełny flow zakupowy, ✅ Stripe Checkout Session, ✅ JWT auth, ✅ Protected routes, ✅ Account management, ✅ Tailwind CSS.
+## Status projektu (grudzień 2025)
+- **Panel administracyjny (SportRental.Admin):** ✅ Kompletne moduly CRUD, raporty, upload zdjęć z croppierem, konfiguracja firmy dla umów. ✅ **📱 Responsywne UI mobile-first** (dual UI strategy). ✅ **🌙 Dark mode**. Testy: 290+ scenariusze xUnit/bUnit.
+- **API:** ✅ Hostowane w SportRental.Admin (nie osobny projekt). ✅ Stripe payment intents + webhooks, ✅ Email notifications z PDF, ✅ Multi-tenant.
+- **Klient WASM (SportRental.Client):** ✅ Pełny flow zakupowy, ✅ Stripe Checkout Session, ✅ **📱 Mobile-first UI** z JS interop, ✅ Protected routes, ✅ Account management, ✅ Tailwind CSS, ✅ **🗺️ Mapa Leaflet**.
 - **Media Storage:** ✅ Azure Blob Storage (produkcja) + automatyczne thumbnails (3 rozmiary), ✅ Image optimization (WebP), ✅ Lightbox UI.
 - **Security:** ✅ Azure Key Vault dla WSZYSTKICH sekretów (connection strings, API keys), ✅ DefaultAzureCredential (az login → Managed Identity).
-- **Infra:** .NET 9, PostgreSQL (Azure), Azure Blob Storage, Stripe sandbox, Onet SMTP, pełna dokumentacja.
+- **Infra:** .NET 10, PostgreSQL (Azure), Azure Blob Storage, Stripe sandbox, Onet SMTP, SMSAPI.pl, pełna dokumentacja.
 
 ## Co zostało zrealizowane (Q4 2025)
 ### ✅ Backend i API - COMPLETE
@@ -19,19 +19,29 @@
 7. ✅ **Customer Endpoints** - `/api/auth/register`, `/api/auth/login`, `/api/customers`
 8. ✅ **My Rentals** - historia wynajmów dla klienta z filtrowaniem
 
-### ✅ Frontend Blazor WASM - COMPLETE  
-1. ✅ **Stripe Checkout** - pełny flow płatności z redirect do Stripe + success/cancel pages
-2. ✅ **JWT Authentication** - login, register, token refresh, protected routes
-3. ✅ **Account Management** - `/account` z edycją profilu i historią wynajmów
-4. ✅ **Tailwind CSS** - pełna integracja z responsive design
-5. ✅ **Shopping Cart** - dodawanie produktów, kalkulacja ceny, checkout
-6. ✅ **Protected Routes** - `<AuthorizeView>` + navigation guards
-
 ### ✅ Panel Administracyjny - ENHANCED
 1. ✅ **Image Cropper** - Croppie.js z preview, rotate, zoom (max 8MB)
 2. ✅ **Company Info Config** - panel konfiguracji danych firmy do umów (NIP, adres)
 3. ✅ **Image Optimization** - automatyczne WebP thumbnails (small/medium/large)
 4. ✅ **Lightbox** - pełnoekranowy podgląd zdjęć na kliknięcie
+5. ✅ **📱 Responsywne UI** - dual UI strategy (mobile <768px / desktop)
+6. ✅ **🌙 Dark Mode** - ThemeSwitcher z persystencją w localStorage
+7. ✅ **Responsywne dialogi** - CustomerEdit, CustomerRentals, IssueEquipment, ReturnEquipment
+8. ✅ **Mobile drawer** - nawigacja boczna na urządzeniach mobilnych
+
+### ✅ Frontend Blazor WASM - MOBILE-FIRST
+1. ✅ **📱 Mobile-First UI** - osobne widoki dla mobile/desktop
+2. ✅ **JS Interop Mobile Detection** - wykrywanie rozmiaru ekranu (`mobile-detection.js`)
+3. ✅ **Sticky UI Elements** - sticky headers, bottom summaries
+4. ✅ **Kompaktowe karty** - siatka 2-kolumnowa na mobile
+5. ✅ **Slidable filters** - panel filtrów na mobile
+6. ✅ **🗺️ Mapa Leaflet** - interaktywna mapa wypożyczalni (`/map`)
+
+### ✅ Lokalizacja i Mapa
+1. ✅ **City/Voivodeship** - pola lokalizacji w Product i CompanyInfo
+2. ✅ **API /api/tenants/locations** - endpoint dla mapy
+3. ✅ **Filtrowanie po lokalizacji** - w UI produktów
+4. ✅ **LeafletMap component** - do wyświetlania lokalizacji
 
 ## TODO - Pozostałe zadania Q4 2025
 ### Backend

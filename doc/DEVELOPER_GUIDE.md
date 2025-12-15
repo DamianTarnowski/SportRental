@@ -186,11 +186,79 @@ dotnet ef migrations list --project SportRental.Admin
 dotnet ef dbcontext script --project SportRental.Admin
 ```
 
+## 📱 Responsywne UI (Mobile-First)
+
+### Dual UI Strategy
+Projekt wykorzystuje **osobne widoki** dla mobile (<768px) i desktop. W komponentach Razor:
+
+```razor
+@if (_isMobile)
+{
+    <!-- Mobile UI -->
+}
+else
+{
+    <!-- Desktop UI -->
+}
+```
+
+### Mobile Detection (JS Interop)
+Plik `wwwroot/js/mobile-detection.js` wykrywa szerokość ekranu:
+
+```csharp
+// W komponencie Blazor:
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+private bool _isMobile;
+private DotNetObjectReference<MyComponent>? _dotNetRef;
+
+protected override async Task OnAfterRenderAsync(bool firstRender)
+{
+    if (firstRender)
+    {
+        _dotNetRef = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("setupMobileDetection", _dotNetRef);
+    }
+}
+
+[JSInvokable]
+public void OnScreenResize(bool isMobile)
+{
+    _isMobile = isMobile;
+    StateHasChanged();
+}
+
+public async ValueTask DisposeAsync()
+{
+    await JS.InvokeVoidAsync("removeMobileDetection");
+    _dotNetRef?.Dispose();
+}
+```
+
+### Testowanie responsywności
+1. **Chrome DevTools** - F12 → Toggle device toolbar (Ctrl+Shift+M)
+2. **Breakpoint:** 768px (mobile < 768px, desktop >= 768px)
+3. **Sprawdź:** sticky headers, bottom summaries, slidable panels
+
+### Dark Mode (Admin)
+- `ThemeSwitcher.razor` - przełącznik motywu
+- Persystencja w localStorage
+- CSS variables w `admin-theme.css`
+
+### Mapa Leaflet
+- **Dodanie do komponentu:**
+  ```razor
+  <LeafletMap Latitude="52.2297" Longitude="21.0122" Zoom="13" />
+  ```
+- **JS Interop:** `leaflet-interop.js` (Admin), `leaflet-map.js` (Client)
+
 ## Dalsza lektura
 - Dokumentacja Blazor: https://learn.microsoft.com/aspnet/core/blazor/
 - Entity Framework Core: https://learn.microsoft.com/ef/core/
 - MudBlazor: https://mudblazor.com/
 - Minimal APIs: https://learn.microsoft.com/aspnet/core/fundamentals/minimal-apis
+- Leaflet.js: https://leafletjs.com/
 
 Powodzenia! W razie watpliwosci sprawdz pozostale pliki dokumentacji lub otworz issue w repozytorium.
 
