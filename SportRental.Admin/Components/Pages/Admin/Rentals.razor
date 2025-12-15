@@ -630,12 +630,30 @@ else
                                 </MudItem>
                                 <MudItem xs="12" md="3">
                                     <MudStack Row="true" Spacing="1">
-                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="StartScanner" StartIcon="@Icons.Material.Filled.CameraAlt">Kamera</MudButton>
-                                        <MudButton Variant="Variant.Text" Size="Size.Small" OnClick="StopScanner">Stop</MudButton>
+                                        @if (!_scannerActive)
+                                        {
+                                            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="StartScanner" StartIcon="@Icons.Material.Filled.CameraAlt">Kamera</MudButton>
+                                        }
+                                        else
+                                        {
+                                            <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" OnClick="StopScanner" StartIcon="@Icons.Material.Filled.Stop">Stop</MudButton>
+                                        }
                                     </MudStack>
                                 </MudItem>
                             </MudGrid>
-                            <video id="videoScanner" width="200" height="120" autoplay muted playsinline style="border-radius:12px; border:2px solid #e0e0e0; margin-top: 12px; display: none;"></video>
+                            @if (_scannerActive)
+                            {
+                                <MudPaper Elevation="2" Class="pa-3 mt-3" Style="border-radius: 12px; background: #f5f5f5;">
+                                    <MudStack Spacing="2">
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                            <MudIcon Icon="@Icons.Material.Filled.Videocam" Size="Size.Small" Class="mr-1" />
+                                            Skieruj kamerę na kod QR produktu
+                                        </MudText>
+                                        <video id="videoScanner" width="100%" height="200" autoplay muted playsinline style="border-radius:8px; border:2px solid #4caf50; max-width: 300px;"></video>
+                                    </MudStack>
+                                </MudPaper>
+                            }
+                            <video id="videoScannerHidden" style="display:none;"></video>
                         </MudExpansionPanel>
                     </MudExpansionPanels>
                 </MudStack>
@@ -969,14 +987,28 @@ else
         Recalculate();
     }
 
+    private bool _scannerActive = false;
+    
     private async Task StartScanner()
     {
-        await JS.InvokeAsync<bool>("srBarcode.start", "videoScanner");
+        _scannerActive = true;
+        StateHasChanged();
+        
+        // Wait for video element to render
+        await Task.Delay(100);
+        
+        var success = await JS.InvokeAsync<bool>("srBarcode.start", "videoScanner");
+        if (!success)
+        {
+            _scannerActive = false;
+            Snackbar.Add("Nie udało się uruchomić kamery. Sprawdź uprawnienia.", Severity.Error);
+        }
     }
 
     private async Task StopScanner()
     {
         await JS.InvokeVoidAsync("srBarcode.stop", "videoScanner");
+        _scannerActive = false;
     }
 
     private void RemoveItem(RentalItem item)
