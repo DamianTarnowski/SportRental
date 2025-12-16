@@ -13,28 +13,30 @@ window.QrScanner = {
     scanner: null,
     dotNetRef: null,
     elementId: null,
+    scanCount: 0,
     
     init: async function(elementId, dotNetReference) {
         console.log('QrScanner.init:', elementId);
         this.dotNetRef = dotNetReference;
         this.elementId = elementId;
+        this.scanCount = 0;
         
         try {
             if (typeof Html5Qrcode === 'undefined') {
+                console.error('Html5Qrcode not loaded!');
                 return { success: false, error: 'Biblioteka QR nie załadowana' };
             }
             
             const element = document.getElementById(elementId);
             if (!element) {
+                console.error('Element not found:', elementId);
                 return { success: false, error: 'Element nie znaleziony' };
             }
             
-            this.scanner = new Html5Qrcode(elementId, { 
-                verbose: false,
-                formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
-            });
+            // Create scanner without format restriction for better detection
+            this.scanner = new Html5Qrcode(elementId, { verbose: true });
             
-            console.log('QrScanner initialized');
+            console.log('QrScanner initialized successfully');
             return { success: true };
         } catch (error) {
             console.error('Init error:', error);
@@ -43,66 +45,82 @@ window.QrScanner = {
     },
     
     start: async function(preferBackCamera = true) {
-        console.log('QrScanner.start');
+        console.log('QrScanner.start called');
         
         if (!this.scanner) {
+            console.error('Scanner not initialized');
             return { success: false, error: 'Skaner nie zainicjalizowany' };
         }
         
+        const self = this;
+        
         try {
-            // Mniejsza ramka skanowania dla lepszego wykrywania
+            // Simpler config - let library handle sizing
             const config = {
-                fps: 15,
-                qrbox: { width: 180, height: 180 },
-                aspectRatio: 1.0,
-                disableFlip: false,
-                experimentalFeatures: {
-                    useBarCodeDetectorIfSupported: true
+                fps: 10,
+                qrbox: 200,
+                aspectRatio: 1.0
+            };
+            
+            console.log('Starting with config:', config);
+            
+            const onSuccess = function(decodedText, decodedResult) {
+                self.scanCount++;
+                console.log('=== QR CODE DETECTED ===');
+                console.log('Text:', decodedText);
+                console.log('Format:', decodedResult?.result?.format?.formatName);
+                console.log('Scan count:', self.scanCount);
+                
+                if (self.dotNetRef) {
+                    console.log('Calling Blazor callback...');
+                    self.dotNetRef.invokeMethodAsync('OnQrCodeScanned', decodedText)
+                        .then(() => console.log('Blazor callback success'))
+                        .catch(err => console.error('Blazor callback error:', err));
+                } else {
+                    console.error('No dotNetRef available!');
                 }
             };
             
-            const cameraConfig = preferBackCamera 
-                ? { facingMode: "environment" } 
-                : { facingMode: "user" };
+            const onError = function(errorMessage) {
+                // This fires constantly when no QR in frame - ignore
+            };
             
-            await this.scanner.start(
-                cameraConfig,
-                config,
-                (decodedText, decodedResult) => {
-                    console.log('QR detected:', decodedText);
-                    if (this.dotNetRef) {
-                        this.dotNetRef.invokeMethodAsync('OnQrCodeScanned', decodedText);
+            // Try back camera first
+            try {
+                await this.scanner.start(
+                    { facingMode: "environment" },
+                    config,
+                    onSuccess,
+                    onError
+                );
+                console.log('Camera started (environment)');
+                return { success: true };
+            } catch (envError) {
+                console.log('Environment camera failed:', envError.message);
+                
+                // Try any camera
+                try {
+                    const cameras = await Html5Qrcode.getCameras();
+                    console.log('Available cameras:', cameras);
+                    
+                    if (cameras && cameras.length > 0) {
+                        await this.scanner.start(
+                            cameras[0].id,
+                            config,
+                            onSuccess,
+                            onError
+                        );
+                        console.log('Camera started (first available)');
+                        return { success: true };
                     }
-                },
-                (errorMessage) => {
-                    // Ignore - no QR in frame
+                } catch (camError) {
+                    console.error('Camera list failed:', camError);
                 }
-            );
-            
-            console.log('Camera started');
-            return { success: true };
+                
+                throw envError;
+            }
         } catch (error) {
             console.error('Start error:', error);
-            
-            // Fallback - try any camera
-            try {
-                const cameras = await Html5Qrcode.getCameras();
-                if (cameras && cameras.length > 0) {
-                    await this.scanner.start(
-                        cameras[0].id,
-                        { fps: 15, qrbox: { width: 180, height: 180 } },
-                        (decodedText) => {
-                            if (this.dotNetRef) {
-                                this.dotNetRef.invokeMethodAsync('OnQrCodeScanned', decodedText);
-                            }
-                        },
-                        () => {}
-                    );
-                    return { success: true };
-                }
-            } catch (e) {
-                console.error('Fallback failed:', e);
-            }
             
             if (error.name === 'NotAllowedError') {
                 return { success: false, error: 'Brak uprawnień do kamery' };
@@ -112,12 +130,15 @@ window.QrScanner = {
     },
     
     stop: async function() {
+        console.log('QrScanner.stop called');
         if (!this.scanner) return { success: true };
         
         try {
             const state = this.scanner.getState();
+            console.log('Scanner state:', state);
             if (state === Html5QrcodeScannerState.SCANNING) {
                 await this.scanner.stop();
+                console.log('Scanner stopped');
             }
             return { success: true };
         } catch (error) {
@@ -133,12 +154,16 @@ window.QrScanner = {
         
         try {
             const capabilities = this.scanner.getRunningTrackCapabilities();
+            console.log('Camera capabilities:', capabilities);
+            
             if (capabilities && capabilities.torch) {
                 const settings = this.scanner.getRunningTrackSettings();
                 const newTorch = !(settings.torch || false);
                 await this.scanner.applyVideoConstraints({ advanced: [{ torch: newTorch }] });
+                console.log('Flash toggled to:', newTorch);
                 return { success: true, flashOn: newTorch };
             }
+            console.log('Flash not available');
             return { success: false, flashOn: false };
         } catch (error) {
             console.error('Flash error:', error);
@@ -147,6 +172,7 @@ window.QrScanner = {
     },
     
     dispose: async function() {
+        console.log('QrScanner.dispose called');
         await this.stop();
         if (this.scanner) {
             try { this.scanner.clear(); } catch (e) {}
@@ -155,3 +181,5 @@ window.QrScanner = {
         this.dotNetRef = null;
     }
 };
+
+console.log('QrScanner module loaded');
