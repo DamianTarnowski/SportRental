@@ -103,7 +103,6 @@
     [Parameter] public bool AutoStart { get; set; } = false;
     
     private ElementReference _videoElement;
-    private IJSObjectReference? _module;
     private DotNetObjectReference<WasmQrScanner>? _dotNetRef;
     
     private bool _isLoading;
@@ -117,7 +116,6 @@
             try
             {
                 _dotNetRef = DotNetObjectReference.Create(this);
-                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_client/js/wasm-qr-scanner.js");
                 
                 if (AutoStart)
                 {
@@ -140,12 +138,7 @@
         
         try
         {
-            if (_module == null)
-            {
-                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_client/js/wasm-qr-scanner.js");
-            }
-            
-            var result = await _module.InvokeAsync<CameraResult>("startCamera", _videoElement, _dotNetRef);
+            var result = await JS.InvokeAsync<CameraResult>("wasmQrScanner.startCamera", _videoElement, _dotNetRef);
             
             if (result.Success)
             {
@@ -171,10 +164,7 @@
     {
         try
         {
-            if (_module != null)
-            {
-                await _module.InvokeVoidAsync("stopCamera");
-            }
+            await JS.InvokeVoidAsync("wasmQrScanner.stopCamera");
         }
         catch { }
         
@@ -197,11 +187,7 @@
     {
         try
         {
-            if (_module != null)
-            {
-                await _module.InvokeVoidAsync("stopCamera");
-                await _module.DisposeAsync();
-            }
+            await JS.InvokeVoidAsync("wasmQrScanner.stopCamera");
         }
         catch { }
         
