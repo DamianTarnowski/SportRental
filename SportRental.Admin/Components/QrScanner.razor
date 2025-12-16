@@ -7,15 +7,15 @@
     {
         <div class="qr-scanner-loading">
             <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
-            <MudText Typo="Typo.body1" Class="mt-2">Uruchamianie kamery...</MudText>
+            <MudText Typo="Typo.body2" Class="mt-2">Uruchamianie kamery...</MudText>
         </div>
     }
     else if (!string.IsNullOrEmpty(_error))
     {
         <div class="qr-scanner-error">
-            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large" />
-            <MudText Typo="Typo.body1" Color="Color.Error" Class="mt-2">@_error</MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartScanning" Class="mt-3">
+            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" />
+            <MudText Typo="Typo.body2" Color="Color.Error" Class="mt-2">@_error</MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="StartScanning" Class="mt-2" Size="Size.Small">
                 Spróbuj ponownie
             </MudButton>
         </div>
@@ -23,35 +23,27 @@
     else if (!_isScanning && !_isLoading && string.IsNullOrEmpty(_error))
     {
         <div class="qr-scanner-start">
-            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="Size.Large" Color="Color.Primary" />
-            <MudText Typo="Typo.h6" Class="mt-2">Skaner kodów QR</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                Skieruj kamerę na kod QR produktu
-            </MudText>
+            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Class="mt-2">Skieruj kamerę na kod QR</MudText>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartScanning"
-                       StartIcon="@Icons.Material.Filled.CameraAlt" Size="Size.Large">
-                Uruchom kamerę
+                       StartIcon="@Icons.Material.Filled.CameraAlt" Size="Size.Small" Class="mt-2">
+                Uruchom
             </MudButton>
         </div>
     }
     
-    @* Video container - always in DOM, visibility controlled by CSS *@
+    @* Video container *@
     <div id="@_scannerId" class="qr-scanner-video" style="@(_isScanning ? "display: block;" : "display: none;")"></div>
     
     @if (_isScanning)
     {
         <div class="qr-scanner-controls">
-            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="ToggleFlash" 
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" OnClick="ToggleFlash" 
                        StartIcon="@(_flashOn ? Icons.Material.Filled.FlashOff : Icons.Material.Filled.FlashOn)"
                        Size="Size.Small">
-                @(_flashOn ? "Wyłącz" : "Latarka")
+                @(_flashOn ? "Wył" : "Latarka")
             </MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Default" OnClick="SwitchCamera"
-                       StartIcon="@Icons.Material.Filled.Cameraswitch"
-                       Size="Size.Small">
-                Przełącz
-            </MudButton>
-            <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="StopScanning"
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="StopScanning"
                        StartIcon="@Icons.Material.Filled.Stop"
                        Size="Size.Small">
                 Stop
@@ -66,39 +58,40 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 400px;
         background: var(--mud-palette-background-grey);
-        border-radius: 12px;
-        padding: 1rem;
+        border-radius: 8px;
+        padding: 0.5rem;
         width: 100%;
+        max-height: 320px;
+        overflow: hidden;
     }
     
     .qr-scanner-video {
         width: 100%;
-        max-width: 100%;
-        min-height: 300px;
-        border-radius: 12px;
+        max-width: 280px;
+        height: 200px !important;
+        max-height: 200px !important;
+        border-radius: 8px;
         overflow: hidden;
         background: #000;
     }
     
-    /* Force html5-qrcode video to be visible */
+    /* Force html5-qrcode to respect size */
     .qr-scanner-video video {
         width: 100% !important;
-        height: auto !important;
-        max-height: 400px !important;
+        height: 200px !important;
+        max-height: 200px !important;
         object-fit: cover !important;
-        border-radius: 8px;
     }
     
-    /* html5-qrcode container styling */
     .qr-scanner-video > div {
         width: 100% !important;
+        height: 200px !important;
+        max-height: 200px !important;
     }
     
-    .qr-scanner-video #qr-shaded-region {
-        border-color: #4caf50 !important;
-        border-width: 3px !important;
+    .qr-scanner-video img {
+        max-height: 200px !important;
     }
     
     .qr-scanner-loading,
@@ -108,13 +101,13 @@
         flex-direction: column;
         align-items: center;
         text-align: center;
-        padding: 2rem;
+        padding: 1rem;
     }
     
     .qr-scanner-controls {
         display: flex;
         gap: 0.5rem;
-        margin-top: 1rem;
+        margin-top: 0.5rem;
         flex-wrap: wrap;
         justify-content: center;
     }
@@ -141,14 +134,13 @@
         {
             _dotNetRef = DotNetObjectReference.Create(this);
             
-            // Small delay to ensure DOM is ready
             await Task.Delay(100);
             
             var result = await JS.InvokeAsync<InitResult>("QrScanner.init", _scannerId, _dotNetRef);
             
             if (!result.Success)
             {
-                _error = result.Error ?? "Nie udało się zainicjalizować skanera";
+                _error = result.Error ?? "Błąd inicjalizacji";
                 StateHasChanged();
                 return;
             }
@@ -168,7 +160,7 @@
     {
         if (!_initialized)
         {
-            _error = "Skaner nie został zainicjalizowany";
+            _error = "Skaner nie gotowy";
             StateHasChanged();
             return;
         }
@@ -177,7 +169,6 @@
         _error = null;
         StateHasChanged();
         
-        // Wait for DOM update
         await Task.Delay(50);
         
         try
@@ -186,7 +177,7 @@
             
             if (!result.Success)
             {
-                _error = result.Error ?? "Nie udało się uruchomić kamery";
+                _error = result.Error ?? "Błąd kamery";
             }
             else
             {
@@ -212,10 +203,7 @@
             _isScanning = false;
             _flashOn = false;
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error stopping scanner: {ex.Message}");
-        }
+        catch { }
         StateHasChanged();
     }
     
@@ -229,32 +217,16 @@
                 _flashOn = result.FlashOn;
             }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error toggling flash: {ex.Message}");
-        }
+        catch { }
         StateHasChanged();
-    }
-    
-    private async Task SwitchCamera()
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("QrScanner.switchCamera");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error switching camera: {ex.Message}");
-        }
     }
     
     [JSInvokable]
     public async Task OnQrCodeScanned(string qrData)
     {
-        // Stop scanning after successful scan
+        Console.WriteLine($"QR Code scanned: {qrData}");
         await StopScanning();
         
-        // Notify parent
         if (OnScanned.HasDelegate)
         {
             await OnScanned.InvokeAsync(qrData);
@@ -282,6 +254,5 @@
     {
         public bool Success { get; set; }
         public bool FlashOn { get; set; }
-        public string? Error { get; set; }
     }
 }
