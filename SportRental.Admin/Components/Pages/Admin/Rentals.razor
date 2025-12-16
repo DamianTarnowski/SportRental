@@ -639,8 +639,7 @@ else
                             @if (_showScanner)
                             {
                                 <MudPaper Elevation="2" Class="pa-3 mt-3" Style="border-radius: 12px;">
-                                    <SportRental.Client.Components.WasmQrScanner 
-                                        @rendermode="@(new InteractiveWebAssemblyRenderMode(prerender: false))"
+                                    <SportRental.Admin.Components.QrScanner 
                                         OnScanned="OnQrScanned" 
                                         AutoStart="true" />
                                 </MudPaper>
