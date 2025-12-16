@@ -641,19 +641,15 @@ else
                                     </MudStack>
                                 </MudItem>
                             </MudGrid>
-                            @if (_scannerActive)
-                            {
-                                <MudPaper Elevation="2" Class="pa-3 mt-3" Style="border-radius: 12px; background: #f5f5f5;">
-                                    <MudStack Spacing="2">
-                                        <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                            <MudIcon Icon="@Icons.Material.Filled.Videocam" Size="Size.Small" Class="mr-1" />
-                                            Skieruj kamerę na kod QR produktu
-                                        </MudText>
-                                        <video id="videoScanner" width="100%" height="200" autoplay muted playsinline style="border-radius:8px; border:2px solid #4caf50; max-width: 300px;"></video>
-                                    </MudStack>
-                                </MudPaper>
-                            }
-                            <video id="videoScannerHidden" style="display:none;"></video>
+                            <MudPaper Elevation="2" Class="pa-3 mt-3" Style="@GetScannerContainerStyle()">
+                                <MudStack Spacing="2">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        <MudIcon Icon="@Icons.Material.Filled.Videocam" Size="Size.Small" Class="mr-1" />
+                                        Skieruj kamerę na kod QR produktu
+                                    </MudText>
+                                    <video id="videoScanner" width="100%" height="200" autoplay muted playsinline style="border-radius:8px; border:2px solid #4caf50; max-width: 300px;"></video>
+                                </MudStack>
+                            </MudPaper>
                         </MudExpansionPanel>
                     </MudExpansionPanels>
                 </MudStack>
@@ -989,25 +985,41 @@ else
 
     private bool _scannerActive = false;
     
+    private string GetScannerContainerStyle()
+    {
+        var baseStyle = "border-radius: 12px; background: #f5f5f5;";
+        return _scannerActive ? baseStyle : baseStyle + " display: none;";
+    }
+    
     private async Task StartScanner()
     {
-        _scannerActive = true;
-        StateHasChanged();
-        
-        // Wait for video element to render
-        await Task.Delay(100);
-        
-        var success = await JS.InvokeAsync<bool>("srBarcode.start", "videoScanner");
-        if (!success)
+        try
         {
-            _scannerActive = false;
-            Snackbar.Add("Nie udało się uruchomić kamery. Sprawdź uprawnienia.", Severity.Error);
+            // Video element is always in DOM now, just hidden
+            var success = await JS.InvokeAsync<bool>("srBarcode.start", "videoScanner");
+            if (success)
+            {
+                _scannerActive = true;
+                Snackbar.Add("Kamera uruchomiona", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add("Nie udało się uruchomić kamery. Sprawdź uprawnienia w ustawieniach przeglądarki.", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd kamery: {ex.Message}", Severity.Error);
         }
     }
 
     private async Task StopScanner()
     {
-        await JS.InvokeVoidAsync("srBarcode.stop", "videoScanner");
+        try
+        {
+            await JS.InvokeVoidAsync("srBarcode.stop", "videoScanner");
+        }
+        catch { }
         _scannerActive = false;
     }
 
