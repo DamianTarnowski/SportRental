@@ -1,4 +1,5 @@
 @page "/admin/qr-scanner"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize(Roles = "Owner,Employee")]
 
 @using Microsoft.EntityFrameworkCore

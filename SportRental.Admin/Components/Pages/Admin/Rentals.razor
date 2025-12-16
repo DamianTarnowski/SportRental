@@ -1,5 +1,5 @@
 @page "/admin/rentals"
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
