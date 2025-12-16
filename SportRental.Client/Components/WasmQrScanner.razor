@@ -1,0 +1,216 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="wasm-qr-scanner">
+    @if (_isLoading)
+    {
+        <div class="scanner-loading">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Class="mt-2">Uruchamianie kamery...</MudText>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="scanner-error">
+            <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Large" />
+            <MudText Typo="Typo.body1" Color="Color.Error" Class="mt-2">@_error</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartCamera" Class="mt-3">
+                Spróbuj ponownie
+            </MudButton>
+        </div>
+    }
+    else if (!_cameraActive)
+    {
+        <div class="scanner-start">
+            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Class="mt-2">Skaner kodów QR</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Skieruj kamerę na kod QR produktu
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartCamera"
+                       StartIcon="@Icons.Material.Filled.CameraAlt" Size="Size.Large">
+                Uruchom kamerę
+            </MudButton>
+        </div>
+    }
+    
+    <div class="video-container" style="@(_cameraActive ? "" : "display: none;")">
+        <video @ref="_videoElement" autoplay muted playsinline class="scanner-video"></video>
+        <div class="scanner-overlay">
+            <div class="scanner-frame"></div>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="StopCamera" Class="mt-2"
+                   StartIcon="@Icons.Material.Filled.Stop">
+            Zatrzymaj
+        </MudButton>
+    </div>
+</div>
+
+<style>
+    .wasm-qr-scanner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        min-height: 300px;
+    }
+    
+    .scanner-loading, .scanner-error, .scanner-start {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 2rem;
+    }
+    
+    .video-container {
+        position: relative;
+        width: 100%;
+        max-width: 400px;
+    }
+    
+    .scanner-video {
+        width: 100%;
+        border-radius: 12px;
+        background: #000;
+    }
+    
+    .scanner-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+    }
+    
+    .scanner-frame {
+        width: 200px;
+        height: 200px;
+        border: 3px solid #4caf50;
+        border-radius: 12px;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+    }
+</style>
+
+@code {
+    [Parameter] public EventCallback<string> OnScanned { get; set; }
+    [Parameter] public bool AutoStart { get; set; } = false;
+    
+    private ElementReference _videoElement;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<WasmQrScanner>? _dotNetRef;
+    
+    private bool _isLoading;
+    private bool _cameraActive;
+    private string? _error;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _dotNetRef = DotNetObjectReference.Create(this);
+                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/WasmQrScanner.razor.js");
+                
+                if (AutoStart)
+                {
+                    await StartCamera();
+                }
+            }
+            catch (Exception ex)
+            {
+                _error = $"Błąd inicjalizacji: {ex.Message}";
+                StateHasChanged();
+            }
+        }
+    }
+    
+    private async Task StartCamera()
+    {
+        _isLoading = true;
+        _error = null;
+        StateHasChanged();
+        
+        try
+        {
+            if (_module == null)
+            {
+                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/WasmQrScanner.razor.js");
+            }
+            
+            var result = await _module.InvokeAsync<CameraResult>("startCamera", _videoElement, _dotNetRef);
+            
+            if (result.Success)
+            {
+                _cameraActive = true;
+            }
+            else
+            {
+                _error = result.Error ?? "Nie udało się uruchomić kamery";
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Błąd: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private async Task StopCamera()
+    {
+        try
+        {
+            if (_module != null)
+            {
+                await _module.InvokeVoidAsync("stopCamera");
+            }
+        }
+        catch { }
+        
+        _cameraActive = false;
+        StateHasChanged();
+    }
+    
+    [JSInvokable]
+    public async Task OnQrCodeDetected(string code)
+    {
+        await StopCamera();
+        
+        if (OnScanned.HasDelegate)
+        {
+            await OnScanned.InvokeAsync(code);
+        }
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module != null)
+            {
+                await _module.InvokeVoidAsync("stopCamera");
+                await _module.DisposeAsync();
+            }
+        }
+        catch { }
+        
+        _dotNetRef?.Dispose();
+    }
+    
+    private class CameraResult
+    {
+        public bool Success { get; set; }
+        public string? Error { get; set; }
+    }
+}

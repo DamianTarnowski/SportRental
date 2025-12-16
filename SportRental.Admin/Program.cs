@@ -53,7 +53,8 @@ if (!string.IsNullOrWhiteSpace(keyVaultUrl))
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents()
+    .AddInteractiveWebAssemblyComponents();
 
 // Configure SignalR for large file uploads
 builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(options =>
@@ -354,7 +355,9 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = filesRequestPath
 });
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AddAdditionalAssemblies(typeof(SportRental.Client._Imports).Assembly);
 
 // Health endpoints
 app.MapHealthChecks("/health");

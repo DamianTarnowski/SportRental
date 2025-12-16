@@ -630,26 +630,21 @@ else
                                 </MudItem>
                                 <MudItem xs="12" md="3">
                                     <MudStack Row="true" Spacing="1">
-                                        @if (!_scannerActive)
-                                        {
-                                            <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="StartScanner" StartIcon="@Icons.Material.Filled.CameraAlt">Kamera</MudButton>
-                                        }
-                                        else
-                                        {
-                                            <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small" OnClick="StopScanner" StartIcon="@Icons.Material.Filled.Stop">Stop</MudButton>
-                                        }
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ToggleScanner" StartIcon="@Icons.Material.Filled.QrCodeScanner">
+                                            @(_showScanner ? "Ukryj skaner" : "Skaner QR")
+                                        </MudButton>
                                     </MudStack>
                                 </MudItem>
                             </MudGrid>
-                            <MudPaper Elevation="2" Class="pa-3 mt-3" Style="@GetScannerContainerStyle()">
-                                <MudStack Spacing="2">
-                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        <MudIcon Icon="@Icons.Material.Filled.Videocam" Size="Size.Small" Class="mr-1" />
-                                        Skieruj kamerę na kod QR produktu
-                                    </MudText>
-                                    <video id="videoScanner" width="100%" height="200" autoplay muted playsinline style="border-radius:8px; border:2px solid #4caf50; max-width: 300px;"></video>
-                                </MudStack>
-                            </MudPaper>
+                            @if (_showScanner)
+                            {
+                                <MudPaper Elevation="2" Class="pa-3 mt-3" Style="border-radius: 12px;">
+                                    <SportRental.Client.Components.WasmQrScanner 
+                                        @rendermode="@(new InteractiveWebAssemblyRenderMode(prerender: false))"
+                                        OnScanned="OnQrScanned" 
+                                        AutoStart="true" />
+                                </MudPaper>
+                            }
                         </MudExpansionPanel>
                     </MudExpansionPanels>
                 </MudStack>
@@ -983,44 +978,76 @@ else
         Recalculate();
     }
 
-    private bool _scannerActive = false;
+    private bool _showScanner = false;
     
-    private string GetScannerContainerStyle()
+    private void ToggleScanner()
     {
-        var baseStyle = "border-radius: 12px; background: #f5f5f5;";
-        return _scannerActive ? baseStyle : baseStyle + " display: none;";
+        _showScanner = !_showScanner;
     }
     
-    private async Task StartScanner()
+    private async Task OnQrScanned(string qrCode)
     {
-        try
+        _showScanner = false;
+        
+        // Parse QR code - format: SR:P:{ProductId}
+        var productId = ParseProductIdFromQr(qrCode);
+        if (productId.HasValue)
         {
-            // Video element is always in DOM now, just hidden
-            var success = await JS.InvokeAsync<bool>("srBarcode.start", "videoScanner");
-            if (success)
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(CurrentTenantId());
+            var product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId.Value);
+            
+            if (product != null)
             {
-                _scannerActive = true;
-                Snackbar.Add("Kamera uruchomiona", Severity.Success);
+                // Add product to rental
+                var existingItem = editItems.FirstOrDefault(i => i.ProductId == product.Id);
+                if (existingItem != null)
+                {
+                    existingItem.Quantity++;
+                }
+                else
+                {
+                    var days = Math.Max(1, (int)Math.Ceiling(((endDate ?? DateTime.Today.AddDays(1)) - (startDate ?? DateTime.Today)).TotalDays));
+                    editItems.Add(new RentalItem
+                    {
+                        Id = Guid.NewGuid(),
+                        ProductId = product.Id,
+                        Quantity = 1,
+                        PricePerDay = product.DailyPrice,
+                        Subtotal = product.DailyPrice * days
+                    });
+                }
+                Recalculate();
+                Snackbar.Add($"Dodano: {product.Name}", Severity.Success);
             }
             else
             {
-                Snackbar.Add("Nie udało się uruchomić kamery. Sprawdź uprawnienia w ustawieniach przeglądarki.", Severity.Error);
+                Snackbar.Add("Nie znaleziono produktu o tym kodzie QR", Severity.Warning);
             }
         }
-        catch (Exception ex)
+        else
         {
-            Snackbar.Add($"Błąd kamery: {ex.Message}", Severity.Error);
+            Snackbar.Add($"Nieprawidłowy kod QR: {qrCode}", Severity.Error);
         }
+        
+        StateHasChanged();
     }
-
-    private async Task StopScanner()
+    
+    private Guid? ParseProductIdFromQr(string qrCode)
     {
-        try
+        if (string.IsNullOrWhiteSpace(qrCode)) return null;
+        
+        // Format: SR:P:{ProductId}
+        if (qrCode.StartsWith("SR:P:", StringComparison.OrdinalIgnoreCase))
         {
-            await JS.InvokeVoidAsync("srBarcode.stop", "videoScanner");
+            var idPart = qrCode.Substring(5);
+            if (Guid.TryParse(idPart, out var id)) return id;
         }
-        catch { }
-        _scannerActive = false;
+        
+        // Try raw GUID
+        if (Guid.TryParse(qrCode, out var rawId)) return rawId;
+        
+        return null;
     }
 
     private void RemoveItem(RentalItem item)
