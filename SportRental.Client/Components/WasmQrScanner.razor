@@ -117,7 +117,7 @@
             try
             {
                 _dotNetRef = DotNetObjectReference.Create(this);
-                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/WasmQrScanner.razor.js");
+                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_client/js/wasm-qr-scanner.js");
                 
                 if (AutoStart)
                 {
@@ -142,7 +142,7 @@
         {
             if (_module == null)
             {
-                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/WasmQrScanner.razor.js");
+                _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_client/js/wasm-qr-scanner.js");
             }
             
             var result = await _module.InvokeAsync<CameraResult>("startCamera", _videoElement, _dotNetRef);
