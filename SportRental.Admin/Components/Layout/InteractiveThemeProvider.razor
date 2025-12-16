@@ -11,7 +11,9 @@
     
     protected override void OnInitialized()
     {
-        _isDarkMode = Theme.IsDarkMode;
+        // Domyślnie jasny motyw
+        _isDarkMode = false;
+        Theme.IsDarkMode = false;
         Theme.OnChanged += HandleThemeChanged;
     }
     
@@ -21,13 +23,8 @@
         {
             try
             {
-                var systemPreference = await _mudThemeProvider.GetSystemPreference();
-                if (systemPreference != _isDarkMode)
-                {
-                    _isDarkMode = systemPreference;
-                    Theme.IsDarkMode = _isDarkMode;
-                    StateHasChanged();
-                }
+                // NIE pobieramy preferencji systemowych - zawsze zaczynamy od jasnego motywu
+                // Użytkownik może przełączyć motyw ręcznie
                 await _mudThemeProvider.WatchSystemPreference(OnSystemPreferenceChanged);
             }
             catch
@@ -39,9 +36,11 @@
     
     private async Task OnSystemPreferenceChanged(bool newValue)
     {
-        _isDarkMode = newValue;
-        Theme.IsDarkMode = newValue;
-        await InvokeAsync(StateHasChanged);
+        // Reagujemy na zmianę preferencji systemowych tylko jeśli użytkownik tego chce
+        // Na razie ignorujemy - motyw zmienia się tylko przez przycisk
+        // _isDarkMode = newValue;
+        // Theme.IsDarkMode = newValue;
+        // await InvokeAsync(StateHasChanged);
     }
     
     private void HandleThemeChanged()

@@ -20,8 +20,23 @@
             </MudButton>
         </div>
     }
+    else if (!_isScanning && !_isLoading && string.IsNullOrEmpty(_error))
+    {
+        <div class="qr-scanner-start">
+            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="Size.Large" Color="Color.Primary" />
+            <MudText Typo="Typo.h6" Class="mt-2">Skaner kodów QR</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                Skieruj kamerę na kod QR produktu
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartScanning"
+                       StartIcon="@Icons.Material.Filled.CameraAlt" Size="Size.Large">
+                Uruchom kamerę
+            </MudButton>
+        </div>
+    }
     
-    <div id="@_scannerId" class="qr-scanner-video @(_isScanning ? "" : "hidden")"></div>
+    @* Video container - always in DOM, visibility controlled by CSS *@
+    <div id="@_scannerId" class="qr-scanner-video" style="@(_isScanning ? "display: block;" : "display: none;")"></div>
     
     @if (_isScanning)
     {
@@ -43,20 +58,6 @@
             </MudButton>
         </div>
     }
-    else if (!_isLoading && string.IsNullOrEmpty(_error))
-    {
-        <div class="qr-scanner-start">
-            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Size="Size.Large" Color="Color.Primary" />
-            <MudText Typo="Typo.h6" Class="mt-2">Skaner kodów QR</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
-                Skieruj kamerę na kod QR produktu
-            </MudText>
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartScanning"
-                       StartIcon="@Icons.Material.Filled.CameraAlt" Size="Size.Large">
-                Uruchom kamerę
-            </MudButton>
-        </div>
-    }
 </div>
 
 <style>
@@ -65,21 +66,39 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 350px;
+        min-height: 400px;
         background: var(--mud-palette-background-grey);
         border-radius: 12px;
         padding: 1rem;
+        width: 100%;
     }
     
     .qr-scanner-video {
         width: 100%;
-        max-width: 400px;
+        max-width: 100%;
+        min-height: 300px;
         border-radius: 12px;
         overflow: hidden;
+        background: #000;
     }
     
-    .qr-scanner-video.hidden {
-        display: none;
+    /* Force html5-qrcode video to be visible */
+    .qr-scanner-video video {
+        width: 100% !important;
+        height: auto !important;
+        max-height: 400px !important;
+        object-fit: cover !important;
+        border-radius: 8px;
+    }
+    
+    /* html5-qrcode container styling */
+    .qr-scanner-video > div {
+        width: 100% !important;
+    }
+    
+    .qr-scanner-video #qr-shaded-region {
+        border-color: #4caf50 !important;
+        border-width: 3px !important;
     }
     
     .qr-scanner-loading,
@@ -98,11 +117,6 @@
         margin-top: 1rem;
         flex-wrap: wrap;
         justify-content: center;
-    }
-    
-    /* Style the html5-qrcode scanner */
-    :deep(#qr-shaded-region) {
-        border-color: var(--mud-palette-primary) !important;
     }
 </style>
 
@@ -126,6 +140,10 @@
         if (firstRender)
         {
             _dotNetRef = DotNetObjectReference.Create(this);
+            
+            // Small delay to ensure DOM is ready
+            await Task.Delay(100);
+            
             var result = await JS.InvokeAsync<InitResult>("QrScanner.init", _scannerId, _dotNetRef);
             
             if (!result.Success)
@@ -151,12 +169,16 @@
         if (!_initialized)
         {
             _error = "Skaner nie został zainicjalizowany";
+            StateHasChanged();
             return;
         }
         
         _isLoading = true;
         _error = null;
         StateHasChanged();
+        
+        // Wait for DOM update
+        await Task.Delay(50);
         
         try
         {
