@@ -1,12 +1,18 @@
 # Instrukcja publikowania aplikacji SportRentalHybrid na Azure
 
-> **Ostatnia aktualizacja:** Grudzień 2025
+> **Ostatnia aktualizacja:** Styczeń 2026
 
 ## Przegląd architektury
 
 Projekt składa się z dwóch **aktywnych** aplikacji:
-1. **SportRental.Admin** - Blazor Server (panel administracyjny + **API dla klienta WASM**) → Azure App Service
-2. **SportRental.Client** - Blazor WASM (aplikacja kliencka) → Azure Static Web Apps
+1. **SportRental.Admin** - Blazor Server (panel administracyjny + **API dla klienta WASM**) → Azure App Service (`sradmin`)
+2. **SportRental.Client** - Blazor WASM (aplikacja kliencka) → Azure App Service (`srclient-blazor`)
+
+### Aktualne URL-e produkcyjne
+| Aplikacja | URL |
+|-----------|-----|
+| Admin Panel | https://sradmin.azurewebsites.net |
+| Client WASM | https://srclient-blazor.azurewebsites.net |
 
 ### ⚠️ Wyłączone projekty
 - **SportRental.Api** - wyłączony, API hostowane w Admin
@@ -194,6 +200,8 @@ Wszystkie sekrety są w folderze `secrets/` (gitignored):
 - `secrets/README.md` - opis
 
 **NIE COMMITUJ SEKRETÓW DO GITA!**
+
+
 
 
 
