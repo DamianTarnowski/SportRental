@@ -1,11 +1,13 @@
 @page "/admin/rentals"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
+@using Microsoft.AspNetCore.SignalR.Client
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
 @inject SportRental.Admin.Services.Sms.ISmsConfirmationService SmsConfirmationService
 @inject ILogger<Rentals> Logger
+@inject NavigationManager NavigationManager
 @if (_isMobile)
 {
     @* ==================== MOBILE UI ==================== *@
@@ -93,6 +95,7 @@
                                         <MudMenuItem Icon="@Icons.Material.Filled.Description" Href="@rental.ContractUrl" Target="_blank">Umowa</MudMenuItem>
                                     }
                                     <MudMenuItem Icon="@Icons.Material.Filled.Email" OnClick="() => SendContractByEmail(rental)">Email</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Sms" OnClick="() => OpenCustomSmsDialog(rental)">SMS</MudMenuItem>
                                     @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
                                     {
                                         <MudMenuItem Icon="@Icons.Material.Filled.CheckCircle" OnClick="() => CompleteRental(rental)">Zakończ</MudMenuItem>
@@ -100,12 +103,22 @@
                                     <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="() => Delete(rental)">Usuń</MudMenuItem>
                                 </MudMenu>
                             </div>
-                            @if (IsOverdue(rental))
-                            {
-                                <MudChip T="string" Color="Color.Error" Size="Size.Small" Class="mt-1">
-                                    ⚠️ Przeterminowany (@GetOverdueDays(rental) dni)
-                                </MudChip>
-                            }
+                            <div class="d-flex align-center gap-1 flex-wrap mt-1">
+                                @if (rental.IsSmsConfirmationSent)
+                                {
+                                    <MudChip T="string" Icon="@Icons.Material.Filled.Sms" 
+                                             Color="@(rental.IsSmsConfirmed ? Color.Success : Color.Warning)" 
+                                             Size="Size.Small">
+                                        @(rental.IsSmsConfirmed ? "SMS ✓" : "SMS...")
+                                    </MudChip>
+                                }
+                                @if (IsOverdue(rental))
+                                {
+                                    <MudChip T="string" Color="Color.Error" Size="Size.Small">
+                                        ⚠️ Przeterminowany (@GetOverdueDays(rental) dni)
+                                    </MudChip>
+                                }
+                            </div>
                         </MudCardContent>
                     </MudCard>
                 }
@@ -275,7 +288,7 @@ else
                                                      Color="@GetStatusColor(rental.Status)" 
                                                      Variant="Variant.Text"
                                                      Size="Size.Small">
-                                                @GetStatusText(rental.Status)
+                                                @GetRentalStatusText(rental)
                                             </MudChip>
                                             <MudChip T="string" Icon="@Icons.Material.Filled.Email" 
                                                      Color="@(rental.IsEmailSent ? Color.Success : Color.Default)" 
@@ -283,6 +296,15 @@ else
                                                      Size="Size.Small">
                                                 Email: @(rental.IsEmailSent ? "✓" : "✗")
                                             </MudChip>
+                                            @if (rental.IsSmsConfirmationSent)
+                                            {
+                                                <MudChip T="string" Icon="@Icons.Material.Filled.Sms" 
+                                                         Color="@(rental.IsSmsConfirmed ? Color.Success : Color.Warning)" 
+                                                         Variant="Variant.Filled"
+                                                         Size="Size.Small">
+                                                    SMS: @(rental.IsSmsConfirmed ? "Potwierdzony" : "Oczekuje")
+                                                </MudChip>
+                                            }
                                             <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
                                                      Color="@GetSourceColor(rental.Source)" 
                                                      Variant="Variant.Text"
@@ -353,6 +375,12 @@ else
                                                        OnClick="() => SendContractByEmail(rental)"
                                                        Size="Size.Small">
                                                 Email
+                                            </MudButton>
+                                            <MudButton StartIcon="@Icons.Material.Filled.Sms" 
+                                                       OnClick="() => OpenCustomSmsDialog(rental)"
+                                                       Size="Size.Small"
+                                                       Color="Color.Info">
+                                                SMS
                                             </MudButton>
                                         </MudButtonGroup>
                                         
@@ -803,6 +831,8 @@ else
 @code {
     // ==================== BREAKPOINT ====================
     private bool _isMobile = false;
+    private bool _smsConfirmationEnabled;
+    private Microsoft.AspNetCore.SignalR.Client.HubConnection? _hubConnection;
     
     private void OnBreakpointChanged(Breakpoint breakpoint)
     {
@@ -859,12 +889,74 @@ else
             customers = await Db.Customers.AsNoTracking().OrderBy(c => c.FullName).ToListAsync();
             customersDict = customers.ToDictionary(c => c.Id, c => c);
             rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+            _smsConfirmationEnabled = companyInfo?.SmsConfirmationEnabled == true;
             await UpdateReservedMap();
+
+            await ConnectToSignalRAsync();
         }
         catch (Exception ex)
         {
             loadError = "Nie udało się załadować listy wynajmów. Sprawdź logi.";
             Logger.LogError(ex, "Błąd podczas wczytywania wynajmów (tenant {TenantId})", CurrentTenantId());
+        }
+    }
+
+    private async Task ConnectToSignalRAsync()
+    {
+        try
+        {
+            var baseUri = NavigationManager.BaseUri.TrimEnd('/');
+            _hubConnection = new Microsoft.AspNetCore.SignalR.Client.HubConnectionBuilder()
+                .WithUrl(new Uri($"{baseUri}/hubs/rentals"))
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hubConnection.On("RentalStatusChanged", (SportRental.Admin.Hubs.RentalStatusChangedEvent evt) =>
+            {
+                Logger.LogInformation("Received RentalStatusChanged for rental {RentalId}", evt.RentalId);
+                
+                var rental = rentals.FirstOrDefault(r => r.Id == evt.RentalId);
+                if (rental != null)
+                {
+                    rental.IsSmsConfirmed = evt.IsSmsConfirmed;
+                    rental.IsSmsConfirmationSent = evt.IsSmsConfirmationSent;
+                    if (Enum.TryParse<RentalStatus>(evt.NewStatus, out var newStatus))
+                    {
+                        rental.Status = newStatus;
+                    }
+                    _ = InvokeAsync(() =>
+                    {
+                        StateHasChanged();
+                        Snackbar.Add($"Status wynajmu zaktualizowany: {GetRentalStatusText(rental)}", MudBlazor.Severity.Info);
+                    });
+                }
+            });
+
+            await _hubConnection.StartAsync();
+            await _hubConnection.SendAsync("JoinTenantGroup", CurrentTenantId().ToString());
+            Logger.LogInformation("Connected to SignalR hub for tenant {TenantId}", CurrentTenantId());
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to connect to SignalR hub - real-time updates disabled");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            try
+            {
+                await _hubConnection.SendAsync("LeaveTenantGroup", CurrentTenantId().ToString());
+                await _hubConnection.DisposeAsync();
+            }
+            catch
+            {
+                // ignore
+            }
+            _hubConnection = null;
         }
     }
 
@@ -1260,20 +1352,32 @@ else
     [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
     private Guid CurrentTenantId() => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
 
-    private async Task RefreshRentals()
+    private Task RefreshRentals() => RefreshRentalsInternalAsync(showSnackbar: true);
+
+    private async Task RefreshRentalsInternalAsync(bool showSnackbar, CancellationToken ct = default)
     {
         try
         {
-            await using var Db = await DbFactory.CreateDbContextAsync();
+            await using var Db = await DbFactory.CreateDbContextAsync(ct);
             Db.SetTenant(CurrentTenantId());
-            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
-            Snackbar.Add("Lista wynajmów odświeżona", MudBlazor.Severity.Info);
+            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync(ct);
+            var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId(), ct);
+            _smsConfirmationEnabled = companyInfo?.SmsConfirmationEnabled == true;
+
+            if (showSnackbar)
+            {
+                Snackbar.Add("Lista wynajmów odświeżona", MudBlazor.Severity.Info);
+            }
+
             StateHasChanged();
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error refreshing rentals");
-            Snackbar.Add($"Błąd odświeżania: {ex.Message}", MudBlazor.Severity.Error);
+            if (showSnackbar)
+            {
+                Snackbar.Add($"Błąd odświeżania: {ex.Message}", MudBlazor.Severity.Error);
+            }
         }
     }
 
@@ -1297,7 +1401,11 @@ else
         var statusFilter = new List<RentalStatus>();
         if (cbStarted) statusFilter.Add(RentalStatus.Active);
         if (cbEnded) statusFilter.Add(RentalStatus.Completed);
-        if (cbIncoming) statusFilter.Add(RentalStatus.Confirmed);
+        if (cbIncoming)
+        {
+            statusFilter.Add(RentalStatus.Confirmed);
+            statusFilter.Add(RentalStatus.Pending);
+        }
         
         if (statusFilter.Any())
         {
@@ -1411,6 +1519,17 @@ else
         RentalStatus.Cancelled => "Anulowany",
         _ => status.ToString()
     };
+
+    private string GetRentalStatusText(Rental rental)
+    {
+        if (_smsConfirmationEnabled && rental.IsSmsConfirmationSent && !rental.IsSmsConfirmed)
+            return "Oczekuje na SMS";
+        
+        if (rental.IsSmsConfirmed)
+            return "Potwierdzony ✓";
+        
+        return GetStatusText(rental.Status);
+    }
 
     private string GetStatusColorHex(RentalStatus status) => status switch
     {

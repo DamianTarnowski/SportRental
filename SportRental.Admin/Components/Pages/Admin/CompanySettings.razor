@@ -63,6 +63,38 @@
                         </MudStack>
                     </MudExpansionPanel>
                     
+                    <MudExpansionPanel Text="📱 Ustawienia SMS" Style="border-radius: 10px;">
+                        <MudStack Spacing="2">
+                            <MudAlert Severity="Severity.Success" Dense="true">
+                                ✅ SMSAPI.pl aktywne
+                            </MudAlert>
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsConfirmationEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsConfirmationEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Potwierdzenie umowy" />
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsThanksEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsThanksEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Podziękowanie po zwrocie" />
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsReminderEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsReminderEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Przypomnienie o zwrocie" />
+
+                            <MudButton StartIcon="@Icons.Material.Filled.Save"
+                                       Color="Color.Primary"
+                                       Variant="Variant.Filled"
+                                       OnClick="Save"
+                                       Disabled="@isSaving"
+                                       Class="mt-2">
+                                Zapisz ustawienia SMS
+                            </MudButton>
+                        </MudStack>
+                    </MudExpansionPanel>
+                    
                     <MudExpansionPanel Text="📍 Lokalizacja" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
                             <MudTextField @bind-Value="companyInfo.City" Label="Miasto" ReadOnly="true" Dense="true" Variant="Variant.Outlined" />
@@ -89,7 +121,7 @@
                 </MudExpansionPanels>
                 
                 @* Przyciski *@
-                <MudStack Row="true" Spacing="2" Class="mud-justify-end">
+                <MudStack Row="true" Spacing="2" Class="mud-justify-end mt-4 mb-4">
                     <MudButton Href="/admin/owner" Variant="Variant.Outlined" Size="Size.Small">Anuluj</MudButton>
                     <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@isSaving" Size="Size.Small">
                         @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
@@ -187,6 +219,66 @@ else
                     </MudPaper>
                 </MudItem>
                 
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">📱 Ustawienia SMS</MudText>
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                            <MudText Typo="Typo.body2">
+                                ✅ Integracja z SMSAPI.pl jest aktywna. SMS-y będą wysyłane do klientów.
+                            </MudText>
+                        </MudAlert>
+                        <MudStack Spacing="3">
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsConfirmationEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsConfirmationEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Wysyłaj SMS z prośbą o potwierdzenie umowy" />
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsThanksEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsThanksEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Wysyłaj SMS z podziękowaniem po zwrocie" />
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsReminderEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsReminderEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Wysyłaj SMS z przypomnieniem o zwrocie" />
+
+                            <MudButton StartIcon="@Icons.Material.Filled.Save"
+                                       Color="Color.Primary"
+                                       Variant="Variant.Filled"
+                                       OnClick="Save"
+                                       Disabled="@isSaving">
+                                Zapisz ustawienia SMS
+                            </MudButton>
+                            
+                            @if (companyInfo.SmsThanksEnabled)
+                            {
+                                <MudTextField @bind-Value="companyInfo.SmsThanksText" 
+                                              Label="Treść SMS - podziękowanie" 
+                                              Lines="2"
+                                              Variant="Variant.Outlined"
+                                              HelperText="Zostaw puste dla domyślnej wiadomości" />
+                            }
+                            @if (companyInfo.SmsReminderEnabled)
+                            {
+                                <MudTextField @bind-Value="companyInfo.SmsReminderText" 
+                                              Label="Treść SMS - przypomnienie 1" 
+                                              Lines="2"
+                                              Variant="Variant.Outlined" />
+                                <MudTextField @bind-Value="companyInfo.SmsReminderText2" 
+                                              Label="Treść SMS - przypomnienie 2" 
+                                              Lines="2"
+                                              Variant="Variant.Outlined" />
+                                <MudTextField @bind-Value="companyInfo.SmsReminderText3" 
+                                              Label="Treść SMS - przypomnienie 3" 
+                                              Lines="2"
+                                              Variant="Variant.Outlined" />
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                
                 <MudItem xs="12">
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
                         <MudText Typo="Typo.h6" Class="mb-3">📝 Dodatkowe informacje</MudText>
@@ -260,7 +352,7 @@ else
                 </MudItem>
                 
                 <MudItem xs="12">
-                    <MudStack Row="true" Spacing="2" Class="mud-justify-end">
+                    <MudStack Row="true" Spacing="2" Class="mud-justify-end mt-6 mb-6">
                         <MudButton Href="/admin/owner" Variant="Variant.Outlined">Anuluj</MudButton>
                         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@isSaving">
                             @if (isSaving)

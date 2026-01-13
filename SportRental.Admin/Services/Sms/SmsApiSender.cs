@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using SMSApi.Api;
+using System.Text.RegularExpressions;
 
 namespace SportRental.Admin.Services.Sms
 {
@@ -26,11 +27,12 @@ namespace SportRental.Admin.Services.Sms
         public async Task SendAsync(string phoneNumber, string message, CancellationToken ct = default)
         {
             var normalizedPhone = NormalizePhoneNumber(phoneNumber);
+            var sanitizedMessage = SanitizeSmsText(message);
 
             if (!_settings.IsEnabled || _client == null)
             {
-                Console.WriteLine($"[SMS-DISABLED] {normalizedPhone}: {message}");
-                _logger.LogInformation("[SMS-DISABLED] To: {PhoneNumber}, Message: {Message}", normalizedPhone, message);
+                Console.WriteLine($"[SMS-DISABLED] {normalizedPhone}: {sanitizedMessage}");
+                _logger.LogInformation("[SMS-DISABLED] To: {PhoneNumber}, Message: {Message}", normalizedPhone, sanitizedMessage);
                 return;
             }
 
@@ -43,7 +45,7 @@ namespace SportRental.Admin.Services.Sms
                 attempts++;
                 try
                 {
-                    await SendSmsInternalAsync(normalizedPhone, message);
+                    await SendSmsInternalAsync(normalizedPhone, sanitizedMessage);
                     _logger.LogInformation("SMS sent successfully to {PhoneNumber} on attempt {Attempt}", normalizedPhone, attempts);
                     return;
                 }
@@ -63,6 +65,29 @@ namespace SportRental.Admin.Services.Sms
             _logger.LogError(lastException, "Failed to send SMS to {PhoneNumber} after {MaxAttempts} attempts", 
                 normalizedPhone, maxAttempts);
             throw new InvalidOperationException($"Failed to send SMS after {maxAttempts} attempts", lastException);
+        }
+
+        private static string SanitizeSmsText(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return message;
+
+            var sanitized = message;
+
+            // Remove URLs
+            sanitized = Regex.Replace(sanitized, @"\bhttps?://\S+\b", "", RegexOptions.IgnoreCase);
+            sanitized = Regex.Replace(sanitized, @"\bwww\.\S+\b", "", RegexOptions.IgnoreCase);
+
+            // Remove emails
+            sanitized = Regex.Replace(sanitized, @"\b[\w.\-+%]+@[\w.\-]+\.[A-Za-z]{2,}\b", "", RegexOptions.IgnoreCase);
+
+            // Some providers also flag domain-like patterns; remove bare domains like example.com
+            sanitized = Regex.Replace(sanitized, @"\b[\w\-]+\.(pl|com|net|org|io|dev|eu|info)\b", "", RegexOptions.IgnoreCase);
+
+            // Normalize whitespace
+            sanitized = Regex.Replace(sanitized, @"\s{2,}", " ").Trim();
+
+            return sanitized;
         }
 
         private async Task SendSmsInternalAsync(string phoneNumber, string message)
@@ -130,9 +155,8 @@ namespace SportRental.Admin.Services.Sms
         
         public Task SendContractConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, string? customerEmail, CancellationToken ct = default)
         {
-            var contractUrl = $"https://sradmin2.azurewebsites.net/c/{rentalId.ToString()[..8].ToLower()}";
-            var emailInfo = !string.IsNullOrWhiteSpace(customerEmail) ? $" wysłanej na {customerEmail}" : "";
-            var message = $"SportRental: {customerName}, czy potwierdzasz warunki umowy{emailInfo}? {contractUrl} Odpisz TAK lub NIE.";
+            var rentalCode = rentalId.ToString()[..8].ToUpper();
+            var message = $"SportRental: {customerName}, czy potwierdzasz umowe nr {rentalCode}? Odpisz TAK lub NIE.";
             return SendAsync(phoneNumber, message, ct);
         }
     }

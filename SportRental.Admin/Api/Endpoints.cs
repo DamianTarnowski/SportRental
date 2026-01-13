@@ -288,6 +288,59 @@ namespace SportRental.Admin.Api
                 return product is null ? Results.NotFound() : Results.Ok(product);
             });
 
+            // GET /api/tenants - lista wszystkich wypożyczalni z produktami
+            api.MapGet("/tenants", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                CancellationToken ct) =>
+            {
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                db.SetTenant(null); // Globalny dostęp
+
+                // Pobierz tenant IDs które mają aktywne produkty
+                var tenantIdsWithProducts = await db.Products
+                    .IgnoreQueryFilters()
+                    .Where(p => p.IsActive)
+                    .Select(p => p.TenantId)
+                    .Distinct()
+                    .ToListAsync(ct);
+
+                var tenants = await db.Tenants
+                    .AsNoTracking()
+                    .Where(t => tenantIdsWithProducts.Contains(t.Id))
+                    .Select(t => new
+                    {
+                        Id = t.Id,
+                        Name = t.Name,
+                        LogoUrl = t.LogoUrl
+                    })
+                    .ToListAsync(ct);
+
+                // Pobierz company info osobno
+                var companyInfos = await db.CompanyInfos
+                    .AsNoTracking()
+                    .Where(ci => tenantIdsWithProducts.Contains(ci.TenantId))
+                    .ToDictionaryAsync(ci => ci.TenantId, ct);
+
+                // Zlicz produkty dla każdego tenanta
+                var productCounts = await db.Products
+                    .IgnoreQueryFilters()
+                    .Where(p => p.IsActive && tenantIdsWithProducts.Contains(p.TenantId))
+                    .GroupBy(p => p.TenantId)
+                    .Select(g => new { TenantId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.TenantId, x => x.Count, ct);
+
+                var result = tenants.Select(t => new
+                {
+                    t.Id,
+                    Name = companyInfos.TryGetValue(t.Id, out var ci) && !string.IsNullOrEmpty(ci.Name) ? ci.Name : t.Name,
+                    t.LogoUrl,
+                    ProductCount = productCounts.GetValueOrDefault(t.Id, 0),
+                    City = companyInfos.TryGetValue(t.Id, out var ci2) ? ci2.City : null
+                }).ToList();
+
+                return Results.Ok(result);
+            });
+
             // GET /api/tenants/locations - lokalizacje wypożyczalni (dla mapy)
             api.MapGet("/tenants/locations", [AllowAnonymous] async (
                 IDbContextFactory<ApplicationDbContext> dbFactory,

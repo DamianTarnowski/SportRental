@@ -1,6 +1,7 @@
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Tenancy;
+using SportRental.Admin.Hubs;
 using Microsoft.EntityFrameworkCore;
 
 namespace SportRental.Admin.Services.Sms
@@ -11,6 +12,7 @@ namespace SportRental.Admin.Services.Sms
         private readonly ITenantProvider _tenantProvider;
         private readonly ILogger<SmsConfirmationService> _logger;
         private readonly ISmsSender _smsSender;
+        private readonly IRentalNotificationService _notificationService;
 
         // Słowa kluczowe oznaczające potwierdzenie
         private static readonly string[] ConfirmationKeywords = { "TAK", "YES", "OK", "POTWIERDZAM", "ZGADZAM", "1" };
@@ -20,12 +22,14 @@ namespace SportRental.Admin.Services.Sms
             IDbContextFactory<ApplicationDbContext> contextFactory,
             ITenantProvider tenantProvider,
             ILogger<SmsConfirmationService> logger,
-            ISmsSender smsSender)
+            ISmsSender smsSender,
+            IRentalNotificationService notificationService)
         {
             _contextFactory = contextFactory;
             _tenantProvider = tenantProvider;
             _logger = logger;
             _smsSender = smsSender;
+            _notificationService = notificationService;
         }
 
         public async Task<string> GenerateConfirmationCodeAsync(Guid rentalId, CancellationToken ct = default)
@@ -235,6 +239,22 @@ namespace SportRental.Admin.Services.Sms
             }
 
             await context.SaveChangesAsync(ct);
+
+            // Powiadom UI o zmianie statusu przez SignalR
+            try
+            {
+                var notification = new RentalStatusChangedEvent(
+                    rental.Id,
+                    rental.Status.ToString(),
+                    rental.IsSmsConfirmed,
+                    rental.IsSmsConfirmationSent,
+                    DateTime.UtcNow);
+                await _notificationService.NotifyRentalStatusChangedAsync(pendingConfirmation.TenantId, notification, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send SignalR notification for rental {RentalId}", rental.Id);
+            }
 
             // Wyślij odpowiedź SMS
             try

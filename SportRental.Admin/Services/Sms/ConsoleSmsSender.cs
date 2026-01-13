@@ -37,9 +37,8 @@ namespace SportRental.Admin.Services.Sms
         
         public Task SendContractConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, string? customerEmail, CancellationToken ct = default)
         {
-            var contractUrl = $"https://sradmin2.azurewebsites.net/c/{rentalId.ToString()[..8].ToLower()}";
-            var emailInfo = !string.IsNullOrWhiteSpace(customerEmail) ? $" wysłanej na {customerEmail}" : "";
-            var message = $"SportRental: {customerName}, czy potwierdzasz warunki umowy{emailInfo}? {contractUrl} Odpisz TAK lub NIE.";
+            var rentalCode = rentalId.ToString()[..8].ToUpper();
+            var message = $"SportRental: {customerName}, czy potwierdzasz umowe nr {rentalCode}? Odpisz TAK lub NIE.";
             return SendAsync(phoneNumber, message, ct);
         }
     }

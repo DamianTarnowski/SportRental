@@ -2,8 +2,10 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 @using SportRental.Infrastructure.Domain
+@using Microsoft.AspNetCore.Components.Authorization
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthStateProvider
 @inject MudBlazor.ISnackbar Snackbar
 @inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
 @inject IDialogService DialogService
@@ -458,6 +460,47 @@ else
                                           Variant="Variant.Outlined"
                                           Class="rounded-lg" />
                         </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="model.Category" 
+                                       Label="Kategoria"
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Category"
+                                       Class="rounded-lg">
+                                <MudSelectItem Value="@("Narty")">🎿 Narty</MudSelectItem>
+                                <MudSelectItem Value="@("Snowboard")">🏂 Snowboard</MudSelectItem>
+                                <MudSelectItem Value="@("Buty narciarskie")">👟 Buty narciarskie</MudSelectItem>
+                                <MudSelectItem Value="@("Buty snowboardowe")">👢 Buty snowboardowe</MudSelectItem>
+                                <MudSelectItem Value="@("Kije")">🥢 Kije</MudSelectItem>
+                                <MudSelectItem Value="@("Kask")">⛑️ Kask</MudSelectItem>
+                                <MudSelectItem Value="@("Gogle")">🥽 Gogle</MudSelectItem>
+                                <MudSelectItem Value="@("Rower")">🚴 Rower</MudSelectItem>
+                                <MudSelectItem Value="@("SUP")">🏄 SUP</MudSelectItem>
+                                <MudSelectItem Value="@("Kajak")">🛶 Kajak</MudSelectItem>
+                                <MudSelectItem Value="@("Inne")">📦 Inne</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudStack Row="true" Class="mud-align-center" Spacing="3" Style="height: 100%; padding-top: 8px;">
+                                <MudSwitch @bind-Value="model.IsActive" 
+                                           Color="Color.Success" 
+                                           Label="Produkt aktywny" />
+                                @if (model.IsActive)
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                                        <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
+                                        Widoczny dla klientów
+                                    </MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
+                                        <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small" Class="mr-1" />
+                                        Ukryty
+                                    </MudChip>
+                                }
+                            </MudStack>
+                        </MudItem>
                     </MudGrid>
                 </MudStack>
             </MudPaper>
@@ -501,47 +544,7 @@ else
                                               Variant="Variant.Outlined"
                                               Class="rounded-lg" />
                         </MudItem>
-                        <MudItem xs="12" md="4">
-                            <MudSelect T="string" @bind-Value="model.Category" 
-                                       Label="Kategoria"
-                                       Variant="Variant.Outlined"
-                                       Adornment="Adornment.Start"
-                                       AdornmentIcon="@Icons.Material.Filled.Category"
-                                       Class="rounded-lg">
-                                <MudSelectItem Value="@("Narty")">🎿 Narty</MudSelectItem>
-                                <MudSelectItem Value="@("Snowboard")">🏂 Snowboard</MudSelectItem>
-                                <MudSelectItem Value="@("Buty narciarskie")">👟 Buty narciarskie</MudSelectItem>
-                                <MudSelectItem Value="@("Buty snowboardowe")">👢 Buty snowboardowe</MudSelectItem>
-                                <MudSelectItem Value="@("Kije")">🥢 Kije</MudSelectItem>
-                                <MudSelectItem Value="@("Kask")">⛑️ Kask</MudSelectItem>
-                                <MudSelectItem Value="@("Gogle")">🥽 Gogle</MudSelectItem>
-                                <MudSelectItem Value="@("Rower")">🚴 Rower</MudSelectItem>
-                                <MudSelectItem Value="@("SUP")">🏄 SUP</MudSelectItem>
-                                <MudSelectItem Value="@("Kajak")">🛶 Kajak</MudSelectItem>
-                                <MudSelectItem Value="@("Inne")">📦 Inne</MudSelectItem>
-                            </MudSelect>
-                        </MudItem>
                     </MudGrid>
-
-                    <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                        <MudSwitch @bind-Value="model.IsActive" 
-                                   Color="Color.Success" 
-                                   Label="Produkt aktywny" />
-                        @if (model.IsActive)
-                        {
-                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
-                                <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
-                                Widoczny dla klientów
-                            </MudChip>
-                        }
-                        else
-                        {
-                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
-                                <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small" Class="mr-1" />
-                                Ukryty
-                            </MudChip>
-                        }
-                    </MudStack>
                 </MudStack>
             </MudPaper>
 
@@ -735,8 +738,17 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Pobierz TenantId z AuthenticationState (działa po SignalR reconnect)
+        var tenantId = await GetTenantIdAsync();
+        if (tenantId == Guid.Empty)
+        {
+            // Brak tenanta - nie pokazuj żadnych produktów
+            products = new List<Product>();
+            return;
+        }
+        
         await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(CurrentTenantId());
+        Db.SetTenant(tenantId);
         products = await Db.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
         await LoadCurrentlyRentedProducts();
     }
@@ -859,13 +871,43 @@ else
             _croppedBase64Image = null;
             _selectedImageName = null;
         }
-        products = await Db.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
+        // Przeładuj produkty tylko dla aktualnego tenanta
+        var tenantId = CurrentTenantId();
+        if (tenantId == Guid.Empty)
+        {
+            products = new List<Product>();
+        }
+        else
+        {
+            await using var DbReload = await DbFactory.CreateDbContextAsync();
+            DbReload.SetTenant(tenantId);
+            products = await DbReload.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
+        }
         dialogOpen = false;
         Snackbar.Add("Produkt zapisany!", Severity.Success);
     }
 
-    [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
-    private Guid CurrentTenantId() => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+    private Guid _cachedTenantId = Guid.Empty;
+    
+    private async Task<Guid> GetTenantIdAsync()
+    {
+        if (_cachedTenantId != Guid.Empty) return _cachedTenantId;
+        
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var claim = user.FindFirst("tenant-id");
+            if (claim != null && Guid.TryParse(claim.Value, out var tenantId))
+            {
+                _cachedTenantId = tenantId;
+                return tenantId;
+            }
+        }
+        return Guid.Empty;
+    }
+    
+    private Guid CurrentTenantId() => _cachedTenantId;
 
     private string GetProductIcon(string? category) => category?.ToLower() switch
     {
