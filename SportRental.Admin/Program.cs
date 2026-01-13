@@ -75,7 +75,9 @@ builder.Services.AddCors(options =>
             "http://localhost:5014",
             "https://localhost:7083",
             "http://localhost:5015",  // dodatkowy port dla backupu
-            "https://nice-tree-0359d8403.3.azurestaticapps.net"  // Production WASM client
+            "https://nice-tree-0359d8403.3.azurestaticapps.net",  // Azure Static Web Apps
+            "https://srclient.azurewebsites.net",  // Azure App Service (stary)
+            "https://srclient-blazor.azurewebsites.net"  // Azure App Service WASM client (nowy)
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
@@ -124,10 +126,19 @@ builder.Services.AddHttpClient("MediaStorage");
 // SerwerSMS.pl Configuration - integracja z SerwerSMS.pl
 // Dokumentacja: https://dev.serwersms.pl/https-api-v2/wprowadzenie
 // Panel: Ustawienia interfejsów → HTTP API → Użytkownicy API
+builder.Services.Configure<SmsRoutingSettings>(builder.Configuration.GetSection(SmsRoutingSettings.SectionName));
 builder.Services.Configure<SerwerSmsSettings>(builder.Configuration.GetSection(SerwerSmsSettings.SectionName));
+builder.Services.Configure<SmsApiSettings>(builder.Configuration.GetSection(SmsApiSettings.SectionName));
 builder.Services.AddHttpClient("SerwerSms");
-builder.Services.AddSingleton<ISmsSender, SerwerSmsSender>();
+builder.Services.AddSingleton<SmsApiSender>();
+builder.Services.AddSingleton<SerwerSmsSender>();
+builder.Services.AddSingleton<ConsoleSmsSender>();
+builder.Services.AddSingleton<ISmsSender, SmsSenderRouter>();
 builder.Services.AddScoped<ISmsConfirmationService, SmsConfirmationService>();
+
+// SignalR Hub for real-time rental notifications
+builder.Services.AddSingleton<SportRental.Admin.Hubs.IRentalNotificationService, SportRental.Admin.Hubs.RentalNotificationService>();
+
 // WewnÄ™trzny blob: domyĹ›lnie App_Data (+ mapowanie StaticFiles), alternatywnie wwwroot
 builder.Services.AddSingleton<IFileStorage>(sp =>
 {
@@ -218,12 +229,12 @@ builder.Services.AddAuthentication(options =>
     .AddIdentityCookies();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-// Pooled DbContext dla API i usĹ‚ug (scoped, ale z poolingiem)
-builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
-// Pooled factory dla komponentĂłw Blazor (lokalne, niezaleĹĽne instancje na ĹĽÄ…danie)
+// Pooled factory dla Blazor Server - tworzy instancje DbContext na żądanie
 builder.Services.AddPooledDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
+// Scoped DbContext dla Identity (pobiera z factory)
+builder.Services.AddScoped<ApplicationDbContext>(sp => 
+    sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => {
@@ -367,6 +378,7 @@ app.MapAdditionalIdentityEndpoints();
 app.MapSportRentalApi();
 app.MapSmsApiCallbacks(); // SMSAPI delivery report callbacks
 app.MapControllers();
+app.MapHub<SportRental.Admin.Hubs.RentalNotificationHub>("/hubs/rentals");
 
 // Seed test data in development (from test-data.json)
 if (app.Environment.IsDevelopment())

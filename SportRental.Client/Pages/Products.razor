@@ -2,12 +2,14 @@
 @using MudBlazor
 @using Microsoft.AspNetCore.Components.Web
 @using SportRental.Shared.Models
+@using SportRental.Client.Services
 @inject IApiService ApiService
 @inject ICartService CartService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject TenantService TenantService
 @implements IAsyncDisposable
 
 <PageTitle>SportRental - Katalog produktów</PageTitle>
@@ -610,6 +612,19 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // ============================================================================
+        // WAŻNE: Domyślnie wyświetlamy WSZYSTKIE produkty ze WSZYSTKICH wypożyczalni!
+        // NIE ładujemy tenanta z localStorage - filtrowanie tylko na życzenie użytkownika.
+        // Użytkownik może wybrać wypożyczalnię w filtrach jeśli chce.
+        // ============================================================================
+        
+        // WYŁĄCZONE - nie filtrujemy domyślnie po tenancie!
+        // var savedTenantName = await TenantService.GetSelectedTenantNameAsync();
+        // if (!string.IsNullOrEmpty(savedTenantName))
+        // {
+        //     selectedTenant = savedTenantName;
+        // }
+        
         await LoadInitialData();
     }
 
@@ -682,7 +697,13 @@ else
         try
         {
             // Load first page and get filter options from a larger sample
-            var initialResponse = await ApiService.GetProductsPagedAsync(new ProductFilterRequest { Page = 1, PageSize = 200 });
+            // Użyj wybranego tenanta jeśli jest ustawiony
+            var initialResponse = await ApiService.GetProductsPagedAsync(new ProductFilterRequest 
+            { 
+                Page = 1, 
+                PageSize = 200,
+                Tenant = string.IsNullOrWhiteSpace(selectedTenant) ? null : selectedTenant
+            });
             
             // Extract filter options from initial load
             var allProducts = initialResponse.Items;
