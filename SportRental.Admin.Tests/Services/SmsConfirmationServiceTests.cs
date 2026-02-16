@@ -42,7 +42,8 @@ public class SmsConfirmationServiceTests : IDisposable
             _contextFactoryMock.Object,
             _tenantProviderMock.Object,
             _loggerMock.Object,
-            _smsSenderMock.Object);
+            _smsSenderMock.Object,
+            new Mock<SportRental.Admin.Hubs.IRentalNotificationService>().Object);
     }
 
     [Fact]
