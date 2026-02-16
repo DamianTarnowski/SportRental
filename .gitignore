@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Azure deployment secrets (ścieżka: .azure-deploy-secrets)
+.azure-deploy-secrets
+
 # User-specific files
 *.rsuser
 *.suo
