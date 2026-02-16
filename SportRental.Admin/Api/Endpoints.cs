@@ -15,6 +15,24 @@ namespace SportRental.Admin.Api
 {
     public static class Endpoints
     {
+        // Helper to convert relative URLs to absolute URLs
+        private static string? ToAbsoluteUrl(string? relativeUrl, HttpRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(relativeUrl))
+                return relativeUrl;
+            
+            // Already absolute URL
+            if (relativeUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                relativeUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return relativeUrl;
+            
+            // Build absolute URL from request
+            var baseUrl = $"{request.Scheme}://{request.Host}";
+            return relativeUrl.StartsWith("/") 
+                ? $"{baseUrl}{relativeUrl}" 
+                : $"{baseUrl}/{relativeUrl}";
+        }
+
         public static IEndpointRouteBuilder MapSportRentalApi(this IEndpointRouteBuilder app)
         {
             // Krótki link do umowy (poza /api żeby był krótszy)
@@ -113,6 +131,7 @@ namespace SportRental.Admin.Api
             MapCustomerEndpoints(api);
 
             api.MapGet("/products", [AllowAnonymous] async (
+                HttpRequest request,
                 IDbContextFactory<ApplicationDbContext> dbFactory, 
                 ITenantProvider tenantProvider, 
                 int? page, 
@@ -235,9 +254,18 @@ namespace SportRental.Admin.Api
                     .Take(pageSizeNum)
                     .ToListAsync();
 
+                // Convert relative ImageUrls to absolute URLs
+                var itemsWithAbsoluteUrls = items.Select(p => new
+                {
+                    p.Id, p.TenantId, p.TenantName, p.Name, p.Sku, p.Category, p.Description,
+                    ImageUrl = ToAbsoluteUrl(p.ImageUrl, request),
+                    p.PricePerDay, p.DailyPrice, p.HourlyPrice, p.Quantity, p.AvailableQuantity,
+                    p.IsAvailable, p.City, p.Voivodeship, p.Lat, p.Lon
+                }).ToList();
+
                 return Results.Ok(new
                 {
-                    Items = items,
+                    Items = itemsWithAbsoluteUrls,
                     TotalCount = totalCount,
                     Page = pageNum,
                     PageSize = pageSizeNum,
@@ -247,6 +275,7 @@ namespace SportRental.Admin.Api
 
             // GET /api/products/{id} - pojedynczy produkt
             api.MapGet("/products/{id:guid}", [AllowAnonymous] async (
+                HttpRequest request,
                 IDbContextFactory<ApplicationDbContext> dbFactory,
                 ITenantProvider tenantProvider,
                 Guid id,
@@ -285,7 +314,18 @@ namespace SportRental.Admin.Api
                     })
                     .FirstOrDefaultAsync(ct);
 
-                return product is null ? Results.NotFound() : Results.Ok(product);
+                if (product is null) return Results.NotFound();
+                
+                // Convert relative ImageUrl to absolute URL
+                return Results.Ok(new
+                {
+                    product.Id, product.TenantId, product.TenantName, product.Name, product.Sku,
+                    product.Category, product.Description,
+                    ImageUrl = ToAbsoluteUrl(product.ImageUrl, request),
+                    product.PricePerDay, product.DailyPrice, product.HourlyPrice,
+                    product.Quantity, product.AvailableQuantity, product.IsAvailable,
+                    product.City, product.Voivodeship
+                });
             });
 
             // GET /api/tenants - lista wszystkich wypożyczalni z produktami
@@ -890,19 +930,17 @@ namespace SportRental.Admin.Api
                     return Results.BadRequest(new { error = "Email i hasło są wymagane" });
                 }
 
-                // Get tenant from header
+                // Tenant is optional — user is global, can see all rentals
+                Guid? tenantId = null;
                 var tenantIdHeader = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
-                if (string.IsNullOrWhiteSpace(tenantIdHeader) || !Guid.TryParse(tenantIdHeader, out var tenantId))
+                if (!string.IsNullOrWhiteSpace(tenantIdHeader) && Guid.TryParse(tenantIdHeader, out var parsedTenantId))
                 {
-                    return Results.BadRequest(new { error = "Header X-Tenant-Id jest wymagany" });
-                }
-
-                // Verify tenant exists
-                await using var db = await dbFactory.CreateDbContextAsync();
-                var tenantExists = await db.Tenants.AnyAsync(t => t.Id == tenantId);
-                if (!tenantExists)
-                {
-                    return Results.BadRequest(new { error = "Nieprawidłowy Tenant ID" });
+                    await using var dbCheck = await dbFactory.CreateDbContextAsync();
+                    var tenantExists = await dbCheck.Tenants.AnyAsync(t => t.Id == parsedTenantId);
+                    if (tenantExists)
+                    {
+                        tenantId = parsedTenantId;
+                    }
                 }
 
                 // Check if email already exists
@@ -930,11 +968,12 @@ namespace SportRental.Admin.Api
                 // Assign Client role
                 await userManager.AddToRoleAsync(user, "Client");
 
-                // Automatically create Customer record
+                // Automatically create Customer record (use tenant if provided)
+                await using var db = await dbFactory.CreateDbContextAsync();
                 var customer = new Customer
                 {
                     Id = Guid.NewGuid(),
-                    TenantId = tenantId,
+                    TenantId = tenantId ?? Guid.Empty,
                     FullName = request.FullName ?? request.Email.Split('@')[0],
                     Email = request.Email,
                     PhoneNumber = request.PhoneNumber,
@@ -1251,7 +1290,7 @@ namespace SportRental.Admin.Api
                         || Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
                     var clientBaseUrl = isDevelopment 
                         ? "http://localhost:5014" 
-                        : "https://nice-tree-0359d8403.3.azurestaticapps.net";
+                        : "https://srclient-blazor.azurewebsites.net";
                     
                     var successUrl = stripe.SuccessUrl ?? configuration["Stripe:SuccessUrl"] ?? $"{clientBaseUrl}/checkout/success";
                     var cancelUrl = stripe.CancelUrl ?? configuration["Stripe:CancelUrl"] ?? $"{clientBaseUrl}/checkout/cancel";

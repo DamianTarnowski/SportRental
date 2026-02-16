@@ -7,6 +7,7 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
 @inject UserManager<ApplicationUser> UserManager
+@inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
 
 @if (_isMobile)
 {
@@ -523,15 +524,30 @@ else
             
             if (selectedLogoFile != null)
             {
-                using var content = new MultipartFormDataContent();
-                content.Add(new StreamContent(selectedLogoFile.OpenReadStream(5 * 1024 * 1024)), "file", selectedLogoFile.Name);
-                
-                var client = new HttpClient { BaseAddress = new Uri(Navigation.ToAbsoluteUri("/").ToString()) };
-                var res = await client.PostAsync($"api/tenants/{_tenantId}/logo", content);
-                if (res.IsSuccessStatusCode)
+                try
                 {
-                    var json = await res.Content.ReadFromJsonAsync<LogoResponse>();
-                    tenant.LogoUrl = json?.logoUrl;
+                    var ext = Path.GetExtension(selectedLogoFile.Name).ToLowerInvariant();
+                    var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
+                    if (!allowed.Contains(ext))
+                    {
+                        Snackbar.Add("Nieobsługiwane rozszerzenie pliku", Severity.Error);
+                    }
+                    else if (selectedLogoFile.Size > 5 * 1024 * 1024)
+                    {
+                        Snackbar.Add("Plik jest zbyt duży. Maks: 5 MB", Severity.Error);
+                    }
+                    else
+                    {
+                        var rel = $"images/tenants/{_tenantId}/{_tenantId}{ext}";
+                        await using var stream = selectedLogoFile.OpenReadStream(5 * 1024 * 1024);
+                        var url = await FileStorage.SaveAsync(rel, stream);
+                        tenant.LogoUrl = url;
+                        Snackbar.Add("Logo zapisane!", Severity.Success);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Błąd zapisu logo: {ex.Message}", Severity.Error);
                 }
             }
             

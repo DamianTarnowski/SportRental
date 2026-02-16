@@ -452,11 +452,25 @@ else
             return;
         }
 
-        Db.Customers.Remove(existing);
-        await Db.SaveChangesAsync();
-        customers.RemoveAll(x => x.Id == c.Id);
-        Snackbar.Add("Klient został usunięty", Severity.Success);
-        StateHasChanged();
+        var hasRentals = await Db.Rentals.AnyAsync(r => r.CustomerId == c.Id);
+        if (hasRentals)
+        {
+            Snackbar.Add("Nie można usunąć klienta, który ma wypożyczenia. Usuń najpierw jego wypożyczenia.", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            Db.Customers.Remove(existing);
+            await Db.SaveChangesAsync();
+            customers.RemoveAll(x => x.Id == c.Id);
+            Snackbar.Add("Klient został usunięty", Severity.Success);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd usuwania klienta: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task RefreshCustomers()

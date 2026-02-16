@@ -1,6 +1,7 @@
 @page "/admin/owner"
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
     <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px;">
@@ -218,15 +219,19 @@
         t.SecondaryColorHex = secondaryHex;
         if (_logoFile is not null)
         {
-            using var content = new MultipartFormDataContent();
-            content.Add(new StreamContent(_logoFile.OpenReadStream(5 * 1024 * 1024)), "file", _logoFile.Name);
-            var client = new HttpClient { BaseAddress = new Uri(Nav.ToAbsoluteUri("/").ToString()) };
-            var res = await client.PostAsync($"api/tenants/{tenantId}/logo", content);
-            if (res.IsSuccessStatusCode)
+            try
             {
-                var json = await res.Content.ReadFromJsonAsync<LogoResponse>();
-                t.LogoUrl = json?.logoUrl;
+                var ext = Path.GetExtension(_logoFile.Name).ToLowerInvariant();
+                var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
+                if (allowed.Contains(ext) && _logoFile.Size <= 5 * 1024 * 1024)
+                {
+                    var rel = $"images/tenants/{tenantId}/{tenantId}{ext}";
+                    await using var stream = _logoFile.OpenReadStream(5 * 1024 * 1024);
+                    var url = await FileStorage.SaveAsync(rel, stream);
+                    t.LogoUrl = url;
+                }
             }
+            catch { }
         }
         Db.Tenants.Update(t);
         await Db.SaveChangesAsync();
