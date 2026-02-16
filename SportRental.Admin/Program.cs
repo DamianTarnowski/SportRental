@@ -26,6 +26,9 @@ using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 
+// QuestPDF license - Community is free for revenue < $1M USD
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Azure Key Vault Configuration
@@ -72,6 +75,7 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(
+            "http://localhost:5002",  // WASM client dev
             "http://localhost:5014",
             "https://localhost:7083",
             "http://localhost:5015",  // dodatkowy port dla backupu
@@ -118,7 +122,7 @@ builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantProvider, HttpContextTenantProvider>();
+builder.Services.AddScoped<ITenantProvider, SportRental.Admin.Services.Tenancy.BlazorTenantProvider>();
 builder.Services.AddScoped<IContractGenerator, QuestPdfContractGenerator>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("MediaStorage");
@@ -269,7 +273,11 @@ builder.Services.AddScoped<SportRental.Admin.Services.Email.IEmailSender>(sp =>
 });
 builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp =>
     sp.GetRequiredService<SportRental.Admin.Services.Email.IEmailSender>());
-builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddScoped<IEmailSender<ApplicationUser>>(sp =>
+{
+    var emailSender = sp.GetRequiredService<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>();
+    return new IdentityNoOpEmailSender(emailSender);
+});
 
 // Additional services from old project
 builder.Services.AddScoped<SportRental.Admin.Services.Logging.IAuditLogger, SportRental.Admin.Services.Logging.DatabaseAuditLogger>();

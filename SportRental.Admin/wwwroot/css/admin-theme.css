@@ -373,6 +373,23 @@ article.content {
     font-weight: 600;
 }
 
+/* Croppie zoom slider fix - scoped to cropper container only */
+#cropperContainer .cr-slider-wrap {
+    width: 100%;
+    padding: 10px 0;
+    z-index: 10;
+    position: relative;
+}
+
+#cropperContainer .cr-slider {
+    width: 100% !important;
+    cursor: pointer;
+}
+
+#cropperContainer .croppie-container {
+    overflow: visible !important;
+}
+
 /* ============================================
    ADMIN PAGE HEADER
    ============================================ */
