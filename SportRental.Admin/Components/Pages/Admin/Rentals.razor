@@ -8,6 +8,7 @@
 @inject SportRental.Admin.Services.Sms.ISmsConfirmationService SmsConfirmationService
 @inject ILogger<Rentals> Logger
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
 @if (_isMobile)
 {
     @* ==================== MOBILE UI ==================== *@
@@ -883,6 +884,9 @@ else
     {
         try
         {
+            // Resolve tenant ID asynchronously first (works in both HTTP and SignalR contexts)
+            await GetTenantIdAsync();
+            
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
             products = await Db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
@@ -1267,9 +1271,16 @@ else
 
             foreach (var item in editItems)
             {
-                item.Id = Guid.NewGuid();
-                item.RentalId = editModel.Id;
-                await Db.RentalItems.AddAsync(item);
+                var newItem = new RentalItem
+                {
+                    Id = Guid.NewGuid(),
+                    RentalId = editModel.Id,
+                    ProductId = item.ProductId,
+                    Quantity = item.Quantity,
+                    PricePerDay = item.PricePerDay,
+                    Subtotal = item.Subtotal
+                };
+                await Db.RentalItems.AddAsync(newItem);
             }
 
             await Db.SaveChangesAsync();
@@ -1279,13 +1290,15 @@ else
             var productsForContract = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
             var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             
+            // Collect all post-save updates, then save ONCE to avoid concurrency exceptions
+            bool needsPostSaveUpdate = false;
+            
             try
             {
                 var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(
                     editModel, editItems.ToList(), customer!, productsForContract, companyInfo);
                 editModel.ContractUrl = contractUrl;
-                Db.Rentals.Update(editModel);
-                await Db.SaveChangesAsync();
+                needsPostSaveUpdate = true;
                 Snackbar.Add("📄 Umowa została wygenerowana", MudBlazor.Severity.Success);
             }
             catch (Exception contractEx)
@@ -1301,8 +1314,7 @@ else
                     await ContractGenerator.SendRentalConfirmationEmailAsync(
                         editModel, editItems.ToList(), customer, productsForContract, companyInfo);
                     editModel.IsEmailSent = true;
-                    Db.Rentals.Update(editModel);
-                    await Db.SaveChangesAsync();
+                    needsPostSaveUpdate = true;
                     Snackbar.Add($"📧 Email wysłany do {customer.Email}", MudBlazor.Severity.Success);
                 }
                 catch (Exception emailEx)
@@ -1325,8 +1337,7 @@ else
                     
                     editModel.IsSmsConfirmationSent = true;
                     editModel.Status = RentalStatus.Pending;
-                    Db.Rentals.Update(editModel);
-                    await Db.SaveChangesAsync();
+                    needsPostSaveUpdate = true;
                     
                     Snackbar.Add($"📱 SMS z prośbą o potwierdzenie wysłany do {customer.PhoneNumber}", MudBlazor.Severity.Info);
                 }
@@ -1334,6 +1345,20 @@ else
                 {
                     Logger.LogError(smsEx, "Failed to send SMS for rental {RentalId}", editModel.Id);
                     Snackbar.Add($"⚠️ Błąd wysyłania SMS: {smsEx.Message}", MudBlazor.Severity.Warning);
+                }
+            }
+            
+            // Single post-save update for all changes (ContractUrl, IsEmailSent, IsSmsConfirmationSent, Status)
+            if (needsPostSaveUpdate)
+            {
+                try
+                {
+                    Db.Rentals.Update(editModel);
+                    await Db.SaveChangesAsync();
+                }
+                catch (Exception postSaveEx)
+                {
+                    Logger.LogError(postSaveEx, "Failed to save post-processing updates for rental {RentalId}", editModel.Id);
                 }
             }
             
@@ -1350,7 +1375,37 @@ else
     }
 
     [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
-    private Guid CurrentTenantId() => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+    
+    private Guid _cachedTenantId = Guid.Empty;
+    
+    private async Task<Guid> GetTenantIdAsync()
+    {
+        if (_cachedTenantId != Guid.Empty) return _cachedTenantId;
+        
+        // Try ITenantProvider first (works during initial HTTP request)
+        var fromProvider = TenantProvider.GetCurrentTenantId();
+        if (fromProvider.HasValue && fromProvider.Value != Guid.Empty)
+        {
+            _cachedTenantId = fromProvider.Value;
+            return _cachedTenantId;
+        }
+        
+        // Fallback: AuthenticationStateProvider (works during SignalR circuit)
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var claim = user.FindFirst("tenant-id");
+            if (claim != null && Guid.TryParse(claim.Value, out var tenantId))
+            {
+                _cachedTenantId = tenantId;
+                return tenantId;
+            }
+        }
+        return Guid.Empty;
+    }
+    
+    private Guid CurrentTenantId() => _cachedTenantId;
 
     private Task RefreshRentals() => RefreshRentalsInternalAsync(showSnackbar: true);
 
@@ -1616,9 +1671,13 @@ else
             
             await ContractGenerator.SendRentalConfirmationEmailAsync(rental, items, customer, products, companyInfo);
             
-            rental.IsEmailSent = true;
-            Db.Rentals.Update(rental);
-            await Db.SaveChangesAsync();
+            var tracked = await Db.Rentals.FindAsync(rental.Id);
+            if (tracked != null)
+            {
+                tracked.IsEmailSent = true;
+                await Db.SaveChangesAsync();
+                rental.IsEmailSent = true;
+            }
             
             Snackbar.Add($"📧 Email z umową wysłany do {customer.Email}", MudBlazor.Severity.Success);
         }
@@ -1635,8 +1694,13 @@ else
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
             
-            rental.Status = RentalStatus.Completed;
-            Db.Rentals.Update(rental);
+            var tracked = await Db.Rentals.FindAsync(rental.Id);
+            if (tracked == null)
+            {
+                Snackbar.Add("Wynajem nie istnieje", MudBlazor.Severity.Error);
+                return;
+            }
+            tracked.Status = RentalStatus.Completed;
             await Db.SaveChangesAsync();
             
             Snackbar.Add($"Wynajem został zakończony", MudBlazor.Severity.Success);
@@ -1660,7 +1724,13 @@ else
             var items = await Db.RentalItems.Where(i => i.RentalId == rental.Id).ToListAsync();
             Db.RentalItems.RemoveRange(items);
             
-            Db.Rentals.Remove(rental);
+            var tracked = await Db.Rentals.FindAsync(rental.Id);
+            if (tracked == null)
+            {
+                Snackbar.Add("Wynajem nie istnieje lub został już usunięty", MudBlazor.Severity.Warning);
+                return;
+            }
+            Db.Rentals.Remove(tracked);
             await Db.SaveChangesAsync();
             
             Snackbar.Add($"Wynajem został usunięty", MudBlazor.Severity.Success);
