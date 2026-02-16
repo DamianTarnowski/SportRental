@@ -8,6 +8,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject MudBlazor.ISnackbar Snackbar
 @inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
+@inject SportRental.Admin.Services.Storage.ImageVariantService ImageVariantService
 @inject IDialogService DialogService
 @inject SportRental.Admin.Services.QrCode.IQrCodeGenerator QrCodeGenerator
 @inject IJSRuntime JS
@@ -432,34 +433,6 @@ else
                     </MudStack>
                     
                     <MudGrid Spacing="3">
-                        <MudItem xs="12" md="8">
-                            <MudTextField @bind-Value="model.Name" 
-                                          Label="Nazwa produktu" 
-                                          Placeholder="np. Narty Atomic Redster X9"
-                                          Required="true"
-                                          Variant="Variant.Outlined"
-                                          Adornment="Adornment.Start"
-                                          AdornmentIcon="@Icons.Material.Filled.Label"
-                                          Class="rounded-lg" />
-                        </MudItem>
-                        <MudItem xs="12" md="4">
-                            <MudTextField @bind-Value="model.Sku" 
-                                          Label="Kod SKU" 
-                                          Placeholder="np. NAR-001"
-                                          Required="true"
-                                          Variant="Variant.Outlined"
-                                          Adornment="Adornment.Start"
-                                          AdornmentIcon="@Icons.Material.Filled.QrCode"
-                                          Class="rounded-lg" />
-                        </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField @bind-Value="model.Description" 
-                                          Label="Opis produktu" 
-                                          Placeholder="Krótki opis sprzętu..."
-                                          Lines="3"
-                                          Variant="Variant.Outlined"
-                                          Class="rounded-lg" />
-                        </MudItem>
                         <MudItem xs="12" md="6">
                             <MudSelect T="string" @bind-Value="model.Category" 
                                        Label="Kategoria"
@@ -500,6 +473,61 @@ else
                                     </MudChip>
                                 }
                             </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" md="8">
+                            <MudTextField @bind-Value="model.Name" 
+                                          Label="Nazwa produktu" 
+                                          Placeholder="np. Narty Atomic Redster X9"
+                                          Required="true"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Label"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="model.Sku" 
+                                          Label="Kod SKU" 
+                                          Placeholder="np. NAR-001"
+                                          Required="true"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.QrCode"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="model.Producer" 
+                                          Label="Producent" 
+                                          Placeholder="np. Atomic"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Factory"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="model.Model" 
+                                          Label="Model" 
+                                          Placeholder="np. Redster X9"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Badge"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="model.SerialNumber" 
+                                          Label="Numer seryjny" 
+                                          Placeholder="np. SN-123456"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Numbers"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="model.Description" 
+                                          Label="Opis produktu" 
+                                          Placeholder="Krótki opis sprzętu..."
+                                          Lines="3"
+                                          Variant="Variant.Outlined"
+                                          Class="rounded-lg" />
                         </MudItem>
                     </MudGrid>
                 </MudStack>
@@ -596,7 +624,6 @@ else
                     </MudText>
                     
                     <ImageCropper MaxSizeMB="8" 
-                                  OnImageReady="OnImageReadySkipCrop"
                                   OnBase64ImageReady="OnImageReadyCropped" />
                 </MudStack>
             </MudPaper>
@@ -793,7 +820,10 @@ else
             IsActive = p.IsActive,
             ImageUrl = p.ImageUrl,
             AvailableQuantity = p.AvailableQuantity,
-            Description = p.Description
+            Description = p.Description,
+            SerialNumber = p.SerialNumber,
+            Producer = p.Producer,
+            Model = p.Model
         };
         
         // Generate QR code for existing product
@@ -823,68 +853,72 @@ else
 
     private async Task Save()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(CurrentTenantId());
-        if (model.Id == Guid.Empty)
+        try
         {
-            model.Id = Guid.NewGuid();
-            model.CreatedAtUtc = DateTime.UtcNow;
-            model.TenantId = CurrentTenantId();
-            await Db.Products.AddAsync(model);
-        }
-        else
-        {
-            Db.Products.Update(model);
-        }
-        await Db.SaveChangesAsync();
-        
-        if (!string.IsNullOrEmpty(_croppedBase64Image) || _selectedImage is not null)
-        {
-            using var content = new MultipartFormDataContent();
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(CurrentTenantId());
+            if (model.Id == Guid.Empty)
+            {
+                model.Id = Guid.NewGuid();
+                model.CreatedAtUtc = DateTime.UtcNow;
+                model.TenantId = CurrentTenantId();
+                await Db.Products.AddAsync(model);
+            }
+            else
+            {
+                Db.Products.Update(model);
+            }
+            await Db.SaveChangesAsync();
             
             if (!string.IsNullOrEmpty(_croppedBase64Image))
             {
-                var base64Data = _croppedBase64Image.Contains(",") 
-                    ? _croppedBase64Image.Split(',')[1] 
-                    : _croppedBase64Image;
-                var bytes = Convert.FromBase64String(base64Data);
-                var streamContent = new ByteArrayContent(bytes);
-                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
-                content.Add(streamContent, "file", "cropped-image.jpg");
+                try
+                {
+                    var base64Data = _croppedBase64Image.Contains(",") 
+                        ? _croppedBase64Image.Split(',')[1] 
+                        : _croppedBase64Image;
+                    var bytes = Convert.FromBase64String(base64Data);
+                    using var imageStream = new MemoryStream(bytes);
+                    
+                    var (basePath, defaultUrl, variants) = await ImageVariantService.SaveProductImageAsync(
+                        model.TenantId, model.Id, "image.jpg", imageStream);
+                    
+                    model.ImageBasePath = basePath;
+                    model.ImageUrl = defaultUrl;
+                    Db.Products.Update(model);
+                    await Db.SaveChangesAsync();
+                    
+                    Snackbar.Add("Zdjęcie zapisane!", Severity.Success);
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Błąd zapisu zdjęcia: {ex.Message}", Severity.Error);
+                }
+                finally
+                {
+                    _croppedBase64Image = null;
+                    _selectedImageName = null;
+                }
             }
-            else if (_selectedImage is not null)
+            // Przeładuj produkty tylko dla aktualnego tenanta
+            var tenantId = CurrentTenantId();
+            if (tenantId == Guid.Empty)
             {
-                content.Add(new StreamContent(_selectedImage.OpenReadStream(10 * 1024 * 1024)), "file", _selectedImage.Name);
+                products = new List<Product>();
             }
-            
-            var client = new HttpClient { BaseAddress = new Uri(Navigation.ToAbsoluteUri("/").ToString()) };
-            var res = await client.PostAsync($"api/products/{model.Id}/image", content);
-            
-            if (res.IsSuccessStatusCode)
+            else
             {
-                var json = await res.Content.ReadFromJsonAsync<ImageResponse>();
-                model.ImageUrl = json?.imageUrl;
-                Snackbar.Add("Zdjęcie zapisane!", Severity.Success);
+                await using var DbReload = await DbFactory.CreateDbContextAsync();
+                DbReload.SetTenant(tenantId);
+                products = await DbReload.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
             }
-            
-            _selectedImage = null;
-            _croppedBase64Image = null;
-            _selectedImageName = null;
+            dialogOpen = false;
+            Snackbar.Add("Produkt zapisany!", Severity.Success);
         }
-        // Przeładuj produkty tylko dla aktualnego tenanta
-        var tenantId = CurrentTenantId();
-        if (tenantId == Guid.Empty)
+        catch (Exception ex)
         {
-            products = new List<Product>();
+            Snackbar.Add($"Błąd zapisu produktu: {ex.Message}", Severity.Error);
         }
-        else
-        {
-            await using var DbReload = await DbFactory.CreateDbContextAsync();
-            DbReload.SetTenant(tenantId);
-            products = await DbReload.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
-        }
-        dialogOpen = false;
-        Snackbar.Add("Produkt zapisany!", Severity.Success);
     }
 
     private Guid _cachedTenantId = Guid.Empty;
@@ -926,12 +960,40 @@ else
 
     private async Task Delete(Product p)
     {
+        var result = await DialogService.ShowMessageBox(
+            "Potwierdzenie usunięcia",
+            $"Czy na pewno chcesz usunąć produkt '{p.Name}'?",
+            yesText: "Usuń", cancelText: "Anuluj");
+        
+        if (result != true) return;
+        
         await using var Db = await DbFactory.CreateDbContextAsync();
         Db.SetTenant(CurrentTenantId());
-        Db.Products.Remove(p);
-        await Db.SaveChangesAsync();
-        products.RemoveAll(x => x.Id == p.Id);
-        Snackbar.Add($"Produkt '{p.Name}' usunięty", Severity.Success);
+
+        var hasRentalItems = await Db.RentalItems.AnyAsync(ri => ri.ProductId == p.Id);
+        if (hasRentalItems)
+        {
+            Snackbar.Add("Nie można usunąć produktu, który występuje w wypożyczeniach. Możesz go dezaktywować.", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            var existing = await Db.Products.FirstOrDefaultAsync(x => x.Id == p.Id);
+            if (existing is null)
+            {
+                Snackbar.Add("Produkt nie istnieje lub został już usunięty", Severity.Warning);
+                return;
+            }
+            Db.Products.Remove(existing);
+            await Db.SaveChangesAsync();
+            products.RemoveAll(x => x.Id == p.Id);
+            Snackbar.Add($"Produkt '{p.Name}' usunięty", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd usuwania produktu: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task ToggleActive(Product p)
@@ -949,22 +1011,12 @@ else
     }
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
-    private IBrowserFile? _selectedImage;
     private string? _croppedBase64Image;
-    private class ImageResponse { public string? imageUrl { get; set; } }
-    
-    private void OnImageReadySkipCrop(IBrowserFile file)
-    {
-        _selectedImage = file;
-        _selectedImageName = file?.Name;
-        _croppedBase64Image = null;
-    }
 
     private void OnImageReadyCropped(string base64Image)
     {
         _croppedBase64Image = base64Image;
-        _selectedImageName = "cropped-image.jpg";
-        _selectedImage = null;
+        _selectedImageName = "image.jpg";
     }
     
     // QR Code functionality

@@ -62,7 +62,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(p => p.Producer).HasMaxLength(100);
             entity.Property(p => p.Model).HasMaxLength(100);
             entity.Property(p => p.SerialNumber).HasMaxLength(100);
-            entity.Property(p => p.Description).HasMaxLength(1000);
+            entity.Property(p => p.Description).HasMaxLength(5000);
             entity.Property(p => p.QrCode).HasMaxLength(500);
             entity.Property(p => p.DailyPrice).HasPrecision(18, 2);
             entity.HasIndex(p => new { p.TenantId, p.Sku }).IsUnique();
