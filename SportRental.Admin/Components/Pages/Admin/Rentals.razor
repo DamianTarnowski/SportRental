@@ -2,8 +2,10 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 @using Microsoft.AspNetCore.SignalR.Client
+@using SportRental.Admin.Components.Dialogs
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IDialogService DialogService
 @inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
 @inject SportRental.Admin.Services.Sms.ISmsConfirmationService SmsConfirmationService
 @inject ILogger<Rentals> Logger
@@ -443,31 +445,49 @@ else
                         <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Dane podstawowe</MudText>
                     </MudStack>
                     
-                    <MudAutocomplete T="Customer"
-                                     Label="Wybierz klienta"
-                                     Placeholder="Zacznij pisać imię lub email..."
-                                     Value="@(customers.FirstOrDefault(c => c.Id == editModel.CustomerId))"
-                                     ValueChanged="@(c => { if (c != null) editModel.CustomerId = c.Id; })"
-                                     SearchFunc="@((string s, CancellationToken ct) => Task.FromResult(customers.Where(c => string.IsNullOrWhiteSpace(s) || (c.FullName?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) || (c.Email?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false))))"
-                                     ToStringFunc="@(c => c?.FullName ?? "")"
-                                     Variant="Variant.Outlined"
-                                     Adornment="Adornment.Start"
-                                     AdornmentIcon="@Icons.Material.Filled.PersonSearch"
-                                     Class="rounded-lg">
-                        <ItemTemplate>
-                            <MudStack Row="true" Spacing="2" Class="mud-align-center pa-1">
-                                <MudAvatar Color="Color.Primary" Size="Size.Small">
-                                    <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
-                                </MudAvatar>
-                                <div>
-                                    <MudText Typo="Typo.body1">@context.FullName</MudText>
-                                    <MudText Typo="Typo.caption" Color="Color.Default">
-                                        @(context.Email ?? context.PhoneNumber ?? "brak kontaktu")
-                                    </MudText>
-                                </div>
-                            </MudStack>
-                        </ItemTemplate>
-                    </MudAutocomplete>
+                    <MudStack Row="true" Spacing="1" Class="mud-align-center">
+                        <MudAutocomplete T="Customer"
+                                         Label="Wybierz klienta"
+                                         Placeholder="Zacznij pisać imię lub email..."
+                                         Value="@(customers.FirstOrDefault(c => c.Id == editModel.CustomerId))"
+                                         ValueChanged="@(c => { if (c != null) editModel.CustomerId = c.Id; })"
+                                         SearchFunc="@((string s, CancellationToken ct) => Task.FromResult(customers.Where(c => string.IsNullOrWhiteSpace(s) || (c.FullName?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false) || (c.Email?.Contains(s, StringComparison.OrdinalIgnoreCase) ?? false))))"
+                                         ToStringFunc="@(c => c?.FullName ?? "")"
+                                         Variant="Variant.Outlined"
+                                         Adornment="Adornment.Start"
+                                         AdornmentIcon="@Icons.Material.Filled.PersonSearch"
+                                         Class="rounded-lg"
+                                         Style="flex: 1;">
+                            <ItemTemplate>
+                                <MudStack Row="true" Spacing="2" Class="mud-align-center pa-1">
+                                    <MudAvatar Color="Color.Primary" Size="Size.Small">
+                                        <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" />
+                                    </MudAvatar>
+                                    <div>
+                                        <MudText Typo="Typo.body1">@context.FullName</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">
+                                            @(context.Email ?? context.PhoneNumber ?? "brak kontaktu")
+                                        </MudText>
+                                    </div>
+                                </MudStack>
+                            </ItemTemplate>
+                        </MudAutocomplete>
+                        <MudTooltip Text="Dodaj nowego klienta">
+                            <MudIconButton Icon="@Icons.Material.Filled.PersonAdd"
+                                           Color="Color.Primary"
+                                           OnClick="OpenNewCustomerFromRental"
+                                           Size="Size.Medium" />
+                        </MudTooltip>
+                        @if (editModel.CustomerId != Guid.Empty)
+                        {
+                            <MudTooltip Text="Edytuj wybranego klienta">
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                                               Color="Color.Warning"
+                                               OnClick="OpenEditCustomerFromRental"
+                                               Size="Size.Medium" />
+                            </MudTooltip>
+                        }
+                    </MudStack>
                     
                     <MudGrid Spacing="3">
                         <MudItem xs="12" md="6">
@@ -1776,6 +1796,126 @@ else
         customSmsMessage = "";
     }
     
+    private async Task OpenNewCustomerFromRental()
+    {
+        var newCustomer = new Customer { Id = Guid.Empty, TenantId = CurrentTenantId() };
+        var parameters = new DialogParameters
+        {
+            ["Customer"] = newCustomer,
+            ["IsNew"] = true
+        };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            BackdropClick = false
+        };
+        var dialog = await DialogService.ShowAsync<CustomerEditDialog>("Nowy klient", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is Customer created)
+        {
+            await SaveCustomerFromRentalAsync(created, isNew: true);
+        }
+    }
+
+    private async Task OpenEditCustomerFromRental()
+    {
+        var existing = customers.FirstOrDefault(c => c.Id == editModel.CustomerId);
+        if (existing == null) return;
+
+        var clone = new Customer
+        {
+            Id = existing.Id,
+            TenantId = existing.TenantId,
+            FullName = existing.FullName,
+            Email = existing.Email,
+            PhoneNumber = existing.PhoneNumber,
+            DocumentNumber = existing.DocumentNumber,
+            Address = existing.Address,
+            Notes = existing.Notes,
+            CreatedAtUtc = existing.CreatedAtUtc
+        };
+        var parameters = new DialogParameters
+        {
+            ["Customer"] = clone,
+            ["IsNew"] = false
+        };
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseOnEscapeKey = true,
+            BackdropClick = false
+        };
+        var dialog = await DialogService.ShowAsync<CustomerEditDialog>("Edytuj klienta", parameters, options);
+        var result = await dialog.Result;
+        if (!result.Canceled && result.Data is Customer updated)
+        {
+            await SaveCustomerFromRentalAsync(updated, isNew: false);
+        }
+    }
+
+    private async Task SaveCustomerFromRentalAsync(Customer model, bool isNew)
+    {
+        model.FullName = model.FullName?.Trim() ?? string.Empty;
+        model.Email = model.Email?.Trim();
+        model.PhoneNumber = NormalizePhone(model.PhoneNumber);
+        model.Address = model.Address?.Trim();
+        model.DocumentNumber = model.DocumentNumber?.Trim();
+        model.Notes = model.Notes?.Trim();
+
+        try
+        {
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(CurrentTenantId());
+
+            if (isNew)
+            {
+                model.Id = Guid.NewGuid();
+                model.CreatedAtUtc = DateTime.UtcNow;
+                model.TenantId = CurrentTenantId();
+                await Db.Customers.AddAsync(model);
+                Snackbar.Add($"Klient {model.FullName} dodany", MudBlazor.Severity.Success);
+            }
+            else
+            {
+                var tracked = await Db.Customers.FindAsync(model.Id);
+                if (tracked == null)
+                {
+                    Snackbar.Add("Nie znaleziono klienta", MudBlazor.Severity.Warning);
+                    return;
+                }
+                tracked.FullName = model.FullName;
+                tracked.Email = model.Email;
+                tracked.PhoneNumber = model.PhoneNumber;
+                tracked.DocumentNumber = model.DocumentNumber;
+                tracked.Address = model.Address;
+                tracked.Notes = model.Notes;
+                Snackbar.Add($"Klient {model.FullName} zaktualizowany", MudBlazor.Severity.Success);
+            }
+            await Db.SaveChangesAsync();
+
+            customers = await Db.Customers.AsNoTracking().OrderBy(c => c.FullName).ToListAsync();
+            customersDict = customers.ToDictionary(c => c.Id);
+            editModel.CustomerId = model.Id;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving customer from rental dialog");
+            Snackbar.Add($"Błąd zapisu klienta: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private static string? NormalizePhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone)) return null;
+        phone = phone.Trim().Replace(" ", "");
+        if (phone.Length == 9 && !phone.StartsWith("+")) phone = "+48" + phone;
+        return phone;
+    }
+
     private async Task SendCustomSms()
     {
         if (customSmsRental == null || string.IsNullOrWhiteSpace(customSmsMessage))
