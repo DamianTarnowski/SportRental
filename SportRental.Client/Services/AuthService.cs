@@ -25,13 +25,6 @@ public class AuthService
     {
         try
         {
-            // Użyj wybranego tenanta lub domyślnego z konfiguracji
-            var tenantId = await _tenantService.GetSelectedTenantIdAsync();
-            if (string.IsNullOrEmpty(tenantId))
-            {
-                tenantId = _defaultTenantId;
-            }
-
             var request = new HttpRequestMessage(HttpMethod.Post, $"{_apiBaseUrl}/api/auth/register")
             {
                 Content = JsonContent.Create(new
@@ -44,8 +37,12 @@ public class AuthService
                 })
             };
 
-            // Add X-Tenant-Id header
-            request.Headers.Add("X-Tenant-Id", tenantId);
+            // Optionally attach tenant if one is selected (user is global)
+            var tenantId = await _tenantService.GetSelectedTenantIdAsync();
+            if (!string.IsNullOrEmpty(tenantId))
+            {
+                request.Headers.Add("X-Tenant-Id", tenantId);
+            }
 
             var response = await _httpClient.SendAsync(request);
 

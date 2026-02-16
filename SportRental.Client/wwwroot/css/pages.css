@@ -1407,6 +1407,23 @@
     font-size: 1.1rem;
 }
 
+.checkout-remove-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 0.5rem;
+    font-size: 1.25rem;
+    border-radius: 8px;
+    transition: all 0.2s;
+    margin-left: 0.5rem;
+}
+
+.checkout-remove-btn:hover {
+    background: #fef2f2;
+    transform: scale(1.1);
+}
+
 .checkout-form-card {
     background: white;
     border-radius: 24px;

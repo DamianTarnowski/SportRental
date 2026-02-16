@@ -1,5 +1,5 @@
 @page "/map"
-@inject HttpClient Http
+@inject IApiService ApiService
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
@@ -178,8 +178,8 @@
 </MudContainer>
 
 @code {
-    private List<TenantLocation> allLocations = new();
-    private List<TenantLocation> filteredLocations = new();
+    private List<TenantLocationDto> allLocations = new();
+    private List<TenantLocationDto> filteredLocations = new();
     private bool isLoading = true;
     private int _selectedRadius = 0;
     private double? userLat;
@@ -219,7 +219,7 @@
     {
         try
         {
-            var response = await Http.GetFromJsonAsync<List<TenantLocation>>("api/tenants/locations");
+            var response = await ApiService.GetTenantLocationsAsync();
             if (response != null)
             {
                 allLocations = response.Where(l => l.Lat.HasValue && l.Lon.HasValue && l.Lat != 0 && l.Lon != 0).ToList();
@@ -350,7 +350,7 @@
         }
     }
 
-    private async Task SelectLocation(TenantLocation loc)
+    private async Task SelectLocation(TenantLocationDto loc)
     {
         if (loc.Lat.HasValue && loc.Lon.HasValue && _mapInitialized)
         {
@@ -432,19 +432,4 @@
         _objRef?.Dispose();
     }
 
-    private class TenantLocation
-    {
-        public Guid TenantId { get; set; }
-        public string? TenantName { get; set; }
-        public double? Lat { get; set; }
-        public double? Lon { get; set; }
-        public string? Address { get; set; }
-        public string? City { get; set; }
-        public string? Voivodeship { get; set; }
-        public string? PhoneNumber { get; set; }
-        public string? Email { get; set; }
-        public string? OpeningHours { get; set; }
-        public string? LogoUrl { get; set; }
-        public double? Distance { get; set; }
-    }
 }

@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <StaticWebAssetBasePath>_client</StaticWebAssetBasePath>
+    <!-- Wyłącz generowanie web.config przez dotnet publish - używamy własnego -->
+    <PublishIISAssets>false</PublishIISAssets>
   </PropertyGroup>
 
   <ItemGroup>

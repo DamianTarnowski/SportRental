@@ -84,7 +84,7 @@
                         <div class="rental-mobile-products">
                             @foreach (var item in rental.Items.Take(2))
                             {
-                                <span class="rental-mobile-product">📦 @item.ProductName x@item.Quantity</span>
+                                <span class="rental-mobile-product">📦 @item.ProductName x@(item.Quantity)</span>
                             }
                             @if (rental.Items.Count > 2)
                             {
@@ -96,7 +96,6 @@
                         <div class="rental-mobile-footer">
                             <div class="rental-mobile-amount">
                                 <span class="amount-value">@rental.TotalAmount.ToString("C")</span>
-                                <span class="amount-deposit">dep. @rental.DepositAmount.ToString("C")</span>
                             </div>
                             <button class="rental-mobile-btn" @onclick="@(() => ViewDetails(rental.Id))">
                                 Szczegóły →
@@ -181,7 +180,7 @@ else
                             {
                                 <div class="rental-product-item">
                                     <span>📦 @item.ProductName</span>
-                                    <span class="font-medium">x@item.Quantity</span>
+                                    <span class="font-medium">x@(item.Quantity)</span>
                                 </div>
                             }
                             @if (rental.Items.Count > 3)
@@ -195,7 +194,6 @@ else
                         <div class="rental-card-footer">
                             <div class="rental-total">
                                 @rental.TotalAmount.ToString("C")
-                                <span>depozyt: @rental.DepositAmount.ToString("C")</span>
                             </div>
                             <div class="rental-actions">
                                 <button class="rental-btn rental-btn-primary" @onclick="@(() => ViewDetails(rental.Id))">

@@ -74,7 +74,7 @@
                         {
                             <div class="checkout-mobile-item">
                                 <span class="item-name">@item.ProductName</span>
-                                <span class="item-qty">x@item.Quantity</span>
+                                <span class="item-qty">x@(item.Quantity)</span>
                                 <span class="item-price">@item.TotalPrice.ToString("C")</span>
                             </div>
                         }
@@ -145,13 +145,9 @@
                 }
                 else
                 {
-                    <div class="checkout-mobile-summary-row">
-                        <span>Razem</span>
-                        <span>@_quote.TotalAmount.ToString("C")</span>
-                    </div>
                     <div class="checkout-mobile-summary-row highlight">
-                        <span>Do zapłaty teraz (depozyt)</span>
-                        <span class="summary-amount">@_quote.DepositAmount.ToString("C")</span>
+                        <span>Do zapłaty</span>
+                        <span class="summary-amount">@_quote.TotalAmount.ToString("C")</span>
                     </div>
                 }
                 <button class="checkout-mobile-submit" 
@@ -163,7 +159,7 @@
                     }
                     else
                     {
-                        <span>✅ Zapłać @_quote?.DepositAmount.ToString("C")</span>
+                        <span>✅ Zapłać @_quote?.TotalAmount.ToString("C")</span>
                     }
                 </button>
                 <p class="checkout-mobile-secure">🔒 Bezpieczna płatność Stripe</p>
@@ -219,7 +215,7 @@ else
                     @foreach (var item in _cart.Items)
                     {
                         <div class="checkout-item">
-                            <div>
+                            <div style="flex: 1;">
                                 <div class="checkout-item-name">@item.ProductName</div>
                                 <div class="checkout-item-details">
                                     @if (item.RentalType == RentalTypeDto.Hourly && item.HoursRented.HasValue)
@@ -240,6 +236,9 @@ else
                                 }
                             </div>
                             <div class="checkout-item-price">@item.TotalPrice.ToString("C")</div>
+                            <button class="checkout-remove-btn" @onclick="@(() => RemoveFromCart(item.ProductId))" title="Usuń z zamówienia">
+                                🗑️
+                            </button>
                         </div>
                     }
 
@@ -337,17 +336,9 @@ else
                                 <span>Łącznie za wypożyczenie</span>
                                 <span class="font-semibold">@_quote.TotalAmount.ToString("C")</span>
                             </div>
-                            <div class="checkout-summary-row">
-                                <span>Depozyt (płatne teraz)</span>
-                                <span class="font-semibold text-blue-600">@_quote.DepositAmount.ToString("C")</span>
-                            </div>
-                            <div class="checkout-summary-row">
-                                <span>Pozostało przy odbiorze</span>
-                                <span>@((_quote.TotalAmount - _quote.DepositAmount).ToString("C"))</span>
-                            </div>
                             <div class="checkout-summary-row checkout-summary-total">
-                                <span>Do zapłaty teraz</span>
-                                <span class="text-xl text-blue-600">@_quote.DepositAmount.ToString("C")</span>
+                                <span>Do zapłaty</span>
+                                <span class="text-xl text-blue-600">@_quote.TotalAmount.ToString("C")</span>
                             </div>
                         }
                     </div>
@@ -498,6 +489,15 @@ else
         _cart = CartService.GetCart();
         _hasMixedDates = HasMixedDates(_cart);
         _ = RefreshPaymentSummaryAsync();
+    }
+
+    private async Task RemoveFromCart(Guid productId)
+    {
+        await CartService.RemoveFromCartAsync(productId);
+        _cart = CartService.GetCart();
+        _hasMixedDates = HasMixedDates(_cart);
+        await RefreshPaymentSummaryAsync();
+        Snackbar.Add("Produkt usunięty z zamówienia", Severity.Info);
     }
 
     private static bool HasMixedDates(CartModel cart)

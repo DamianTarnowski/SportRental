@@ -22,8 +22,8 @@ if (response.IsSuccessStatusCode)
     builder.Configuration.AddJsonStream(stream);
 }
 
-// Konfiguracja HttpClient
-builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
+// Konfiguracja HttpClient - BEZ BaseAddress, bo ApiService ustawi go na API URL
+builder.Services.AddScoped(sp => new HttpClient());
 
 // Blazored LocalStorage
 builder.Services.AddBlazoredLocalStorage();
@@ -52,8 +52,8 @@ var tenantService = host.Services.GetRequiredService<TenantService>();
 var baseUrl = configuration["Api:BaseUrl"];
 var hostAddress = builder.HostEnvironment.BaseAddress;
 
-// Produkcja: Azure Static Web Apps -> Admin na Azure App Service
-if (hostAddress.Contains("azurestaticapps.net") || hostAddress.Contains("nice-tree"))
+// Produkcja: Azure App Service lub Static Web Apps -> Admin na Azure App Service
+if (hostAddress.Contains("azurewebsites.net") || hostAddress.Contains("azurestaticapps.net") || hostAddress.Contains("nice-tree"))
 {
     baseUrl = "https://sradmin2.azurewebsites.net";
 }
