@@ -1643,7 +1643,10 @@ namespace SportRental.Admin.Api
                 return Results.Text("OK"); // SerwerSMS wymaga odpowiedzi OK
             });
             
-            // Alternatywny endpoint POST dla większej elastyczności
+            // Uniwersalny endpoint POST — obsługuje zarówno SerwerSMS.pl jak i SMSAPI.pl
+            // SerwerSMS: phone/numer, text/wiadomosc/message, id/message_id
+            // SMSAPI:    sms_from, sms_text, sms_to, sms_date, username
+            // URL callback w panelu SMSAPI: https://sradmin.azurewebsites.net/api/sms/incoming
             sms.MapPost("/incoming", [AllowAnonymous] async (
                 ISmsConfirmationService confirmationService,
                 ILoggerFactory loggerFactory,
@@ -1652,12 +1655,24 @@ namespace SportRental.Admin.Api
             {
                 var logger = loggerFactory.CreateLogger("SmsWebhook");
                 var form = await request.ReadFormAsync(ct);
-                var numer = form["phone"].FirstOrDefault() ?? form["numer"].FirstOrDefault();
-                var wiadomosc = form["text"].FirstOrDefault() ?? form["wiadomosc"].FirstOrDefault() ?? form["message"].FirstOrDefault();
-                var id = form["id"].FirstOrDefault() ?? form["message_id"].FirstOrDefault();
                 
-                logger.LogInformation("Incoming SMS POST webhook: numer={Numer}, wiadomosc={Wiadomosc}, id={Id}", 
-                    numer, wiadomosc, id);
+                // SMSAPI.pl format: sms_from, sms_text
+                // SerwerSMS.pl format: phone/numer, text/wiadomosc/message
+                var numer = form["sms_from"].FirstOrDefault() 
+                    ?? form["phone"].FirstOrDefault() 
+                    ?? form["numer"].FirstOrDefault();
+                var wiadomosc = form["sms_text"].FirstOrDefault() 
+                    ?? form["text"].FirstOrDefault() 
+                    ?? form["wiadomosc"].FirstOrDefault() 
+                    ?? form["message"].FirstOrDefault();
+                var id = form["id"].FirstOrDefault() ?? form["message_id"].FirstOrDefault();
+                var smsTo = form["sms_to"].FirstOrDefault();
+                var smsDate = form["sms_date"].FirstOrDefault();
+                var username = form["username"].FirstOrDefault();
+                
+                logger.LogInformation(
+                    "Incoming SMS POST webhook: from={Numer}, text={Wiadomosc}, id={Id}, to={SmsTo}, date={SmsDate}, user={Username}", 
+                    numer, wiadomosc, id, smsTo, smsDate, username);
                 
                 if (string.IsNullOrWhiteSpace(numer) || string.IsNullOrWhiteSpace(wiadomosc))
                 {
