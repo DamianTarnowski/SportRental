@@ -106,6 +106,12 @@
                                     <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="() => Delete(rental)">Usuń</MudMenuItem>
                                 </MudMenu>
                             </div>
+                            @if (rental.Items?.Any() == true)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-1" Style="opacity: 0.8;">
+                                    📦 @GetItemsSummary(rental, 2)
+                                </MudText>
+                            }
                             <div class="d-flex align-center gap-1 flex-wrap mt-1">
                                 @if (rental.IsSmsConfirmationSent)
                                 {
@@ -279,6 +285,29 @@ else
                                                 </MudPaper>
                                             </MudItem>
                                         </MudGrid>
+
+                                        @if (rental.Items?.Any() == true)
+                                        {
+                                            <MudPaper Class="pa-2 mt-1" Elevation="0" Style="border-radius: 8px; background: rgba(0,0,0,0.03);">
+                                                <MudStack Row="true" Class="mud-align-center" Spacing="1">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" Color="Color.Default" />
+                                                    <MudText Typo="Typo.caption" Style="font-weight: 600;">Sprzęt:</MudText>
+                                                </MudStack>
+                                                <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mt-1">
+                                                    @foreach (var item in rental.Items)
+                                                    {
+                                                        var productName = productsDict.GetValueOrDefault(item.ProductId)?.Name ?? "Nieznany";
+                                                        var label = item.Quantity > 1 ? $"{productName} ×{item.Quantity}" : productName;
+                                                        <MudChip T="string" Icon="@Icons.Material.Filled.SportsSoccer"
+                                                                 Size="Size.Small"
+                                                                 Variant="Variant.Text"
+                                                                 Color="Color.Primary">
+                                                            @label
+                                                        </MudChip>
+                                                    }
+                                                </MudStack>
+                                            </MudPaper>
+                                        }
 
                                         <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
                                             <MudChip T="string" Icon="@Icons.Material.Filled.AttachMoney" 
@@ -909,6 +938,7 @@ else
     private List<Product> products = new();
     private List<Customer> customers = new();
     private Dictionary<Guid, Customer> customersDict = new();
+    private Dictionary<Guid, Product> productsDict = new();
     private Dictionary<Guid, int> reservedByProduct = new();
 
     private bool dialogOpen;
@@ -955,9 +985,10 @@ else
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
             products = await Db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+            productsDict = products.ToDictionary(p => p.Id, p => p);
             customers = await Db.Customers.AsNoTracking().OrderBy(c => c.FullName).ToListAsync();
             customersDict = customers.ToDictionary(c => c.Id, c => c);
-            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             _smsConfirmationEnabled = companyInfo?.SmsConfirmationEnabled == true;
             await UpdateReservedMap();
@@ -1472,7 +1503,7 @@ else
                 }
             }
             
-            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             dialogOpen = false;
             Snackbar.Add("✅ Wynajem został zapisany!", MudBlazor.Severity.Success);
             StateHasChanged();
@@ -1525,7 +1556,7 @@ else
         {
             await using var Db = await DbFactory.CreateDbContextAsync(ct);
             Db.SetTenant(CurrentTenantId());
-            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync(ct);
+            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync(ct);
             var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId(), ct);
             _smsConfirmationEnabled = companyInfo?.SmsConfirmationEnabled == true;
 
@@ -1560,7 +1591,8 @@ else
             query = query.Where(r => 
                 (customersDict.GetValueOrDefault(r.CustomerId)?.FullName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
                 r.Id.ToString().Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                (r.Notes?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+                (r.Notes?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                r.Items.Any(i => (productsDict.GetValueOrDefault(i.ProductId)?.Name?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)));
         }
         
         var statusFilter = new List<RentalStatus>();
@@ -1582,8 +1614,25 @@ else
 
     private string GetRentalTitle(Rental rental)
     {
-        var customerName = customersDict.GetValueOrDefault(rental.CustomerId)?.FullName ?? "brak";
-        return $"{rental.Id}. {customerName}";
+        return customersDict.GetValueOrDefault(rental.CustomerId)?.FullName ?? "Nieznany klient";
+    }
+
+    private string GetItemsSummary(Rental rental, int maxItems = 10)
+    {
+        var items = rental.Items;
+        if (items == null || !items.Any()) return "Brak sprzętu";
+        
+        var names = items.Select(i =>
+        {
+            var name = productsDict.GetValueOrDefault(i.ProductId)?.Name ?? "Nieznany";
+            return i.Quantity > 1 ? $"{name} ×{i.Quantity}" : name;
+        }).ToList();
+        
+        if (names.Count <= maxItems)
+            return string.Join(", ", names);
+        
+        var shown = string.Join(", ", names.Take(maxItems));
+        return $"{shown} +{names.Count - maxItems} więcej";
     }
 
     private string GetRentalCardClass(Rental rental)
@@ -1743,7 +1792,7 @@ else
             Db.Rentals.Update(rental);
             await Db.SaveChangesAsync();
             
-            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
             
             Snackbar.Add("Umowa została wygenerowana i zapisana", MudBlazor.Severity.Success);
@@ -1815,7 +1864,7 @@ else
             
             Snackbar.Add($"Wynajem został zakończony", MudBlazor.Severity.Success);
             
-            rentals = await Db.Rentals.AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
         }
         catch (Exception ex)
