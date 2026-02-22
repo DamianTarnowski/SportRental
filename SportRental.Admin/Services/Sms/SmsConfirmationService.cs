@@ -69,7 +69,7 @@ namespace SportRental.Admin.Services.Sms
                 TenantId = tenantId.Value,
                 RentalId = rentalId,
                 Code = code,
-                PhoneNumber = rental.Customer.PhoneNumber,
+                PhoneNumber = NormalizePhoneNumber(rental.Customer.PhoneNumber),
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddHours(24)
             };
