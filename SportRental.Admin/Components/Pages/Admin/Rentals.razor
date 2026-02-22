@@ -524,15 +524,23 @@ else
                         </MudItem>
                         @if (editModel.RentalType == RentalType.Hourly)
                         {
-                            <MudItem xs="12" md="6">
-                                <MudNumericField T="int?" @bind-Value="editModel.HoursRented" 
-                                                  Label="Liczba godzin"
-                                                  Min="1"
-                                                  Max="24"
-                                                  Variant="Variant.Outlined"
-                                                  Adornment="Adornment.End"
-                                                  AdornmentText="godz."
-                                                  Class="rounded-lg" />
+                            <MudItem xs="6" md="3">
+                                <MudTimePicker Label="⏰ Godzina od"
+                                               Time="@startTime"
+                                               TimeChanged="OnStartTimeChanged"
+                                               Variant="Variant.Outlined"
+                                               Editable="true"
+                                               AmPm="false"
+                                               Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudTimePicker Label="⏰ Godzina do"
+                                               Time="@endTime"
+                                               TimeChanged="OnEndTimeChanged"
+                                               Variant="Variant.Outlined"
+                                               Editable="true"
+                                               AmPm="false"
+                                               Class="rounded-lg" />
                             </MudItem>
                         }
                     </MudGrid>
@@ -729,7 +737,12 @@ else
                                     <MudNumericField T="int" @bind-Value="context.Quantity" Min="1" Variant="Variant.Text" Style="width: 60px; text-align: center;" />
                                 </MudTd>
                                 <MudTd Style="text-align: right;">
-                                    <MudText Color="Color.Default">@context.PricePerDay.ToString("0.00") zł</MudText>
+                                    <MudNumericField T="decimal" Value="@context.PricePerDay"
+                                                     ValueChanged="@(v => { context.PricePerDay = v; Recalculate(); })"
+                                                     Min="0" Format="0.00"
+                                                     Variant="Variant.Text"
+                                                     Adornment="Adornment.End" AdornmentText="zł"
+                                                     Style="width: 100px; text-align: right;" />
                                 </MudTd>
                                 <MudTd Style="text-align: right;">
                                     <MudText Color="Color.Success" Style="font-weight: 600;">@context.Subtotal.ToString("0.00") zł</MudText>
@@ -744,17 +757,45 @@ else
                         </MudTable>
 
                         <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                            <MudStack Row="true" Class="mud-justify-space-between mud-align-center">
-                                <MudStack Spacing="0">
-                                    <MudText Typo="Typo.body2" Style="opacity: 0.9;">Do zapłaty</MudText>
-                                    <MudText Typo="Typo.h4" Style="font-weight: 700;">@total.ToString("0.00") zł</MudText>
+                            <MudStack Spacing="2">
+                                <MudStack Row="true" Class="mud-justify-space-between mud-align-center">
+                                    <MudStack Spacing="0">
+                                        <MudText Typo="Typo.body2" Style="opacity: 0.9;">Cena katalogowa</MudText>
+                                        <MudText Typo="Typo.h5" Style="@($"font-weight: 600;{(customTotalPrice.HasValue ? " text-decoration: line-through; opacity: 0.6;" : "")}")">@total.ToString("0.00") zł</MudText>
+                                    </MudStack>
+                                    <MudStack Spacing="0" Class="text-right">
+                                        <MudText Typo="Typo.caption" Style="opacity: 0.8;">@editItems.Sum(i => i.Quantity) produktów</MudText>
+                                        @if (startDate.HasValue && endDate.HasValue)
+                                        {
+                                            if (editModel.RentalType == RentalType.Hourly && editModel.HoursRented.HasValue)
+                                            {
+                                                <MudText Typo="Typo.caption" Style="opacity: 0.8;">@editModel.HoursRented.Value godz.</MudText>
+                                            }
+                                            else
+                                            {
+                                                var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
+                                                <MudText Typo="Typo.caption" Style="opacity: 0.8;">@days dni</MudText>
+                                            }
+                                        }
+                                    </MudStack>
                                 </MudStack>
-                                <MudStack Spacing="0" Class="text-right">
-                                    <MudText Typo="Typo.caption" Style="opacity: 0.8;">@editItems.Sum(i => i.Quantity) produktów</MudText>
-                                    @if (startDate.HasValue && endDate.HasValue)
+                                <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                    <MudNumericField T="decimal?" @bind-Value="customTotalPrice"
+                                                     Label="Cena indywidualna (opcjonalnie)"
+                                                     Placeholder="@total.ToString("0.00")"
+                                                     Variant="Variant.Filled"
+                                                     Adornment="Adornment.End" AdornmentText="zł"
+                                                     Clearable="true"
+                                                     Min="0"
+                                                     Format="0.00"
+                                                     Style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 8px;"
+                                                     Class="white-text-field" />
+                                    @if (customTotalPrice.HasValue)
                                     {
-                                        var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
-                                        <MudText Typo="Typo.caption" Style="opacity: 0.8;">@days dni</MudText>
+                                        <MudStack Spacing="0">
+                                            <MudText Typo="Typo.body2" Style="opacity: 0.9;">Do zapłaty</MudText>
+                                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@effectiveTotal.ToString("0.00") zł</MudText>
+                                        </MudStack>
                                     }
                                 </MudStack>
                             </MudStack>
@@ -876,7 +917,11 @@ else
     private List<RentalItem> editItems = new();
     private DateTime? startDate;
     private DateTime? endDate;
+    private TimeSpan? startTime;
+    private TimeSpan? endTime;
     private decimal total => editItems.Sum(i => i.Subtotal);
+    private decimal? customTotalPrice;
+    private decimal effectiveTotal => customTotalPrice ?? total;
     private string? skuInput;
     private int skuQty = 1;
     private Product? selectedProduct;
@@ -995,6 +1040,9 @@ else
         editItems = new();
         startDate = DateTime.Today;
         endDate = DateTime.Today.AddDays(1);
+        startTime = null;
+        endTime = null;
+        customTotalPrice = null;
         dialogOpen = true;
         _ = UpdateReservedMap();
     }
@@ -1012,10 +1060,17 @@ else
             EndDateUtc = r.EndDateUtc,
             Status = r.Status,
             TotalAmount = r.TotalAmount,
-            ContractUrl = r.ContractUrl
+            ContractUrl = r.ContractUrl,
+            RentalType = r.RentalType,
+            HoursRented = r.HoursRented
         };
-        startDate = r.StartDateUtc.ToLocalTime();
-        endDate = r.EndDateUtc.ToLocalTime();
+        var localStart = r.StartDateUtc.ToLocalTime();
+        var localEnd = r.EndDateUtc.ToLocalTime();
+        startDate = localStart.Date;
+        endDate = localEnd.Date;
+        startTime = r.RentalType == RentalType.Hourly ? localStart.TimeOfDay : null;
+        endTime = r.RentalType == RentalType.Hourly ? localEnd.TimeOfDay : null;
+        customTotalPrice = null;
         editItems = Db.RentalItems.Where(i => i.RentalId == r.Id).ToList();
         dialogOpen = true;
         _ = UpdateReservedMap();
@@ -1220,6 +1275,34 @@ else
         Recalculate();
     }
 
+    private void OnStartTimeChanged(TimeSpan? time)
+    {
+        startTime = time;
+        RecalculateHoursFromTime();
+        Recalculate();
+    }
+
+    private void OnEndTimeChanged(TimeSpan? time)
+    {
+        endTime = time;
+        RecalculateHoursFromTime();
+        Recalculate();
+    }
+
+    private void RecalculateHoursFromTime()
+    {
+        if (startTime.HasValue && endTime.HasValue)
+        {
+            var diff = endTime.Value - startTime.Value;
+            if (diff.TotalHours <= 0) diff = diff.Add(TimeSpan.FromHours(24));
+            editModel.HoursRented = Math.Max(1, (int)Math.Ceiling(diff.TotalHours));
+        }
+        else
+        {
+            editModel.HoursRented = null;
+        }
+    }
+
     private async Task UpdateReservedMap()
     {
         try
@@ -1270,9 +1353,17 @@ else
 
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
-            editModel.StartDateUtc = startDate.Value.ToUniversalTime();
-            editModel.EndDateUtc = endDate.Value.ToUniversalTime();
-            editModel.TotalAmount = editItems.Sum(i => i.Subtotal);
+            
+            var sLocal = startDate.Value.Date;
+            var eLocal = endDate.Value.Date;
+            if (editModel.RentalType == RentalType.Hourly)
+            {
+                if (startTime.HasValue) sLocal = sLocal.Add(startTime.Value);
+                if (endTime.HasValue) eLocal = eLocal.Add(endTime.Value);
+            }
+            editModel.StartDateUtc = DateTime.SpecifyKind(sLocal, DateTimeKind.Local).ToUniversalTime();
+            editModel.EndDateUtc = DateTime.SpecifyKind(eLocal, DateTimeKind.Local).ToUniversalTime();
+            editModel.TotalAmount = effectiveTotal;
 
             if (editModel.Id == Guid.Empty)
             {
