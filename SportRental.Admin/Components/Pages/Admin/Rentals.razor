@@ -1239,16 +1239,15 @@ else
             
             if (editModel.RentalType == RentalType.Hourly && product?.HourlyPrice.HasValue == true)
             {
-                item.PricePerHour = product.HourlyPrice;
-                item.PricePerDay = product.DailyPrice;
-                item.Subtotal = product.HourlyPrice.Value * item.Quantity * hours;
+                item.PricePerHour ??= product.HourlyPrice;
+                if (item.PricePerDay == 0) item.PricePerDay = product.DailyPrice;
+                item.Subtotal = (item.PricePerHour ?? product.HourlyPrice.Value) * item.Quantity * hours;
             }
             else
             {
-                var price = product?.DailyPrice ?? item.PricePerDay;
-                item.PricePerDay = price;
-                item.PricePerHour = product?.HourlyPrice;
-                item.Subtotal = price * item.Quantity * days;
+                if (item.PricePerDay == 0) item.PricePerDay = product?.DailyPrice ?? 0;
+                item.PricePerHour ??= product?.HourlyPrice;
+                item.Subtotal = item.PricePerDay * item.Quantity * days;
             }
         }
     }
