@@ -263,18 +263,28 @@ else
                             }
                             @if (companyInfo.SmsReminderEnabled)
                             {
+                                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                                    <MudText Typo="Typo.caption">
+                                        Dostępne zmienne: <b>{imie}</b> - imię klienta, <b>{data_konca}</b> - data końca wynajmu, 
+                                        <b>{sprzet}</b> - lista sprzętu, <b>{firma}</b> - nazwa firmy, <b>{telefon}</b> - tel. firmy
+                                    </MudText>
+                                </MudAlert>
                                 <MudTextField @bind-Value="companyInfo.SmsReminderText" 
-                                              Label="Treść SMS - przypomnienie 1" 
-                                              Lines="2"
-                                              Variant="Variant.Outlined" />
+                                              Label="Treść SMS - przypomnienie o zwrocie" 
+                                              Lines="3"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Witaj {imie}! Wynajem sprzetu ({sprzet}) konczy sie {data_konca}. Prosimy o zwrot lub kontakt. {firma}"
+                                              HelperText="Zostaw puste dla domyślnej wiadomości" />
                                 <MudTextField @bind-Value="companyInfo.SmsReminderText2" 
-                                              Label="Treść SMS - przypomnienie 2" 
+                                              Label="Treść SMS - przypomnienie 2 (opcjonalne)" 
                                               Lines="2"
-                                              Variant="Variant.Outlined" />
+                                              Variant="Variant.Outlined"
+                                              HelperText="Drugie przypomnienie (np. dzień po terminie)" />
                                 <MudTextField @bind-Value="companyInfo.SmsReminderText3" 
-                                              Label="Treść SMS - przypomnienie 3" 
+                                              Label="Treść SMS - przypomnienie 3 (opcjonalne)" 
                                               Lines="2"
-                                              Variant="Variant.Outlined" />
+                                              Variant="Variant.Outlined"
+                                              HelperText="Trzecie przypomnienie (np. 3 dni po terminie)" />
                             }
                         </MudStack>
                     </MudPaper>
