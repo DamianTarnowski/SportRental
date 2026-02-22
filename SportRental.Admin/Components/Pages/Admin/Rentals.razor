@@ -121,6 +121,13 @@
                                         @(rental.IsSmsConfirmed ? "SMS ✓" : "SMS...")
                                     </MudChip>
                                 }
+                                @if (rental.IsReminderSmsSent)
+                                {
+                                    <MudChip T="string" Icon="@Icons.Material.Filled.NotificationsActive" 
+                                             Color="Color.Info" Size="Size.Small">
+                                        Przyp. ✓
+                                    </MudChip>
+                                }
                                 @if (IsOverdue(rental))
                                 {
                                     <MudChip T="string" Color="Color.Error" Size="Size.Small">
@@ -349,6 +356,15 @@ else
                                                      Size="Size.Small">
                                                 @GetEquipmentStatusText(rental)
                                             </MudChip>
+                                            @if (rental.IsReminderSmsSent)
+                                            {
+                                                <MudChip T="string" Icon="@Icons.Material.Filled.NotificationsActive" 
+                                                         Color="Color.Info" 
+                                                         Variant="Variant.Filled"
+                                                         Size="Size.Small">
+                                                    Przypomnienie SMS ✓
+                                                </MudChip>
+                                            }
                                             @if (IsOverdue(rental))
                                             {
                                                 <MudChip T="string" Icon="@Icons.Material.Filled.Warning" 
@@ -426,6 +442,16 @@ else
                                                            Size="Size.Small"
                                                            Class="flex-1">
                                                     Zakończ
+                                                </MudButton>
+                                            }
+                                            @if (rental.Status != RentalStatus.Completed && rental.Status != RentalStatus.Cancelled && !rental.IsReminderSmsSent)
+                                            {
+                                                <MudButton StartIcon="@Icons.Material.Filled.NotificationsActive" 
+                                                           OnClick="() => SendReminderSms(rental)"
+                                                           Color="Color.Warning"
+                                                           Variant="Variant.Outlined"
+                                                           Size="Size.Small">
+                                                    Przypomnienie SMS
                                                 </MudButton>
                                             }
                                         </MudStack>
@@ -1870,6 +1896,54 @@ else
         catch (Exception ex)
         {
             Snackbar.Add($"Błąd podczas kończenia wynajmu: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private async Task SendReminderSms(Rental rental)
+    {
+        try
+        {
+            var customer = customersDict.GetValueOrDefault(rental.CustomerId);
+            if (customer == null || string.IsNullOrWhiteSpace(customer.PhoneNumber))
+            {
+                Snackbar.Add("Klient nie ma numeru telefonu", MudBlazor.Severity.Warning);
+                return;
+            }
+
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(CurrentTenantId());
+
+            var companyInfo = await Db.CompanyInfos.AsNoTracking()
+                .FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+
+            var productIds = rental.Items?.Select(i => i.ProductId).Distinct().ToList() ?? new();
+            var productNames = await Db.Products.AsNoTracking()
+                .Where(p => productIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Name);
+
+            var message = SportRental.Admin.Services.Email.RentalReminderService
+                .BuildReminderSmsText(rental, companyInfo ?? new CompanyInfo(), productNames);
+
+            await SmsSender.SendReminderAsync(customer.PhoneNumber, customer.FullName, message);
+
+            var tracked = await Db.Rentals.FindAsync(rental.Id);
+            if (tracked != null)
+            {
+                tracked.IsReminderSmsSent = true;
+                tracked.ReminderSmsSentAtUtc = DateTime.UtcNow;
+                await Db.SaveChangesAsync();
+            }
+
+            rental.IsReminderSmsSent = true;
+            rental.ReminderSmsSentAtUtc = DateTime.UtcNow;
+
+            Snackbar.Add("Przypomnienie SMS wysłane!", MudBlazor.Severity.Success);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Błąd wysyłania przypomnienia SMS");
+            Snackbar.Add($"Błąd: {ex.Message}", MudBlazor.Severity.Error);
         }
     }
 

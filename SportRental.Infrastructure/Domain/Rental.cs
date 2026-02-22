@@ -53,6 +53,8 @@ namespace SportRental.Infrastructure.Domain
         public bool IsSmsConfirmationSent { get; set; } = false;  // Czy wysłano SMS z prośbą o potwierdzenie
         public bool IsSmsConfirmed { get; set; } = false;          // Czy klient potwierdził SMS-em
         public bool IsEmailSent { get; set; } = false;
+        public bool IsReminderSmsSent { get; set; } = false;
+        public DateTime? ReminderSmsSentAtUtc { get; set; }
 
         // Źródło wypożyczenia
         public RentalSource Source { get; set; } = RentalSource.Online;
