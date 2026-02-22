@@ -6,10 +6,16 @@
 @using SportRental.Infrastructure.Domain
 @using Microsoft.EntityFrameworkCore
 
+@using SportRental.Infrastructure.Tenancy
+@using Microsoft.AspNetCore.Identity
+
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 @inject ILogger<EquipmentHandling> Logger
+@inject ITenantProvider TenantProvider
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
 
 @if (_isMobile)
 {
@@ -457,8 +463,14 @@ else
     {
         await using var db = await DbFactory.CreateDbContextAsync();
         
-        var tenants = await db.Tenants.ToListAsync();
-        _tenantId = tenants.FirstOrDefault()?.Id ?? Guid.Empty;
+        _tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        if (_tenantId == Guid.Empty)
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = await UserManager.GetUserAsync(authState.User);
+            _tenantId = user?.TenantId ?? Guid.Empty;
+        }
+        db.SetTenant(_tenantId);
         
         var now = DateTime.UtcNow;
         
@@ -466,9 +478,8 @@ else
             .Include(r => r.Customer)
             .Include(r => r.Items).ThenInclude(i => i.Product)
             .Where(r => r.TenantId == _tenantId)
-            .Where(r => r.Status == RentalStatus.Confirmed)
+            .Where(r => r.Status == RentalStatus.Confirmed || r.Status == RentalStatus.Pending)
             .Where(r => r.IssuedAtUtc == null)
-            .Where(r => r.StartDateUtc <= now.AddHours(24))
             .OrderBy(r => r.StartDateUtc)
             .ToListAsync();
         _toIssueCount = _toIssueRentals.Count;
