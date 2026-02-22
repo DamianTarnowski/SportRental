@@ -577,27 +577,24 @@ else
                                 <MudSelectItem Value="RentalType.Hourly">⏰ Godzinowy</MudSelectItem>
                             </MudSelect>
                         </MudItem>
-                        @if (editModel.RentalType == RentalType.Hourly)
-                        {
-                            <MudItem xs="6" md="3">
-                                <MudTimePicker Label="⏰ Godzina od"
-                                               Time="@startTime"
-                                               TimeChanged="OnStartTimeChanged"
-                                               Variant="Variant.Outlined"
-                                               Editable="true"
-                                               AmPm="false"
-                                               Class="rounded-lg" />
-                            </MudItem>
-                            <MudItem xs="6" md="3">
-                                <MudTimePicker Label="⏰ Godzina do"
-                                               Time="@endTime"
-                                               TimeChanged="OnEndTimeChanged"
-                                               Variant="Variant.Outlined"
-                                               Editable="true"
-                                               AmPm="false"
-                                               Class="rounded-lg" />
-                            </MudItem>
-                        }
+                        <MudItem xs="6" md="3">
+                            <MudTimePicker Label="⏰ Godzina od"
+                                           Time="@startTime"
+                                           TimeChanged="OnStartTimeChanged"
+                                           Variant="Variant.Outlined"
+                                           Editable="true"
+                                           AmPm="false"
+                                           Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="6" md="3">
+                            <MudTimePicker Label="⏰ Godzina do"
+                                           Time="@endTime"
+                                           TimeChanged="OnEndTimeChanged"
+                                           Variant="Variant.Outlined"
+                                           Editable="true"
+                                           AmPm="false"
+                                           Class="rounded-lg" />
+                        </MudItem>
                     </MudGrid>
                     
                     @if (startDate.HasValue && endDate.HasValue)
@@ -1125,8 +1122,8 @@ else
         var localEnd = r.EndDateUtc.ToLocalTime();
         startDate = localStart.Date;
         endDate = localEnd.Date;
-        startTime = r.RentalType == RentalType.Hourly ? localStart.TimeOfDay : null;
-        endTime = r.RentalType == RentalType.Hourly ? localEnd.TimeOfDay : null;
+        startTime = localStart.TimeOfDay;
+        endTime = localEnd.TimeOfDay;
         customTotalPrice = null;
         editItems = Db.RentalItems.Where(i => i.RentalId == r.Id).ToList();
         dialogOpen = true;
@@ -1412,11 +1409,8 @@ else
             
             var sLocal = startDate.Value.Date;
             var eLocal = endDate.Value.Date;
-            if (editModel.RentalType == RentalType.Hourly)
-            {
-                if (startTime.HasValue) sLocal = sLocal.Add(startTime.Value);
-                if (endTime.HasValue) eLocal = eLocal.Add(endTime.Value);
-            }
+            if (startTime.HasValue) sLocal = sLocal.Add(startTime.Value);
+            if (endTime.HasValue) eLocal = eLocal.Add(endTime.Value);
             editModel.StartDateUtc = DateTime.SpecifyKind(sLocal, DateTimeKind.Local).ToUniversalTime();
             editModel.EndDateUtc = DateTime.SpecifyKind(eLocal, DateTimeKind.Local).ToUniversalTime();
             editModel.TotalAmount = effectiveTotal;
