@@ -139,6 +139,7 @@ builder.Services.AddSingleton<SerwerSmsSender>();
 builder.Services.AddSingleton<ConsoleSmsSender>();
 builder.Services.AddSingleton<ISmsSender, SmsSenderRouter>();
 builder.Services.AddScoped<ISmsConfirmationService, SmsConfirmationService>();
+builder.Services.AddScoped<SportRental.Admin.Services.IRentalConfirmationService, SportRental.Admin.Services.RentalConfirmationService>();
 
 // SignalR Hub for real-time rental notifications
 builder.Services.AddSingleton<SportRental.Admin.Hubs.IRentalNotificationService, SportRental.Admin.Hubs.RentalNotificationService>();
@@ -385,6 +386,7 @@ app.MapAdditionalIdentityEndpoints();
 // REST API
 app.MapSportRentalApi();
 app.MapSmsApiCallbacks(); // SMSAPI delivery report callbacks
+app.MapConfirmationEndpoints(); // Public rental confirmation page
 app.MapControllers();
 app.MapHub<SportRental.Admin.Hubs.RentalNotificationHub>("/hubs/rentals");
 

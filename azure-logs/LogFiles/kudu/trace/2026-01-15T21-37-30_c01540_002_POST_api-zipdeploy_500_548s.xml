@@ -1,0 +1,96 @@
+<step title="Incoming Request" date="2026-01-15T21:37:30.876" instance="c01540" url="/api/zipdeploy?isAsync=true" method="POST" type="request" pid="19444,2,7" Cache-Control="no-cache" Connection="Keep-Alive" Content-Length="91715226" Content-Type="application/octet-stream" Accept="*/*" Accept-Encoding="gzip, deflate" Authorization="Bas..." Host="sradmin.scm.azurewebsites.net" User-Agent="AZURECLI/2.77.0 (MSI)" x-ms-client-request-id="5ff0b30e-f25a-11f0-8483-d4d853b8ec18" X-ARR-LOG-ID="5ff0b30e-f25a-11f0-8483-d4d853b8ec18" CLIENT-IP="37.109.152.231:4614" X-SITE-DEPLOYMENT-ID="sradmin" WAS-DEFAULT-HOSTNAME="sradmin.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/zipdeploy?isAsync=true" X-MS-COLDSTART="1" >
+  <step title="ZipPushDeploy" date="2026-01-15T21:37:31.471" >
+    <step title="ZipDeploy. Extract zip. " date="2026-01-15T21:37:31.502" /><!-- duration: 0ms -->
+    <step title="Starting PushDeployAsync" date="2026-01-15T21:37:31.517" /><!-- duration: 0ms -->
+    <step title="Updating shutdown sentinel last write time" date="2026-01-15T21:37:31.564" SemaphoreCount="7" /><!-- duration: 0ms -->
+    <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-01-15T21:37:31.580" /><!-- duration: 0ms -->
+    <step title="Saving request content to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:37:31.580" >
+      <step title="Writing 7,073,792 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:38:01.586" /><!-- duration: 0ms -->
+      <step title="Writing 13,578,240 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:38:31.748" /><!-- duration: 0ms -->
+      <step title="Writing 20,164,608 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:39:01.829" /><!-- duration: 0ms -->
+      <step title="Writing 26,357,760 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:39:31.880" /><!-- duration: 16ms -->
+      <step title="Writing 32,485,376 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:40:01.917" /><!-- duration: 0ms -->
+      <step title="Writing 38,301,696 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:40:32.192" /><!-- duration: 0ms -->
+      <step title="Writing 44,920,832 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:41:02.459" /><!-- duration: 16ms -->
+      <step title="Writing 51,556,352 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:41:32.541" /><!-- duration: 16ms -->
+      <step title="Writing 57,700,352 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:42:02.607" /><!-- duration: 16ms -->
+      <step title="Writing 63,516,672 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:42:32.765" /><!-- duration: 0ms -->
+      <step title="Writing 69,906,432 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:43:02.892" /><!-- duration: 0ms -->
+      <step title="Writing 76,214,272 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:43:32.972" /><!-- duration: 0ms -->
+      <step title="Writing 82,980,864 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:44:02.996" /><!-- duration: 0ms -->
+      <step title="Writing 91,271,168 bytes to C:\local\Temp\zipdeploy\cvgnrv4k.zip" date="2026-01-15T21:44:33.052" /><!-- duration: 15ms -->
+    </step><!-- duration: 547394ms -->
+    <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; released" date="2026-01-15T21:46:38.989" /><!-- duration: 0ms -->
+    <step title="Deleting shutdown sentinel file" date="2026-01-15T21:46:39.036" SemaphoreCount="8" /><!-- duration: 16ms -->
+  </step><!-- duration: 547581ms -->
+  <step title="Error occurred" date="2026-01-15T21:46:39.067" type="error" text="The client disconnected." stackTrace="   at System.Web.Hosting.IIS7WorkerRequest.EndRead(IAsyncResult asyncResult)
+   at System.Web.HttpBufferlessInputStream.EndRead(IAsyncResult asyncResult)
+   at System.IO.Stream.&lt;&gt;c.&lt;BeginEndReadAsync&gt;b__43_1(Stream stream, IAsyncResult asyncResult)
+   at System.Threading.Tasks.TaskFactory`1.FromAsyncTrimPromise`1.Complete(TInstance thisRef, Func`3 endMethod, IAsyncResult asyncResult, Boolean requiresSynchronization)
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Web.Http.WebHost.SeekableBufferedRequestStream.&lt;ReadAsync&gt;d__11.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Kudu.Services.ByteRanges.HttpRequestMessageExtensions.&lt;CopyToAsync&gt;d__1.MoveNext() in C:\__w\1\s\Kudu.Services\ByteRanges\HttpRequestMessageExtensions.cs:line 55
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Kudu.Services.Deployment.PushDeploymentController.&lt;&gt;c__DisplayClass16_0.&lt;&lt;PushDeployAsync&gt;b__0&gt;d.MoveNext() in C:\__w\1\s\Kudu.Services\Deployment\PushDeploymentController.cs:line 519
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Kudu.Contracts.Infrastructure.LockExtensions.&lt;LockOperationAsync&gt;d__6.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Kudu.Services.Infrastructure.LockExtensions.&lt;LockHttpOperationAsync&gt;d__1.MoveNext() in C:\__w\1\s\Kudu.Services\Infrastructure\LockExtensions.cs:line 30
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.ValidateEnd(Task task)
+   at Kudu.Services.Deployment.PushDeploymentController.&lt;PushDeployAsync&gt;d__16.MoveNext() in C:\__w\1\s\Kudu.Services\Deployment\PushDeploymentController.cs:line 498
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at Kudu.Services.Deployment.PushDeploymentController.&lt;ZipPushDeploy&gt;d__12.MoveNext() in C:\__w\1\s\Kudu.Services\Deployment\PushDeploymentController.cs:line 103
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Threading.Tasks.TaskHelpersExtensions.&lt;CastToObject&gt;d__1`1.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Web.Http.Controllers.ApiControllerActionInvoker.&lt;InvokeActionAsyncCore&gt;d__1.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Web.Http.Filters.ActionFilterAttribute.&lt;CallOnActionExecutedAsync&gt;d__6.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Web.Http.Filters.ActionFilterAttribute.&lt;CallOnActionExecutedAsync&gt;d__6.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Web.Http.Filters.ActionFilterAttribute.&lt;ExecuteActionFilterAsyncCore&gt;d__5.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Web.Http.Filters.ActionFilterAttribute.&lt;CallOnActionExecutedAsync&gt;d__6.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Web.Http.Filters.ActionFilterAttribute.&lt;CallOnActionExecutedAsync&gt;d__6.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Web.Http.Filters.ActionFilterAttribute.&lt;ExecuteActionFilterAsyncCore&gt;d__5.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Web.Http.Controllers.ActionFilterResult.&lt;ExecuteAsync&gt;d__5.MoveNext()
+--- End of stack trace from previous location where exception was thrown ---
+   at System.Runtime.CompilerServices.TaskAwaiter.ThrowForNonSuccess(Task task)
+   at System.Runtime.CompilerServices.TaskAwaiter.HandleNonSuccessAndDebuggerNotification(Task task)
+   at System.Web.Http.Controllers.ExceptionFilterResult.&lt;ExecuteAsync&gt;d__6.MoveNext()" /><!-- duration: 0ms -->
+  <step title="Outgoing response" date="2026-01-15T21:46:39.145" type="response" statusCode="500" statusText="Internal Server Error" Server="Microsoft-IIS/10.0" x-ms-request-id="5ff0b30e-f25a-11f0-8483-d4d853b8ec18" Cache-Control="private" X-AspNet-Version="4.0.30319" Content-Type="application/json; charset=utf-8" /><!-- duration: 0ms -->
+</step><!-- duration: 548285ms -->

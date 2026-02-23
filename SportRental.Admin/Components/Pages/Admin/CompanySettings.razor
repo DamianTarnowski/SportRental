@@ -292,7 +292,25 @@ else
                 
                 <MudItem xs="12">
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
-                        <MudText Typo="Typo.h6" Class="mb-3">📝 Dodatkowe informacje</MudText>
+                        <MudText Typo="Typo.h6" Class="mb-3">� Regulamin wypożyczalni</MudText>
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                            <MudText Typo="Typo.caption">
+                                Regulamin jest wyświetlany klientowi na stronie potwierdzenia wynajmu. 
+                                Klient musi zaakceptować regulamin przed potwierdzeniem.
+                            </MudText>
+                        </MudAlert>
+                        <MudTextField @bind-Value="companyInfo.RegulationsText" 
+                                      Label="Treść regulaminu" 
+                                      Lines="10"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Wpisz treść regulaminu wypożyczalni..."
+                                      HelperText="Zostaw puste jeśli nie chcesz wymagać akceptacji regulaminu" />
+                    </MudPaper>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">� Dodatkowe informacje</MudText>
                         <MudTextField @bind-Value="companyInfo.ExtraInfo" 
                                       Label="Dodatkowe informacje" 
                                       Lines="3"
@@ -481,7 +499,8 @@ else
                 EmailThanksText = existingCompanyInfo.EmailThanksText,
                 EmailReminderText = existingCompanyInfo.EmailReminderText,
                 EmailReminderText2 = existingCompanyInfo.EmailReminderText2,
-                EmailReminderText3 = existingCompanyInfo.EmailReminderText3
+                EmailReminderText3 = existingCompanyInfo.EmailReminderText3,
+                RegulationsText = existingCompanyInfo.RegulationsText
             };
         }
     }
@@ -588,6 +607,7 @@ else
                 existingCompanyInfo.EmailReminderText = companyInfo.EmailReminderText;
                 existingCompanyInfo.EmailReminderText2 = companyInfo.EmailReminderText2;
                 existingCompanyInfo.EmailReminderText3 = companyInfo.EmailReminderText3;
+                existingCompanyInfo.RegulationsText = companyInfo.RegulationsText;
                 existingCompanyInfo.UpdatedAtUtc = DateTime.UtcNow;
                 
                 Db.CompanyInfos.Update(existingCompanyInfo);
@@ -622,6 +642,7 @@ else
                     EmailReminderText = companyInfo.EmailReminderText,
                     EmailReminderText2 = companyInfo.EmailReminderText2,
                     EmailReminderText3 = companyInfo.EmailReminderText3,
+                    RegulationsText = companyInfo.RegulationsText,
                     CreatedAtUtc = DateTime.UtcNow,
                     UpdatedAtUtc = DateTime.UtcNow
                 };
@@ -669,6 +690,7 @@ else
         public string? EmailReminderText { get; set; }
         public string? EmailReminderText2 { get; set; }
         public string? EmailReminderText3 { get; set; }
+        public string? RegulationsText { get; set; }
     }
 
     private class LogoResponse 

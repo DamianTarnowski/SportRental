@@ -1,0 +1,105 @@
+<step title="BackgroundTrace" date="2026-02-13T20:05:14.927" instance="c01540" url="/api/zipdeploy" method="POST" >
+  <step title="Cleanup Xml Logs" date="2026-02-13T20:05:14.927" /><!-- duration: 16ms -->
+  <step title="Updating shutdown sentinel last write time" date="2026-02-13T20:05:14.943" SemaphoreCount="7" /><!-- duration: 0ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-02-13T20:05:14.943" /><!-- duration: 16ms -->
+  <step title="Creating temporary deployment" date="2026-02-13T20:05:14.959" /><!-- duration: 31ms -->
+  <step title="Performing fetch based deployment" date="2026-02-13T20:05:15.006" >
+    <step title="Fetching changes." date="2026-02-13T20:05:15.068" /><!-- duration: 0ms -->
+    <step title="Starting LocalZipHandler" date="2026-02-13T20:05:15.068" /><!-- duration: 16ms -->
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\ggz4getq.zip (62.72 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-02-13T20:05:15.099" /><!-- duration: 0ms -->
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\ggz4getq.zip (62.72 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-02-13T20:05:15.099" >
+      <step title="Extracting 746 entries to C:\local\Temp\zipdeploy\extracted directory" date="2026-02-13T20:05:15.115" >
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-Black.ttf ..." date="2026-02-13T20:05:15.115" /><!-- duration: 31ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-BlackItalic.ttf ..." date="2026-02-13T20:05:15.146" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-Bold.ttf ..." date="2026-02-13T20:05:15.162" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-BoldItalic.ttf ..." date="2026-02-13T20:05:15.240" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-ExtraBold.ttf ..." date="2026-02-13T20:05:15.271" /><!-- duration: 16ms -->
+        <step title="Omitting extracting file traces ..." date="2026-02-13T20:05:15.287" /><!-- duration: 16ms -->
+      </step><!-- duration: 2125ms -->
+    </step><!-- duration: 2141ms -->
+    <step title="Before sending BuildRequestReceived status to /api/updatedeploystatus" date="2026-02-13T20:05:17.240" /><!-- duration: 0ms -->
+    <step title="DeploymentManager.Deploy(id:3e2899efe36a4be9aeb550d2a592b168)" date="2026-02-13T20:05:17.256" >
+      <step title="Collecting changeset information" date="2026-02-13T20:05:17.287" /><!-- duration: 16ms -->
+      <step title="Updating submodules" date="2026-02-13T20:05:17.302" >
+        <step title="Updating submodules." date="2026-02-13T20:05:17.334" /><!-- duration: 0ms -->
+      </step><!-- duration: 47ms -->
+      <step title="Preparing deployment for commit id &apos;3e2899efe3&apos;." date="2026-02-13T20:05:17.365" /><!-- duration: 16ms -->
+      <step title="Determining deployment builder" date="2026-02-13T20:05:17.412" >
+        <step title="Builder is BasicBuilder" date="2026-02-13T20:05:17.427" /><!-- duration: 0ms -->
+      </step><!-- duration: 16ms -->
+      <step title="Copying SSH keys" date="2026-02-13T20:05:17.443" /><!-- duration: 16ms -->
+      <step title="Building" date="2026-02-13T20:05:17.459" >
+        <step title="Generating deployment script." date="2026-02-13T20:05:17.490" /><!-- duration: 0ms -->
+        <step title="Generating deployment script" date="2026-02-13T20:05:17.490" >
+          <step title="Using cached version of the deployment script for command: -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --basic --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;" date="2026-02-13T20:05:17.537" /><!-- duration: 0ms -->
+          <step title="Using cached version of deployment script (command: &apos;azure -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --basic --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;&apos;)." date="2026-02-13T20:05:17.537" /><!-- duration: 0ms -->
+        </step><!-- duration: 63ms -->
+        <step title="Running deployment command..." date="2026-02-13T20:05:17.568" /><!-- duration: 0ms -->
+        <step title="Command: &quot;C:\home\site\deployments\tools\deploy.cmd&quot;" date="2026-02-13T20:05:17.584" /><!-- duration: 0ms -->
+        <step title="Executing external process" date="2026-02-13T20:05:17.599" type="process" path="starter.cmd" arguments="&quot;C:\home\site\deployments\tools\deploy.cmd&quot;" >
+          <step title="Handling Basic Web Site deployment." date="2026-02-13T20:05:17.802" /><!-- duration: 0ms -->
+          <step title="Creating app_offline.htm" date="2026-02-13T20:05:18.162" /><!-- duration: 0ms -->
+          <step title="KuduSync.NET from: &apos;C:\local\Temp\zipdeploy\extracted&apos; to: &apos;C:\home\site\wwwroot&apos;" date="2026-02-13T20:05:18.177" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\BrowserDebugHost.dll&apos;" date="2026-02-13T20:05:18.177" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\BrowserDebugHost.runtimeconfig.json&apos;" date="2026-02-13T20:05:18.177" /><!-- duration: 16ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\BrowserDebugProxy.dll&apos;" date="2026-02-13T20:05:18.193" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\Microsoft.CodeAnalysis.CSharp.dll&apos;" date="2026-02-13T20:05:18.209" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\Microsoft.CodeAnalysis.CSharp.Scripting.dll&apos;" date="2026-02-13T20:05:18.224" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\Microsoft.CodeAnalysis.dll&apos;" date="2026-02-13T20:05:18.240" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\Microsoft.CodeAnalysis.Scripting.dll&apos;" date="2026-02-13T20:05:18.240" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\Microsoft.FileFormats.dll&apos;" date="2026-02-13T20:05:18.240" /><!-- duration: 16ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\Microsoft.NET.WebAssembly.Webcil.dll&apos;" date="2026-02-13T20:05:18.256" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\Microsoft.SymbolStore.dll&apos;" date="2026-02-13T20:05:18.256" /><!-- duration: 0ms -->
+          <step title="Deleting file: &apos;BlazorDebugProxy\Newtonsoft.Json.dll&apos;" date="2026-02-13T20:05:18.271" /><!-- duration: 0ms -->
+          <step title="Deleting directory: &apos;BlazorDebugProxy&apos;" date="2026-02-13T20:05:18.271" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;appsettings.Development.json&apos;" date="2026-02-13T20:05:18.271" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;appsettings.json&apos;" date="2026-02-13T20:05:18.287" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;AWSSDK.Core.dll&apos;" date="2026-02-13T20:05:18.287" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;AWSSDK.S3.dll&apos;" date="2026-02-13T20:05:18.302" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Azure.Core.dll&apos;" date="2026-02-13T20:05:18.318" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Azure.Extensions.AspNetCore.Configuration.Secrets.dll&apos;" date="2026-02-13T20:05:18.318" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Azure.Identity.dll&apos;" date="2026-02-13T20:05:18.318" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Azure.Security.KeyVault.Secrets.dll&apos;" date="2026-02-13T20:05:18.334" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Azure.Storage.Blobs.dll&apos;" date="2026-02-13T20:05:18.334" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Azure.Storage.Common.dll&apos;" date="2026-02-13T20:05:18.349" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Blazored.LocalStorage.dll&apos;" date="2026-02-13T20:05:18.365" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;BouncyCastle.Cryptography.dll&apos;" date="2026-02-13T20:05:18.365" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;MailKit.dll&apos;" date="2026-02-13T20:05:18.381" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.AspNetCore.Components.WebAssembly.dll&apos;" date="2026-02-13T20:05:18.381" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.AspNetCore.Components.WebAssembly.Server.dll&apos;" date="2026-02-13T20:05:18.381" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore.dll&apos;" date="2026-02-13T20:05:18.396" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.AspNetCore.Http.Connections.Client.dll&apos;" date="2026-02-13T20:05:18.396" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;Microsoft.AspNetCore.Identity.EntityFrameworkCore.dll&apos;" date="2026-02-13T20:05:18.412" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.AspNetCore.SignalR.Client.Core.dll&apos;" date="2026-02-13T20:05:18.412" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.AspNetCore.SignalR.Client.dll&apos;" date="2026-02-13T20:05:18.427" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.Bcl.AsyncInterfaces.dll&apos;" date="2026-02-13T20:05:18.427" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.EntityFrameworkCore.Abstractions.dll&apos;" date="2026-02-13T20:05:18.459" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.EntityFrameworkCore.dll&apos;" date="2026-02-13T20:05:18.459" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.EntityFrameworkCore.Relational.dll&apos;" date="2026-02-13T20:05:18.459" /><!-- duration: 16ms -->
+          <step title="Copying file: &apos;Microsoft.Identity.Client.dll&apos;" date="2026-02-13T20:05:18.474" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.Identity.Client.Extensions.Msal.dll&apos;" date="2026-02-13T20:05:18.474" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.IdentityModel.Abstractions.dll&apos;" date="2026-02-13T20:05:18.490" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.JSInterop.WebAssembly.dll&apos;" date="2026-02-13T20:05:18.490" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Microsoft.OpenApi.dll&apos;" date="2026-02-13T20:05:18.490" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;MimeKit.dll&apos;" date="2026-02-13T20:05:18.506" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;MudBlazor.dll&apos;" date="2026-02-13T20:05:18.506" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Newtonsoft.Json.dll&apos;" date="2026-02-13T20:05:18.506" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Npgsql.dll&apos;" date="2026-02-13T20:05:18.521" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;Npgsql.EntityFrameworkCore.PostgreSQL.dll&apos;" date="2026-02-13T20:05:18.521" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;package-lock.json&apos;" date="2026-02-13T20:05:18.521" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;package.json&apos;" date="2026-02-13T20:05:18.537" /><!-- duration: 0ms -->
+          <step title="Omitting next output lines..." date="2026-02-13T20:05:18.537" /><!-- duration: 0ms -->
+          <step title="Finished successfully." date="2026-02-13T20:05:27.687" /><!-- duration: 0ms -->
+        </step><!-- duration: 10087ms -->
+        <step title="Running post deployment command(s)..." date="2026-02-13T20:05:27.734" /><!-- duration: 0ms -->
+        <step title="Triggering recycle (preview mode disabled)." date="2026-02-13T20:05:27.765" /><!-- duration: 0ms -->
+        <step title="Ignoring FS watcher based recycle request as this is a classic Windows app." date="2026-02-13T20:05:27.780" /><!-- duration: 0ms -->
+        <step title="Deployment successful. DEPLOYMENTINFO: deploymentPath = ZipDeploy. Extract zip. , deployer = ZipDeploy, os = windows, sku = Shared, siteName = sradmin, siteHostName = sradmin.azurewebsites.net, deploymentStatus = Success" date="2026-02-13T20:05:27.796" /><!-- duration: 0ms -->
+      </step><!-- duration: 10603ms -->
+    </step><!-- duration: 10806ms -->
+    <step title="Cleaning up temp files" date="2026-02-13T20:05:28.062" /><!-- duration: 16ms -->
+    <step title="Skip function trigger and logicapp sync because function is not enabled." date="2026-02-13T20:05:28.077" /><!-- duration: 0ms -->
+  </step><!-- duration: 13103ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; released" date="2026-02-13T20:05:28.124" /><!-- duration: 0ms -->
+  <step title="Deleting shutdown sentinel file" date="2026-02-13T20:05:28.124" SemaphoreCount="8" /><!-- duration: 0ms -->
+</step><!-- duration: 13197ms -->

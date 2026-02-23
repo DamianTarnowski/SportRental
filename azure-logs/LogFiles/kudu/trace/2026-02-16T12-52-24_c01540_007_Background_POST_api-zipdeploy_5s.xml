@@ -1,0 +1,61 @@
+<step title="BackgroundTrace" date="2026-02-16T12:52:24.114" instance="c01540" url="/api/zipdeploy" method="POST" >
+  <step title="Cleanup Xml Logs" date="2026-02-16T12:52:24.130" /><!-- duration: 0ms -->
+  <step title="Updating shutdown sentinel last write time" date="2026-02-16T12:52:24.130" SemaphoreCount="7" /><!-- duration: 16ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; acquired" date="2026-02-16T12:52:24.146" /><!-- duration: 0ms -->
+  <step title="Creating temporary deployment" date="2026-02-16T12:52:24.146" /><!-- duration: 16ms -->
+  <step title="Performing fetch based deployment" date="2026-02-16T12:52:24.161" >
+    <step title="Fetching changes." date="2026-02-16T12:52:24.193" /><!-- duration: 0ms -->
+    <step title="Starting LocalZipHandler" date="2026-02-16T12:52:24.208" /><!-- duration: 0ms -->
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\0aiykvqo.zip (62.73 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-02-16T12:52:24.208" /><!-- duration: 0ms -->
+    <step title="Cleaning up temp folders from previous zip deployments and extracting pushed zip file C:\local\Temp\zipdeploy\0aiykvqo.zip (62.73 MB) to C:\local\Temp\zipdeploy\extracted" date="2026-02-16T12:52:24.224" >
+      <step title="Renaming extractTargetDirectory(C:\local\Temp\zipdeploy\extracted) to tempDirectory(C:\local\Temp\zipdeploy\acgkw0mt.eh3)" date="2026-02-16T12:52:24.224" /><!-- duration: 0ms -->
+      <step title="Extracting 746 entries to C:\local\Temp\zipdeploy\extracted directory" date="2026-02-16T12:52:24.239" >
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-Black.ttf ..." date="2026-02-16T12:52:24.239" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-BlackItalic.ttf ..." date="2026-02-16T12:52:24.255" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-Bold.ttf ..." date="2026-02-16T12:52:24.271" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-BoldItalic.ttf ..." date="2026-02-16T12:52:24.286" /><!-- duration: 16ms -->
+        <step title="Extracting to C:\local\Temp\zipdeploy\extracted\LatoFont\Lato-ExtraBold.ttf ..." date="2026-02-16T12:52:24.302" /><!-- duration: 16ms -->
+        <step title="Omitting extracting file traces ..." date="2026-02-16T12:52:24.318" /><!-- duration: 16ms -->
+      </step><!-- duration: 2047ms -->
+    </step><!-- duration: 2063ms -->
+    <step title="Before sending BuildRequestReceived status to /api/updatedeploystatus" date="2026-02-16T12:52:26.286" /><!-- duration: 0ms -->
+    <step title="DeploymentManager.Deploy(id:e4cc0fc8f80b46a8ba889ca5c5496429)" date="2026-02-16T12:52:26.302" >
+      <step title="Collecting changeset information" date="2026-02-16T12:52:26.302" /><!-- duration: 31ms -->
+      <step title="Updating submodules" date="2026-02-16T12:52:26.333" >
+        <step title="Updating submodules." date="2026-02-16T12:52:26.349" /><!-- duration: 16ms -->
+      </step><!-- duration: 47ms -->
+      <step title="Preparing deployment for commit id &apos;e4cc0fc8f8&apos;." date="2026-02-16T12:52:26.396" /><!-- duration: 0ms -->
+      <step title="Determining deployment builder" date="2026-02-16T12:52:26.411" >
+        <step title="Builder is BasicBuilder" date="2026-02-16T12:52:26.411" /><!-- duration: 0ms -->
+      </step><!-- duration: 16ms -->
+      <step title="Copying SSH keys" date="2026-02-16T12:52:26.427" /><!-- duration: 0ms -->
+      <step title="Building" date="2026-02-16T12:52:26.443" >
+        <step title="Generating deployment script." date="2026-02-16T12:52:26.458" /><!-- duration: 0ms -->
+        <step title="Generating deployment script" date="2026-02-16T12:52:26.458" >
+          <step title="Using cached version of the deployment script for command: -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --basic --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;" date="2026-02-16T12:52:26.474" /><!-- duration: 0ms -->
+          <step title="Using cached version of deployment script (command: &apos;azure -y --no-dot-deployment -r &quot;C:\local\Temp\zipdeploy\extracted&quot; -o &quot;C:\home\site\deployments\tools&quot; --basic --sitePath &quot;C:\local\Temp\zipdeploy\extracted&quot;&apos;)." date="2026-02-16T12:52:26.489" /><!-- duration: 0ms -->
+        </step><!-- duration: 31ms -->
+        <step title="Running deployment command..." date="2026-02-16T12:52:26.505" /><!-- duration: 0ms -->
+        <step title="Command: &quot;C:\home\site\deployments\tools\deploy.cmd&quot;" date="2026-02-16T12:52:26.521" /><!-- duration: 16ms -->
+        <step title="Executing external process" date="2026-02-16T12:52:26.536" type="process" path="starter.cmd" arguments="&quot;C:\home\site\deployments\tools\deploy.cmd&quot;" >
+          <step title="Handling Basic Web Site deployment." date="2026-02-16T12:52:26.677" /><!-- duration: 0ms -->
+          <step title="Creating app_offline.htm" date="2026-02-16T12:52:29.083" /><!-- duration: 0ms -->
+          <step title="KuduSync.NET from: &apos;C:\local\Temp\zipdeploy\extracted&apos; to: &apos;C:\home\site\wwwroot&apos;" date="2026-02-16T12:52:29.083" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;SportRental.dll&apos;" date="2026-02-16T12:52:29.099" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;SportRental.exe&apos;" date="2026-02-16T12:52:29.099" /><!-- duration: 0ms -->
+          <step title="Copying file: &apos;SportRental.pdb&apos;" date="2026-02-16T12:52:29.115" /><!-- duration: 0ms -->
+          <step title="Deleting app_offline.htm" date="2026-02-16T12:52:29.115" /><!-- duration: 16ms -->
+          <step title="Finished successfully." date="2026-02-16T12:52:29.146" /><!-- duration: 0ms -->
+        </step><!-- duration: 2610ms -->
+        <step title="Running post deployment command(s)..." date="2026-02-16T12:52:29.162" /><!-- duration: 0ms -->
+        <step title="Triggering recycle (preview mode disabled)." date="2026-02-16T12:52:29.193" /><!-- duration: 0ms -->
+        <step title="Ignoring FS watcher based recycle request as this is a classic Windows app." date="2026-02-16T12:52:29.193" /><!-- duration: 0ms -->
+        <step title="Deployment successful. DEPLOYMENTINFO: deploymentPath = ZipDeploy. Extract zip. , deployer = ZipDeploy, os = windows, sku = Shared, siteName = sradmin, siteHostName = sradmin.azurewebsites.net, deploymentStatus = Success" date="2026-02-16T12:52:29.224" /><!-- duration: 0ms -->
+      </step><!-- duration: 2844ms -->
+    </step><!-- duration: 3000ms -->
+    <step title="Cleaning up temp files" date="2026-02-16T12:52:29.302" /><!-- duration: 16ms -->
+    <step title="Skip function trigger and logicapp sync because function is not enabled." date="2026-02-16T12:52:29.318" /><!-- duration: 0ms -->
+  </step><!-- duration: 5188ms -->
+  <step title="LockFile &apos;C:\home\site\locks\deployments.lock&apos; released" date="2026-02-16T12:52:29.349" /><!-- duration: 0ms -->
+  <step title="Deleting shutdown sentinel file" date="2026-02-16T12:52:29.349" SemaphoreCount="8" /><!-- duration: 0ms -->
+</step><!-- duration: 5235ms -->

@@ -8,6 +8,7 @@
 @inject IDialogService DialogService
 @inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
 @inject SportRental.Admin.Services.Sms.ISmsConfirmationService SmsConfirmationService
+@inject SportRental.Admin.Services.IRentalConfirmationService RentalConfirmationService
 @inject ILogger<Rentals> Logger
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
@@ -1485,27 +1486,24 @@ else
                 }
             }
             
-            if (companyInfo?.SmsConfirmationEnabled == true && customer != null && !string.IsNullOrWhiteSpace(customer.PhoneNumber))
+            if (companyInfo?.SmsConfirmationEnabled == true && customer != null 
+                && (!string.IsNullOrWhiteSpace(customer.PhoneNumber) || !string.IsNullOrWhiteSpace(customer.Email)))
             {
                 try
                 {
-                    await SmsConfirmationService.GenerateConfirmationCodeAsync(editModel.Id);
-                    await SmsSender.SendContractConfirmationRequestAsync(
-                        customer.PhoneNumber, 
-                        customer.FullName ?? "Klient", 
-                        editModel.Id,
-                        customer.Email);
+                    var token = await RentalConfirmationService.CreateConfirmationAsync(editModel.Id);
+                    await RentalConfirmationService.SendConfirmationLinkAsync(editModel.Id, token);
                     
                     editModel.IsSmsConfirmationSent = true;
                     editModel.Status = RentalStatus.Pending;
                     needsPostSaveUpdate = true;
                     
-                    Snackbar.Add($"📱 SMS z prośbą o potwierdzenie wysłany do {customer.PhoneNumber}", MudBlazor.Severity.Info);
+                    Snackbar.Add($"🔗 Link potwierdzenia wysłany do klienta", MudBlazor.Severity.Info);
                 }
                 catch (Exception smsEx)
                 {
-                    Logger.LogError(smsEx, "Failed to send SMS for rental {RentalId}", editModel.Id);
-                    Snackbar.Add($"⚠️ Błąd wysyłania SMS: {smsEx.Message}", MudBlazor.Severity.Warning);
+                    Logger.LogError(smsEx, "Failed to send confirmation link for rental {RentalId}", editModel.Id);
+                    Snackbar.Add($"⚠️ Błąd wysyłania linku: {smsEx.Message}", MudBlazor.Severity.Warning);
                 }
             }
             

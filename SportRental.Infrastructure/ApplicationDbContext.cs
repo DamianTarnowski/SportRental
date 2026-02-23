@@ -40,6 +40,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<EmployeeInvitation> EmployeeInvitations => Set<EmployeeInvitation>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
+    public DbSet<RentalConfirmation> RentalConfirmations => Set<RentalConfirmation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -266,6 +267,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(rt => rt.Token).HasMaxLength(128).IsRequired();
             entity.Property(rt => rt.RevokedReason).HasMaxLength(200);
             entity.Property(rt => rt.ReplacedByToken).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<RentalConfirmation>(entity =>
+        {
+            entity.HasKey(rc => rc.Id);
+            entity.Property(rc => rc.Token).HasMaxLength(128).IsRequired();
+            entity.Property(rc => rc.PhoneNumber).HasMaxLength(20);
+            entity.Property(rc => rc.Email).HasMaxLength(256);
+            entity.Property(rc => rc.ConfirmedFromIp).HasMaxLength(45);
+            entity.Property(rc => rc.ConfirmedUserAgent).HasMaxLength(500);
+            entity.Property(rc => rc.RegulationsHash).HasMaxLength(64);
+            entity.HasOne(rc => rc.Rental)
+                .WithMany()
+                .HasForeignKey(rc => rc.RentalId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(rc => rc.Token).IsUnique();
+            entity.HasIndex(rc => new { rc.TenantId, rc.RentalId });
+            entity.HasQueryFilter(rc => TenantId == null || rc.TenantId == TenantId);
         });
 
         modelBuilder.Entity<CheckoutSession>(entity =>

@@ -1,0 +1,447 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<entries>
+  <entry time="2025-11-27T22:23:40.8220699+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [653f3498-d402-4a5f-b912-d0402275c2fe] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-11-27T22:23:40.9479228+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-11-27T22:23:40.9479228+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-11-27T22:23:40.9479228+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [653f3498-d402-4a5f-b912-d0402275c2fe] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-11-27T22:33:08.7124673+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [12f07860-9a26-487f-9b5d-17c2a0aab512] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-11-27T22:33:08.8375212+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-11-27T22:33:08.8375212+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-11-27T22:33:08.8375212+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [12f07860-9a26-487f-9b5d-17c2a0aab512] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-11T13:17:35.557693+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [6a6291fa-dc33-476f-9222-c7bac6e41fc5] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-11T13:17:35.6826185+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-11T13:17:35.6826185+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-11T13:17:35.6826185+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [6a6291fa-dc33-476f-9222-c7bac6e41fc5] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-12T02:47:05.9778522+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [d0bf4b97-dec5-49fc-9c41-0ff9f59ed15f] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-12T02:47:06.0872861+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-12T02:47:06.0872861+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-12T02:47:06.0872861+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [d0bf4b97-dec5-49fc-9c41-0ff9f59ed15f] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-12T23:43:41.8887835+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [b2ffd43c-e236-4de7-b376-dfb2f68c37b8] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-12T23:43:41.9981347+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-12T23:43:41.9981347+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-12T23:43:41.9981347+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [b2ffd43c-e236-4de7-b376-dfb2f68c37b8] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-13T00:35:07.4603284+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [42d8c87d-542b-47c9-81a5-12382f18ef19] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-13T00:35:07.5384644+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-13T00:35:07.5384644+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-13T00:35:07.5384644+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [42d8c87d-542b-47c9-81a5-12382f18ef19] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-13T00:57:42.1769093+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [aa696f8f-7332-4171-8626-5ca29702bc33] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-13T00:57:42.2863009+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-13T00:57:42.2863009+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-13T00:57:42.2863009+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [aa696f8f-7332-4171-8626-5ca29702bc33] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-13T02:23:51.5309155+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [6c5a6fb9-9eee-4e37-9411-050920d23a16] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-13T02:23:51.6559243+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-13T02:23:51.6559243+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-13T02:23:51.6559243+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [6c5a6fb9-9eee-4e37-9411-050920d23a16] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-15T01:53:54.1197928+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [12fe26aa-4489-4c5a-94dd-e299dd70434f] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-15T01:53:54.2291464+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-15T01:53:54.2291464+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-15T01:53:54.2291464+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [12fe26aa-4489-4c5a-94dd-e299dd70434f] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-15T02:06:42.7600279+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [8d8ecbbf-fd29-4ff7-8654-0510a955f6eb] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-15T02:06:42.7600279+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-15T02:06:42.7600279+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-15T02:06:42.7600279+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [8d8ecbbf-fd29-4ff7-8654-0510a955f6eb] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-15T19:20:56.0631693+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [c469dc6c-fdb5-4987-969e-188b3622b7f3] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-15T19:20:56.1724839+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-15T19:20:56.1881821+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-15T19:20:56.1881821+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [c469dc6c-fdb5-4987-969e-188b3622b7f3] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-15T22:29:21.8263488+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [314ba6ea-45d0-4d36-bed8-d4c2e07a5980] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-15T22:29:21.9357301+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-15T22:29:21.9357301+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-15T22:29:21.9357301+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [314ba6ea-45d0-4d36-bed8-d4c2e07a5980] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-15T23:59:55.254607+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [0a3c3a6f-a2c4-4c2d-9a97-9b25335abe5e] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-15T23:59:55.3639685+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-15T23:59:55.3639685+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-15T23:59:55.3639685+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [0a3c3a6f-a2c4-4c2d-9a97-9b25335abe5e] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T01:56:36.2944048+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [fa583b25-ab0e-4674-9ae2-6c36d6f861a1] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T01:56:36.4037399+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T01:56:36.4037399+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T01:56:36.4037399+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [fa583b25-ab0e-4674-9ae2-6c36d6f861a1] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T02:24:23.9589706+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [ebc9d8e1-0623-4e77-b399-61aad8358cc5] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T02:24:24.0684051+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T02:24:24.0684051+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T02:24:24.0684051+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [ebc9d8e1-0623-4e77-b399-61aad8358cc5] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T11:22:33.6682369+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [ff470cdf-6c10-4c32-b057-6cb01b01a58e] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T11:22:33.7932895+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T11:22:33.7932895+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T11:22:33.7932895+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [ff470cdf-6c10-4c32-b057-6cb01b01a58e] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T12:35:04.6934621+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [df5d25ab-6a37-441e-9ad5-6399105af8c4] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T12:35:04.8185109+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T12:35:04.8185109+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T12:35:04.8185109+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [df5d25ab-6a37-441e-9ad5-6399105af8c4] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T12:54:35.3497522+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [c24355ae-2208-4803-b2d6-27be91a8f7aa] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T12:54:35.3497522+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T12:54:35.3497522+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T12:54:35.3497522+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [c24355ae-2208-4803-b2d6-27be91a8f7aa] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T13:25:47.9327135+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [37fdcf22-1908-4e8e-9817-881940e1298e] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T13:25:48.0421312+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T13:25:48.0421312+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T13:25:48.0421312+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [37fdcf22-1908-4e8e-9817-881940e1298e] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T13:53:11.4750382+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [225324c9-05eb-4a2d-874a-c00f7a20edce] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T13:53:11.5844832+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T13:53:11.5844832+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T13:53:11.5844832+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [225324c9-05eb-4a2d-874a-c00f7a20edce] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T17:24:28.5175343+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [a975a5c3-fc08-400e-837c-171bf8407a7a] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T17:24:28.6425235+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T17:24:28.6425235+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T17:24:28.6425235+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [a975a5c3-fc08-400e-837c-171bf8407a7a] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-16T17:41:20.6393432+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [9290b742-d55a-4bf0-a672-c382798b5215] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-16T17:41:20.6549671+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-16T17:41:20.6549671+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-16T17:41:20.6549671+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [9290b742-d55a-4bf0-a672-c382798b5215] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-19T01:59:39.8027872+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [809a3e23-cc7a-4be0-b186-98286d4d7d44] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-19T01:59:39.927785+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-19T01:59:39.927785+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-19T01:59:39.927785+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [809a3e23-cc7a-4be0-b186-98286d4d7d44] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2025-12-19T22:49:28.949575+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [e30ee474-d621-4e99-bc97-a52b13d91e7b] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2025-12-19T22:49:29.0745778+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2025-12-19T22:49:29.0745778+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2025-12-19T22:49:29.0745778+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [e30ee474-d621-4e99-bc97-a52b13d91e7b] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-01-13T09:11:54.9905898+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [64427473-14e8-48a0-b471-ccfd5b4704d7] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-01-13T09:11:55.0999639+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-01-13T09:11:55.1155907+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-01-13T09:11:55.1155907+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [64427473-14e8-48a0-b471-ccfd5b4704d7] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-01-13T10:35:09.6189592+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [fa378fc7-0c95-4b6d-822c-6c3f0178d16a] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-01-13T10:35:09.728336+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-01-13T10:35:09.728336+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-01-13T10:35:09.728336+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [fa378fc7-0c95-4b6d-822c-6c3f0178d16a] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-01-13T11:01:22.2242953+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [c61970e6-39c8-45e0-a361-013d2533c03f] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-01-13T11:01:22.3336642+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-01-13T11:01:22.3336642+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-01-13T11:01:22.3336642+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [c61970e6-39c8-45e0-a361-013d2533c03f] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-01-13T11:09:35.9367764+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [d57da78a-0677-4369-b7ec-c996b6088efd] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-01-13T11:09:35.9367764+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-01-13T11:09:35.9367764+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-01-13T11:09:35.9367764+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [d57da78a-0677-4369-b7ec-c996b6088efd] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-01-13T11:18:47.0675511+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [9ebafa85-e760-4b39-9176-bf556996825b] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-01-13T11:18:47.0831688+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-01-13T11:18:47.0831688+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-01-13T11:18:47.0831688+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [9ebafa85-e760-4b39-9176-bf556996825b] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-01-13T11:25:36.0052305+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [e8a213a6-d3ee-40f2-81c5-489128c7511e] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-01-13T11:25:36.0052305+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-01-13T11:25:36.0052305+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-01-13T11:25:36.0052305+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [e8a213a6-d3ee-40f2-81c5-489128c7511e] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-01-15T18:10:28.9001347+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [817ef2cc-7204-4734-9653-49db253ea6a5] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-01-15T18:10:29.0250789+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-01-15T18:10:29.0250789+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-01-15T18:10:29.0250789+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [817ef2cc-7204-4734-9653-49db253ea6a5] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-01-15T22:21:07.0494359+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [5bdcebcd-ebe3-4c97-a8e2-2c8ed1db16fc] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-01-15T22:21:07.174436+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-01-15T22:21:07.174436+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-01-15T22:21:07.174436+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [5bdcebcd-ebe3-4c97-a8e2-2c8ed1db16fc] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-02-16T17:33:10.6431812+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [b51495af-c024-4fc0-875b-91f1f933149e] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-02-16T17:33:10.7525037+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-02-16T17:33:10.7525037+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-02-16T17:33:10.7525037+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [b51495af-c024-4fc0-875b-91f1f933149e] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-02-17T10:28:25.9215944+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [a4559594-438c-4395-bf35-9c14cc68b215] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-02-17T10:28:26.0309712+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-02-17T10:28:26.0309712+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-02-17T10:28:26.0309712+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [a4559594-438c-4395-bf35-9c14cc68b215] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-02-22T22:15:42.1419547+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [e9ceafc4-7cc0-4e28-9fdc-fe54fe904be1] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-02-22T22:15:42.2513332+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-02-22T22:15:42.2669595+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-02-22T22:15:42.2669595+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [e9ceafc4-7cc0-4e28-9fdc-fe54fe904be1] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-02-22T22:25:16.5735455+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [cea59fec-1138-4fd6-9b72-473e19a0aad6] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-02-22T22:25:16.5891621+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-02-22T22:25:16.5891621+00:00" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-02-22T22:25:16.5891621+00:00" type="Message">
+    <message>[Information] [user: $sradmin] [cea59fec-1138-4fd6-9b72-473e19a0aad6] Post-deployment operations complete.</message>
+  </entry>
+  <entry time="2026-02-22T22:31:34.0046598Z" type="Message">
+    <message>[Information] [user: $sradmin] [9bf8bba6-7cc5-406d-9f6b-ce9f37e47b20] WebDeploy operation complete. Performing post-deployment operations.</message>
+  </entry>
+  <entry time="2026-02-22T22:31:34.0046598Z" type="Message">
+    <message>[Verbose] [user: $sradmin] Skip function trigger and logicapp sync because function is not enabled.</message>
+  </entry>
+  <entry time="2026-02-22T22:31:34.0046598Z" type="Message">
+    <message>[Verbose] [user: $sradmin] AutoSwap is not enabled</message>
+  </entry>
+  <entry time="2026-02-22T22:31:34.0046598Z" type="Message">
+    <message>[Information] [user: $sradmin] [9bf8bba6-7cc5-406d-9f6b-ce9f37e47b20] Post-deployment operations complete.</message>
+  </entry>
+</entries>
