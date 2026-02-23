@@ -6,6 +6,7 @@ using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Tenancy;
 using SportRental.Admin.Hubs;
 using SportRental.Admin.Services.Sms;
+using SportRental.Admin.Services.Email;
 
 namespace SportRental.Admin.Services;
 
@@ -60,6 +61,7 @@ public class RentalConfirmationService : IRentalConfirmationService
     private readonly ISmsSender _smsSender;
     private readonly IRentalNotificationService _notificationService;
     private readonly IConfiguration _configuration;
+    private readonly IEmailSender _emailSender;
 
     public RentalConfirmationService(
         IDbContextFactory<ApplicationDbContext> contextFactory,
@@ -67,7 +69,8 @@ public class RentalConfirmationService : IRentalConfirmationService
         ILogger<RentalConfirmationService> logger,
         ISmsSender smsSender,
         IRentalNotificationService notificationService,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IEmailSender emailSender)
     {
         _contextFactory = contextFactory;
         _tenantProvider = tenantProvider;
@@ -75,6 +78,7 @@ public class RentalConfirmationService : IRentalConfirmationService
         _smsSender = smsSender;
         _notificationService = notificationService;
         _configuration = configuration;
+        _emailSender = emailSender;
     }
 
     public async Task<string> CreateConfirmationAsync(Guid rentalId, CancellationToken ct = default)
@@ -280,18 +284,67 @@ public class RentalConfirmationService : IRentalConfirmationService
             }
         }
 
-        // Send Email
+        // Send Email with regulations + confirmation link
         if (!string.IsNullOrWhiteSpace(rental.Customer.Email))
         {
             try
             {
                 var company = await context.CompanyInfos.FirstOrDefaultAsync(ct);
                 var companyName = company?.Name ?? "SportRental";
+                var regulationsText = company?.RegulationsText;
 
-                // Use simple email via IEmailSender if available, otherwise log
-                _logger.LogInformation("Email confirmation link for rental {RentalId} to {Email}: {Url}",
-                    rentalId, rental.Customer.Email, confirmUrl);
+                var items = await context.Set<RentalItem>()
+                    .Where(ri => ri.RentalId == rentalId)
+                    .Include(ri => ri.Product)
+                    .ToListAsync(ct);
+
+                var itemsHtml = string.Join("", items.Select(i =>
+                    $"<tr><td style='padding:6px 12px;border:1px solid #ddd;'>{i.Product?.Name ?? "Produkt"}</td>" +
+                    $"<td style='padding:6px 12px;border:1px solid #ddd;text-align:center;'>{i.Quantity}</td>" +
+                    $"<td style='padding:6px 12px;border:1px solid #ddd;text-align:right;'>{i.Subtotal:N2} zł</td></tr>"));
+
+                var regulationsSection = !string.IsNullOrWhiteSpace(regulationsText)
+                    ? $@"<h3 style='color:#333;margin-top:24px;'>📋 Regulamin wypożyczalni</h3>
+                       <div style='background:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:16px;max-height:300px;overflow-y:auto;font-size:13px;white-space:pre-wrap;'>{System.Net.WebUtility.HtmlEncode(regulationsText)}</div>"
+                    : "";
+
+                var htmlBody = $@"<html><body style='font-family:Arial,sans-serif;color:#333;'>
+<h2 style='color:#1976d2;'>Potwierdzenie wynajmu — {companyName}</h2>
+<p>Dzień dobry <b>{customerName}</b>,</p>
+<p>Prosimy o potwierdzenie poniższego wynajmu:</p>
+
+<h3 style='color:#333;'>📦 Szczegóły wynajmu</h3>
+<table style='border-collapse:collapse;width:100%;max-width:500px;'>
+<tr style='background:#1976d2;color:white;'>
+  <th style='padding:8px 12px;text-align:left;'>Produkt</th>
+  <th style='padding:8px 12px;text-align:center;'>Ilość</th>
+  <th style='padding:8px 12px;text-align:right;'>Kwota</th>
+</tr>
+{itemsHtml}
+<tr style='background:#f5f5f5;font-weight:bold;'>
+  <td colspan='2' style='padding:8px 12px;border:1px solid #ddd;'>Razem</td>
+  <td style='padding:8px 12px;border:1px solid #ddd;text-align:right;'>{rental.TotalAmount:N2} zł</td>
+</tr>
+</table>
+<p><b>Okres:</b> {rental.StartDateUtc:dd.MM.yyyy} — {rental.EndDateUtc:dd.MM.yyyy}</p>
+{(rental.DepositAmount > 0 ? $"<p><b>Kaucja:</b> {rental.DepositAmount:N2} zł</p>" : "")}
+
+{regulationsSection}
+
+<div style='margin-top:24px;'>
+  <a href='{confirmUrl}' style='display:inline-block;background:#1976d2;color:white;padding:14px 32px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:bold;'>✅ Potwierdź wynajem</a>
+</div>
+<p style='font-size:12px;color:#888;margin-top:16px;'>Link ważny 48 godzin. Klikając &quot;Potwierdź wynajem&quot; akceptujesz warunki regulaminu wypożyczalni.</p>
+<p>Pozdrawiamy,<br>{companyName}</p>
+</body></html>";
+
+                await _emailSender.SendEmailAsync(
+                    rental.Customer.Email,
+                    $"Potwierdzenie wynajmu — {companyName}",
+                    htmlBody);
+
                 if (confirmation != null) confirmation.IsEmailSent = true;
+                _logger.LogInformation("Sent confirmation email for rental {RentalId} to {Email}", rentalId, rental.Customer.Email);
             }
             catch (Exception ex)
             {
