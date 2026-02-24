@@ -121,6 +121,15 @@
                                              Size="Size.Small">
                                         @(rental.IsSmsConfirmed ? "SMS ✓" : "SMS...")
                                     </MudChip>
+                                    @if (!rental.IsSmsConfirmed)
+                                    {
+                                        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.CheckCircle"
+                                                   OnClick="@(() => ConfirmRentalByAdmin(rental))"
+                                                   Style="text-transform:none; min-width:auto; padding:2px 8px; font-size:0.75rem;">
+                                            Potwierdź
+                                        </MudButton>
+                                    }
                                 }
                                 @if (rental.IsReminderSmsSent)
                                 {
@@ -344,6 +353,15 @@ else
                                                          Size="Size.Small">
                                                     SMS: @(rental.IsSmsConfirmed ? "Potwierdzony" : "Oczekuje")
                                                 </MudChip>
+                                                @if (!rental.IsSmsConfirmed)
+                                                {
+                                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                                               StartIcon="@Icons.Material.Filled.CheckCircle"
+                                                               OnClick="@(() => ConfirmRentalByAdmin(rental))"
+                                                               Style="text-transform:none;">
+                                                        Potwierdź ręcznie
+                                                    </MudButton>
+                                                }
                                             }
                                             <MudChip T="string" Icon="@GetSourceIcon(rental.Source)" 
                                                      Color="@GetSourceColor(rental.Source)" 
@@ -1935,6 +1953,31 @@ else
         catch (Exception ex)
         {
             Logger.LogError(ex, "Błąd wysyłania przypomnienia SMS");
+            Snackbar.Add($"Błąd: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private async Task ConfirmRentalByAdmin(Rental rental)
+    {
+        try
+        {
+            var result = await RentalConfirmationService.ConfirmByAdminAsync(rental.Id, "admin");
+            if (result.Success)
+            {
+                rental.IsSmsConfirmed = true;
+                if (rental.Status == RentalStatus.Pending)
+                    rental.Status = RentalStatus.Confirmed;
+                Snackbar.Add($"✅ {result.Message}", MudBlazor.Severity.Success);
+                StateHasChanged();
+            }
+            else
+            {
+                Snackbar.Add($"⚠️ {result.Message}", MudBlazor.Severity.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Błąd ręcznego potwierdzenia wynajmu {RentalId}", rental.Id);
             Snackbar.Add($"Błąd: {ex.Message}", MudBlazor.Severity.Error);
         }
     }

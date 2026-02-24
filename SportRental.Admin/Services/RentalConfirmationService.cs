@@ -31,6 +31,11 @@ public interface IRentalConfirmationService
     /// Wysyła link potwierdzający SMS-em i/lub emailem
     /// </summary>
     Task SendConfirmationLinkAsync(Guid rentalId, string token, CancellationToken ct = default);
+
+    /// <summary>
+    /// Ręczne potwierdzenie wynajmu przez pracownika z panelu admina
+    /// </summary>
+    Task<ConfirmationResult> ConfirmByAdminAsync(Guid rentalId, string adminUserName, CancellationToken ct = default);
 }
 
 public record ConfirmationPageData(
@@ -354,6 +359,65 @@ public class RentalConfirmationService : IRentalConfirmationService
 
         if (confirmation != null)
             await context.SaveChangesAsync(ct);
+    }
+
+    public async Task<ConfirmationResult> ConfirmByAdminAsync(Guid rentalId, string adminUserName, CancellationToken ct = default)
+    {
+        var tenantId = _tenantProvider.GetCurrentTenantId();
+        if (tenantId == null)
+            return new ConfirmationResult(false, "Brak kontekstu tenanta.");
+
+        await using var context = await _contextFactory.CreateDbContextAsync(ct);
+        context.SetTenant(tenantId);
+
+        var rental = await context.Rentals
+            .Include(r => r.Customer)
+            .FirstOrDefaultAsync(r => r.Id == rentalId, ct);
+
+        if (rental == null)
+            return new ConfirmationResult(false, "Wynajem nie został znaleziony.");
+
+        if (rental.IsSmsConfirmed)
+            return new ConfirmationResult(true, "Wynajem został już wcześniej potwierdzony.");
+
+        // Update rental
+        rental.IsSmsConfirmed = true;
+        if (rental.Status == RentalStatus.Pending)
+            rental.Status = RentalStatus.Confirmed;
+
+        // Update RentalConfirmation if exists
+        var confirmation = await context.RentalConfirmations
+            .FirstOrDefaultAsync(rc => rc.RentalId == rentalId, ct);
+
+        if (confirmation != null)
+        {
+            confirmation.IsConfirmed = true;
+            confirmation.ConfirmedAt = DateTime.UtcNow;
+            confirmation.ConfirmedFromIp = "admin-panel";
+            confirmation.ConfirmedUserAgent = $"Admin: {adminUserName}";
+        }
+
+        await context.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Rental {RentalId} manually confirmed by admin {Admin}", rentalId, adminUserName);
+
+        // Notify via SignalR
+        try
+        {
+            var notification = new RentalStatusChangedEvent(
+                rental.Id,
+                rental.Status.ToString(),
+                rental.IsSmsConfirmed,
+                rental.IsSmsConfirmationSent,
+                DateTime.UtcNow);
+            await _notificationService.NotifyRentalStatusChangedAsync(tenantId.Value, notification, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send SignalR notification for rental {RentalId}", rentalId);
+        }
+
+        return new ConfirmationResult(true, "Wynajem został potwierdzony przez pracownika.");
     }
 
     private string GetBaseUrl()
