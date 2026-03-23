@@ -1232,65 +1232,57 @@ else
     {
         _showScanner = false;
         
-        // Parse QR code - format: SR:P:{ProductId}
-        var productId = ParseProductIdFromQr(qrCode);
-        if (productId.HasValue)
+        var (type, id, skuOrCode) = SportRental.Admin.Services.QrCode.SimpleQrCodeGenerator.ParseQrCodeData(qrCode);
+        
+        Product? product = null;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(CurrentTenantId());
+        
+        if (id.HasValue)
         {
-            await using var db = await DbFactory.CreateDbContextAsync();
-            db.SetTenant(CurrentTenantId());
-            var product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId.Value);
+            product = await db.Products.FirstOrDefaultAsync(p => p.Id == id.Value);
+        }
+        else if (type == "Barcode" && !string.IsNullOrEmpty(skuOrCode))
+        {
+            // Barcode — search by SKU
+            product = await db.Products.FirstOrDefaultAsync(p => p.Sku == skuOrCode);
             
-            if (product != null)
+            // Try short ID format (SR + first 8 chars of GUID)
+            if (product == null && skuOrCode.StartsWith("SR", StringComparison.OrdinalIgnoreCase) && skuOrCode.Length == 10)
             {
-                // Add product to rental
-                var existingItem = editItems.FirstOrDefault(i => i.ProductId == product.Id);
-                if (existingItem != null)
-                {
-                    existingItem.Quantity++;
-                }
-                else
-                {
-                    var days = Math.Max(1, (int)Math.Ceiling(((endDate ?? DateTime.Today.AddDays(1)) - (startDate ?? DateTime.Today)).TotalDays));
-                    editItems.Add(new RentalItem
-                    {
-                        Id = Guid.NewGuid(),
-                        ProductId = product.Id,
-                        Quantity = 1,
-                        PricePerDay = product.DailyPrice,
-                        Subtotal = product.DailyPrice * days
-                    });
-                }
-                Recalculate();
-                Snackbar.Add($"Dodano: {product.Name}", Severity.Success);
+                var shortId = skuOrCode[2..].ToLower();
+                product = await db.Products.FirstOrDefaultAsync(p => p.Id.ToString().Replace("-", "").StartsWith(shortId));
+            }
+        }
+        
+        if (product != null)
+        {
+            var existingItem = editItems.FirstOrDefault(i => i.ProductId == product.Id);
+            if (existingItem != null)
+            {
+                existingItem.Quantity++;
             }
             else
             {
-                Snackbar.Add("Nie znaleziono produktu o tym kodzie QR", Severity.Warning);
+                var days = Math.Max(1, (int)Math.Ceiling(((endDate ?? DateTime.Today.AddDays(1)) - (startDate ?? DateTime.Today)).TotalDays));
+                editItems.Add(new RentalItem
+                {
+                    Id = Guid.NewGuid(),
+                    ProductId = product.Id,
+                    Quantity = 1,
+                    PricePerDay = product.DailyPrice,
+                    Subtotal = product.DailyPrice * days
+                });
             }
+            Recalculate();
+            Snackbar.Add($"Dodano: {product.Name}", Severity.Success);
         }
         else
         {
-            Snackbar.Add($"Nieprawidłowy kod QR: {qrCode}", Severity.Error);
+            Snackbar.Add($"Nie znaleziono produktu: {qrCode}", Severity.Warning);
         }
         
         StateHasChanged();
-    }
-    
-    private Guid? ParseProductIdFromQr(string qrCode)
-    {
-        if (string.IsNullOrWhiteSpace(qrCode)) return null;
-        
-        // Format: SR:P:{ProductId}
-        if (qrCode.StartsWith("SR:P:", StringComparison.OrdinalIgnoreCase))
-        {
-            var idPart = qrCode.Substring(5);
-            if (Guid.TryParse(idPart, out var id)) return id;
-        }
-        
-        // Try raw GUID
-        if (Guid.TryParse(qrCode, out var rawId)) return rawId;
-        
-        return null;
     }
 
     private void RemoveItem(RentalItem item)

@@ -4,6 +4,10 @@ using QRCoder;
 
 namespace SportRental.Admin.Services.QrCode
 {
+    // BEZPIECZEŃSTWO: Generowanie kodów QR jest zachowane w kodzie, ale wyłączone z UI.
+    // Kody QR mogą być łatwo podmienione przez osoby trzecie (phishing, przekierowanie na złośliwe strony).
+    // W środowisku wypożyczalni sprzętu sportowego stosujemy kody kreskowe Code 128 (BarcodeGenerator).
+    // Klasa SimpleQrCodeGenerator pozostaje dostępna na wypadek przyszłej potrzeby.
     public class SimpleQrCodeGenerator : IQrCodeGenerator
     {
         private readonly ILogger<SimpleQrCodeGenerator> _logger;
@@ -73,10 +77,10 @@ namespace SportRental.Admin.Services.QrCode
         /// <summary>
         /// Parses QR code data and returns the type and ID
         /// </summary>
-        public static (string Type, Guid? Id) ParseQrCodeData(string qrData)
+        public static (string Type, Guid? Id, string? SkuOrCode) ParseQrCodeData(string qrData)
         {
             if (string.IsNullOrWhiteSpace(qrData))
-                return (string.Empty, null);
+                return (string.Empty, null, null);
             
             var data = qrData.Trim();
             
@@ -84,21 +88,22 @@ namespace SportRental.Admin.Services.QrCode
             {
                 var idPart = data.Substring(PRODUCT_PREFIX.Length);
                 if (Guid.TryParse(idPart, out var productId))
-                    return ("Product", productId);
+                    return ("Product", productId, null);
             }
             else if (data.StartsWith(RENTAL_PREFIX, StringComparison.OrdinalIgnoreCase))
             {
                 var idPart = data.Substring(RENTAL_PREFIX.Length);
                 if (Guid.TryParse(idPart, out var rentalId))
-                    return ("Rental", rentalId);
+                    return ("Rental", rentalId, null);
             }
             // Try to parse as raw GUID (backwards compatibility)
             else if (Guid.TryParse(data, out var rawId))
             {
-                return ("Unknown", rawId);
+                return ("Unknown", rawId, null);
             }
             
-            return (string.Empty, null);
+            // Barcode/SKU — not a GUID, treat as product SKU or barcode data
+            return ("Barcode", null, data);
         }
     }
 }

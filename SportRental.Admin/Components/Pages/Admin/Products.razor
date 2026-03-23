@@ -134,11 +134,11 @@ else
                 <MudStack Row="true" Spacing="2">
                     <MudButton Variant="Variant.Outlined" 
                                Color="Color.Surface" 
-                               StartIcon="@Icons.Material.Filled.QrCode2"
+                               StartIcon="@Icons.Material.Filled.ViewWeek"
                                OnClick="OpenQrLabelsDialog"
                                Size="Size.Large"
                                Class="rounded-pill px-4">
-                        Etykiety QR
+                        Etykiety
                     </MudButton>
                     <MudButton Variant="Variant.Filled" 
                                Color="Color.Surface" 
@@ -1019,7 +1019,7 @@ else
         _selectedImageName = "image.jpg";
     }
     
-    // QR Code functionality
+    // Generowanie etykiet z kodami kreskowymi (QR wyłączone z UI ze względów bezpieczeństwa)
     private async Task OpenQrLabelsDialog()
     {
         var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.QrLabelsDialog>
@@ -1035,7 +1035,7 @@ else
         };
         
         await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.QrLabelsDialog>(
-            "Generuj etykiety QR", parameters, options);
+            "Generuj etykiety", parameters, options);
     }
     
     private async Task ShowProductQr(Product product)
@@ -1054,6 +1054,6 @@ else
         };
         
         await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.QrLabelsDialog>(
-            "Generuj etykietę QR", parameters, options);
+            "Generuj etykietę", parameters, options);
     }
 }

@@ -1,4 +1,7 @@
-// QR Scanner using html5-qrcode library
+// Skaner kodów kreskowych (i QR — zachowane w kodzie, ale wyłączone z UI ze względów bezpieczeństwa)
+// UWAGA: Kody QR mogą być łatwo podmienione (phishing). Używamy kodów kreskowych Code 128.
+// Biblioteka html5-qrcode obsługuje oba formaty — QR_CODE zostawiony w formatsToSupport
+// na wypadek przyszłej potrzeby, ale UI kieruje użytkownika wyłącznie na kody kreskowe.
 
 window.downloadFile = function(fileName, contentType, base64Data) {
     const link = document.createElement('a');
@@ -33,8 +36,17 @@ window.QrScanner = {
                 return { success: false, error: 'Element nie znaleziony' };
             }
             
-            // Create scanner without format restriction for better detection
-            this.scanner = new Html5Qrcode(elementId, { verbose: true });
+            // Formaty: priorytet na kody kreskowe, QR zachowany w razie potrzeby
+            this.scanner = new Html5Qrcode(elementId, {
+                verbose: false,
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.QR_CODE  // zachowane, ale UI kieruje na kody kreskowe
+                ]
+            });
             
             console.log('QrScanner initialized successfully');
             return { success: true };
@@ -55,11 +67,25 @@ window.QrScanner = {
         const self = this;
         
         try {
-            // Simpler config - let library handle sizing
+            // Dynamic qrbox — prostokątny (szerszy) dla kodów kreskowych
+            const container = document.getElementById(this.elementId);
+            const containerWidth = container ? container.clientWidth : 280;
+            const containerHeight = container ? container.clientHeight : 200;
+            const qrboxWidth = Math.max(150, Math.min(containerWidth - 40, 280));  // szerszy dla barcodes
+            const qrboxHeight = Math.max(80, Math.min(containerHeight - 60, 120)); // niższy — kod kreskowy jest płaski
+            
             const config = {
                 fps: 10,
-                qrbox: 200,
-                aspectRatio: 1.0
+                qrbox: { width: qrboxWidth, height: qrboxHeight },
+                // iOS Safari wymaga aspect ratio bliskiego 4:3 dla stabilnej pracy kamery
+                aspectRatio: 4 / 3,
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39,
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.QR_CODE
+                ]
             };
             
             console.log('Starting with config:', config);
@@ -85,7 +111,18 @@ window.QrScanner = {
                 // This fires constantly when no QR in frame - ignore
             };
             
-            // Try back camera first
+            // iOS Safari fix: wymuszenie playsinline na elemencie video po starcie
+            const fixIOSVideo = () => {
+                const videos = container ? container.querySelectorAll('video') : [];
+                videos.forEach(v => {
+                    v.setAttribute('playsinline', 'true');
+                    v.setAttribute('webkit-playsinline', 'true');
+                    v.setAttribute('muted', 'true');
+                    v.style.objectFit = 'cover';
+                });
+            };
+            
+            // Try back camera first (environment = tylna kamera)
             try {
                 await this.scanner.start(
                     { facingMode: "environment" },
@@ -93,24 +130,46 @@ window.QrScanner = {
                     onSuccess,
                     onError
                 );
+                fixIOSVideo();
                 console.log('Camera started (environment)');
                 return { success: true };
             } catch (envError) {
                 console.log('Environment camera failed:', envError.message);
                 
-                // Try any camera
+                // iOS Safari fallback: spróbuj exact environment, potem listę kamer
+                try {
+                    await this.scanner.start(
+                        { facingMode: { exact: "environment" } },
+                        config,
+                        onSuccess,
+                        onError
+                    );
+                    fixIOSVideo();
+                    console.log('Camera started (exact environment)');
+                    return { success: true };
+                } catch (exactError) {
+                    console.log('Exact environment failed:', exactError.message);
+                }
+                
+                // Last resort: try any camera from list
                 try {
                     const cameras = await Html5Qrcode.getCameras();
                     console.log('Available cameras:', cameras);
                     
                     if (cameras && cameras.length > 0) {
+                        // Prefer back camera on iOS (usually last in list or contains 'back'/'environment')
+                        const backCam = cameras.find(c => 
+                            c.label && (c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('environment'))
+                        ) || cameras[cameras.length - 1];
+                        
                         await this.scanner.start(
-                            cameras[0].id,
+                            backCam.id,
                             config,
                             onSuccess,
                             onError
                         );
-                        console.log('Camera started (first available)');
+                        fixIOSVideo();
+                        console.log('Camera started:', backCam.label || backCam.id);
                         return { success: true };
                     }
                 } catch (camError) {

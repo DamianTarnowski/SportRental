@@ -23,8 +23,8 @@
     else if (!_isScanning && !_isLoading && string.IsNullOrEmpty(_error))
     {
         <div class="qr-scanner-start">
-            <MudIcon Icon="@Icons.Material.Filled.QrCodeScanner" Color="Color.Primary" />
-            <MudText Typo="Typo.body2" Class="mt-2">Skieruj kamerę na kod QR</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.ViewWeek" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Class="mt-2">Skieruj kamerę na kod kreskowy</MudText>
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StartScanning"
                        StartIcon="@Icons.Material.Filled.CameraAlt" Size="Size.Small" Class="mt-2">
                 Uruchom
@@ -62,15 +62,15 @@
         border-radius: 8px;
         padding: 0.5rem;
         width: 100%;
-        max-height: 320px;
+        max-height: 420px;
         overflow: hidden;
     }
     
     .qr-scanner-video {
         width: 100%;
-        max-width: 280px;
-        height: 200px !important;
-        max-height: 200px !important;
+        max-width: 400px;
+        height: 300px !important;
+        max-height: 300px !important;
         border-radius: 8px;
         overflow: hidden;
         background: #000;
@@ -79,19 +79,19 @@
     /* Force html5-qrcode to respect size */
     .qr-scanner-video video {
         width: 100% !important;
-        height: 200px !important;
-        max-height: 200px !important;
+        height: 300px !important;
+        max-height: 300px !important;
         object-fit: cover !important;
     }
     
     .qr-scanner-video > div {
         width: 100% !important;
-        height: 200px !important;
-        max-height: 200px !important;
+        height: 300px !important;
+        max-height: 300px !important;
     }
     
     .qr-scanner-video img {
-        max-height: 200px !important;
+        max-height: 300px !important;
     }
     
     .qr-scanner-loading,

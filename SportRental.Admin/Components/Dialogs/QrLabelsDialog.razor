@@ -7,12 +7,27 @@
 <MudDialog>
     <TitleContent>
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
-            <MudIcon Icon="@Icons.Material.Filled.QrCode2" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">Generuj etykiety QR</MudText>
+            <MudIcon Icon="@Icons.Material.Filled.ViewWeek" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Generuj etykiety z kodami kreskowymi</MudText>
         </MudStack>
     </TitleContent>
     <DialogContent>
         <MudStack Spacing="3">
+            @* 
+                UWAGA: Generowanie etykiet QR Code jest zachowane w kodzie (metoda GenerateLabelsAsync),
+                ale wyłączone z interfejsu ze względów bezpieczeństwa — kody QR mogą być łatwo
+                podmienione (phishing, przekierowanie na złośliwe strony). Kody kreskowe Code 128
+                są bezpieczniejsze w środowisku wypożyczalni sprzętu.
+                Aby przywrócić QR, odkomentuj toggle poniżej i zmień _useBarcode na false.
+            *@
+            @* <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                <MudText Typo="Typo.subtitle2">Typ kodu:</MudText>
+                <MudToggleGroup T="bool" @bind-Value="_useBarcode" Color="Color.Primary" Rounded="true" CheckMark="true">
+                    <MudToggleItem T="bool" Value="false" Text="QR Code" />
+                    <MudToggleItem T="bool" Value="true" Text="Kod kreskowy" />
+                </MudToggleGroup>
+            </MudStack> *@
+
             <!-- Label Size Selection -->
             <MudSelect T="LabelSize" @bind-Value="_selectedSize" Label="Rozmiar etykiet" Variant="Variant.Outlined">
                 <MudSelectItem Value="LabelSize.Small">Małe (38×30mm) - 45 na stronę</MudSelectItem>
@@ -76,7 +91,7 @@
                     <MudExpansionPanel Text="Podgląd etykiety" IsInitiallyExpanded="false">
                         <div class="label-preview">
                             <div class="label-preview-qr">
-                                <MudIcon Icon="@Icons.Material.Filled.QrCode2" Size="Size.Large" />
+                                <MudIcon Icon="@Icons.Material.Filled.ViewWeek" Size="Size.Large" />
                             </div>
                             <div class="label-preview-text">
                                 <strong>@(Products?.FirstOrDefault(p => _selectedProducts.ContainsKey(p.Id))?.Name ?? "Nazwa produktu")</strong>
@@ -142,6 +157,9 @@
     private LabelSize _selectedSize = LabelSize.Medium;
     private Dictionary<Guid, int> _selectedProducts = new();
     private bool _isGenerating;
+    // BEZPIECZEŃSTWO: Kody QR wyłączone — używamy wyłącznie kodów kreskowych Code 128.
+    // Kod QR generowania (GenerateLabelsAsync) pozostaje w kodzie na wypadek przyszłej potrzeby.
+    private bool _useBarcode = true; // zawsze true — QR wyłączone z UI
     
     protected override void OnParametersSet()
     {
@@ -184,10 +202,13 @@
                 .Select(p => (p, _selectedProducts[p.Id]))
                 .ToList();
             
-            var pdfBytes = await LabelGenerator.GenerateLabelsAsync(productsWithQuantities, _selectedSize);
+            var pdfBytes = _useBarcode
+                ? await LabelGenerator.GenerateBarcodeLabelAsync(productsWithQuantities, _selectedSize)
+                : await LabelGenerator.GenerateLabelsAsync(productsWithQuantities, _selectedSize);
             
             // Download the PDF
-            var fileName = $"etykiety-qr-{DateTime.Now:yyyyMMdd-HHmmss}.pdf";
+            var codeType = _useBarcode ? "barcode" : "qr";
+            var fileName = $"etykiety-{codeType}-{DateTime.Now:yyyyMMdd-HHmmss}.pdf";
             await DownloadFile(pdfBytes, fileName, "application/pdf");
             
             Snackbar.Add($"Wygenerowano {_selectedProducts.Values.Sum()} etykiet", Severity.Success);

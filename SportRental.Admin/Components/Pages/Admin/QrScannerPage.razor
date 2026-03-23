@@ -13,16 +13,16 @@
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 
-<PageTitle>Skaner QR - SportRental Admin</PageTitle>
+<PageTitle>Skaner kodów - SportRental Admin</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
     <MudStack Spacing="4">
         <!-- Header -->
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudStack Spacing="0">
-                <MudText Typo="Typo.h4" Class="fw-bold">📷 Skaner QR</MudText>
+                <MudText Typo="Typo.h4" Class="fw-bold">📷 Skaner kodów kreskowych</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Skanuj kody QR produktów aby szybko je znaleźć
+                    Skanuj kody kreskowe produktów aby szybko je znaleźć
                 </MudText>
             </MudStack>
             <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
@@ -73,9 +73,10 @@
         <MudAlert Severity="Severity.Info" Dense="true">
             <MudText Typo="Typo.body2">
                 <strong>Wskazówki:</strong><br/>
-                • Upewnij się, że kod QR jest dobrze oświetlony<br/>
-                • Trzymaj telefon stabilnie<br/>
-                • Kod QR powinien być w całości widoczny w ramce
+                • Upewnij się, że kod kreskowy jest dobrze oświetlony<br/>
+                • Trzymaj telefon stabilnie, równolegle do kodu<br/>
+                • Kod kreskowy powinien być w całości widoczny w ramce<br/>
+                • Na iPhone: jeśli kamera się nie uruchamia, sprawdź uprawnienia w Ustawieniach &gt; Safari
             </MudText>
         </MudAlert>
     </MudStack>
@@ -86,7 +87,7 @@
     
     private async Task HandleScanned(string qrData)
     {
-        var (type, id) = SimpleQrCodeGenerator.ParseQrCodeData(qrData);
+        var (type, id, skuOrCode) = SimpleQrCodeGenerator.ParseQrCodeData(qrData);
         
         Product? product = null;
         string? errorMessage = null;
@@ -101,6 +102,24 @@
                 errorMessage = "Produkt o tym ID nie istnieje w bazie danych.";
             }
         }
+        else if (type == "Barcode" && !string.IsNullOrEmpty(skuOrCode))
+        {
+            // Barcode scanned — search by SKU or barcode data
+            await using var db = await DbFactory.CreateDbContextAsync();
+            product = await db.Products.FirstOrDefaultAsync(p => p.Sku == skuOrCode);
+            
+            // Also try short ID format (SR + first 8 chars of GUID)
+            if (product == null && skuOrCode.StartsWith("SR", StringComparison.OrdinalIgnoreCase) && skuOrCode.Length == 10)
+            {
+                var shortId = skuOrCode[2..].ToLower();
+                product = await db.Products.FirstOrDefaultAsync(p => p.Id.ToString().Replace("-", "").StartsWith(shortId));
+            }
+            
+            if (product == null)
+            {
+                errorMessage = $"Nie znaleziono produktu o kodzie: {skuOrCode}";
+            }
+        }
         else if (id.HasValue)
         {
             // Try to find product by ID even if type is unknown
@@ -109,7 +128,7 @@
         }
         else
         {
-            errorMessage = "Nieprawidłowy format kodu QR.";
+            errorMessage = "Nieprawidłowy format kodu.";
         }
         
         // Add to recent scans

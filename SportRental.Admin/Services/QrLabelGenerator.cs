@@ -7,17 +7,22 @@ using SportRental.Infrastructure.Domain;
 namespace SportRental.Admin.Services;
 
 /// <summary>
-/// Generates printable PDF labels with QR codes for products
+/// Generates printable PDF labels with codes for products.
+/// BEZPIECZEŃSTWO: Metoda GenerateLabelsAsync (QR) jest zachowana w kodzie, ale wyłączona z UI.
+/// Kody QR mogą być łatwo podmienione — stosujemy kody kreskowe Code 128 (GenerateBarcodeLabelAsync).
 /// </summary>
 public interface IQrLabelGenerator
 {
     /// <summary>
-    /// Generates PDF with QR code labels for products
+    /// [WYŁĄCZONE Z UI] Generates PDF with QR code labels for products.
+    /// Zachowane na wypadek przyszłej potrzeby — aktualnie używamy GenerateBarcodeLabelAsync.
     /// </summary>
-    /// <param name="products">Products with quantities</param>
-    /// <param name="labelSize">Size of each label in mm</param>
-    /// <returns>PDF as byte array</returns>
     Task<byte[]> GenerateLabelsAsync(IEnumerable<(Product Product, int Quantity)> products, LabelSize labelSize = LabelSize.Medium);
+
+    /// <summary>
+    /// Generates PDF with barcode (Code 128) labels for products — aktualnie jedyna metoda używana w UI
+    /// </summary>
+    Task<byte[]> GenerateBarcodeLabelAsync(IEnumerable<(Product Product, int Quantity)> products, LabelSize labelSize = LabelSize.Medium);
 }
 
 public enum LabelSize
@@ -30,10 +35,12 @@ public enum LabelSize
 public class QrLabelGenerator : IQrLabelGenerator
 {
     private readonly IQrCodeGenerator _qrCodeGenerator;
+    private readonly IBarcodeGenerator _barcodeGenerator;
     
-    public QrLabelGenerator(IQrCodeGenerator qrCodeGenerator)
+    public QrLabelGenerator(IQrCodeGenerator qrCodeGenerator, IBarcodeGenerator barcodeGenerator)
     {
         _qrCodeGenerator = qrCodeGenerator;
+        _barcodeGenerator = barcodeGenerator;
     }
     
     public async Task<byte[]> GenerateLabelsAsync(IEnumerable<(Product Product, int Quantity)> products, LabelSize labelSize = LabelSize.Medium)
@@ -144,6 +151,112 @@ public class QrLabelGenerator : IQrLabelGenerator
         }).GeneratePdf();
     }
     
+    public async Task<byte[]> GenerateBarcodeLabelAsync(IEnumerable<(Product Product, int Quantity)> products, LabelSize labelSize = LabelSize.Medium)
+    {
+        var (labelWidth, labelHeight, columns, rows, _, fontSize) = GetLabelDimensions(labelSize);
+        var barcodeHeight = labelSize switch { LabelSize.Small => 12f, LabelSize.Medium => 20f, LabelSize.Large => 28f, _ => 20f };
+        
+        var labels = products
+            .SelectMany(p => Enumerable.Range(0, p.Quantity).Select(_ => p.Product))
+            .ToList();
+        
+        if (!labels.Any())
+        {
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Content().AlignCenter().AlignMiddle().Text("Brak etykiet do wygenerowania").FontSize(14);
+                });
+            }).GeneratePdf();
+        }
+        
+        // Pre-generate all barcodes
+        var barcodes = new Dictionary<Guid, byte[]>();
+        foreach (var product in labels.DistinctBy(p => p.Id))
+        {
+            var barcodeData = _barcodeGenerator.GenerateProductBarcodeData(product.Id, product.Sku);
+            var barcodeBytes = await _barcodeGenerator.GenerateBarcodeBytesAsync(barcodeData, 300, 80);
+            barcodes[product.Id] = barcodeBytes;
+        }
+        
+        var labelsPerPage = columns * rows;
+        var pageCount = (int)Math.Ceiling((double)labels.Count / labelsPerPage);
+        
+        return Document.Create(container =>
+        {
+            for (int pageIndex = 0; pageIndex < pageCount; pageIndex++)
+            {
+                var pageLabels = labels.Skip(pageIndex * labelsPerPage).Take(labelsPerPage).ToList();
+                
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.MarginTop(10, Unit.Millimetre);
+                    page.MarginBottom(10, Unit.Millimetre);
+                    page.MarginLeft(10, Unit.Millimetre);
+                    page.MarginRight(10, Unit.Millimetre);
+                    
+                    page.Content().Table(table =>
+                    {
+                        table.ColumnsDefinition(cols =>
+                        {
+                            for (int i = 0; i < columns; i++)
+                                cols.ConstantColumn(labelWidth, Unit.Millimetre);
+                        });
+                        
+                        int labelIndex = 0;
+                        for (int row = 0; row < rows && labelIndex < pageLabels.Count; row++)
+                        {
+                            for (int col = 0; col < columns && labelIndex < pageLabels.Count; col++)
+                            {
+                                var product = pageLabels[labelIndex];
+                                var barcodeBytes = barcodes[product.Id];
+                                
+                                table.Cell()
+                                    .Row((uint)(row + 1))
+                                    .Column((uint)(col + 1))
+                                    .Height(labelHeight, Unit.Millimetre)
+                                    .Border(0.5f)
+                                    .BorderColor(Colors.Grey.Lighten2)
+                                    .Padding(2, Unit.Millimetre)
+                                    .Column(column =>
+                                    {
+                                        column.Item()
+                                            .AlignCenter()
+                                            .Text(text =>
+                                            {
+                                                text.Line(TruncateName(product.Name, labelSize))
+                                                    .FontSize(fontSize)
+                                                    .Bold();
+                                            });
+                                        
+                                        column.Item()
+                                            .AlignCenter()
+                                            .MaxHeight(barcodeHeight, Unit.Millimetre)
+                                            .ScaleToFit()
+                                            .Image(barcodeBytes);
+                                        
+                                        column.Item()
+                                            .AlignCenter()
+                                            .Text(text =>
+                                            {
+                                                text.Line(product.Sku ?? "")
+                                                    .FontSize(fontSize - 1)
+                                                    .FontColor(Colors.Grey.Darken1);
+                                            });
+                                    });
+                                
+                                labelIndex++;
+                            }
+                        }
+                    });
+                });
+            }
+        }).GeneratePdf();
+    }
+
     private static (float LabelWidth, float LabelHeight, int Columns, int Rows, float QrSize, float FontSize) GetLabelDimensions(LabelSize size)
     {
         return size switch
