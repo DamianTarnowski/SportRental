@@ -739,7 +739,7 @@ else
                                                   Placeholder="Wpisz lub zeskanuj..." 
                                                   Variant="Variant.Outlined"
                                                   Adornment="Adornment.Start"
-                                                  AdornmentIcon="@Icons.Material.Filled.QrCode"
+                                                  AdornmentIcon="@Icons.Material.Filled.ViewWeek"
                                                   Class="rounded-lg" />
                                 </MudItem>
                                 <MudItem xs="6" md="2">
@@ -758,8 +758,8 @@ else
                                 </MudItem>
                                 <MudItem xs="12" md="3">
                                     <MudStack Row="true" Spacing="1">
-                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ToggleScanner" StartIcon="@Icons.Material.Filled.QrCodeScanner">
-                                            @(_showScanner ? "Ukryj skaner" : "Skaner QR")
+                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ToggleScanner" StartIcon="@Icons.Material.Filled.DocumentScanner">
+                                            @(_showScanner ? "Ukryj skaner" : "Skaner kodów")
                                         </MudButton>
                                     </MudStack>
                                 </MudItem>

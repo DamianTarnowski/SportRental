@@ -4,12 +4,43 @@
 // na wypadek przyszłej potrzeby, ale UI kieruje użytkownika wyłącznie na kody kreskowe.
 
 window.downloadFile = function(fileName, contentType, base64Data) {
-    const link = document.createElement('a');
-    link.download = fileName;
-    link.href = `data:${contentType};base64,${base64Data}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const byteCharacters = atob(base64Data);
+    const byteNumbers = new Array(byteCharacters.length);
+
+    for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+
+    const blob = new Blob([new Uint8Array(byteNumbers)], { type: contentType });
+    const url = URL.createObjectURL(blob);
+
+    try {
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+};
+
+window.downloadFileFromStream = async function(fileName, contentType, contentStreamReference) {
+    const arrayBuffer = await contentStreamReference.arrayBuffer();
+    const blob = new Blob([arrayBuffer], { type: contentType });
+    const url = URL.createObjectURL(blob);
+
+    try {
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } finally {
+        URL.revokeObjectURL(url);
+    }
 };
 
 window.QrScanner = {
@@ -27,7 +58,7 @@ window.QrScanner = {
         try {
             if (typeof Html5Qrcode === 'undefined') {
                 console.error('Html5Qrcode not loaded!');
-                return { success: false, error: 'Biblioteka QR nie załadowana' };
+                return { success: false, error: 'Biblioteka skanera nie załadowana' };
             }
             
             const element = document.getElementById(elementId);
@@ -92,7 +123,7 @@ window.QrScanner = {
             
             const onSuccess = function(decodedText, decodedResult) {
                 self.scanCount++;
-                console.log('=== QR CODE DETECTED ===');
+                console.log('=== CODE DETECTED ===');
                 console.log('Text:', decodedText);
                 console.log('Format:', decodedResult?.result?.format?.formatName);
                 console.log('Scan count:', self.scanCount);
@@ -108,7 +139,7 @@ window.QrScanner = {
             };
             
             const onError = function(errorMessage) {
-                // This fires constantly when no QR in frame - ignore
+                // This fires constantly when no code is in frame - ignore
             };
             
             // iOS Safari fix: wymuszenie playsinline na elemencie video po starcie
