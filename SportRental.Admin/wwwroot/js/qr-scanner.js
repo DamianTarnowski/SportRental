@@ -89,45 +89,44 @@ window.QrScanner = {
     
     start: async function(preferBackCamera = true) {
         console.log('QrScanner.start called');
-        
+
         if (!this.scanner) {
             console.error('Scanner not initialized');
             return { success: false, error: 'Skaner nie zainicjalizowany' };
         }
-        
+
         const self = this;
-        
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        console.log('iOS detected:', isIOS);
+
         try {
             // Dynamic qrbox — prostokątny (szerszy) dla kodów kreskowych
             const container = document.getElementById(this.elementId);
             const containerWidth = container ? container.clientWidth : 280;
             const containerHeight = container ? container.clientHeight : 200;
-            const qrboxWidth = Math.max(150, Math.min(containerWidth - 40, 280));  // szerszy dla barcodes
-            const qrboxHeight = Math.max(80, Math.min(containerHeight - 60, 120)); // niższy — kod kreskowy jest płaski
-            
+            const qrboxWidth = Math.max(150, Math.min(containerWidth - 40, 280));
+            const qrboxHeight = Math.max(80, Math.min(containerHeight - 60, 120));
+
             const config = {
                 fps: 10,
                 qrbox: { width: qrboxWidth, height: qrboxHeight },
-                // iOS Safari wymaga aspect ratio bliskiego 4:3 dla stabilnej pracy kamery
-                aspectRatio: 4 / 3,
-                formatsToSupport: [
-                    Html5QrcodeSupportedFormats.CODE_128,
-                    Html5QrcodeSupportedFormats.CODE_39,
-                    Html5QrcodeSupportedFormats.EAN_13,
-                    Html5QrcodeSupportedFormats.EAN_8,
-                    Html5QrcodeSupportedFormats.QR_CODE
-                ]
             };
-            
+
+            // iOS Safari: aspectRatio w constraints powoduje OverconstrainedError
+            if (!isIOS) {
+                config.aspectRatio = 4 / 3;
+            }
+
             console.log('Starting with config:', config);
-            
+
             const onSuccess = function(decodedText, decodedResult) {
                 self.scanCount++;
                 console.log('=== CODE DETECTED ===');
                 console.log('Text:', decodedText);
                 console.log('Format:', decodedResult?.result?.format?.formatName);
                 console.log('Scan count:', self.scanCount);
-                
+
                 if (self.dotNetRef) {
                     console.log('Calling Blazor callback...');
                     self.dotNetRef.invokeMethodAsync('OnQrCodeScanned', decodedText)
@@ -137,83 +136,90 @@ window.QrScanner = {
                     console.error('No dotNetRef available!');
                 }
             };
-            
+
             const onError = function(errorMessage) {
                 // This fires constantly when no code is in frame - ignore
             };
-            
-            // iOS Safari fix: wymuszenie playsinline na elemencie video po starcie
-            const fixIOSVideo = () => {
-                const videos = container ? container.querySelectorAll('video') : [];
-                videos.forEach(v => {
+
+            // iOS Safari fix: MutationObserver ustawia playsinline ZANIM video zacznie grać.
+            // Bez tego iOS Safari próbuje otworzyć video fullscreen i failuje.
+            let observer = null;
+            if (container) {
+                observer = new MutationObserver((mutations) => {
+                    for (const mutation of mutations) {
+                        for (const node of mutation.addedNodes) {
+                            if (node.nodeName === 'VIDEO' || (node.querySelectorAll && node.querySelectorAll('video').length)) {
+                                const videos = node.nodeName === 'VIDEO' ? [node] : node.querySelectorAll('video');
+                                videos.forEach(v => {
+                                    v.setAttribute('playsinline', 'true');
+                                    v.setAttribute('muted', 'true');
+                                    v.style.objectFit = 'cover';
+                                });
+                            }
+                        }
+                    }
+                });
+                observer.observe(container, { childList: true, subtree: true });
+
+                // Ustaw też na istniejących video (gdyby już były)
+                container.querySelectorAll('video').forEach(v => {
                     v.setAttribute('playsinline', 'true');
-                    v.setAttribute('webkit-playsinline', 'true');
                     v.setAttribute('muted', 'true');
                     v.style.objectFit = 'cover';
                 });
+            }
+
+            const cleanupObserver = () => {
+                if (observer) { observer.disconnect(); observer = null; }
             };
-            
-            // Try back camera first (environment = tylna kamera)
-            try {
-                await this.scanner.start(
-                    { facingMode: "environment" },
-                    config,
-                    onSuccess,
-                    onError
-                );
-                fixIOSVideo();
-                console.log('Camera started (environment)');
-                return { success: true };
-            } catch (envError) {
-                console.log('Environment camera failed:', envError.message);
-                
-                // iOS Safari fallback: spróbuj exact environment, potem listę kamer
+
+            // Strategia uruchamiania kamery — od najmniej do najbardziej restrykcyjnej
+            const strategies = [
+                { label: 'environment', cameraId: { facingMode: "environment" } },
+                { label: 'camera list', cameraId: null }, // resolved dynamically below
+            ];
+
+            let lastError = null;
+
+            for (const strategy of strategies) {
                 try {
-                    await this.scanner.start(
-                        { facingMode: { exact: "environment" } },
-                        config,
-                        onSuccess,
-                        onError
-                    );
-                    fixIOSVideo();
-                    console.log('Camera started (exact environment)');
-                    return { success: true };
-                } catch (exactError) {
-                    console.log('Exact environment failed:', exactError.message);
-                }
-                
-                // Last resort: try any camera from list
-                try {
-                    const cameras = await Html5Qrcode.getCameras();
-                    console.log('Available cameras:', cameras);
-                    
-                    if (cameras && cameras.length > 0) {
-                        // Prefer back camera on iOS (usually last in list or contains 'back'/'environment')
-                        const backCam = cameras.find(c => 
+                    let cameraId = strategy.cameraId;
+
+                    if (cameraId === null) {
+                        // Pobierz listę kamer i wybierz tylną
+                        const cameras = await Html5Qrcode.getCameras();
+                        console.log('Available cameras:', cameras);
+                        if (!cameras || cameras.length === 0) continue;
+
+                        const backCam = cameras.find(c =>
                             c.label && (c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('environment'))
                         ) || cameras[cameras.length - 1];
-                        
-                        await this.scanner.start(
-                            backCam.id,
-                            config,
-                            onSuccess,
-                            onError
-                        );
-                        fixIOSVideo();
-                        console.log('Camera started:', backCam.label || backCam.id);
-                        return { success: true };
+                        cameraId = backCam.id;
                     }
-                } catch (camError) {
-                    console.error('Camera list failed:', camError);
+
+                    await this.scanner.start(cameraId, config, onSuccess, onError);
+                    console.log('Camera started (' + strategy.label + ')');
+                    cleanupObserver();
+                    return { success: true };
+                } catch (err) {
+                    console.log(strategy.label + ' failed:', err.message);
+                    lastError = err;
                 }
-                
-                throw envError;
             }
+
+            cleanupObserver();
+            throw lastError || new Error('Nie udało się uruchomić kamery');
         } catch (error) {
             console.error('Start error:', error);
-            
+
             if (error.name === 'NotAllowedError') {
-                return { success: false, error: 'Brak uprawnień do kamery' };
+                return { success: false, error: 'Brak uprawnień do kamery. Sprawdź Ustawienia > Safari > Kamera.' };
+            }
+            if (error.name === 'NotFoundError') {
+                return { success: false, error: 'Nie znaleziono kamery na tym urządzeniu.' };
+            }
+            if (error.name === 'OverconstrainedError') {
+                return { success: false, error: 'Kamera nie obsługuje wymaganych parametrów.' };
             }
             return { success: false, error: error.message };
         }

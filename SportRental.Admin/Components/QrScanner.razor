@@ -32,9 +32,10 @@
         </div>
     }
     
-    @* Video container *@
-    <div id="@_scannerId" class="qr-scanner-video" style="@(_isScanning ? "display: block;" : "display: none;")"></div>
-    
+    @* Video container — musi być widoczny PRZED scanner.start(), bo html5-qrcode
+       oblicza wymiary canvasa dekodującego na podstawie rozmiaru kontenera *@
+    <div id="@_scannerId" class="qr-scanner-video" style="@(_isScanning || _isLoading ? "display: block;" : "display: none;")"></div>
+
     @if (_isScanning)
     {
         <div class="qr-scanner-controls">
@@ -69,29 +70,27 @@
     .qr-scanner-video {
         width: 100%;
         max-width: 400px;
-        height: 300px !important;
-        max-height: 300px !important;
+        min-height: 250px;
+        max-height: 350px;
         border-radius: 8px;
         overflow: hidden;
         background: #000;
     }
-    
+
     /* Force html5-qrcode to respect size */
     .qr-scanner-video video {
         width: 100% !important;
-        height: 300px !important;
-        max-height: 300px !important;
+        max-height: 350px !important;
         object-fit: cover !important;
     }
-    
+
     .qr-scanner-video > div {
         width: 100% !important;
-        height: 300px !important;
-        max-height: 300px !important;
+        max-height: 350px !important;
     }
-    
+
     .qr-scanner-video img {
-        max-height: 300px !important;
+        max-height: 350px !important;
     }
     
     .qr-scanner-loading,
@@ -168,8 +167,9 @@
         _isLoading = true;
         _error = null;
         StateHasChanged();
-        
-        await Task.Delay(50);
+
+        // Kontener musi być widoczny i mieć wymiary zanim start() obliczy qrbox
+        await Task.Delay(200);
         
         try
         {
