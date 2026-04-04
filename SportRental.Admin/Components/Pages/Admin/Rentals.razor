@@ -729,51 +729,58 @@ else
                         </MudItem>
                     </MudGrid>
 
-                    @* Szybkie dodawanie po SKU *@
-                    <MudExpansionPanels Elevation="0">
-                        <MudExpansionPanel Text="⚡ Szybkie dodawanie po SKU / kamerą" Style="background: transparent;">
-                            <MudGrid Spacing="2">
-                                <MudItem xs="12" md="5">
-                                    <MudTextField @bind-Value="skuInput" 
-                                                  Label="Kod SKU" 
-                                                  Placeholder="Wpisz lub zeskanuj..." 
-                                                  Variant="Variant.Outlined"
-                                                  Adornment="Adornment.Start"
-                                                  AdornmentIcon="@Icons.Material.Filled.ViewWeek"
-                                                  Class="rounded-lg" />
-                                </MudItem>
-                                <MudItem xs="6" md="2">
-                                    <MudNumericField T="int" @bind-Value="skuQty" Label="Ilość" Min="1" Variant="Variant.Outlined" Class="rounded-lg" />
-                                </MudItem>
-                                <MudItem xs="6" md="2">
-                                    <MudButton FullWidth="true" 
-                                               Variant="Variant.Outlined" 
-                                               Color="Color.Primary"
-                                               StartIcon="@Icons.Material.Filled.Add" 
-                                               OnClick="AddItemBySku"
-                                               Style="height: 56px;"
-                                               Class="rounded-lg">
-                                        Dodaj
-                                    </MudButton>
-                                </MudItem>
-                                <MudItem xs="12" md="3">
-                                    <MudStack Row="true" Spacing="1">
-                                        <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="ToggleScanner" StartIcon="@Icons.Material.Filled.DocumentScanner">
-                                            @(_showScanner ? "Ukryj skaner" : "Skaner kodów")
-                                        </MudButton>
-                                    </MudStack>
-                                </MudItem>
-                            </MudGrid>
-                            @if (_showScanner)
-                            {
-                                <MudPaper Elevation="2" Class="pa-3 mt-3" Style="border-radius: 12px;">
-                                    <SportRental.Admin.Components.QrScanner 
-                                        OnScanned="OnQrScanned" 
-                                        AutoStart="true" />
-                                </MudPaper>
-                            }
-                        </MudExpansionPanel>
-                    </MudExpansionPanels>
+                    @* Szybkie dodawanie / Skaner *@
+                    <MudGrid Spacing="2" Class="mt-2">
+                        <MudItem xs="12" md="5">
+                            <MudTextField @bind-Value="skuInput" 
+                                          Label="Szybkie dodawanie (SKU / Barcode)" 
+                                          Placeholder="Wpisz SKU lub zeskanuj..." 
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.QrCodeScanner"
+                                          OnKeyUp="OnSkuKeyUp"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="6" md="2">
+                            <MudNumericField T="int" @bind-Value="skuQty" Label="Ilość" Min="1" Variant="Variant.Outlined" Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="6" md="2">
+                            <MudButton FullWidth="true" 
+                                       Variant="Variant.Filled" 
+                                       Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.Bolt" 
+                                       OnClick="AddItemBySku"
+                                       Style="height: 56px;"
+                                       Class="rounded-lg">
+                                Dodaj
+                            </MudButton>
+                        </MudItem>
+                        <MudItem xs="12" md="3">
+                            <MudStack Row="true" Spacing="1" Class="h-100 mud-align-center">
+                                <MudButton Variant="@(_showScanner ? Variant.Filled : Variant.Outlined)" 
+                                           Color="@(_showScanner ? Color.Error : Color.Primary)"
+                                           FullWidth="true"
+                                           OnClick="ToggleScanner" 
+                                           StartIcon="@Icons.Material.Filled.DocumentScanner"
+                                           Style="height: 56px;"
+                                           Class="rounded-lg">
+                                    @(_showScanner ? "Zamknij" : "Skaner")
+                                </MudButton>
+                                <MudTooltip Text="Skanowanie ciągłe">
+                                    <MudCheckBox @bind-Value="_continuousScan" Color="Color.Primary" Dense="true" />
+                                </MudTooltip>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                    
+                    @if (_showScanner)
+                    {
+                        <MudPaper Elevation="2" Class="pa-3 mt-3" Style="border-radius: 12px; background: #000;">
+                            <SportRental.Admin.Components.QrScanner 
+                                OnScanned="OnQrScanned" 
+                                AutoStart="true" />
+                        </MudPaper>
+                    }
                 </MudStack>
             </MudPaper>
 
@@ -1183,6 +1190,14 @@ else
         Recalculate();
     }
 
+    private void OnSkuKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            AddItemBySku();
+        }
+    }
+
     private Task<IEnumerable<Product>> SearchProducts(string value, CancellationToken token = default)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1222,6 +1237,7 @@ else
     }
 
     private bool _showScanner = false;
+    private bool _continuousScan = true;
     
     private void ToggleScanner()
     {
@@ -1230,7 +1246,8 @@ else
     
     private async Task OnQrScanned(string qrCode)
     {
-        _showScanner = false;
+        if (!_continuousScan)
+            _showScanner = false;
         
         var (type, id, skuOrCode) = SportRental.Admin.Services.QrCode.SimpleQrCodeGenerator.ParseQrCodeData(qrCode);
         
