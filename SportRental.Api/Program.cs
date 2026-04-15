@@ -48,7 +48,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is required");
 
 builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString)
+    options.UseNpgsql(connectionString, npg => npg.MigrationsAssembly("SportRental.Infrastructure"))
 );
 
 // Identity

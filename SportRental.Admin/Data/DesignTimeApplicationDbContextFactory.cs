@@ -20,7 +20,7 @@ namespace SportRental.Admin.Data
                                    ?? "Host=localhost;Port=5432;Database=sportrental;Username=postgres";
 
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-            optionsBuilder.UseNpgsql(connectionString);
+            optionsBuilder.UseNpgsql(connectionString, npg => npg.MigrationsAssembly("SportRental.Infrastructure"));
 
             return new ApplicationDbContext(optionsBuilder.Options);
         }

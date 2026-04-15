@@ -236,7 +236,7 @@ builder.Services.AddAuthentication(options =>
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 // Pooled factory dla Blazor Server - tworzy instancje DbContext na żądanie
 builder.Services.AddPooledDbContextFactory<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, npg => npg.MigrationsAssembly("SportRental.Infrastructure")));
 // Scoped DbContext dla Identity (pobiera z factory)
 builder.Services.AddScoped<ApplicationDbContext>(sp => 
     sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
@@ -417,16 +417,7 @@ using (var scope = app.Services.CreateScope())
     var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     
-    // Automatyczne migracje
-    try
-    {
-        await db.Database.MigrateAsync();
-        Console.WriteLine("✅ Migracje zastosowane pomyślnie");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"⚠️ Migracje: {ex.Message}");
-    }
+    await db.Database.MigrateAsync();
     
     // Ensure default tenant exists - use existing tenant with products if available
     var tenantId = config.GetValue<Guid?>("Tenant:Id") ?? Guid.Empty;
