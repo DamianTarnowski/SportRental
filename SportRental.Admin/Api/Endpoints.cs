@@ -39,10 +39,11 @@ namespace SportRental.Admin.Api
             // Format: /c/{shortId} gdzie shortId to pierwsze 8 znaków GUID wynajmu
             app.MapGet("/c/{shortId}", [AllowAnonymous] async (
                 string shortId,
-                IDbContextFactory<ApplicationDbContext> dbFactory) =>
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                IFileStorage storage) =>
             {
                 await using var db = await dbFactory.CreateDbContextAsync();
-                
+
                 // Szukaj wynajmu po pierwszych 8 znakach ID (bez filtra tenanta)
                 var rental = await db.Rentals
                     .IgnoreQueryFilters()
@@ -50,16 +51,17 @@ namespace SportRental.Admin.Api
                     .Include(r => r.Items)
                     .Where(r => r.Id.ToString().StartsWith(shortId.ToLower()))
                     .FirstOrDefaultAsync();
-                
+
                 if (rental == null)
                 {
                     return Results.NotFound("Umowa nie została znaleziona.");
                 }
-                
-                // Jeśli jest URL do umowy PDF, przekieruj
+
+                // Jeśli jest URL do umowy PDF, wygeneruj krótkotrwały SAS i przekieruj
                 if (!string.IsNullOrWhiteSpace(rental.ContractUrl))
                 {
-                    return Results.Redirect(rental.ContractUrl);
+                    var sasUrl = await storage.GetPrivateReadUrlAsync(rental.ContractUrl, TimeSpan.FromMinutes(10));
+                    return Results.Redirect(sasUrl);
                 }
                 
                 // Jeśli nie ma PDF, pokaż podstawowe informacje jako HTML
@@ -645,8 +647,8 @@ namespace SportRental.Admin.Api
                         ? await contracts.GenerateRentalContractAsync(rental, items, customer, productMap.Values, companyInfo)
                         : await contracts.GenerateRentalContractAsync(template.Content, rental, items, customer, productMap.Values, companyInfo);
                     var relativePath = $"contracts/{rental.TenantId}/{rental.Id}.pdf";
-                    var publicUrl = await storage.SaveAsync(relativePath, pdf);
-                    rental.ContractUrl = publicUrl;
+                    var storageReference = await storage.SavePrivateAsync(relativePath, pdf);
+                    rental.ContractUrl = storageReference;
                     db.Rentals.Update(rental);
                     await db.SaveChangesAsync();
 
@@ -680,13 +682,14 @@ namespace SportRental.Admin.Api
                 }
             });
 
-            api.MapGet("/contracts/{id:guid}", [Authorize] async (Guid id, IDbContextFactory<ApplicationDbContext> dbFactory) =>
+            api.MapGet("/contracts/{id:guid}", [Authorize] async (Guid id, IDbContextFactory<ApplicationDbContext> dbFactory, IFileStorage storage) =>
             {
                 await using var db = await dbFactory.CreateDbContextAsync();
                 var rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == id);
                 if (rental == null || string.IsNullOrWhiteSpace(rental.ContractUrl))
                     return Results.NotFound();
-                return Results.Redirect(rental.ContractUrl);
+                var sasUrl = await storage.GetPrivateReadUrlAsync(rental.ContractUrl, TimeSpan.FromMinutes(10));
+                return Results.Redirect(sasUrl);
             });
 
             // Upload zdjęcia produktu

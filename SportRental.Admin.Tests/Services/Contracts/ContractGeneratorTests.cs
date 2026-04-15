@@ -28,6 +28,8 @@ public class QuestPdfContractGeneratorTests
         // Setup mock file storage
         _fileStorageMock.Setup(fs => fs.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((string path, byte[] data, CancellationToken ct) => $"https://localhost/storage/{path}");
+        _fileStorageMock.Setup(fs => fs.SavePrivateAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string path, byte[] data, CancellationToken ct) => $"https://localhost/storage/{path}");
 
         _contractGenerator = new QuestPdfContractGenerator(_fileStorageMock.Object, _emailSenderMock.Object, _loggerMock.Object);
     }
@@ -57,10 +59,10 @@ public class QuestPdfContractGeneratorTests
         result.Should().Contain(".pdf");
         
         // Verify file storage was called
-        _fileStorageMock.Verify(fs => fs.SaveAsync(
-            It.Is<string>(path => path.StartsWith($"contracts/{rental.TenantId}") && path.Contains(rental.Id.ToString())), 
-            It.IsAny<byte[]>(), 
-            It.IsAny<CancellationToken>()), 
+        _fileStorageMock.Verify(fs => fs.SavePrivateAsync(
+            It.Is<string>(path => path.StartsWith($"contracts/{rental.TenantId}") && path.Contains(rental.Id.ToString())),
+            It.IsAny<byte[]>(),
+            It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

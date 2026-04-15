@@ -565,18 +565,19 @@ using (var scope = app.Services.CreateScope())
             await userManager.AddToRoleAsync(hdUser, RoleNames.Owner);
         if (!await userManager.IsInRoleAsync(hdUser, RoleNames.Client))
             await userManager.AddToRoleAsync(hdUser, RoleNames.Client);
-        
-        // Reset hasła dla konta deweloperskiego
-        var resetToken = await userManager.GeneratePasswordResetTokenAsync(hdUser);
-        var resetResult = await userManager.ResetPasswordAsync(hdUser, resetToken, "HasloHaslo122@@@");
-        if (resetResult.Succeeded)
+
+        if (app.Environment.IsDevelopment())
         {
-            Console.WriteLine($"🔑 Hasło dla hdtdtr@gmail.com zresetowane do: HasloHaslo122@@@");
+            var resetToken = await userManager.GeneratePasswordResetTokenAsync(hdUser);
+            var resetResult = await userManager.ResetPasswordAsync(hdUser, resetToken, "HasloHaslo122@@@");
+            if (resetResult.Succeeded)
+            {
+                Console.WriteLine($"🔑 [DEV] Hasło dla hdtdtr@gmail.com zresetowane do hasła deweloperskiego");
+            }
         }
     }
-    else
+    else if (app.Environment.IsDevelopment())
     {
-        // Utwórz konto jeśli nie istnieje
         hdUser = new ApplicationUser
         {
             UserName = "hdtdtr@gmail.com",
@@ -590,28 +591,30 @@ using (var scope = app.Services.CreateScope())
             await userManager.AddToRoleAsync(hdUser, RoleNames.SuperAdmin);
             await userManager.AddToRoleAsync(hdUser, RoleNames.Owner);
             await userManager.AddToRoleAsync(hdUser, RoleNames.Client);
-            Console.WriteLine($"✨ Utworzono konto hdtdtr@gmail.com z hasłem: HasloHaslo122@@@");
+            Console.WriteLine($"✨ [DEV] Utworzono konto hdtdtr@gmail.com z hasłem deweloperskim");
         }
     }
 
-    // Dodaj konto testowe właściciela, jeśli nie istnieje
-    var testOwnerEmail = "owner@test.local";
-    var testOwnerPass = "Owner123!";
-    var testOwner = await userManager.FindByEmailAsync(testOwnerEmail);
-    if (testOwner == null)
+    if (app.Environment.IsDevelopment())
     {
-        testOwner = new ApplicationUser
+        var testOwnerEmail = "owner@test.local";
+        var testOwnerPass = "Owner123!";
+        var testOwner = await userManager.FindByEmailAsync(testOwnerEmail);
+        if (testOwner == null)
         {
-            UserName = testOwnerEmail,
-            Email = testOwnerEmail,
-            EmailConfirmed = true,
-            TenantId = tenantId
-        };
-        var createResult = await userManager.CreateAsync(testOwner, testOwnerPass);
-        if (createResult.Succeeded)
-        {
-            await userManager.AddToRoleAsync(testOwner, RoleNames.Owner);
-            await userManager.AddToRoleAsync(testOwner, RoleNames.Client);
+            testOwner = new ApplicationUser
+            {
+                UserName = testOwnerEmail,
+                Email = testOwnerEmail,
+                EmailConfirmed = true,
+                TenantId = tenantId
+            };
+            var createResult = await userManager.CreateAsync(testOwner, testOwnerPass);
+            if (createResult.Succeeded)
+            {
+                await userManager.AddToRoleAsync(testOwner, RoleNames.Owner);
+                await userManager.AddToRoleAsync(testOwner, RoleNames.Client);
+            }
         }
     }
 }

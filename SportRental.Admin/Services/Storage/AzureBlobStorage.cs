@@ -1,24 +1,27 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Azure.Storage.Sas;
 using Microsoft.Extensions.Configuration;
 
 namespace SportRental.Admin.Services.Storage;
 
 /// <summary>
-/// Azure Blob Storage implementation for production use
-/// Supports Azure Storage Account with automatic container creation
+/// Azure Blob Storage implementation for production use.
+/// Uses two containers: a public one for product images/logos and a private one
+/// (no anonymous access) for sensitive artefacts such as PDF contracts.
 /// </summary>
 public sealed class AzureBlobStorage : IFileStorage
 {
     private readonly BlobServiceClient _blobServiceClient;
     private readonly string _containerName;
+    private readonly string _privateContainerName;
     private readonly string? _publicBaseUrl;
     private readonly ILogger<AzureBlobStorage> _logger;
 
     public AzureBlobStorage(IConfiguration config, ILogger<AzureBlobStorage> logger)
     {
         _logger = logger;
-        
+
         var connectionString = config["Storage:AzureBlob:ConnectionString"];
         if (string.IsNullOrWhiteSpace(connectionString))
         {
@@ -27,9 +30,12 @@ public sealed class AzureBlobStorage : IFileStorage
 
         _blobServiceClient = new BlobServiceClient(connectionString);
         _containerName = config["Storage:AzureBlob:ContainerName"] ?? "images";
-        _publicBaseUrl = config["Storage:AzureBlob:PublicBaseUrl"]; // Optional: for custom CDN domain
-        
-        _logger.LogInformation("AzureBlobStorage initialized. Container: {Container}", _containerName);
+        _privateContainerName = config["Storage:AzureBlob:PrivateContainerName"] ?? $"{_containerName}-private";
+        _publicBaseUrl = config["Storage:AzureBlob:PublicBaseUrl"];
+
+        _logger.LogInformation(
+            "AzureBlobStorage initialized. Public container: {Public}, private container: {Private}",
+            _containerName, _privateContainerName);
     }
 
     public async Task<string> SaveAsync(string relativePath, byte[] content, CancellationToken ct = default)
@@ -43,41 +49,29 @@ public sealed class AzureBlobStorage : IFileStorage
         try
         {
             var normalized = NormalizeRelativePath(relativePath);
-            
-            // Get or create container
+
             var containerClient = _blobServiceClient.GetBlobContainerClient(_containerName);
             await containerClient.CreateIfNotExistsAsync(PublicAccessType.Blob, cancellationToken: ct);
-            
-            // Upload blob
+
             var blobClient = containerClient.GetBlobClient(normalized);
-            
-            // Set content type based on file extension
-            var contentType = GetContentType(normalized);
             var blobHttpHeaders = new BlobHttpHeaders
             {
-                ContentType = contentType,
-                CacheControl = "public, max-age=31536000" // 1 year cache for immutable images
+                ContentType = GetContentType(normalized),
+                CacheControl = "public, max-age=31536000"
             };
 
             await blobClient.UploadAsync(
-                content, 
-                new BlobUploadOptions
-                {
-                    HttpHeaders = blobHttpHeaders,
-                    Conditions = null // Overwrite if exists
-                },
+                content,
+                new BlobUploadOptions { HttpHeaders = blobHttpHeaders },
                 cancellationToken: ct);
 
-            _logger.LogInformation("Uploaded blob: {BlobName}, Size: {Size} bytes", normalized, content.Length);
+            _logger.LogInformation("Uploaded public blob: {BlobName}", normalized);
 
-            // Return public URL
             if (!string.IsNullOrWhiteSpace(_publicBaseUrl))
             {
-                // Use custom CDN URL if configured
                 return $"{_publicBaseUrl.TrimEnd('/')}/{normalized}";
             }
-            
-            // Return Azure Blob URL
+
             return blobClient.Uri.ToString();
         }
         catch (Exception ex)
@@ -85,6 +79,82 @@ public sealed class AzureBlobStorage : IFileStorage
             _logger.LogError(ex, "Failed to upload blob: {Path}", relativePath);
             throw;
         }
+    }
+
+    public async Task<string> SavePrivateAsync(string relativePath, byte[] content, CancellationToken ct = default)
+    {
+        try
+        {
+            var normalized = NormalizeRelativePath(relativePath);
+
+            var containerClient = _blobServiceClient.GetBlobContainerClient(_privateContainerName);
+            await containerClient.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: ct);
+
+            var blobClient = containerClient.GetBlobClient(normalized);
+            var blobHttpHeaders = new BlobHttpHeaders
+            {
+                ContentType = GetContentType(normalized),
+                CacheControl = "private, no-store"
+            };
+
+            using var ms = new MemoryStream(content, writable: false);
+            await blobClient.UploadAsync(
+                ms,
+                new BlobUploadOptions { HttpHeaders = blobHttpHeaders },
+                cancellationToken: ct);
+
+            _logger.LogInformation("Uploaded private blob: {BlobName}", normalized);
+
+            return normalized;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload private blob: {Path}", relativePath);
+            throw;
+        }
+    }
+
+    public Task<string> GetPrivateReadUrlAsync(string storageReference, TimeSpan ttl, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(storageReference))
+            throw new ArgumentException("Storage reference is empty", nameof(storageReference));
+
+        var (containerName, blobName) = ResolvePrivateReference(storageReference);
+        var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
+        var blobClient = containerClient.GetBlobClient(blobName);
+
+        if (!blobClient.CanGenerateSasUri)
+        {
+            throw new InvalidOperationException(
+                "Azure Blob client cannot generate SAS URIs. Ensure the connection string contains an account key.");
+        }
+
+        var sasBuilder = new BlobSasBuilder
+        {
+            BlobContainerName = containerName,
+            BlobName = blobName,
+            Resource = "b",
+            ExpiresOn = DateTimeOffset.UtcNow.Add(ttl)
+        };
+        sasBuilder.SetPermissions(BlobSasPermissions.Read);
+
+        var sasUri = blobClient.GenerateSasUri(sasBuilder);
+        return Task.FromResult(sasUri.ToString());
+    }
+
+    private (string Container, string Blob) ResolvePrivateReference(string storageReference)
+    {
+        if (storageReference.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || storageReference.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            var uri = new Uri(storageReference);
+            var segments = uri.AbsolutePath.TrimStart('/').Split('/', 2);
+            if (segments.Length != 2)
+                throw new ArgumentException("Cannot parse blob URL: missing container/blob segments", nameof(storageReference));
+            return (segments[0], segments[1]);
+        }
+
+        return (_privateContainerName, NormalizeRelativePath(storageReference));
     }
 
     public async Task<byte[]> ReadAsync(string relativePath, CancellationToken ct = default)
@@ -145,24 +215,17 @@ public sealed class AzureBlobStorage : IFileStorage
         if (string.IsNullOrWhiteSpace(path))
             throw new ArgumentException("Path cannot be null or empty", nameof(path));
 
-        // Remove leading slash if present
-        path = path.TrimStart('/');
-        
-        // Normalize path separators to forward slash (Azure Blob uses forward slash)
-        path = path.Replace('\\', '/');
-        
-        return path;
-    }
+        var normalized = path.Replace('\\', '/').TrimStart('/');
 
-    private static Guid? ExtractTenantId(string path)
-    {
-        // Try to extract tenant ID from path like "images/products/{tenantId}/..."
-        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length > 2 && Guid.TryParse(parts[2], out var tenantId))
+        foreach (var segment in normalized.Split('/'))
         {
-            return tenantId;
+            if (segment.Length == 0)
+                throw new ArgumentException("Path contains empty segments", nameof(path));
+            if (segment == "." || segment == "..")
+                throw new ArgumentException("Path traversal segments are not allowed", nameof(path));
         }
-        return null;
+
+        return normalized;
     }
 
     private static string GetContentType(string fileName)

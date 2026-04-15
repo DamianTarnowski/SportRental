@@ -272,11 +272,11 @@ namespace SportRental.Admin.Services.Contracts
             var fileName = $"umowa_{rental.Id}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
             var filePath = $"contracts/{rental.TenantId}/{fileName}";
             
-            var url = await _fileStorage.SaveAsync(filePath, contractBytes, ct);
-            
+            var storageReference = await _fileStorage.SavePrivateAsync(filePath, contractBytes, ct);
+
             _logger.LogInformation("Umowa zapisana w {FilePath} dla wynajmu {RentalId}", filePath, rental.Id);
-            
-            return url;
+
+            return storageReference;
         }
 
         public async Task SendRentalContractByEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)

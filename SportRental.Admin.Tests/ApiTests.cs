@@ -367,6 +367,10 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
             => Task.FromResult(Array.Empty<byte>());
         public Task<bool> ExistsAsync(string relativePath, CancellationToken ct = default)
             => Task.FromResult(true);
+        public Task<string> SavePrivateAsync(string relativePath, byte[] content, CancellationToken ct = default)
+            => Task.FromResult(relativePath);
+        public Task<string> GetPrivateReadUrlAsync(string storageReference, TimeSpan ttl, CancellationToken ct = default)
+            => Task.FromResult($"https://test/{storageReference}?sas=fake");
     }
 
     private sealed class FakeSmsSender : SportRental.Admin.Services.Sms.ISmsSender

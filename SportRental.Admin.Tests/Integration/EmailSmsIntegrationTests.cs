@@ -406,7 +406,7 @@ public class EmailSmsIntegrationTests : IAsyncLifetime
 
         var mockStorage = new Mock<IFileStorage>();
         mockStorage
-            .Setup(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SavePrivateAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync("https://storage/contract.pdf");
 
         var mockEmail = new Mock<IEmailSender>();

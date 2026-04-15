@@ -238,15 +238,15 @@ public class RentalContractEmailIntegrationTests : IAsyncLifetime
         var expectedUrl = $"https://storage.example.com/contracts/{_testTenantId}/umowa_{rentalId}.pdf";
         var mockFileStorage = new Mock<IFileStorage>();
         mockFileStorage
-            .Setup(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SavePrivateAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedUrl);
 
         var mockEmailSender = new Mock<IEmailSender>();
         var mockLogger = new Mock<ILogger<QuestPdfContractGenerator>>();
 
         var contractGenerator = new QuestPdfContractGenerator(
-            mockFileStorage.Object, 
-            mockEmailSender.Object, 
+            mockFileStorage.Object,
+            mockEmailSender.Object,
             mockLogger.Object);
 
         // Act
@@ -257,7 +257,7 @@ public class RentalContractEmailIntegrationTests : IAsyncLifetime
         contractUrl.Should().NotBeNullOrEmpty();
         contractUrl.Should().Be(expectedUrl);
 
-        mockFileStorage.Verify(s => s.SaveAsync(
+        mockFileStorage.Verify(s => s.SavePrivateAsync(
             It.Is<string>(path => path.Contains("contracts") && path.Contains(rentalId.ToString())),
             It.Is<byte[]>(bytes => bytes.Length > 0),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -427,7 +427,7 @@ public class RentalContractEmailIntegrationTests : IAsyncLifetime
         var contractUrl = $"https://storage.example.com/contracts/{_testTenantId}/umowa_{rentalId}.pdf";
         var mockFileStorage = new Mock<IFileStorage>();
         mockFileStorage
-            .Setup(s => s.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SavePrivateAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(contractUrl);
 
         var mockEmailSender = new Mock<IEmailSender>();

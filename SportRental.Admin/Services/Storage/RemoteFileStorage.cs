@@ -97,6 +97,12 @@ public sealed class RemoteFileStorage : IFileStorage
         }
     }
 
+    public Task<string> SavePrivateAsync(string relativePath, byte[] content, CancellationToken ct = default)
+        => SaveAsync(relativePath, content, ct);
+
+    public Task<string> GetPrivateReadUrlAsync(string storageReference, TimeSpan ttl, CancellationToken ct = default)
+        => Task.FromResult(storageReference);
+
     private void AddAuthHeader(HttpRequestMessage request)
     {
         if (!string.IsNullOrWhiteSpace(_apiKey))

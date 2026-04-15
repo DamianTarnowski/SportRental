@@ -44,6 +44,12 @@ namespace SportRental.Admin.Services.Storage
             return Task.FromResult(File.Exists(fullPath));
         }
 
+        public Task<string> SavePrivateAsync(string relativePath, byte[] content, CancellationToken ct = default)
+            => SaveAsync(relativePath, content, ct);
+
+        public Task<string> GetPrivateReadUrlAsync(string storageReference, TimeSpan ttl, CancellationToken ct = default)
+            => Task.FromResult(storageReference);
+
         private string GetFullPath(string relativePath)
         {
             var safe = relativePath.Replace('\\', '/').TrimStart('/');

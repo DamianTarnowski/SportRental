@@ -81,6 +81,12 @@ namespace SportRental.Admin.Services.Storage
             return $"https://{_bucket}.s3.amazonaws.com/{key}";
         }
 
+        public Task<string> SavePrivateAsync(string relativePath, byte[] content, CancellationToken ct = default)
+            => SaveAsync(relativePath, content, ct);
+
+        public Task<string> GetPrivateReadUrlAsync(string storageReference, TimeSpan ttl, CancellationToken ct = default)
+            => Task.FromResult(storageReference);
+
         public void Dispose() => _s3?.Dispose();
     }
 }

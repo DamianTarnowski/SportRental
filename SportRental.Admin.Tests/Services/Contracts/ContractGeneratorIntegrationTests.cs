@@ -224,7 +224,7 @@ public class ContractGeneratorIntegrationTests
 
         var expectedUrl = $"https://storage.example.com/contracts/{tenantId}/umowa_{rental.Id}.pdf";
         _fileStorageMock
-            .Setup(x => x.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.SavePrivateAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(expectedUrl);
 
         // Act
@@ -232,8 +232,8 @@ public class ContractGeneratorIntegrationTests
 
         // Assert
         contractUrl.Should().Be(expectedUrl);
-        
-        _fileStorageMock.Verify(x => x.SaveAsync(
+
+        _fileStorageMock.Verify(x => x.SavePrivateAsync(
             It.Is<string>(path => path.Contains($"contracts/{tenantId}") && path.EndsWith(".pdf")),
             It.Is<byte[]>(bytes => bytes.Length > 1000),
             It.IsAny<CancellationToken>()
@@ -566,7 +566,7 @@ Dziękujemy za skorzystanie z naszych usług!
         // Setup mocks
         var savedPdfPath = "";
         _fileStorageMock
-            .Setup(x => x.SaveAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Setup(x => x.SavePrivateAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .Callback<string, byte[], CancellationToken>((path, _, _) => savedPdfPath = path)
             .ReturnsAsync("https://storage.blob.core.windows.net/contracts/umowa.pdf");
 

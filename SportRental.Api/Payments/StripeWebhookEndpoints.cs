@@ -49,17 +49,21 @@ public static class StripeWebhookEndpoints
             var signatureHeader = request.Headers["Stripe-Signature"].FirstOrDefault();
             Event stripeEvent;
 
+            if (string.IsNullOrWhiteSpace(webhookSecret))
+            {
+                logger.LogError("Stripe webhook secret is not configured; refusing to process webhook without signature verification");
+                return Results.Problem("Webhook verification is not configured", statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            if (string.IsNullOrWhiteSpace(signatureHeader))
+            {
+                logger.LogWarning("Stripe webhook request is missing Stripe-Signature header");
+                return Results.BadRequest(new { error = "Missing Stripe-Signature header" });
+            }
+
             try
             {
-                if (!string.IsNullOrWhiteSpace(webhookSecret) && !string.IsNullOrWhiteSpace(signatureHeader))
-                {
-                    stripeEvent = EventUtility.ConstructEvent(json, signatureHeader, webhookSecret);
-                }
-                else
-                {
-                    logger.LogWarning("Stripe webhook secret not configured. Accepting payload without signature verification (development only).");
-                    stripeEvent = EventUtility.ParseEvent(json);
-                }
+                stripeEvent = EventUtility.ConstructEvent(json, signatureHeader, webhookSecret);
             }
             catch (StripeException ex)
             {

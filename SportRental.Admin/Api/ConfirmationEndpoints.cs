@@ -60,7 +60,7 @@ public static class ConfirmationEndpoints
         {
             itemsHtml.Append($@"
                 <tr>
-                    <td style=""padding:10px 12px;border-bottom:1px solid #e5e7eb"">{item.ProductName}</td>
+                    <td style=""padding:10px 12px;border-bottom:1px solid #e5e7eb"">{System.Net.WebUtility.HtmlEncode(item.ProductName)}</td>
                     <td style=""padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center"">{item.Quantity}</td>
                     <td style=""padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right"">{item.PricePerDay:F2} zł/dzień</td>
                     <td style=""padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right"">{item.Subtotal:F2} zł</td>
