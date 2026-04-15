@@ -2,11 +2,16 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 @using SportRental.Infrastructure.Domain
+@using Microsoft.AspNetCore.Components.Authorization
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthStateProvider
 @inject MudBlazor.ISnackbar Snackbar
 @inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
+@inject SportRental.Admin.Services.Storage.ImageVariantService ImageVariantService
 @inject IDialogService DialogService
+@inject SportRental.Admin.Services.QrCode.IBarcodeGenerator BarcodeGenerator
+@inject IJSRuntime JS
 @if (_isMobile)
 {
     @* ==================== MOBILE UI ==================== *@
@@ -93,7 +98,8 @@
                                     </div>
                                 </div>
                                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
-                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => Edit(product)">Edytuj</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="async () => await Edit(product)">Edytuj</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.ViewWeek" OnClick="() => ShowProductBarcode(product)">Kod kreskowy</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="() => Delete(product)">Usuń</MudMenuItem>
                                     @if (product.IsActive)
                                     {
@@ -125,14 +131,24 @@ else
                         <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj sprzętem sportowym</MudText>
                     </div>
                 </MudStack>
-                <MudButton Variant="Variant.Filled" 
-                           Color="Color.Surface" 
-                           StartIcon="@Icons.Material.Filled.Add"
-                           OnClick="CreateNew"
-                           Size="Size.Large"
-                           Class="rounded-pill px-6">
-                    Nowy produkt
-                </MudButton>
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" 
+                               Color="Color.Surface" 
+                               StartIcon="@Icons.Material.Filled.ViewWeek"
+                               OnClick="() => OpenBarcodeLabelsDialog()"
+                               Size="Size.Large"
+                               Class="rounded-pill px-4">
+                        Etykiety kodów
+                    </MudButton>
+                    <MudButton Variant="Variant.Filled" 
+                               Color="Color.Surface" 
+                               StartIcon="@Icons.Material.Filled.Add"
+                               OnClick="CreateNew"
+                               Size="Size.Large"
+                               Class="rounded-pill px-6">
+                        Nowy produkt
+                    </MudButton>
+                </MudStack>
             </MudStack>
         </MudPaper>
         
@@ -270,8 +286,8 @@ else
                                 <MudCardActions Class="pa-3 pt-0">
                                     <MudStack Spacing="1" Class="w-100">
                                         <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" FullWidth="true">
-                                            <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                                       OnClick="() => Edit(product)"
+                                            <MudButton StartIcon="@Icons.Material.Filled.Edit"
+                                                       OnClick="async () => await Edit(product)"
                                                        Size="Size.Small">
                                                 Edytuj
                                             </MudButton>
@@ -282,7 +298,16 @@ else
                                                 Usuń
                                             </MudButton>
                                         </MudButtonGroup>
-                                        
+
+                                        <MudButton StartIcon="@Icons.Material.Filled.ViewWeek"
+                                                   OnClick="() => ShowProductBarcode(product)"
+                                                   Color="Color.Secondary"
+                                                   Variant="Variant.Outlined"
+                                                   Size="Size.Small"
+                                                   FullWidth="true">
+                                            Kod kreskowy
+                                        </MudButton>
+                                         
                                         @if (product.IsActive)
                                         {
                                             <MudButton StartIcon="@Icons.Material.Filled.VisibilityOff" 
@@ -347,8 +372,14 @@ else
                                     </MudItem>
                                     <MudItem xs="12" md="4">
                                         <MudStack Row="true" Spacing="1" Class="mud-justify-end">
-                                            <MudButton StartIcon="@Icons.Material.Filled.Edit" 
-                                                       OnClick="() => Edit(product)"
+                                            <MudButton StartIcon="@Icons.Material.Filled.ViewWeek"
+                                                       OnClick="() => ShowProductBarcode(product)"
+                                                       Color="Color.Secondary"
+                                                       Size="Size.Small">
+                                                Kod kreskowy
+                                            </MudButton>
+                                            <MudButton StartIcon="@Icons.Material.Filled.Edit"
+                                                       OnClick="async () => await Edit(product)"
                                                        Color="Color.Primary"
                                                        Size="Size.Small">
                                                 Edytuj
@@ -417,6 +448,47 @@ else
                     </MudStack>
                     
                     <MudGrid Spacing="3">
+                        <MudItem xs="12" md="6">
+                            <MudSelect T="string" @bind-Value="model.Category" 
+                                       Label="Kategoria"
+                                       Variant="Variant.Outlined"
+                                       Adornment="Adornment.Start"
+                                       AdornmentIcon="@Icons.Material.Filled.Category"
+                                       Class="rounded-lg">
+                                <MudSelectItem Value="@("Narty")">🎿 Narty</MudSelectItem>
+                                <MudSelectItem Value="@("Snowboard")">🏂 Snowboard</MudSelectItem>
+                                <MudSelectItem Value="@("Buty narciarskie")">👟 Buty narciarskie</MudSelectItem>
+                                <MudSelectItem Value="@("Buty snowboardowe")">👢 Buty snowboardowe</MudSelectItem>
+                                <MudSelectItem Value="@("Kije")">🥢 Kije</MudSelectItem>
+                                <MudSelectItem Value="@("Kask")">⛑️ Kask</MudSelectItem>
+                                <MudSelectItem Value="@("Gogle")">🥽 Gogle</MudSelectItem>
+                                <MudSelectItem Value="@("Rower")">🚴 Rower</MudSelectItem>
+                                <MudSelectItem Value="@("SUP")">🏄 SUP</MudSelectItem>
+                                <MudSelectItem Value="@("Kajak")">🛶 Kajak</MudSelectItem>
+                                <MudSelectItem Value="@("Inne")">📦 Inne</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudStack Row="true" Class="mud-align-center" Spacing="3" Style="height: 100%; padding-top: 8px;">
+                                <MudSwitch @bind-Value="model.IsActive" 
+                                           Color="Color.Success" 
+                                           Label="Produkt aktywny" />
+                                @if (model.IsActive)
+                                {
+                                    <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
+                                        <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
+                                        Widoczny dla klientów
+                                    </MudChip>
+                                }
+                                else
+                                {
+                                    <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
+                                        <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small" Class="mr-1" />
+                                        Ukryty
+                                    </MudChip>
+                                }
+                            </MudStack>
+                        </MudItem>
                         <MudItem xs="12" md="8">
                             <MudTextField @bind-Value="model.Name" 
                                           Label="Nazwa produktu" 
@@ -434,7 +506,34 @@ else
                                           Required="true"
                                           Variant="Variant.Outlined"
                                           Adornment="Adornment.Start"
-                                          AdornmentIcon="@Icons.Material.Filled.QrCode"
+                                          AdornmentIcon="@Icons.Material.Filled.ViewWeek"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="model.Producer" 
+                                          Label="Producent" 
+                                          Placeholder="np. Atomic"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Factory"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="model.Model" 
+                                          Label="Model" 
+                                          Placeholder="np. Redster X9"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Badge"
+                                          Class="rounded-lg" />
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudTextField @bind-Value="model.SerialNumber" 
+                                          Label="Numer seryjny" 
+                                          Placeholder="np. SN-123456"
+                                          Variant="Variant.Outlined"
+                                          Adornment="Adornment.Start"
+                                          AdornmentIcon="@Icons.Material.Filled.Numbers"
                                           Class="rounded-lg" />
                         </MudItem>
                         <MudItem xs="12">
@@ -488,47 +587,7 @@ else
                                               Variant="Variant.Outlined"
                                               Class="rounded-lg" />
                         </MudItem>
-                        <MudItem xs="12" md="4">
-                            <MudSelect T="string" @bind-Value="model.Category" 
-                                       Label="Kategoria"
-                                       Variant="Variant.Outlined"
-                                       Adornment="Adornment.Start"
-                                       AdornmentIcon="@Icons.Material.Filled.Category"
-                                       Class="rounded-lg">
-                                <MudSelectItem Value="@("Narty")">🎿 Narty</MudSelectItem>
-                                <MudSelectItem Value="@("Snowboard")">🏂 Snowboard</MudSelectItem>
-                                <MudSelectItem Value="@("Buty narciarskie")">👟 Buty narciarskie</MudSelectItem>
-                                <MudSelectItem Value="@("Buty snowboardowe")">👢 Buty snowboardowe</MudSelectItem>
-                                <MudSelectItem Value="@("Kije")">🥢 Kije</MudSelectItem>
-                                <MudSelectItem Value="@("Kask")">⛑️ Kask</MudSelectItem>
-                                <MudSelectItem Value="@("Gogle")">🥽 Gogle</MudSelectItem>
-                                <MudSelectItem Value="@("Rower")">🚴 Rower</MudSelectItem>
-                                <MudSelectItem Value="@("SUP")">🏄 SUP</MudSelectItem>
-                                <MudSelectItem Value="@("Kajak")">🛶 Kajak</MudSelectItem>
-                                <MudSelectItem Value="@("Inne")">📦 Inne</MudSelectItem>
-                            </MudSelect>
-                        </MudItem>
                     </MudGrid>
-
-                    <MudStack Row="true" Class="mud-align-center" Spacing="3">
-                        <MudSwitch @bind-Value="model.IsActive" 
-                                   Color="Color.Success" 
-                                   Label="Produkt aktywny" />
-                        @if (model.IsActive)
-                        {
-                            <MudChip T="string" Color="Color.Success" Size="Size.Small" Variant="Variant.Filled">
-                                <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" Class="mr-1" />
-                                Widoczny dla klientów
-                            </MudChip>
-                        }
-                        else
-                        {
-                            <MudChip T="string" Color="Color.Default" Size="Size.Small" Variant="Variant.Outlined">
-                                <MudIcon Icon="@Icons.Material.Filled.VisibilityOff" Size="Size.Small" Class="mr-1" />
-                                Ukryty
-                            </MudChip>
-                        }
-                    </MudStack>
                 </MudStack>
             </MudPaper>
 
@@ -580,8 +639,80 @@ else
                     </MudText>
                     
                     <ImageCropper MaxSizeMB="8" 
-                                  OnImageReady="OnImageReadySkipCrop"
                                   OnBase64ImageReady="OnImageReadyCropped" />
+                </MudStack>
+            </MudPaper>
+
+            @* SEKCJA: KOD KRESKOWY *@
+            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);">
+                <MudStack Spacing="3">
+                    <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                        <MudIcon Icon="@Icons.Material.Filled.ViewWeek" Color="Color.Secondary" />
+                        <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">Kod kreskowy produktu</MudText>
+                    </MudStack>
+                    
+                    @if (model.Id == Guid.Empty)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="rounded-lg">
+                            <MudIcon Icon="@Icons.Material.Filled.Info" Size="Size.Small" Class="mr-2" />
+                            Kod kreskowy zostanie automatycznie wygenerowany po zapisaniu produktu.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center" Class="flex-wrap">
+                            <MudPaper Elevation="2"
+                                      Class="pa-3"
+                                      Style="border-radius: 12px; background: white; cursor: pointer; min-width: 280px;"
+                                      @onclick="() => ShowProductBarcode(model)">
+                                @if (!string.IsNullOrEmpty(_currentProductBarcodePreview))
+                                {
+                                    <img src="@_currentProductBarcodePreview" alt="Kod kreskowy" style="display: block; width: min(100%, 320px); height: auto;" />
+                                }
+                                else
+                                {
+                                    <MudSkeleton SkeletonType="SkeletonType.Rectangle" Width="320px" Height="100px" />
+                                }
+                            </MudPaper>
+                            
+                            <MudStack Spacing="2" Style="flex: 1; min-width: 200px;">
+                                <MudText Typo="Typo.body2">
+                                    <strong>Kod do skanowania:</strong><br/>
+                                    <code style="font-size: 0.9rem; word-break: break-all;">@_currentProductBarcodeData</code>
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Kliknij podgląd, aby otworzyć większą wersję do zeskanowania drugim telefonem.
+                                </MudText>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    Identyfikator produktu: @model.Id
+                                </MudText>
+                                
+                                <MudStack Row="true" Spacing="2" Class="mt-2 flex-wrap">
+                                    <MudButton Variant="Variant.Outlined" 
+                                               Color="Color.Primary" 
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Download"
+                                               OnClick="DownloadProductBarcode">
+                                        Pobierz PNG
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" 
+                                               Color="Color.Secondary" 
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Visibility"
+                                               OnClick="() => ShowProductBarcode(model)">
+                                        Pokaż duży kod
+                                    </MudButton>
+                                    <MudButton Variant="Variant.Outlined" 
+                                               Color="Color.Secondary" 
+                                               Size="Size.Small"
+                                               StartIcon="@Icons.Material.Filled.Print"
+                                               OnClick="() => OpenBarcodeLabelsDialog(model.Id)">
+                                        Drukuj etykietę
+                                    </MudButton>
+                                </MudStack>
+                            </MudStack>
+                        </MudStack>
+                    }
                 </MudStack>
             </MudPaper>
         </MudStack>
@@ -633,6 +764,8 @@ else
     private readonly DialogOptions productDialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
     private Product model = new();
     private string? _selectedImageName;
+    private string? _currentProductBarcodePreview;
+    private string? _currentProductBarcodeData;
 
     private IEnumerable<Product> FilteredProducts()
     {
@@ -659,8 +792,17 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // Pobierz TenantId z AuthenticationState (działa po SignalR reconnect)
+        var tenantId = await GetTenantIdAsync();
+        if (tenantId == Guid.Empty)
+        {
+            // Brak tenanta - nie pokazuj żadnych produktów
+            products = new List<Product>();
+            return;
+        }
+        
         await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(CurrentTenantId());
+        Db.SetTenant(tenantId);
         products = await Db.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
         await LoadCurrentlyRentedProducts();
     }
@@ -687,10 +829,12 @@ else
     private void CreateNew()
     {
         model = new Product { Id = Guid.Empty, TenantId = CurrentTenantId(), IsActive = true };
+        _currentProductBarcodePreview = null;
+        _currentProductBarcodeData = null;
         dialogOpen = true;
     }
 
-    private void Edit(Product p)
+    private async Task Edit(Product p)
     {
         model = new Product
         {
@@ -704,68 +848,126 @@ else
             IsActive = p.IsActive,
             ImageUrl = p.ImageUrl,
             AvailableQuantity = p.AvailableQuantity,
-            Description = p.Description
+            Description = p.Description,
+            SerialNumber = p.SerialNumber,
+            Producer = p.Producer,
+            Model = p.Model
         };
+        
+        await GenerateProductBarcodePreview(p.Id);
+        
         dialogOpen = true;
+    }
+    
+    private async Task GenerateProductBarcodePreview(Guid productId)
+    {
+        _currentProductBarcodeData = BarcodeGenerator.GenerateProductBarcodeData(productId, model.Sku);
+        _currentProductBarcodePreview = await BarcodeGenerator.GenerateBarcodeAsync(_currentProductBarcodeData, 520, 140);
+    }
+    
+    private async Task DownloadProductBarcode()
+    {
+        if (model.Id == Guid.Empty) return;
+        
+        var barcodeData = BarcodeGenerator.GenerateProductBarcodeData(model.Id, model.Sku);
+        var barcodeBytes = await BarcodeGenerator.GenerateBarcodeBytesAsync(barcodeData, 1200, 260);
+        var fileName = $"barcode-{model.Sku ?? model.Id.ToString()}.png";
+        
+        await DownloadFileAsync(barcodeBytes, fileName, "image/png");
+        Snackbar.Add($"Pobrano kod kreskowy: {fileName}", Severity.Success);
     }
 
     private async Task Save()
     {
-        await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(CurrentTenantId());
-        if (model.Id == Guid.Empty)
+        try
         {
-            model.Id = Guid.NewGuid();
-            model.CreatedAtUtc = DateTime.UtcNow;
-            model.TenantId = CurrentTenantId();
-            await Db.Products.AddAsync(model);
-        }
-        else
-        {
-            Db.Products.Update(model);
-        }
-        await Db.SaveChangesAsync();
-        
-        if (!string.IsNullOrEmpty(_croppedBase64Image) || _selectedImage is not null)
-        {
-            using var content = new MultipartFormDataContent();
+            await using var Db = await DbFactory.CreateDbContextAsync();
+            Db.SetTenant(CurrentTenantId());
+            if (model.Id == Guid.Empty)
+            {
+                model.Id = Guid.NewGuid();
+                model.CreatedAtUtc = DateTime.UtcNow;
+                model.TenantId = CurrentTenantId();
+                await Db.Products.AddAsync(model);
+            }
+            else
+            {
+                Db.Products.Update(model);
+            }
+            await Db.SaveChangesAsync();
             
             if (!string.IsNullOrEmpty(_croppedBase64Image))
             {
-                var base64Data = _croppedBase64Image.Contains(",") 
-                    ? _croppedBase64Image.Split(',')[1] 
-                    : _croppedBase64Image;
-                var bytes = Convert.FromBase64String(base64Data);
-                var streamContent = new ByteArrayContent(bytes);
-                streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
-                content.Add(streamContent, "file", "cropped-image.jpg");
+                try
+                {
+                    var base64Data = _croppedBase64Image.Contains(",") 
+                        ? _croppedBase64Image.Split(',')[1] 
+                        : _croppedBase64Image;
+                    var bytes = Convert.FromBase64String(base64Data);
+                    using var imageStream = new MemoryStream(bytes);
+                    
+                    var (basePath, defaultUrl, variants) = await ImageVariantService.SaveProductImageAsync(
+                        model.TenantId, model.Id, "image.jpg", imageStream);
+                    
+                    model.ImageBasePath = basePath;
+                    model.ImageUrl = defaultUrl;
+                    Db.Products.Update(model);
+                    await Db.SaveChangesAsync();
+                    
+                    Snackbar.Add("Zdjęcie zapisane!", Severity.Success);
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Błąd zapisu zdjęcia: {ex.Message}", Severity.Error);
+                }
+                finally
+                {
+                    _croppedBase64Image = null;
+                    _selectedImageName = null;
+                }
             }
-            else if (_selectedImage is not null)
+            // Przeładuj produkty tylko dla aktualnego tenanta
+            var tenantId = CurrentTenantId();
+            if (tenantId == Guid.Empty)
             {
-                content.Add(new StreamContent(_selectedImage.OpenReadStream(10 * 1024 * 1024)), "file", _selectedImage.Name);
+                products = new List<Product>();
             }
-            
-            var client = new HttpClient { BaseAddress = new Uri(Navigation.ToAbsoluteUri("/").ToString()) };
-            var res = await client.PostAsync($"api/products/{model.Id}/image", content);
-            
-            if (res.IsSuccessStatusCode)
+            else
             {
-                var json = await res.Content.ReadFromJsonAsync<ImageResponse>();
-                model.ImageUrl = json?.imageUrl;
-                Snackbar.Add("Zdjęcie zapisane!", Severity.Success);
+                await using var DbReload = await DbFactory.CreateDbContextAsync();
+                DbReload.SetTenant(tenantId);
+                products = await DbReload.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
             }
-            
-            _selectedImage = null;
-            _croppedBase64Image = null;
-            _selectedImageName = null;
+            dialogOpen = false;
+            Snackbar.Add("Produkt zapisany!", Severity.Success);
         }
-        products = await Db.Products.AsNoTracking().OrderByDescending(p => p.CreatedAtUtc).Take(500).ToListAsync();
-        dialogOpen = false;
-        Snackbar.Add("Produkt zapisany!", Severity.Success);
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd zapisu produktu: {ex.Message}", Severity.Error);
+        }
     }
 
-    [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
-    private Guid CurrentTenantId() => TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+    private Guid _cachedTenantId = Guid.Empty;
+    
+    private async Task<Guid> GetTenantIdAsync()
+    {
+        if (_cachedTenantId != Guid.Empty) return _cachedTenantId;
+        
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var claim = user.FindFirst("tenant-id");
+            if (claim != null && Guid.TryParse(claim.Value, out var tenantId))
+            {
+                _cachedTenantId = tenantId;
+                return tenantId;
+            }
+        }
+        return Guid.Empty;
+    }
+    
+    private Guid CurrentTenantId() => _cachedTenantId;
 
     private string GetProductIcon(string? category) => category?.ToLower() switch
     {
@@ -784,12 +986,40 @@ else
 
     private async Task Delete(Product p)
     {
+        var result = await DialogService.ShowMessageBox(
+            "Potwierdzenie usunięcia",
+            $"Czy na pewno chcesz usunąć produkt '{p.Name}'?",
+            yesText: "Usuń", cancelText: "Anuluj");
+        
+        if (result != true) return;
+        
         await using var Db = await DbFactory.CreateDbContextAsync();
         Db.SetTenant(CurrentTenantId());
-        Db.Products.Remove(p);
-        await Db.SaveChangesAsync();
-        products.RemoveAll(x => x.Id == p.Id);
-        Snackbar.Add($"Produkt '{p.Name}' usunięty", Severity.Success);
+
+        var hasRentalItems = await Db.RentalItems.AnyAsync(ri => ri.ProductId == p.Id);
+        if (hasRentalItems)
+        {
+            Snackbar.Add("Nie można usunąć produktu, który występuje w wypożyczeniach. Możesz go dezaktywować.", Severity.Error);
+            return;
+        }
+
+        try
+        {
+            var existing = await Db.Products.FirstOrDefaultAsync(x => x.Id == p.Id);
+            if (existing is null)
+            {
+                Snackbar.Add("Produkt nie istnieje lub został już usunięty", Severity.Warning);
+                return;
+            }
+            Db.Products.Remove(existing);
+            await Db.SaveChangesAsync();
+            products.RemoveAll(x => x.Id == p.Id);
+            Snackbar.Add($"Produkt '{p.Name}' usunięty", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd usuwania produktu: {ex.Message}", Severity.Error);
+        }
     }
 
     private async Task ToggleActive(Product p)
@@ -807,21 +1037,64 @@ else
     }
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
-    private IBrowserFile? _selectedImage;
     private string? _croppedBase64Image;
-    private class ImageResponse { public string? imageUrl { get; set; } }
-    
-    private void OnImageReadySkipCrop(IBrowserFile file)
-    {
-        _selectedImage = file;
-        _selectedImageName = file?.Name;
-        _croppedBase64Image = null;
-    }
 
     private void OnImageReadyCropped(string base64Image)
     {
         _croppedBase64Image = base64Image;
-        _selectedImageName = "cropped-image.jpg";
-        _selectedImage = null;
+        _selectedImageName = "image.jpg";
+    }
+    
+    private async Task OpenBarcodeLabelsDialog(Guid? preselectedProductId = null)
+    {
+        var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.QrLabelsDialog>
+        {
+            { x => x.Products, products }
+        };
+
+        if (preselectedProductId.HasValue)
+        {
+            parameters.Add(x => x.PreselectedProductIds, new[] { preselectedProductId.Value });
+        }
+        
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Medium,
+            FullWidth = true,
+            CloseButton = true
+        };
+        
+        await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.QrLabelsDialog>(
+            preselectedProductId.HasValue ? "Drukuj etykietę" : "Generuj etykiety kodów kreskowych",
+            parameters,
+            options);
+    }
+    
+    private async Task ShowProductBarcode(Product product)
+    {
+        var parameters = new DialogParameters<BarcodePreviewDialog>
+        {
+            { x => x.Product, product }
+        };
+        
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Large,
+            FullWidth = true,
+            FullScreen = _isMobile,
+            CloseButton = true
+        };
+        
+        await DialogService.ShowAsync<BarcodePreviewDialog>(
+            "Kod kreskowy produktu",
+            parameters,
+            options);
+    }
+
+    private async Task DownloadFileAsync(byte[] fileBytes, string fileName, string contentType)
+    {
+        using var stream = new MemoryStream(fileBytes);
+        using var streamRef = new DotNetStreamReference(stream);
+        await JS.InvokeVoidAsync("downloadFileFromStream", fileName, contentType, streamRef);
     }
 }

@@ -26,7 +26,7 @@ namespace SportRental.Infrastructure.Domain
         [MaxLength(100)]
         public string? SerialNumber { get; set; }
         
-        [MaxLength(1000)]
+        [MaxLength(5000)]
         public string? Description { get; set; }
         
         public int Type { get; set; } = 11; // Default to "Inne"

@@ -393,6 +393,9 @@ namespace SportRental.Infrastructure.Migrations
                         .HasMaxLength(14)
                         .HasColumnType("character varying(14)");
 
+                    b.Property<string>("RegulationsText")
+                        .HasColumnType("text");
+
                     b.Property<bool>("SmsConfirmationEnabled")
                         .HasColumnType("boolean");
 
@@ -897,8 +900,8 @@ namespace SportRental.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)");
 
                     b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)");
 
                     b.Property<bool>("Disabled")
                         .HasColumnType("boolean");
@@ -1108,6 +1111,9 @@ namespace SportRental.Infrastructure.Migrations
                     b.Property<bool>("IsEmailSent")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsReminderSmsSent")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsSmsConfirmationSent")
                         .HasColumnType("boolean");
 
@@ -1133,6 +1139,9 @@ namespace SportRental.Infrastructure.Migrations
                     b.Property<string>("PaymentStatus")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("ReminderSmsSentAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("RentalType")
                         .HasColumnType("integer");
@@ -1183,6 +1192,73 @@ namespace SportRental.Infrastructure.Migrations
                     b.HasIndex("TenantId", "StartDateUtc", "EndDateUtc");
 
                     b.ToTable("Rentals");
+                });
+
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.RentalConfirmation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConfirmedFromIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<string>("ConfirmedUserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsEmailSent")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsSmsSent")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("RegulationsHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("RentalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RentalId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "RentalId");
+
+                    b.ToTable("RentalConfirmations");
                 });
 
             modelBuilder.Entity("SportRental.Infrastructure.Domain.RentalItem", b =>
@@ -1581,6 +1657,25 @@ namespace SportRental.Infrastructure.Migrations
                     b.Navigation("IssuedByEmployee");
 
                     b.Navigation("ReturnedByEmployee");
+                });
+
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.RentalConfirmation", b =>
+                {
+                    b.HasOne("SportRental.Infrastructure.Domain.Rental", "Rental")
+                        .WithMany()
+                        .HasForeignKey("RentalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SportRental.Infrastructure.Domain.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Rental");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("SportRental.Infrastructure.Domain.RentalItem", b =>

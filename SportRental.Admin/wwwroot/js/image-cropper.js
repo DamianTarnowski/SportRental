@@ -18,23 +18,38 @@ window.imageCropper = {
             croppieInstance.destroy();
         }
 
+        // Calculate responsive size based on container width
+        const containerWidth = container.offsetWidth || 350;
+        const boundarySize = Math.min(containerWidth, 350);
+        const viewportSize = Math.min(boundarySize - 60, 250);
+
         // Initialize Croppie
         croppieInstance = new Croppie(container, {
             viewport: { 
-                width: 300, 
-                height: 300, 
+                width: viewportSize, 
+                height: viewportSize, 
                 type: 'square' 
             },
             boundary: { 
-                width: 400, 
-                height: 400 
+                width: boundarySize, 
+                height: boundarySize 
             },
             showZoomer: true,
             enableOrientation: true,
             enableResize: false,
             enableExif: true,
-            mouseWheelZoom: 'ctrl'
+            mouseWheelZoom: true
         });
+
+        // Ensure zoom slider is visible
+        setTimeout(function() {
+            const slider = container.querySelector('.cr-slider-wrap');
+            if (slider) {
+                slider.style.position = 'relative';
+                slider.style.zIndex = '10';
+                slider.style.marginBottom = '10px';
+            }
+        }, 100);
 
         // Bind image
         croppieInstance.bind({

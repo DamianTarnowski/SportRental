@@ -3,6 +3,7 @@
 @attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Kalendarz Rezerwacji</PageTitle>
 
@@ -282,8 +283,36 @@ else
     private MudBlazor.DateRange range = new(DateTime.Today, DateTime.Today.AddDays(7));
     private Dictionary<DateTime, List<ItemVm>> grouped = new();
 
+    private Guid _cachedTenantId = Guid.Empty;
+    
+    private async Task<Guid> GetTenantIdAsync()
+    {
+        if (_cachedTenantId != Guid.Empty) return _cachedTenantId;
+        
+        var fromProvider = TenantProvider.GetCurrentTenantId();
+        if (fromProvider.HasValue && fromProvider.Value != Guid.Empty)
+        {
+            _cachedTenantId = fromProvider.Value;
+            return _cachedTenantId;
+        }
+        
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var claim = user.FindFirst("tenant-id");
+            if (claim != null && Guid.TryParse(claim.Value, out var tenantId))
+            {
+                _cachedTenantId = tenantId;
+                return tenantId;
+            }
+        }
+        return Guid.Empty;
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        await GetTenantIdAsync();
         await Load();
     }
 
@@ -298,14 +327,13 @@ else
     private async Task Load()
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(TenantProvider.GetCurrentTenantId());
+        var tid = _cachedTenantId;
+        Db.SetTenant(tid);
 
         var startLocal = (range.Start ?? DateTime.Today).Date;
         var endLocal = (range.End ?? startLocal.AddDays(7)).Date.AddDays(1).AddTicks(-1);
         var start = DateTime.SpecifyKind(startLocal, DateTimeKind.Local).ToUniversalTime();
         var end = DateTime.SpecifyKind(endLocal, DateTimeKind.Local).ToUniversalTime();
-
-        var tid = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
         var baseQuery = await Db.Rentals.AsNoTracking()
             .Where(r => r.TenantId == tid && r.EndDateUtc >= start && r.StartDateUtc <= end)
             .Select(r => new { r.Id, r.CustomerId, r.StartDateUtc, r.EndDateUtc })

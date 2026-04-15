@@ -91,6 +91,12 @@ namespace SportRental.Infrastructure.Domain
         [MaxLength(1000)]
         public string? EmailReminderText3 { get; set; } = null;
 
+        // Regulations / Terms
+        /// <summary>
+        /// Treść regulaminu wypożyczalni — wyświetlana na stronie potwierdzenia wynajmu
+        /// </summary>
+        public string? RegulationsText { get; set; }
+
         // GPS Coordinates
         public double? Lat { get; set; } = 0;
         public double? Lon { get; set; } = 0;

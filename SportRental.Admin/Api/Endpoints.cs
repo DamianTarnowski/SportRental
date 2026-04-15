@@ -15,6 +15,24 @@ namespace SportRental.Admin.Api
 {
     public static class Endpoints
     {
+        // Helper to convert relative URLs to absolute URLs
+        private static string? ToAbsoluteUrl(string? relativeUrl, HttpRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(relativeUrl))
+                return relativeUrl;
+            
+            // Already absolute URL
+            if (relativeUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                relativeUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return relativeUrl;
+            
+            // Build absolute URL from request
+            var baseUrl = $"{request.Scheme}://{request.Host}";
+            return relativeUrl.StartsWith("/") 
+                ? $"{baseUrl}{relativeUrl}" 
+                : $"{baseUrl}/{relativeUrl}";
+        }
+
         public static IEndpointRouteBuilder MapSportRentalApi(this IEndpointRouteBuilder app)
         {
             // Krótki link do umowy (poza /api żeby był krótszy)
@@ -113,6 +131,7 @@ namespace SportRental.Admin.Api
             MapCustomerEndpoints(api);
 
             api.MapGet("/products", [AllowAnonymous] async (
+                HttpRequest request,
                 IDbContextFactory<ApplicationDbContext> dbFactory, 
                 ITenantProvider tenantProvider, 
                 int? page, 
@@ -235,9 +254,18 @@ namespace SportRental.Admin.Api
                     .Take(pageSizeNum)
                     .ToListAsync();
 
+                // Convert relative ImageUrls to absolute URLs
+                var itemsWithAbsoluteUrls = items.Select(p => new
+                {
+                    p.Id, p.TenantId, p.TenantName, p.Name, p.Sku, p.Category, p.Description,
+                    ImageUrl = ToAbsoluteUrl(p.ImageUrl, request),
+                    p.PricePerDay, p.DailyPrice, p.HourlyPrice, p.Quantity, p.AvailableQuantity,
+                    p.IsAvailable, p.City, p.Voivodeship, p.Lat, p.Lon
+                }).ToList();
+
                 return Results.Ok(new
                 {
-                    Items = items,
+                    Items = itemsWithAbsoluteUrls,
                     TotalCount = totalCount,
                     Page = pageNum,
                     PageSize = pageSizeNum,
@@ -247,6 +275,7 @@ namespace SportRental.Admin.Api
 
             // GET /api/products/{id} - pojedynczy produkt
             api.MapGet("/products/{id:guid}", [AllowAnonymous] async (
+                HttpRequest request,
                 IDbContextFactory<ApplicationDbContext> dbFactory,
                 ITenantProvider tenantProvider,
                 Guid id,
@@ -285,7 +314,71 @@ namespace SportRental.Admin.Api
                     })
                     .FirstOrDefaultAsync(ct);
 
-                return product is null ? Results.NotFound() : Results.Ok(product);
+                if (product is null) return Results.NotFound();
+                
+                // Convert relative ImageUrl to absolute URL
+                return Results.Ok(new
+                {
+                    product.Id, product.TenantId, product.TenantName, product.Name, product.Sku,
+                    product.Category, product.Description,
+                    ImageUrl = ToAbsoluteUrl(product.ImageUrl, request),
+                    product.PricePerDay, product.DailyPrice, product.HourlyPrice,
+                    product.Quantity, product.AvailableQuantity, product.IsAvailable,
+                    product.City, product.Voivodeship
+                });
+            });
+
+            // GET /api/tenants - lista wszystkich wypożyczalni z produktami
+            api.MapGet("/tenants", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                CancellationToken ct) =>
+            {
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                db.SetTenant(null); // Globalny dostęp
+
+                // Pobierz tenant IDs które mają aktywne produkty
+                var tenantIdsWithProducts = await db.Products
+                    .IgnoreQueryFilters()
+                    .Where(p => p.IsActive)
+                    .Select(p => p.TenantId)
+                    .Distinct()
+                    .ToListAsync(ct);
+
+                var tenants = await db.Tenants
+                    .AsNoTracking()
+                    .Where(t => tenantIdsWithProducts.Contains(t.Id))
+                    .Select(t => new
+                    {
+                        Id = t.Id,
+                        Name = t.Name,
+                        LogoUrl = t.LogoUrl
+                    })
+                    .ToListAsync(ct);
+
+                // Pobierz company info osobno
+                var companyInfos = await db.CompanyInfos
+                    .AsNoTracking()
+                    .Where(ci => tenantIdsWithProducts.Contains(ci.TenantId))
+                    .ToDictionaryAsync(ci => ci.TenantId, ct);
+
+                // Zlicz produkty dla każdego tenanta
+                var productCounts = await db.Products
+                    .IgnoreQueryFilters()
+                    .Where(p => p.IsActive && tenantIdsWithProducts.Contains(p.TenantId))
+                    .GroupBy(p => p.TenantId)
+                    .Select(g => new { TenantId = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.TenantId, x => x.Count, ct);
+
+                var result = tenants.Select(t => new
+                {
+                    t.Id,
+                    Name = companyInfos.TryGetValue(t.Id, out var ci) && !string.IsNullOrEmpty(ci.Name) ? ci.Name : t.Name,
+                    t.LogoUrl,
+                    ProductCount = productCounts.GetValueOrDefault(t.Id, 0),
+                    City = companyInfos.TryGetValue(t.Id, out var ci2) ? ci2.City : null
+                }).ToList();
+
+                return Results.Ok(result);
             });
 
             // GET /api/tenants/locations - lokalizacje wypożyczalni (dla mapy)
@@ -837,19 +930,17 @@ namespace SportRental.Admin.Api
                     return Results.BadRequest(new { error = "Email i hasło są wymagane" });
                 }
 
-                // Get tenant from header
+                // Tenant is optional — user is global, can see all rentals
+                Guid? tenantId = null;
                 var tenantIdHeader = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
-                if (string.IsNullOrWhiteSpace(tenantIdHeader) || !Guid.TryParse(tenantIdHeader, out var tenantId))
+                if (!string.IsNullOrWhiteSpace(tenantIdHeader) && Guid.TryParse(tenantIdHeader, out var parsedTenantId))
                 {
-                    return Results.BadRequest(new { error = "Header X-Tenant-Id jest wymagany" });
-                }
-
-                // Verify tenant exists
-                await using var db = await dbFactory.CreateDbContextAsync();
-                var tenantExists = await db.Tenants.AnyAsync(t => t.Id == tenantId);
-                if (!tenantExists)
-                {
-                    return Results.BadRequest(new { error = "Nieprawidłowy Tenant ID" });
+                    await using var dbCheck = await dbFactory.CreateDbContextAsync();
+                    var tenantExists = await dbCheck.Tenants.AnyAsync(t => t.Id == parsedTenantId);
+                    if (tenantExists)
+                    {
+                        tenantId = parsedTenantId;
+                    }
                 }
 
                 // Check if email already exists
@@ -877,11 +968,12 @@ namespace SportRental.Admin.Api
                 // Assign Client role
                 await userManager.AddToRoleAsync(user, "Client");
 
-                // Automatically create Customer record
+                // Automatically create Customer record (use tenant if provided)
+                await using var db = await dbFactory.CreateDbContextAsync();
                 var customer = new Customer
                 {
                     Id = Guid.NewGuid(),
-                    TenantId = tenantId,
+                    TenantId = tenantId ?? Guid.Empty,
                     FullName = request.FullName ?? request.Email.Split('@')[0],
                     Email = request.Email,
                     PhoneNumber = request.PhoneNumber,
@@ -1198,7 +1290,7 @@ namespace SportRental.Admin.Api
                         || Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
                     var clientBaseUrl = isDevelopment 
                         ? "http://localhost:5014" 
-                        : "https://nice-tree-0359d8403.3.azurestaticapps.net";
+                        : "https://srclient-blazor.azurewebsites.net";
                     
                     var successUrl = stripe.SuccessUrl ?? configuration["Stripe:SuccessUrl"] ?? $"{clientBaseUrl}/checkout/success";
                     var cancelUrl = stripe.CancelUrl ?? configuration["Stripe:CancelUrl"] ?? $"{clientBaseUrl}/checkout/cancel";
@@ -1551,7 +1643,10 @@ namespace SportRental.Admin.Api
                 return Results.Text("OK"); // SerwerSMS wymaga odpowiedzi OK
             });
             
-            // Alternatywny endpoint POST dla większej elastyczności
+            // Uniwersalny endpoint POST — obsługuje zarówno SerwerSMS.pl jak i SMSAPI.pl
+            // SerwerSMS: phone/numer, text/wiadomosc/message, id/message_id
+            // SMSAPI:    sms_from, sms_text, sms_to, sms_date, username
+            // URL callback w panelu SMSAPI: https://sradmin.azurewebsites.net/api/sms/incoming
             sms.MapPost("/incoming", [AllowAnonymous] async (
                 ISmsConfirmationService confirmationService,
                 ILoggerFactory loggerFactory,
@@ -1560,12 +1655,24 @@ namespace SportRental.Admin.Api
             {
                 var logger = loggerFactory.CreateLogger("SmsWebhook");
                 var form = await request.ReadFormAsync(ct);
-                var numer = form["phone"].FirstOrDefault() ?? form["numer"].FirstOrDefault();
-                var wiadomosc = form["text"].FirstOrDefault() ?? form["wiadomosc"].FirstOrDefault() ?? form["message"].FirstOrDefault();
-                var id = form["id"].FirstOrDefault() ?? form["message_id"].FirstOrDefault();
                 
-                logger.LogInformation("Incoming SMS POST webhook: numer={Numer}, wiadomosc={Wiadomosc}, id={Id}", 
-                    numer, wiadomosc, id);
+                // SMSAPI.pl format: sms_from, sms_text
+                // SerwerSMS.pl format: phone/numer, text/wiadomosc/message
+                var numer = form["sms_from"].FirstOrDefault() 
+                    ?? form["phone"].FirstOrDefault() 
+                    ?? form["numer"].FirstOrDefault();
+                var wiadomosc = form["sms_text"].FirstOrDefault() 
+                    ?? form["text"].FirstOrDefault() 
+                    ?? form["wiadomosc"].FirstOrDefault() 
+                    ?? form["message"].FirstOrDefault();
+                var id = form["id"].FirstOrDefault() ?? form["message_id"].FirstOrDefault();
+                var smsTo = form["sms_to"].FirstOrDefault();
+                var smsDate = form["sms_date"].FirstOrDefault();
+                var username = form["username"].FirstOrDefault();
+                
+                logger.LogInformation(
+                    "Incoming SMS POST webhook: from={Numer}, text={Wiadomosc}, id={Id}, to={SmsTo}, date={SmsDate}, user={Username}", 
+                    numer, wiadomosc, id, smsTo, smsDate, username);
                 
                 if (string.IsNullOrWhiteSpace(numer) || string.IsNullOrWhiteSpace(wiadomosc))
                 {

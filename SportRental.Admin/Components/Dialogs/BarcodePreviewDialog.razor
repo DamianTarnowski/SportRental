@@ -1,0 +1,116 @@
+@using SportRental.Infrastructure.Domain
+@using SportRental.Admin.Services.QrCode
+@inject IBarcodeGenerator BarcodeGenerator
+@inject IJSRuntime JS
+
+<MudDialog>
+    <TitleContent>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.ViewWeek" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Kod kreskowy produktu</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        @if (_isLoading)
+        {
+            <MudStack Spacing="2" AlignItems="AlignItems.Center" Class="py-8">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                <MudText Typo="Typo.body2">Generowanie podglądu kodu kreskowego...</MudText>
+            </MudStack>
+        }
+        else if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+        }
+        else
+        {
+            <MudStack Spacing="3">
+                <MudStack Row="true" Spacing="1" Class="flex-wrap">
+                    <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled">
+                        @(Product.Sku ?? "Brak SKU")
+                    </MudChip>
+                    <MudChip T="string" Color="Color.Default" Variant="Variant.Outlined">
+                        @_barcodeData
+                    </MudChip>
+                </MudStack>
+
+                <MudPaper Elevation="2" Class="pa-4" Style="background: white; border-radius: 16px;">
+                    <img src="@_barcodeImageUrl"
+                         alt="@($"Kod kreskowy produktu {Product.Name}")"
+                         style="display: block; width: 100%; max-width: 960px; height: auto; margin: 0 auto;" />
+                </MudPaper>
+
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    Kliknij pobieranie albo pokaż ten ekran drugiemu telefonowi lub skanerowi. Kod bazuje na SKU produktu albo skróconym identyfikatorze.
+                </MudAlert>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Text" OnClick="Close">Zamknij</MudButton>
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Download"
+                   Disabled="_isLoading || string.IsNullOrWhiteSpace(_barcodeData)"
+                   OnClick="DownloadBarcodeAsync">
+            Pobierz PNG
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired] public Product Product { get; set; } = default!;
+
+    private bool _isLoading = true;
+    private string? _barcodeData;
+    private string? _barcodeImageUrl;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _error = null;
+
+        try
+        {
+            if (Product.Id == Guid.Empty)
+            {
+                _error = "Najpierw zapisz produkt, aby wygenerować kod kreskowy.";
+                return;
+            }
+
+            _barcodeData = BarcodeGenerator.GenerateProductBarcodeData(Product.Id, Product.Sku);
+            _barcodeImageUrl = await BarcodeGenerator.GenerateBarcodeAsync(_barcodeData, 1200, 260);
+        }
+        catch (Exception ex)
+        {
+            _error = $"Nie udało się wygenerować kodu kreskowego: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task DownloadBarcodeAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_barcodeData))
+            return;
+
+        var barcodeBytes = await BarcodeGenerator.GenerateBarcodeBytesAsync(_barcodeData, 1200, 260);
+        var fileName = $"barcode-{(Product.Sku ?? Product.Id.ToString())}.png";
+
+        await DownloadFileAsync(barcodeBytes, fileName, "image/png");
+    }
+
+    private async Task DownloadFileAsync(byte[] fileBytes, string fileName, string contentType)
+    {
+        using var stream = new MemoryStream(fileBytes);
+        using var streamRef = new DotNetStreamReference(stream);
+        await JS.InvokeVoidAsync("downloadFileFromStream", fileName, contentType, streamRef);
+    }
+
+    private void Close() => MudDialog.Cancel();
+}

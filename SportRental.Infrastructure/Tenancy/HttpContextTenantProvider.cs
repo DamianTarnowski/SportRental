@@ -29,11 +29,7 @@ public class HttpContextTenantProvider(IHttpContextAccessor httpContextAccessor,
                 return tenantId;
         }
 
-        // Priority 3: Configuration fallback (for development/testing)
-        var configuredId = _configuration["Tenant:Id"];
-        if (!string.IsNullOrWhiteSpace(configuredId) && Guid.TryParse(configuredId, out var cfgTenant))
-            return cfgTenant;
-
+        // NIE używamy Configuration fallback - każdy tenant musi mieć własny claim
         // Fallback: null (will return all data if endpoint allows it)
         return null;
     }

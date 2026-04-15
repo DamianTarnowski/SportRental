@@ -8,6 +8,9 @@ namespace SportRental.Infrastructure.Data;
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     private Guid? _tenantId;
+    
+    // Getter używany przez query filters - EF Core potrzebuje metody/property żeby prawidłowo re-evaluować
+    public Guid? TenantId => _tenantId;
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
@@ -37,6 +40,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<EmployeeInvitation> EmployeeInvitations => Set<EmployeeInvitation>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
+    public DbSet<RentalConfirmation> RentalConfirmations => Set<RentalConfirmation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -59,14 +63,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(p => p.Producer).HasMaxLength(100);
             entity.Property(p => p.Model).HasMaxLength(100);
             entity.Property(p => p.SerialNumber).HasMaxLength(100);
-            entity.Property(p => p.Description).HasMaxLength(1000);
+            entity.Property(p => p.Description).HasMaxLength(5000);
             entity.Property(p => p.QrCode).HasMaxLength(500);
             entity.Property(p => p.DailyPrice).HasPrecision(18, 2);
             entity.HasIndex(p => new { p.TenantId, p.Sku }).IsUnique();
             entity.HasIndex(p => new { p.TenantId, p.Category });
             entity.HasIndex(p => new { p.TenantId, p.Type });
             entity.HasIndex(p => new { p.TenantId, p.CategoryId });
-            entity.HasQueryFilter(p => _tenantId == null || p.TenantId == _tenantId);
+            entity.HasQueryFilter(p => TenantId == null || p.TenantId == TenantId);
         });
 
         modelBuilder.Entity<Customer>(entity =>
@@ -79,7 +83,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(c => new { c.TenantId, c.Email });
             entity.HasIndex(c => new { c.TenantId, c.FullName });
             entity.HasIndex(c => new { c.TenantId, c.PhoneNumber });
-            entity.HasQueryFilter(c => _tenantId == null || c.TenantId == _tenantId);
+            entity.HasQueryFilter(c => TenantId == null || c.TenantId == TenantId);
         });
 
         modelBuilder.Entity<Rental>(entity =>
@@ -99,7 +103,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(r => new { r.TenantId, r.StartDateUtc, r.EndDateUtc });
             entity.HasIndex(r => new { r.TenantId, r.CustomerId, r.StartDateUtc });
             entity.HasIndex(r => new { r.TenantId, r.IdempotencyKey }).IsUnique();
-            entity.HasQueryFilter(r => _tenantId == null || r.TenantId == _tenantId);
+            entity.HasQueryFilter(r => TenantId == null || r.TenantId == TenantId);
         });
 
         modelBuilder.Entity<RentalItem>(entity =>
@@ -122,7 +126,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(h => h.ExpiresAtUtc).IsRequired();
             entity.HasIndex(h => new { h.TenantId, h.ProductId, h.StartDateUtc, h.EndDateUtc });
             entity.HasIndex(h => h.ExpiresAtUtc);
-            entity.HasQueryFilter(h => _tenantId == null || h.TenantId == _tenantId);
+            entity.HasQueryFilter(h => TenantId == null || h.TenantId == TenantId);
         });
 
         modelBuilder.Entity<ContractTemplate>(entity =>
@@ -130,14 +134,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasKey(ct => ct.Id);
             entity.Property(ct => ct.Content).IsRequired();
             entity.HasIndex(ct => ct.TenantId).IsUnique();
-            entity.HasQueryFilter(ct => _tenantId == null || ct.TenantId == _tenantId);
+            entity.HasQueryFilter(ct => TenantId == null || ct.TenantId == TenantId);
         });
 
         modelBuilder.Entity<TenantUser>(entity =>
         {
             entity.HasKey(tu => tu.Id);
             entity.HasIndex(tu => new { tu.TenantId, tu.UserId }).IsUnique();
-            entity.HasQueryFilter(tu => _tenantId == null || tu.TenantId == _tenantId);
+            entity.HasQueryFilter(tu => TenantId == null || tu.TenantId == TenantId);
         });
 
         modelBuilder.Entity<Employee>(entity =>
@@ -151,7 +155,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(e => e.Position).HasMaxLength(50).IsRequired();
             entity.HasIndex(e => new { e.TenantId, e.Email });
             entity.HasIndex(e => new { e.TenantId, e.FullName });
-            entity.HasQueryFilter(e => _tenantId == null || e.TenantId == _tenantId);
+            entity.HasQueryFilter(e => TenantId == null || e.TenantId == TenantId);
         });
 
         modelBuilder.Entity<EmployeePermissions>(entity =>
@@ -162,7 +166,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .HasForeignKey<EmployeePermissions>(ep => ep.EmployeeId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(ep => ep.EmployeeId).IsUnique();
-            entity.HasQueryFilter(ep => _tenantId == null || ep.TenantId == _tenantId);
+            entity.HasQueryFilter(ep => TenantId == null || ep.TenantId == TenantId);
         });
 
         modelBuilder.Entity<CompanyInfo>(entity =>
@@ -174,7 +178,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(ci => ci.Email).HasMaxLength(200);
             entity.Property(ci => ci.PhoneNumber).HasMaxLength(20);
             entity.HasIndex(ci => ci.TenantId).IsUnique();
-            entity.HasQueryFilter(ci => _tenantId == null || ci.TenantId == _tenantId);
+            entity.HasQueryFilter(ci => TenantId == null || ci.TenantId == TenantId);
         });
 
         modelBuilder.Entity<ProductCategory>(entity =>
@@ -187,7 +191,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .WithOne(p => p.ProductCategory)
                 .HasForeignKey(p => p.CategoryId)
                 .OnDelete(DeleteBehavior.SetNull);
-            entity.HasQueryFilter(pc => _tenantId == null || pc.TenantId == _tenantId);
+            entity.HasQueryFilter(pc => TenantId == null || pc.TenantId == TenantId);
         });
 
         modelBuilder.Entity<AuditLog>(entity =>
@@ -199,7 +203,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(al => al.Level).HasMaxLength(50);
             entity.HasIndex(al => new { al.TenantId, al.Date });
             entity.HasIndex(al => new { al.TenantId, al.EntityType, al.EntityId });
-            entity.HasQueryFilter(al => _tenantId == null || al.TenantId == _tenantId);
+            entity.HasQueryFilter(al => TenantId == null || al.TenantId == TenantId);
         });
 
         modelBuilder.Entity<ErrorLog>(entity =>
@@ -211,7 +215,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(el => el.Severity).HasMaxLength(50);
             entity.HasIndex(el => new { el.TenantId, el.Date });
             entity.HasIndex(el => new { el.TenantId, el.Severity });
-            entity.HasQueryFilter(el => _tenantId == null || el.TenantId == _tenantId);
+            entity.HasQueryFilter(el => TenantId == null || el.TenantId == TenantId);
         });
 
         modelBuilder.Entity<SmsConfirmation>(entity =>
@@ -225,7 +229,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(sc => new { sc.TenantId, sc.RentalId });
             entity.HasIndex(sc => new { sc.Code, sc.RentalId }).IsUnique();
-            entity.HasQueryFilter(sc => _tenantId == null || sc.TenantId == _tenantId);
+            entity.HasQueryFilter(sc => TenantId == null || sc.TenantId == TenantId);
         });
 
         modelBuilder.Entity<TenantInvitation>(entity =>
@@ -250,7 +254,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(ei => ei.Token).IsUnique();
             entity.HasIndex(ei => new { ei.TenantId, ei.Email });
             entity.HasIndex(ei => ei.ExpiresAtUtc);
-            entity.HasQueryFilter(ei => _tenantId == null || ei.TenantId == _tenantId);
+            entity.HasQueryFilter(ei => TenantId == null || ei.TenantId == TenantId);
         });
 
         modelBuilder.Entity<RefreshToken>(entity =>
@@ -263,6 +267,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.Property(rt => rt.Token).HasMaxLength(128).IsRequired();
             entity.Property(rt => rt.RevokedReason).HasMaxLength(200);
             entity.Property(rt => rt.ReplacedByToken).HasMaxLength(128);
+        });
+
+        modelBuilder.Entity<RentalConfirmation>(entity =>
+        {
+            entity.HasKey(rc => rc.Id);
+            entity.Property(rc => rc.Token).HasMaxLength(128).IsRequired();
+            entity.Property(rc => rc.PhoneNumber).HasMaxLength(20);
+            entity.Property(rc => rc.Email).HasMaxLength(256);
+            entity.Property(rc => rc.ConfirmedFromIp).HasMaxLength(45);
+            entity.Property(rc => rc.ConfirmedUserAgent).HasMaxLength(500);
+            entity.Property(rc => rc.RegulationsHash).HasMaxLength(64);
+            entity.HasOne(rc => rc.Rental)
+                .WithMany()
+                .HasForeignKey(rc => rc.RentalId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(rc => rc.Token).IsUnique();
+            entity.HasIndex(rc => new { rc.TenantId, rc.RentalId });
+            entity.HasQueryFilter(rc => TenantId == null || rc.TenantId == TenantId);
         });
 
         modelBuilder.Entity<CheckoutSession>(entity =>

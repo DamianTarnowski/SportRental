@@ -7,6 +7,7 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
 @inject UserManager<ApplicationUser> UserManager
+@inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
 
 @if (_isMobile)
 {
@@ -63,6 +64,38 @@
                         </MudStack>
                     </MudExpansionPanel>
                     
+                    <MudExpansionPanel Text="📱 Ustawienia SMS" Style="border-radius: 10px;">
+                        <MudStack Spacing="2">
+                            <MudAlert Severity="Severity.Success" Dense="true">
+                                ✅ SMSAPI.pl aktywne
+                            </MudAlert>
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsConfirmationEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsConfirmationEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Potwierdzenie umowy" />
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsThanksEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsThanksEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Podziękowanie po zwrocie" />
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsReminderEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsReminderEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Przypomnienie o zwrocie" />
+
+                            <MudButton StartIcon="@Icons.Material.Filled.Save"
+                                       Color="Color.Primary"
+                                       Variant="Variant.Filled"
+                                       OnClick="Save"
+                                       Disabled="@isSaving"
+                                       Class="mt-2">
+                                Zapisz ustawienia SMS
+                            </MudButton>
+                        </MudStack>
+                    </MudExpansionPanel>
+                    
                     <MudExpansionPanel Text="📍 Lokalizacja" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
                             <MudTextField @bind-Value="companyInfo.City" Label="Miasto" ReadOnly="true" Dense="true" Variant="Variant.Outlined" />
@@ -89,7 +122,7 @@
                 </MudExpansionPanels>
                 
                 @* Przyciski *@
-                <MudStack Row="true" Spacing="2" Class="mud-justify-end">
+                <MudStack Row="true" Spacing="2" Class="mud-justify-end mt-4 mb-4">
                     <MudButton Href="/admin/owner" Variant="Variant.Outlined" Size="Size.Small">Anuluj</MudButton>
                     <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@isSaving" Size="Size.Small">
                         @if (isSaving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" /> }
@@ -187,9 +220,97 @@ else
                     </MudPaper>
                 </MudItem>
                 
+                <MudItem xs="12" md="6">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">📱 Ustawienia SMS</MudText>
+                        <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
+                            <MudText Typo="Typo.body2">
+                                ✅ Integracja z SMSAPI.pl jest aktywna. SMS-y będą wysyłane do klientów.
+                            </MudText>
+                        </MudAlert>
+                        <MudStack Spacing="3">
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsConfirmationEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsConfirmationEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Wysyłaj SMS z prośbą o potwierdzenie umowy" />
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsThanksEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsThanksEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Wysyłaj SMS z podziękowaniem po zwrocie" />
+                            <MudSwitch T="bool" 
+                                       Value="@companyInfo.SmsReminderEnabled" 
+                                       ValueChanged="@(v => { companyInfo.SmsReminderEnabled = v; StateHasChanged(); })"
+                                       Color="Color.Primary"
+                                       Label="Wysyłaj SMS z przypomnieniem o zwrocie" />
+
+                            <MudButton StartIcon="@Icons.Material.Filled.Save"
+                                       Color="Color.Primary"
+                                       Variant="Variant.Filled"
+                                       OnClick="Save"
+                                       Disabled="@isSaving">
+                                Zapisz ustawienia SMS
+                            </MudButton>
+                            
+                            @if (companyInfo.SmsThanksEnabled)
+                            {
+                                <MudTextField @bind-Value="companyInfo.SmsThanksText" 
+                                              Label="Treść SMS - podziękowanie" 
+                                              Lines="2"
+                                              Variant="Variant.Outlined"
+                                              HelperText="Zostaw puste dla domyślnej wiadomości" />
+                            }
+                            @if (companyInfo.SmsReminderEnabled)
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                                    <MudText Typo="Typo.caption">
+                                        Dostępne zmienne: <b>{imie}</b> - imię klienta, <b>{data_konca}</b> - data końca wynajmu, 
+                                        <b>{sprzet}</b> - lista sprzętu, <b>{firma}</b> - nazwa firmy, <b>{telefon}</b> - tel. firmy
+                                    </MudText>
+                                </MudAlert>
+                                <MudTextField @bind-Value="companyInfo.SmsReminderText" 
+                                              Label="Treść SMS - przypomnienie o zwrocie" 
+                                              Lines="3"
+                                              Variant="Variant.Outlined"
+                                              Placeholder="Witaj {imie}! Wynajem sprzetu ({sprzet}) konczy sie {data_konca}. Prosimy o zwrot lub kontakt. {firma}"
+                                              HelperText="Zostaw puste dla domyślnej wiadomości" />
+                                <MudTextField @bind-Value="companyInfo.SmsReminderText2" 
+                                              Label="Treść SMS - przypomnienie 2 (opcjonalne)" 
+                                              Lines="2"
+                                              Variant="Variant.Outlined"
+                                              HelperText="Drugie przypomnienie (np. dzień po terminie)" />
+                                <MudTextField @bind-Value="companyInfo.SmsReminderText3" 
+                                              Label="Treść SMS - przypomnienie 3 (opcjonalne)" 
+                                              Lines="2"
+                                              Variant="Variant.Outlined"
+                                              HelperText="Trzecie przypomnienie (np. 3 dni po terminie)" />
+                            }
+                        </MudStack>
+                    </MudPaper>
+                </MudItem>
+                
                 <MudItem xs="12">
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
-                        <MudText Typo="Typo.h6" Class="mb-3">📝 Dodatkowe informacje</MudText>
+                        <MudText Typo="Typo.h6" Class="mb-3">� Regulamin wypożyczalni</MudText>
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mb-2">
+                            <MudText Typo="Typo.caption">
+                                Regulamin jest wyświetlany klientowi na stronie potwierdzenia wynajmu. 
+                                Klient musi zaakceptować regulamin przed potwierdzeniem.
+                            </MudText>
+                        </MudAlert>
+                        <MudTextField @bind-Value="companyInfo.RegulationsText" 
+                                      Label="Treść regulaminu" 
+                                      Lines="10"
+                                      Variant="Variant.Outlined"
+                                      Placeholder="Wpisz treść regulaminu wypożyczalni..."
+                                      HelperText="Zostaw puste jeśli nie chcesz wymagać akceptacji regulaminu" />
+                    </MudPaper>
+                </MudItem>
+                
+                <MudItem xs="12">
+                    <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
+                        <MudText Typo="Typo.h6" Class="mb-3">� Dodatkowe informacje</MudText>
                         <MudTextField @bind-Value="companyInfo.ExtraInfo" 
                                       Label="Dodatkowe informacje" 
                                       Lines="3"
@@ -260,7 +381,7 @@ else
                 </MudItem>
                 
                 <MudItem xs="12">
-                    <MudStack Row="true" Spacing="2" Class="mud-justify-end">
+                    <MudStack Row="true" Spacing="2" Class="mud-justify-end mt-6 mb-6">
                         <MudButton Href="/admin/owner" Variant="Variant.Outlined">Anuluj</MudButton>
                         <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save" Disabled="@isSaving">
                             @if (isSaving)
@@ -378,7 +499,8 @@ else
                 EmailThanksText = existingCompanyInfo.EmailThanksText,
                 EmailReminderText = existingCompanyInfo.EmailReminderText,
                 EmailReminderText2 = existingCompanyInfo.EmailReminderText2,
-                EmailReminderText3 = existingCompanyInfo.EmailReminderText3
+                EmailReminderText3 = existingCompanyInfo.EmailReminderText3,
+                RegulationsText = existingCompanyInfo.RegulationsText
             };
         }
     }
@@ -431,15 +553,30 @@ else
             
             if (selectedLogoFile != null)
             {
-                using var content = new MultipartFormDataContent();
-                content.Add(new StreamContent(selectedLogoFile.OpenReadStream(5 * 1024 * 1024)), "file", selectedLogoFile.Name);
-                
-                var client = new HttpClient { BaseAddress = new Uri(Navigation.ToAbsoluteUri("/").ToString()) };
-                var res = await client.PostAsync($"api/tenants/{_tenantId}/logo", content);
-                if (res.IsSuccessStatusCode)
+                try
                 {
-                    var json = await res.Content.ReadFromJsonAsync<LogoResponse>();
-                    tenant.LogoUrl = json?.logoUrl;
+                    var ext = Path.GetExtension(selectedLogoFile.Name).ToLowerInvariant();
+                    var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
+                    if (!allowed.Contains(ext))
+                    {
+                        Snackbar.Add("Nieobsługiwane rozszerzenie pliku", Severity.Error);
+                    }
+                    else if (selectedLogoFile.Size > 5 * 1024 * 1024)
+                    {
+                        Snackbar.Add("Plik jest zbyt duży. Maks: 5 MB", Severity.Error);
+                    }
+                    else
+                    {
+                        var rel = $"images/tenants/{_tenantId}/{_tenantId}{ext}";
+                        await using var stream = selectedLogoFile.OpenReadStream(5 * 1024 * 1024);
+                        var url = await FileStorage.SaveAsync(rel, stream);
+                        tenant.LogoUrl = url;
+                        Snackbar.Add("Logo zapisane!", Severity.Success);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add($"Błąd zapisu logo: {ex.Message}", Severity.Error);
                 }
             }
             
@@ -470,6 +607,7 @@ else
                 existingCompanyInfo.EmailReminderText = companyInfo.EmailReminderText;
                 existingCompanyInfo.EmailReminderText2 = companyInfo.EmailReminderText2;
                 existingCompanyInfo.EmailReminderText3 = companyInfo.EmailReminderText3;
+                existingCompanyInfo.RegulationsText = companyInfo.RegulationsText;
                 existingCompanyInfo.UpdatedAtUtc = DateTime.UtcNow;
                 
                 Db.CompanyInfos.Update(existingCompanyInfo);
@@ -504,6 +642,7 @@ else
                     EmailReminderText = companyInfo.EmailReminderText,
                     EmailReminderText2 = companyInfo.EmailReminderText2,
                     EmailReminderText3 = companyInfo.EmailReminderText3,
+                    RegulationsText = companyInfo.RegulationsText,
                     CreatedAtUtc = DateTime.UtcNow,
                     UpdatedAtUtc = DateTime.UtcNow
                 };
@@ -551,6 +690,7 @@ else
         public string? EmailReminderText { get; set; }
         public string? EmailReminderText2 { get; set; }
         public string? EmailReminderText3 { get; set; }
+        public string? RegulationsText { get; set; }
     }
 
     private class LogoResponse 

@@ -26,6 +26,9 @@ using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 
+// QuestPDF license - Community is free for revenue < $1M USD
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Azure Key Vault Configuration
@@ -72,10 +75,13 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(
+            "http://localhost:5002",  // WASM client dev
             "http://localhost:5014",
             "https://localhost:7083",
             "http://localhost:5015",  // dodatkowy port dla backupu
-            "https://nice-tree-0359d8403.3.azurestaticapps.net"  // Production WASM client
+            "https://nice-tree-0359d8403.3.azurestaticapps.net",  // Azure Static Web Apps
+            "https://srclient.azurewebsites.net",  // Azure App Service (stary)
+            "https://srclient-blazor.azurewebsites.net"  // Azure App Service WASM client (nowy)
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
@@ -116,7 +122,7 @@ builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ITenantProvider, HttpContextTenantProvider>();
+builder.Services.AddScoped<ITenantProvider, SportRental.Admin.Services.Tenancy.BlazorTenantProvider>();
 builder.Services.AddScoped<IContractGenerator, QuestPdfContractGenerator>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("MediaStorage");
@@ -124,10 +130,20 @@ builder.Services.AddHttpClient("MediaStorage");
 // SerwerSMS.pl Configuration - integracja z SerwerSMS.pl
 // Dokumentacja: https://dev.serwersms.pl/https-api-v2/wprowadzenie
 // Panel: Ustawienia interfejsów → HTTP API → Użytkownicy API
+builder.Services.Configure<SmsRoutingSettings>(builder.Configuration.GetSection(SmsRoutingSettings.SectionName));
 builder.Services.Configure<SerwerSmsSettings>(builder.Configuration.GetSection(SerwerSmsSettings.SectionName));
+builder.Services.Configure<SmsApiSettings>(builder.Configuration.GetSection(SmsApiSettings.SectionName));
 builder.Services.AddHttpClient("SerwerSms");
-builder.Services.AddSingleton<ISmsSender, SerwerSmsSender>();
+builder.Services.AddSingleton<SmsApiSender>();
+builder.Services.AddSingleton<SerwerSmsSender>();
+builder.Services.AddSingleton<ConsoleSmsSender>();
+builder.Services.AddSingleton<ISmsSender, SmsSenderRouter>();
 builder.Services.AddScoped<ISmsConfirmationService, SmsConfirmationService>();
+builder.Services.AddScoped<SportRental.Admin.Services.IRentalConfirmationService, SportRental.Admin.Services.RentalConfirmationService>();
+
+// SignalR Hub for real-time rental notifications
+builder.Services.AddSingleton<SportRental.Admin.Hubs.IRentalNotificationService, SportRental.Admin.Hubs.RentalNotificationService>();
+
 // WewnÄ™trzny blob: domyĹ›lnie App_Data (+ mapowanie StaticFiles), alternatywnie wwwroot
 builder.Services.AddSingleton<IFileStorage>(sp =>
 {
@@ -218,12 +234,12 @@ builder.Services.AddAuthentication(options =>
     .AddIdentityCookies();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-// Pooled DbContext dla API i usĹ‚ug (scoped, ale z poolingiem)
-builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
-// Pooled factory dla komponentĂłw Blazor (lokalne, niezaleĹĽne instancje na ĹĽÄ…danie)
+// Pooled factory dla Blazor Server - tworzy instancje DbContext na żądanie
 builder.Services.AddPooledDbContextFactory<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, npg => npg.MigrationsAssembly("SportRental.Infrastructure")));
+// Scoped DbContext dla Identity (pobiera z factory)
+builder.Services.AddScoped<ApplicationDbContext>(sp => 
+    sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => {
@@ -258,11 +274,17 @@ builder.Services.AddScoped<SportRental.Admin.Services.Email.IEmailSender>(sp =>
 });
 builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp =>
     sp.GetRequiredService<SportRental.Admin.Services.Email.IEmailSender>());
-builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddScoped<IEmailSender<ApplicationUser>>(sp =>
+{
+    var emailSender = sp.GetRequiredService<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>();
+    return new IdentityNoOpEmailSender(emailSender);
+});
 
 // Additional services from old project
 builder.Services.AddScoped<SportRental.Admin.Services.Logging.IAuditLogger, SportRental.Admin.Services.Logging.DatabaseAuditLogger>();
 builder.Services.AddScoped<SportRental.Admin.Services.QrCode.IQrCodeGenerator, SportRental.Admin.Services.QrCode.SimpleQrCodeGenerator>();
+builder.Services.AddScoped<SportRental.Admin.Services.QrCode.IBarcodeGenerator, SportRental.Admin.Services.QrCode.BarcodeGenerator>();
+builder.Services.AddScoped<SportRental.Admin.Services.IQrLabelGenerator, SportRental.Admin.Services.QrLabelGenerator>();
 builder.Services.AddScoped<SportRental.Admin.Services.Sms.ISmsConfirmationService, SportRental.Admin.Services.Sms.SmsConfirmationService>();
 
 // Stripe Payment Gateway
@@ -365,7 +387,9 @@ app.MapAdditionalIdentityEndpoints();
 // REST API
 app.MapSportRentalApi();
 app.MapSmsApiCallbacks(); // SMSAPI delivery report callbacks
+app.MapConfirmationEndpoints(); // Public rental confirmation page
 app.MapControllers();
+app.MapHub<SportRental.Admin.Hubs.RentalNotificationHub>("/hubs/rentals");
 
 // Seed test data in development (from test-data.json)
 if (app.Environment.IsDevelopment())
@@ -393,16 +417,7 @@ using (var scope = app.Services.CreateScope())
     var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     
-    // Automatyczne migracje
-    try
-    {
-        await db.Database.MigrateAsync();
-        Console.WriteLine("✅ Migracje zastosowane pomyślnie");
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"⚠️ Migracje: {ex.Message}");
-    }
+    await db.Database.MigrateAsync();
     
     // Ensure default tenant exists - use existing tenant with products if available
     var tenantId = config.GetValue<Guid?>("Tenant:Id") ?? Guid.Empty;

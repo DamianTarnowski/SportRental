@@ -1,21 +1,41 @@
+@* ============================================================================
+   TENANT SELECTOR - WYŁĄCZONY (nic nie renderuje)
+   ============================================================================
+   WAŻNE: Domyślnie wyświetlamy WSZYSTKIE produkty ze WSZYSTKICH wypożyczalni!
+   Filtrowanie po tenancie jest OPCJONALNE i tylko na wyraźne życzenie użytkownika.
+   
+   Ten komponent jest wyłączony (renderuje pusty element), ale zachowany na przyszłość 
+   gdyby była potrzeba dodania filtrowania wypożyczalni w UI.
+   
+   ABY WŁĄCZYĆ: odkomentuj sekcję UI poniżej i usuń renderowanie pustego diva.
+   ============================================================================ *@
+
 @using SportRental.Client.Services
 @inject TenantService TenantService
 @inject NavigationManager Navigation
 
+@* KOMPONENT WYŁĄCZONY - renderuje pusty element *@
+<div style="display: none;"></div>
+
+@* 
+   ORYGINALNY KOD UI - ZAKOMENTOWANY
+   Domyślnie wszystkie produkty widoczne dla klientów!
+   Odkomentuj poniższy kod aby włączyć selektor wypożyczalni w UI.
+
 <div class="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-    @if (!string.IsNullOrEmpty(currentTenantName))
+    if (!string.IsNullOrEmpty(currentTenantName))
     {
         <div class="flex items-center gap-2">
             <span class="text-2xl">🏢</span>
             <div class="flex flex-col">
                 <span class="text-xs text-gray-500 dark:text-gray-400">Filtr wypożyczalni:</span>
-                <span class="font-semibold text-sm">@currentTenantName</span>
+                <span class="font-semibold text-sm">currentTenantName</span>
             </div>
         </div>
-        <button @onclick="ChangeTenant" class="ml-2 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition">
+        <button class="ml-2 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition">
             Zmień
         </button>
-        <button @onclick="ClearFilter" class="ml-1 px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition">
+        <button class="ml-1 px-3 py-1 text-xs bg-gray-600 hover:bg-gray-700 text-white rounded transition">
             Wszystkie
         </button>
     }
@@ -28,18 +48,20 @@
                 <span class="font-semibold text-sm">Wszystkie wypożyczalnie</span>
             </div>
         </div>
-        <button @onclick="SelectTenant" class="ml-2 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition">
+        <button class="ml-2 px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition">
             Filtruj
         </button>
     }
 </div>
+*@
 
 @code {
     private string? currentTenantName;
 
     protected override async Task OnInitializedAsync()
     {
-        currentTenantName = await TenantService.GetSelectedTenantNameAsync();
+        // WYŁĄCZONE - nie ładujemy tenanta z localStorage
+        // currentTenantName = await TenantService.GetSelectedTenantNameAsync();
     }
 
     private void SelectTenant()

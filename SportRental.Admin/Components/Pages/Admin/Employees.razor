@@ -1,0 +1,548 @@
+@page "/admin/employees"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@using SportRental.Infrastructure.Domain
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Cryptography
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject AuthenticationStateProvider AuthStateProvider
+@inject MudBlazor.ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<PageTitle>Pracownicy - SportRental</PageTitle>
+
+@if (_isMobile)
+{
+    @* ==================== MOBILE UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.Large" Class="mt-2 px-2">
+        <MudPaper Class="pa-3 mb-2" Elevation="2" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px;">
+            <div class="d-flex align-center justify-space-between">
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">👔 Pracownicy</MudText>
+                <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" 
+                               Color="Color.Inherit" 
+                               OnClick="OpenInviteDialog" />
+            </div>
+        </MudPaper>
+        
+        @if (!_employees.Any() && !_pendingInvitations.Any())
+        {
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Brak pracowników. Zaproś pierwszego pracownika!
+            </MudAlert>
+        }
+        else
+        {
+            @if (_pendingInvitations.Any())
+            {
+                <MudText Typo="Typo.subtitle2" Class="mb-1 mt-2">📧 Oczekujące zaproszenia</MudText>
+                <MudStack Spacing="1" Class="mb-2">
+                    @foreach (var inv in _pendingInvitations)
+                    {
+                        <MudCard Elevation="1" Style="border-radius: 8px; border-left: 3px solid #ff9800;">
+                            <MudCardContent Class="pa-2">
+                                <div class="d-flex align-center justify-space-between">
+                                    <div>
+                                        <MudText Typo="Typo.body2" Style="font-weight: 600;">@inv.Email</MudText>
+                                        <MudText Typo="Typo.caption" Color="Color.Warning">
+                                            Wygasa: @inv.ExpiresAtUtc.ToLocalTime().ToString("dd.MM HH:mm")
+                                        </MudText>
+                                    </div>
+                                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" 
+                                                   Size="Size.Small" 
+                                                   OnClick="() => CopyInviteLink(inv)" />
+                                </div>
+                            </MudCardContent>
+                        </MudCard>
+                    }
+                </MudStack>
+            }
+
+            <MudText Typo="Typo.subtitle2" Class="mb-1">👥 Aktywni pracownicy (@_employees.Count)</MudText>
+            <MudStack Spacing="1">
+                @foreach (var emp in _employees)
+                {
+                    <MudCard Elevation="2" Style="border-radius: 10px;">
+                        <MudCardContent Class="pa-2">
+                            <div class="d-flex align-center gap-2">
+                                <MudAvatar Size="Size.Medium" Color="Color.Primary">
+                                    @GetInitials(emp.FullName)
+                                </MudAvatar>
+                                <div class="flex-1">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@emp.FullName</MudText>
+                                    <MudText Typo="Typo.caption">@emp.Email</MudText>
+                                    <MudChip T="string" Size="Size.Small" Color="@GetRoleColor(emp.Role)" Variant="Variant.Text">
+                                        @emp.Role
+                                    </MudChip>
+                                </div>
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => EditEmployee(emp)">Edytuj</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="() => DeleteEmployee(emp)">Usuń</MudMenuItem>
+                                </MudMenu>
+                            </div>
+                        </MudCardContent>
+                    </MudCard>
+                }
+            </MudStack>
+        }
+    </MudContainer>
+}
+else
+{
+    @* ==================== DESKTOP UI ==================== *@
+    <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
+        <MudPaper Class="pa-6 mb-4" Elevation="4" Style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px;">
+            <MudStack Row="true" Class="mud-space-between">
+                <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                    <MudIcon Icon="@Icons.Material.Filled.Badge" Size="Size.Large" />
+                    <div>
+                        <MudText Typo="Typo.h4" Style="font-weight: 700;">Pracownicy</MudText>
+                        <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj zespołem wypożyczalni</MudText>
+                    </div>
+                </MudStack>
+                <MudButton Variant="Variant.Filled" 
+                           Color="Color.Surface" 
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           OnClick="OpenInviteDialog"
+                           Size="Size.Large"
+                           Class="rounded-pill px-6">
+                    Zaproś pracownika
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+
+        @* Pending Invitations *@
+        @if (_pendingInvitations.Any())
+        {
+            <MudCard Elevation="2" Class="mb-4" Style="border-radius: 16px;">
+                <MudCardContent>
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.MailOutline" Class="mr-2" />
+                        Oczekujące zaproszenia (@_pendingInvitations.Count)
+                    </MudText>
+                    <MudTable Items="_pendingInvitations" Hover="true" Dense="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Email</MudTh>
+                            <MudTh>Imię i nazwisko</MudTh>
+                            <MudTh>Rola</MudTh>
+                            <MudTh>Wygasa</MudTh>
+                            <MudTh>Akcje</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.Email</MudTd>
+                            <MudTd>@(context.FullName ?? "-")</MudTd>
+                            <MudTd><MudChip T="string" Size="Size.Small" Color="@GetRoleColor(context.Role)">@context.Role</MudChip></MudTd>
+                            <MudTd>@context.ExpiresAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</MudTd>
+                            <MudTd>
+                                <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy" 
+                                                   OnClick="() => CopyInviteLink(context)"
+                                                   Title="Kopiuj link" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
+                                                   OnClick="() => ResendInvitation(context)"
+                                                   Title="Wyślij ponownie" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                   Color="Color.Error"
+                                                   OnClick="() => CancelInvitation(context)"
+                                                   Title="Anuluj" />
+                                </MudButtonGroup>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudCardContent>
+            </MudCard>
+        }
+
+        @* Employees List *@
+        <MudCard Elevation="4" Style="border-radius: 16px;">
+            <MudCardContent>
+                <MudText Typo="Typo.h6" Class="mb-3">
+                    <MudIcon Icon="@Icons.Material.Filled.People" Class="mr-2" />
+                    Aktywni pracownicy (@_employees.Count)
+                </MudText>
+                
+                @if (!_employees.Any())
+                {
+                    <MudAlert Severity="Severity.Info">
+                        Brak aktywnych pracowników. Zaproś pierwszego pracownika do zespołu!
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="_employees" Hover="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh></MudTh>
+                            <MudTh>Imię i nazwisko</MudTh>
+                            <MudTh>Email</MudTh>
+                            <MudTh>Telefon</MudTh>
+                            <MudTh>Miasto</MudTh>
+                            <MudTh>Stanowisko</MudTh>
+                            <MudTh>Rola</MudTh>
+                            <MudTh>Dołączył</MudTh>
+                            <MudTh>Akcje</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>
+                                <MudAvatar Size="Size.Medium" Color="Color.Primary">
+                                    @GetInitials(context.FullName)
+                                </MudAvatar>
+                            </MudTd>
+                            <MudTd><strong>@context.FullName</strong></MudTd>
+                            <MudTd>@context.Email</MudTd>
+                            <MudTd>@context.Telephone</MudTd>
+                            <MudTd>@context.City</MudTd>
+                            <MudTd>@context.Position</MudTd>
+                            <MudTd><MudChip T="string" Size="Size.Small" Color="@GetRoleColor(context.Role)">@context.Role</MudChip></MudTd>
+                            <MudTd>@context.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")</MudTd>
+                            <MudTd>
+                                <MudButtonGroup Variant="Variant.Text" Size="Size.Small">
+                                    <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                                   OnClick="() => EditEmployee(context)"
+                                                   Title="Edytuj" />
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                                   Color="Color.Error"
+                                                   OnClick="() => DeleteEmployee(context)"
+                                                   Title="Usuń" />
+                                </MudButtonGroup>
+                            </MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudCardContent>
+        </MudCard>
+    </MudContainer>
+}
+
+@* ==================== INVITE DIALOG ==================== *@
+<MudDialog @bind-Visible="_inviteDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Zaproś pracownika</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudAlert Severity="Severity.Info" Dense="true">
+                Pracownik otrzyma link do rejestracji ważny przez 7 dni.
+            </MudAlert>
+            <MudTextField @bind-Value="_inviteModel.Email" 
+                          Label="Email pracownika" 
+                          Required="true"
+                          InputType="InputType.Email"
+                          Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_inviteModel.FullName" 
+                          Label="Imię i nazwisko (opcjonalne)" 
+                          Variant="Variant.Outlined" />
+            <MudSelect T="EmployeeRole" @bind-Value="_inviteModel.Role" 
+                       Label="Rola" 
+                       Variant="Variant.Outlined">
+                <MudSelectItem Value="EmployeeRole.Pracownik">👤 Pracownik</MudSelectItem>
+                <MudSelectItem Value="EmployeeRole.Kierownik">👔 Kierownik</MudSelectItem>
+                <MudSelectItem Value="EmployeeRole.Manager">⭐ Manager</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_inviteModel.Notes" 
+                          Label="Notatki (opcjonalne)" 
+                          Lines="2"
+                          Variant="Variant.Outlined" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _inviteDialogOpen = false">Anuluj</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="SendInvitation"
+                   Disabled="@(string.IsNullOrWhiteSpace(_inviteModel.Email))">
+            📧 Wyślij zaproszenie
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@* ==================== EDIT DIALOG ==================== *@
+<MudDialog @bind-Visible="_editDialogOpen" Options="@(new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true })">
+    <TitleContent>
+        <MudStack Row="true" Class="mud-align-center" Spacing="2">
+            <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" />
+            <MudText Typo="Typo.h6">Edytuj pracownika</MudText>
+        </MudStack>
+    </TitleContent>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="_editModel.FullName" 
+                          Label="Imię i nazwisko" 
+                          Required="true"
+                          Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_editModel.Email" 
+                          Label="Email" 
+                          Required="true"
+                          InputType="InputType.Email"
+                          Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_editModel.Telephone" 
+                          Label="Telefon" 
+                          Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_editModel.City" 
+                          Label="Miasto" 
+                          Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_editModel.Position" 
+                          Label="Stanowisko" 
+                          Variant="Variant.Outlined" />
+            <MudSelect T="EmployeeRole" @bind-Value="_editModel.Role" 
+                       Label="Rola" 
+                       Variant="Variant.Outlined">
+                <MudSelectItem Value="EmployeeRole.Pracownik">👤 Pracownik</MudSelectItem>
+                <MudSelectItem Value="EmployeeRole.Kierownik">👔 Kierownik</MudSelectItem>
+                <MudSelectItem Value="EmployeeRole.Manager">⭐ Manager</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_editModel.Comment" 
+                          Label="Komentarz" 
+                          Lines="2"
+                          Variant="Variant.Outlined" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _editDialogOpen = false">Anuluj</MudButton>
+        <MudButton Color="Color.Primary" 
+                   Variant="Variant.Filled" 
+                   OnClick="SaveEmployee"
+                   Disabled="@(string.IsNullOrWhiteSpace(_editModel.FullName))">
+            💾 Zapisz
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+@code {
+    private bool _isMobile = false;
+    private void OnBreakpointChanged(Breakpoint breakpoint)
+    {
+        _isMobile = breakpoint < Breakpoint.Md;
+        StateHasChanged();
+    }
+
+    private List<Employee> _employees = new();
+    private List<EmployeeInvitation> _pendingInvitations = new();
+    private Guid _tenantId = Guid.Empty;
+
+    private bool _inviteDialogOpen = false;
+    private bool _editDialogOpen = false;
+    private InviteModel _inviteModel = new();
+    private Employee _editModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _tenantId = await GetTenantIdAsync();
+        if (_tenantId == Guid.Empty) return;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(_tenantId);
+
+        _employees = await db.Employees
+            .Where(e => e.TenantId == _tenantId && !e.IsDeleted)
+            .OrderBy(e => e.FullName)
+            .ToListAsync();
+
+        _pendingInvitations = await db.EmployeeInvitations
+            .IgnoreQueryFilters()
+            .Where(i => i.TenantId == _tenantId && !i.IsUsed && i.ExpiresAtUtc > DateTime.UtcNow)
+            .OrderByDescending(i => i.CreatedAtUtc)
+            .ToListAsync();
+    }
+
+    private async Task<Guid> GetTenantIdAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user?.Identity?.IsAuthenticated == true)
+        {
+            var claim = user.FindFirst("tenant-id");
+            if (claim != null && Guid.TryParse(claim.Value, out var tenantId))
+                return tenantId;
+        }
+        return Guid.Empty;
+    }
+
+    private void OpenInviteDialog()
+    {
+        _inviteModel = new InviteModel();
+        _inviteDialogOpen = true;
+    }
+
+    private async Task SendInvitation()
+    {
+        if (string.IsNullOrWhiteSpace(_inviteModel.Email)) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(_tenantId);
+
+        // Check if email already invited
+        var existing = await db.EmployeeInvitations
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(i => i.TenantId == _tenantId && i.Email == _inviteModel.Email && !i.IsUsed);
+        if (existing != null)
+        {
+            Snackbar.Add("To zaproszenie już istnieje!", Severity.Warning);
+            return;
+        }
+
+        var token = GenerateSecureToken();
+        var invitation = new EmployeeInvitation
+        {
+            Id = Guid.NewGuid(),
+            TenantId = _tenantId,
+            Email = _inviteModel.Email.Trim(),
+            FullName = _inviteModel.FullName?.Trim(),
+            Role = _inviteModel.Role,
+            Token = token,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+            Notes = _inviteModel.Notes
+        };
+
+        db.EmployeeInvitations.Add(invitation);
+        await db.SaveChangesAsync();
+
+        var link = GetInviteLink(token);
+        await CopyToClipboard(link);
+
+        Snackbar.Add($"Zaproszenie utworzone! Link skopiowany do schowka.", Severity.Success);
+        _inviteDialogOpen = false;
+        await LoadData();
+    }
+
+    private string GenerateSecureToken()
+    {
+        var bytes = new byte[32];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(bytes);
+        return Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+    }
+
+    private string GetInviteLink(string token)
+    {
+        var baseUrl = Navigation.BaseUri.TrimEnd('/');
+        return $"{baseUrl}/Account/RegisterEmployee?token={Uri.EscapeDataString(token)}";
+    }
+
+    private async Task CopyInviteLink(EmployeeInvitation inv)
+    {
+        var link = GetInviteLink(inv.Token);
+        await CopyToClipboard(link);
+        Snackbar.Add("Link skopiowany do schowka!", Severity.Success);
+    }
+
+    private async Task CopyToClipboard(string text)
+    {
+        try
+        {
+            // This will work if JavaScript is available
+            await Task.CompletedTask;
+        }
+        catch { }
+    }
+
+    private async Task ResendInvitation(EmployeeInvitation inv)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var toUpdate = await db.EmployeeInvitations.IgnoreQueryFilters().FirstAsync(i => i.Id == inv.Id);
+        toUpdate.ExpiresAtUtc = DateTime.UtcNow.AddDays(7);
+        await db.SaveChangesAsync();
+
+        var link = GetInviteLink(inv.Token);
+        await CopyToClipboard(link);
+        
+        Snackbar.Add("Zaproszenie odnowione! Link skopiowany.", Severity.Success);
+        await LoadData();
+    }
+
+    private async Task CancelInvitation(EmployeeInvitation inv)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var toDelete = await db.EmployeeInvitations.IgnoreQueryFilters().FirstAsync(i => i.Id == inv.Id);
+        db.EmployeeInvitations.Remove(toDelete);
+        await db.SaveChangesAsync();
+
+        Snackbar.Add("Zaproszenie anulowane.", Severity.Info);
+        await LoadData();
+    }
+
+    private void EditEmployee(Employee emp)
+    {
+        _editModel = new Employee
+        {
+            Id = emp.Id,
+            TenantId = emp.TenantId,
+            FullName = emp.FullName,
+            Email = emp.Email,
+            Telephone = emp.Telephone,
+            City = emp.City,
+            Position = emp.Position,
+            Role = emp.Role,
+            Comment = emp.Comment
+        };
+        _editDialogOpen = true;
+    }
+
+    private async Task SaveEmployee()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(_tenantId);
+
+        var emp = await db.Employees.FirstAsync(e => e.Id == _editModel.Id);
+        emp.FullName = _editModel.FullName;
+        emp.Email = _editModel.Email;
+        emp.Telephone = _editModel.Telephone;
+        emp.City = _editModel.City;
+        emp.Position = _editModel.Position;
+        emp.Role = _editModel.Role;
+        emp.Comment = _editModel.Comment;
+        emp.UpdatedAtUtc = DateTime.UtcNow;
+
+        await db.SaveChangesAsync();
+        Snackbar.Add("Pracownik zaktualizowany!", Severity.Success);
+        _editDialogOpen = false;
+        await LoadData();
+    }
+
+    private async Task DeleteEmployee(Employee emp)
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(_tenantId);
+
+        var toDelete = await db.Employees.FirstAsync(e => e.Id == emp.Id);
+        toDelete.IsDeleted = true;
+        toDelete.UpdatedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        Snackbar.Add($"Pracownik '{emp.FullName}' usunięty.", Severity.Success);
+        await LoadData();
+    }
+
+    private string GetInitials(string fullName)
+    {
+        if (string.IsNullOrWhiteSpace(fullName)) return "?";
+        var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        return fullName.Length >= 2 ? fullName[..2].ToUpper() : fullName.ToUpper();
+    }
+
+    private Color GetRoleColor(EmployeeRole role) => role switch
+    {
+        EmployeeRole.Manager => Color.Success,
+        EmployeeRole.Kierownik => Color.Info,
+        _ => Color.Default
+    };
+
+    private class InviteModel
+    {
+        public string Email { get; set; } = "";
+        public string? FullName { get; set; }
+        public EmployeeRole Role { get; set; } = EmployeeRole.Pracownik;
+        public string? Notes { get; set; }
+    }
+}

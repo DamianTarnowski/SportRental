@@ -8,6 +8,9 @@ public interface IApiService
     void SetBaseUrl(string baseUrl);
     void SetTenantId(Guid? tenantId);
 
+    // Lokalizacje wypożyczalni
+    Task<List<TenantLocationDto>> GetTenantLocationsAsync();
+
     // Produkty
     Task<List<ProductDto>> GetProductsAsync(int page = 1, int pageSize = 50);
     Task<ProductsPagedResponse> GetProductsPagedAsync(ProductFilterRequest filter);

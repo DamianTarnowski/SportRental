@@ -42,7 +42,7 @@
                 }
 
                 @* Cropper Container *@
-                <div id="cropperContainer" style="width: 100%; max-width: 500px; margin: 0 auto;">
+                <div id="cropperContainer" style="width: 100%; max-width: 400px; margin: 0 auto; min-height: 300px; overflow: visible;">
                     <!-- Croppie will be initialized here -->
                 </div>
 
@@ -212,12 +212,12 @@
 
     private async Task SkipCrop()
     {
-        if (_originalFile == null) return;
+        if (_originalFile == null || string.IsNullOrEmpty(_imageDataUrl)) return;
 
         try
         {
-            // Use original file without cropping
-            await OnImageReady.InvokeAsync(_originalFile);
+            // Return original image as base64 (avoids SignalR stream issues)
+            await OnBase64ImageReady.InvokeAsync(_imageDataUrl);
             
             Snackbar.Add("Zdjęcie gotowe do uploadu (bez obcinania)", Severity.Info);
             

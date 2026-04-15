@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using SportRental.Shared.Models;
 
 namespace SportRental.Shared.Services;
@@ -9,6 +10,10 @@ public class ApiService : IApiService
     private readonly HttpClient _httpClient;
     private string _baseUrl = string.Empty;
     private Guid? _tenantId;
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public ApiService(HttpClient httpClient)
     {
@@ -18,7 +23,8 @@ public class ApiService : IApiService
     public void SetBaseUrl(string baseUrl)
     {
         _baseUrl = baseUrl.TrimEnd('/');
-        _httpClient.BaseAddress = new Uri(_baseUrl);
+        // NIE ustawiamy BaseAddress - używamy pełnych URL w metodach
+        // HttpClient.BaseAddress można ustawić tylko raz, więc lepiej tego unikać
     }
 
     public void SetTenantId(Guid? tenantId)
@@ -31,12 +37,25 @@ public class ApiService : IApiService
         }
     }
 
+    public async Task<List<TenantLocationDto>> GetTenantLocationsAsync()
+    {
+        try
+        {
+            var url = $"{_baseUrl}/api/tenants/locations";
+            return await _httpClient.GetFromJsonAsync<List<TenantLocationDto>>(url, _jsonOptions) ?? new List<TenantLocationDto>();
+        }
+        catch (Exception)
+        {
+            return new List<TenantLocationDto>();
+        }
+    }
+
     public async Task<List<ProductDto>> GetProductsAsync(int page = 1, int pageSize = 50)
     {
         try
         {
-            var url = $"/api/products?page={page}&pageSize={pageSize}";
-            var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url);
+            var url = $"{_baseUrl}/api/products?page={page}&pageSize={pageSize}";
+            var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url, _jsonOptions);
             return response?.Items ?? new List<ProductDto>();
         }
         catch (Exception)
@@ -49,8 +68,8 @@ public class ApiService : IApiService
     {
         try
         {
-            var url = $"/api/products?{filter.ToQueryString()}";
-            var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url);
+            var url = $"{_baseUrl}/api/products?{filter.ToQueryString()}";
+            var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url, _jsonOptions);
             return response ?? new ProductsPagedResponse();
         }
         catch (Exception)
@@ -63,7 +82,7 @@ public class ApiService : IApiService
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<ProductDto>($"/api/products/{id}");
+            return await _httpClient.GetFromJsonAsync<ProductDto>($"{_baseUrl}/api/products/{id}", _jsonOptions);
         }
         catch (Exception)
         {
@@ -73,7 +92,7 @@ public class ApiService : IApiService
 
     public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("/api/customers", request);
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/customers", request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<CustomerDto>()
             ?? throw new InvalidOperationException("Failed to create customer");
@@ -81,7 +100,7 @@ public class ApiService : IApiService
 
     public async Task<CustomerDto?> UpdateCustomerAsync(Guid id, CreateCustomerRequest request)
     {
-        var response = await _httpClient.PutAsJsonAsync($"/api/customers/{id}", request);
+        var response = await _httpClient.PutAsJsonAsync($"{_baseUrl}/api/customers/{id}", request);
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
             return null;
@@ -101,7 +120,7 @@ public class ApiService : IApiService
 
         try
         {
-            var response = await _httpClient.GetAsync($"/api/customers/by-email?email={Uri.EscapeDataString(email)}");
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/customers/by-email?email={Uri.EscapeDataString(email)}");
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
@@ -120,7 +139,7 @@ public class ApiService : IApiService
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<CustomerDto>($"/api/customers/{id}");
+            return await _httpClient.GetFromJsonAsync<CustomerDto>($"{_baseUrl}/api/customers/{id}", _jsonOptions);
         }
         catch (Exception)
         {
@@ -130,7 +149,7 @@ public class ApiService : IApiService
 
     public async Task<PaymentQuoteResponse> GetPaymentQuoteAsync(PaymentQuoteRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("/api/payments/quote", request);
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/payments/quote", request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<PaymentQuoteResponse>()
             ?? throw new InvalidOperationException("Failed to retrieve payment quote");
@@ -138,7 +157,7 @@ public class ApiService : IApiService
 
     public async Task<PaymentIntentDto> CreatePaymentIntentAsync(CreatePaymentIntentRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("/api/payments/intents", request);
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/payments/intents", request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<PaymentIntentDto>()
             ?? throw new InvalidOperationException("Failed to create payment intent");
@@ -153,7 +172,7 @@ public class ApiService : IApiService
                 return null;
             }
 
-            var response = await _httpClient.GetAsync($"/api/payments/intents/{id}");
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/payments/intents/{id}");
             if (response.StatusCode == HttpStatusCode.NotFound)
             {
                 return null;
@@ -170,7 +189,7 @@ public class ApiService : IApiService
 
     public async Task<CheckoutSessionResponse> CreateCheckoutSessionAsync(CreateCheckoutSessionRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("/api/checkout/create-session", request);
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/checkout/create-session", request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<CheckoutSessionResponse>()
             ?? throw new InvalidOperationException("Failed to create checkout session");
@@ -180,7 +199,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var response = await _httpClient.PostAsync($"/api/checkout/finalize-session/{sessionId}", null);
+            var response = await _httpClient.PostAsync($"{_baseUrl}/api/checkout/finalize-session/{sessionId}", null);
             if (response.IsSuccessStatusCode)
             {
                 return await response.Content.ReadFromJsonAsync<FinalizeSessionResponse>();
@@ -195,7 +214,7 @@ public class ApiService : IApiService
 
     public async Task<RentalResponse> CreateRentalAsync(CreateRentalRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync("/api/rentals", request);
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/rentals", request);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<RentalResponse>()
             ?? throw new InvalidOperationException("Failed to create rental");
@@ -205,7 +224,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var response = await _httpClient.DeleteAsync($"/api/rentals/{rentalId}");
+            var response = await _httpClient.DeleteAsync($"{_baseUrl}/api/rentals/{rentalId}");
             return response.IsSuccessStatusCode;
         }
         catch (Exception)
@@ -218,7 +237,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var response = await _httpClient.GetAsync($"/api/contracts/{rentalId}");
+            var response = await _httpClient.GetAsync($"{_baseUrl}/api/contracts/{rentalId}");
             if (response.IsSuccessStatusCode)
             {
                 return response.Headers.Location?.ToString();
@@ -241,8 +260,8 @@ public class ApiService : IApiService
             if (from.HasValue) qp.Add($"from={Uri.EscapeDataString(from.Value.ToString("o"))}");
             if (to.HasValue) qp.Add($"to={Uri.EscapeDataString(to.Value.ToString("o"))}");
             if (customerId.HasValue) qp.Add($"customerId={customerId.Value}");
-            var url = "/api/my-rentals" + (qp.Count > 0 ? "?" + string.Join("&", qp) : string.Empty);
-            var list = await _httpClient.GetFromJsonAsync<List<MyRentalDto>>(url);
+            var url = $"{_baseUrl}/api/my-rentals" + (qp.Count > 0 ? "?" + string.Join("&", qp) : string.Empty);
+            var list = await _httpClient.GetFromJsonAsync<List<MyRentalDto>>(url, _jsonOptions);
             return list ?? new List<MyRentalDto>();
         }
         catch (Exception)
@@ -255,7 +274,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("/api/holds", request);
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/holds", request);
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
@@ -276,7 +295,7 @@ public class ApiService : IApiService
     {
         try
         {
-            var response = await _httpClient.DeleteAsync($"/api/holds/{holdId}");
+            var response = await _httpClient.DeleteAsync($"{_baseUrl}/api/holds/{holdId}");
             return response.IsSuccessStatusCode;
         }
         catch (Exception)

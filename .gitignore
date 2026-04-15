@@ -6,6 +6,9 @@
 # dotenv files
 .env
 
+# Azure deployment secrets (ścieżka: .azure-deploy-secrets)
+.azure-deploy-secrets
+
 # User-specific files
 *.rsuser
 *.suo
@@ -534,3 +537,28 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+## Temp utility projects with hardcoded credentials
+TempHasher/
+DbQuery/
+
+## Temp/dev files
+tmp.txt
+temp_query.sql
+query.csx
+maciej_original_hash.txt
+
+## Test scripts and screenshots
+test-client.js
+test-local-products.js
+test-image.jpg
+local-products-test.png
+products-test.png
+
+## Azure logs pulled locally
+sradmin-logs/
+
+## Misc local files (Excel, notes)
+inne/
+azure-logs/
+azure-logs.zip

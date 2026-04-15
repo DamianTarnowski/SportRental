@@ -50,6 +50,12 @@ public class SerwerSmsSettings
 
 /// <summary>
 /// Implementacja ISmsSender wykorzystująca SerwerSMS.pl
+/// 
+/// ⚠️ ZAPASOWA IMPLEMENTACJA - aktualnie nieaktywna.
+/// Konto SerwerSMS.pl nie jest jeszcze skonfigurowane/opłacone.
+/// Głównym dostawcą SMS jest SMSAPI.pl (SmsApiSender).
+/// 
+/// Aby aktywować: ustaw Sms:Provider = "SerwerSms" w appsettings.json
 /// </summary>
 public class SerwerSmsSender : ISmsSender
 {
@@ -214,10 +220,8 @@ public class SerwerSmsSender : ISmsSender
     
     public Task SendContractConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, string? customerEmail, CancellationToken ct = default)
     {
-        // Krótki link do umowy - klient może kliknąć i zobaczyć szczegóły
-        var contractUrl = $"https://sradmin2.azurewebsites.net/c/{rentalId.ToString()[..8].ToLower()}";
-        var emailInfo = !string.IsNullOrWhiteSpace(customerEmail) ? $" wyslanej na {customerEmail}" : "";
-        var message = $"SportRental: {customerName}, czy potwierdzasz warunki umowy{emailInfo}? {contractUrl} Odpisz TAK lub NIE.";
+        var rentalCode = rentalId.ToString()[..8].ToUpper();
+        var message = $"SportRental: {customerName}, czy potwierdzasz umowe nr {rentalCode}? Odpisz TAK lub NIE.";
         return SendAsync(phoneNumber, message, ct);
     }
 }

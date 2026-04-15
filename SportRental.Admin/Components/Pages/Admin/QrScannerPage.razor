@@ -1,0 +1,206 @@
+@page "/admin/barcode-scanner"
+@page "/admin/qr-scanner"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@attribute [Authorize(Roles = "Owner,Employee")]
+
+@using Microsoft.EntityFrameworkCore
+@using SportRental.Admin.Components.Dialogs
+@using SportRental.Admin.Services.QrCode
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Skaner kodów - SportRental Admin</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
+    <MudStack Spacing="4">
+        <!-- Header -->
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+            <MudStack Spacing="0">
+                <MudText Typo="Typo.h4" Class="fw-bold">📷 Skaner kodów kreskowych</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Skanuj kody kreskowe produktów aby szybko je znaleźć
+                </MudText>
+            </MudStack>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
+                       Href="/admin/products" StartIcon="@Icons.Material.Filled.ArrowBack">
+                Powrót
+            </MudButton>
+        </MudStack>
+        
+        <!-- Scanner Component -->
+        <MudPaper Elevation="2" Class="pa-4">
+            <QrScanner OnScanned="HandleScanned" AutoStart="false" />
+        </MudPaper>
+        
+        <!-- Recent Scans -->
+        @if (_recentScans.Any())
+        {
+            <MudPaper Elevation="1" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-3">Ostatnie skanowania</MudText>
+                <MudList T="string" Dense="true">
+                    @foreach (var scan in _recentScans.Take(5))
+                    {
+                        <MudListItem @key="scan.ScannedAt">
+                            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Style="width: 100%;">
+                                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                                    @if (scan.Product != null)
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2">@scan.Product.Name</MudText>
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@scan.Product.Sku</MudChip>
+                                    }
+                                    else
+                                    {
+                                        <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small" />
+                                        <MudText Typo="Typo.body2" Color="Color.Error">Nieznany kod</MudText>
+                                    }
+                                </MudStack>
+                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                    @scan.ScannedAt.ToString("HH:mm:ss")
+                                </MudText>
+                            </MudStack>
+                        </MudListItem>
+                    }
+                </MudList>
+            </MudPaper>
+        }
+        
+        <!-- Quick Tips -->
+        <MudAlert Severity="Severity.Info" Dense="true">
+            <MudText Typo="Typo.body2">
+                <strong>Wskazówki:</strong><br/>
+                • Upewnij się, że kod kreskowy jest dobrze oświetlony<br/>
+                • Trzymaj telefon stabilnie, równolegle do kodu<br/>
+                • Kod kreskowy powinien być w całości widoczny w ramce<br/>
+                • Na iPhone: jeśli kamera się nie uruchamia, sprawdź uprawnienia w Ustawieniach &gt; Safari
+            </MudText>
+        </MudAlert>
+    </MudStack>
+</MudContainer>
+
+@code {
+    private List<ScanRecord> _recentScans = new();
+    
+    private async Task HandleScanned(string qrData)
+    {
+        var (type, id, skuOrCode) = SimpleQrCodeGenerator.ParseQrCodeData(qrData);
+        
+        Product? product = null;
+        string? errorMessage = null;
+        
+        if (type == "Product" && id.HasValue)
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            product = await db.Products.FirstOrDefaultAsync(p => p.Id == id.Value);
+            
+            if (product == null)
+            {
+                errorMessage = "Produkt o tym ID nie istnieje w bazie danych.";
+            }
+        }
+        else if (type == "Barcode" && !string.IsNullOrEmpty(skuOrCode))
+        {
+            // Barcode scanned — search by SKU or barcode data
+            await using var db = await DbFactory.CreateDbContextAsync();
+            product = await db.Products.FirstOrDefaultAsync(p => p.Sku == skuOrCode);
+            
+            // Also try short ID format (SR + first 8 chars of GUID)
+            if (product == null && skuOrCode.StartsWith("SR", StringComparison.OrdinalIgnoreCase) && skuOrCode.Length == 10)
+            {
+                var shortId = skuOrCode[2..].ToLower();
+                product = await db.Products.FirstOrDefaultAsync(p => p.Id.ToString().Replace("-", "").StartsWith(shortId));
+            }
+            
+            if (product == null)
+            {
+                errorMessage = $"Nie znaleziono produktu o kodzie: {skuOrCode}";
+            }
+        }
+        else if (id.HasValue)
+        {
+            // Try to find product by ID even if type is unknown
+            await using var db = await DbFactory.CreateDbContextAsync();
+            product = await db.Products.FirstOrDefaultAsync(p => p.Id == id.Value);
+        }
+        else
+        {
+            errorMessage = "Nieprawidłowy format kodu.";
+        }
+        
+        // Add to recent scans
+        _recentScans.Insert(0, new ScanRecord
+        {
+            QrData = qrData,
+            Product = product,
+            ScannedAt = DateTime.Now
+        });
+        
+        // Show result dialog
+        var parameters = new DialogParameters<QrScanResultDialog>
+        {
+            { x => x.Product, product },
+            { x => x.QrData, qrData },
+            { x => x.ErrorMessage, errorMessage }
+        };
+        
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true,
+            CloseButton = true
+        };
+        
+        var dialog = await DialogService.ShowAsync<QrScanResultDialog>("Wynik skanowania", parameters, options);
+        var result = await dialog.Result;
+        
+        if (result != null && !result.Canceled && result.Data is QrAction action)
+        {
+            await HandleAction(action, product);
+        }
+    }
+    
+    private async Task HandleAction(QrAction action, Product? product)
+    {
+        switch (action)
+        {
+            case QrAction.ScanAgain:
+                // Scanner will restart automatically in component
+                break;
+                
+            case QrAction.ViewDetails:
+                if (product != null)
+                {
+                    Navigation.NavigateTo($"/admin/products?highlight={product.Id}");
+                }
+                break;
+                
+            case QrAction.IssueEquipment:
+                if (product != null)
+                {
+                    // Navigate to equipment handling with product info
+                    Navigation.NavigateTo($"/admin/equipment-handling?productId={product.Id}");
+                }
+                break;
+                
+            case QrAction.ReturnEquipment:
+                if (product != null)
+                {
+                    // Navigate to rentals with product filter
+                    Navigation.NavigateTo($"/admin/rentals?productId={product.Id}");
+                }
+                break;
+        }
+    }
+    
+    private class ScanRecord
+    {
+        public string QrData { get; set; } = "";
+        public Product? Product { get; set; }
+        public DateTime ScannedAt { get; set; }
+    }
+}

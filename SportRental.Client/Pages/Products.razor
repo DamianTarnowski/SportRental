@@ -2,12 +2,14 @@
 @using MudBlazor
 @using Microsoft.AspNetCore.Components.Web
 @using SportRental.Shared.Models
+@using SportRental.Client.Services
 @inject IApiService ApiService
 @inject ICartService CartService
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject TenantService TenantService
 @implements IAsyncDisposable
 
 <PageTitle>SportRental - Katalog produktów</PageTitle>
@@ -235,37 +237,7 @@ else
          ============================================= -->
     <div class="products-filters">
         <MudGrid Spacing="3">
-            <!-- Search -->
-            <MudItem xs="12" md="4">
-                <MudTextField @bind-Value="searchText"
-                              Label="🔍 Szukaj produktów"
-                              Placeholder="Wpisz nazwę..."
-                              Variant="Variant.Outlined"
-                              Adornment="Adornment.End"
-                              AdornmentIcon="@Icons.Material.Filled.Search"
-                              OnKeyDown="OnSearchKeyDown"
-                              Style="border-radius: 12px;" />
-            </MudItem>
-            
-            <!-- Category chips -->
-            <MudItem xs="12" md="8">
-                <div class="filter-section-title">Kategorie</div>
-                <div class="filter-chips">
-                    <div class="filter-chip @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")" 
-                         @onclick="@(() => SelectCategory(string.Empty))">
-                        <span>🎯</span> Wszystkie
-                    </div>
-                    @foreach (var cat in GetCategoryChips())
-                    {
-                        <div class="filter-chip @(selectedCategory == cat.Name ? "active" : "")"
-                             @onclick="@(() => SelectCategory(cat.Name))">
-                            <span>@cat.Icon</span> @cat.Name
-                        </div>
-                    }
-                </div>
-            </MudItem>
-            
-            <!-- Location filters -->
+            <!-- Location filters FIRST (user request: lokalizacja najpierw) -->
             <MudItem xs="12" md="3">
                 <MudSelect T="string" Label="📍 Województwo" @bind-Value="SelectedVoivodeship" Variant="Variant.Outlined" Clearable="true">
                     @foreach (var v in voivodeships)
@@ -284,6 +256,48 @@ else
                 </MudSelect>
             </MudItem>
             
+            <!-- Search SECOND -->
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="searchText"
+                              Label="🔍 Szukaj produktów"
+                              Placeholder="Wpisz nazwę..."
+                              Variant="Variant.Outlined"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@Icons.Material.Filled.Search"
+                              OnKeyDown="OnSearchKeyDown"
+                              Style="border-radius: 12px;" />
+            </MudItem>
+            
+            <MudItem xs="12" md="2">
+                <MudButton Variant="Variant.Text" 
+                           Color="Color.Primary" 
+                           StartIcon="@Icons.Material.Filled.Refresh"
+                           OnClick="ClearFilters"
+                           FullWidth="true"
+                           Style="height: 56px;">
+                    Resetuj
+                </MudButton>
+            </MudItem>
+            
+            <!-- Category chips -->
+            <MudItem xs="12">
+                <div class="filter-section-title">Kategorie</div>
+                <div class="filter-chips">
+                    <div class="filter-chip @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")" 
+                         @onclick="@(() => SelectCategory(string.Empty))">
+                        <span>🎯</span> Wszystkie
+                    </div>
+                    @foreach (var cat in GetCategoryChips())
+                    {
+                        <div class="filter-chip @(selectedCategory == cat.Name ? "active" : "")"
+                             @onclick="@(() => SelectCategory(cat.Name))">
+                            <span>@cat.Icon</span> @cat.Name
+                        </div>
+                    }
+                </div>
+            </MudItem>
+            
+            <!-- Additional filters row -->
             <MudItem xs="12" md="3">
                 <MudSelect T="string" Label="🏪 Wypożyczalnia" @bind-Value="SelectedTenant" Variant="Variant.Outlined" Clearable="true">
                     @foreach (var t in filteredTenants)
@@ -293,7 +307,6 @@ else
                 </MudSelect>
             </MudItem>
             
-            <!-- Additional filters row -->
             <MudItem xs="12" md="3">
                 <MudSelect T="string" Label="Sortuj" @bind-Value="SelectedSort" Variant="Variant.Outlined">
                     <MudSelectItem Value="@("featured")">⭐ Polecane</MudSelectItem>
@@ -333,16 +346,6 @@ else
             
             <MudItem xs="12" md="3">
                 <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="✅ Tylko dostępne" />
-            </MudItem>
-            
-            <MudItem xs="12" md="2">
-                <MudButton Variant="Variant.Text" 
-                           Color="Color.Primary" 
-                           StartIcon="@Icons.Material.Filled.Refresh"
-                           OnClick="ClearFilters"
-                           FullWidth="true">
-                    Resetuj
-                </MudButton>
             </MudItem>
         </MudGrid>
     </div>
@@ -610,6 +613,19 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // ============================================================================
+        // WAŻNE: Domyślnie wyświetlamy WSZYSTKIE produkty ze WSZYSTKICH wypożyczalni!
+        // NIE ładujemy tenanta z localStorage - filtrowanie tylko na życzenie użytkownika.
+        // Użytkownik może wybrać wypożyczalnię w filtrach jeśli chce.
+        // ============================================================================
+        
+        // WYŁĄCZONE - nie filtrujemy domyślnie po tenancie!
+        // var savedTenantName = await TenantService.GetSelectedTenantNameAsync();
+        // if (!string.IsNullOrEmpty(savedTenantName))
+        // {
+        //     selectedTenant = savedTenantName;
+        // }
+        
         await LoadInitialData();
     }
 
@@ -682,7 +698,13 @@ else
         try
         {
             // Load first page and get filter options from a larger sample
-            var initialResponse = await ApiService.GetProductsPagedAsync(new ProductFilterRequest { Page = 1, PageSize = 200 });
+            // Użyj wybranego tenanta jeśli jest ustawiony
+            var initialResponse = await ApiService.GetProductsPagedAsync(new ProductFilterRequest 
+            { 
+                Page = 1, 
+                PageSize = 200,
+                Tenant = string.IsNullOrWhiteSpace(selectedTenant) ? null : selectedTenant
+            });
             
             // Extract filter options from initial load
             var allProducts = initialResponse.Items;

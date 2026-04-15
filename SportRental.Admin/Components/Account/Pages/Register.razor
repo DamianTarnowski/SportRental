@@ -8,8 +8,12 @@
 @using SportRental.Admin.Data
 @using SportRental.Shared.Identity
 @using SportRental.Infrastructure.Tenancy
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+@using Microsoft.EntityFrameworkCore
 
 @inject UserManager<ApplicationUser> UserManager
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IUserStore<ApplicationUser> UserStore
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IEmailSender<ApplicationUser> EmailSender
@@ -139,15 +143,53 @@
         }
 
         // Przypnij tenant i role właściciela/klienta
-        var tenantId = TenantProvider.GetCurrentTenantId()
-            ?? (Guid.TryParse(Configuration["Tenant:Id"], out var cfgTenant) ? cfgTenant : Guid.Empty);
+        // UWAGA: NIE używamy fallback do Configuration["Tenant:Id"] - każdy nowy użytkownik dostaje NOWY tenant
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(null); // Globalny dostęp do tworzenia tenanta
+        
         if (tenantId == Guid.Empty)
         {
+            // Utwórz nowy tenant dla nowego właściciela
             tenantId = Guid.NewGuid();
+            var tenant = new Tenant
+            {
+                Id = tenantId,
+                Name = $"Wypożyczalnia {Input.Email.Split('@')[0]}"
+            };
+            db.Tenants.Add(tenant);
+            
+            // Utwórz domyślne CompanyInfo dla nowego tenanta
+            db.CompanyInfos.Add(new CompanyInfo
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                Name = tenant.Name,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+            
+            await db.SaveChangesAsync();
+            Logger.LogInformation("Created new tenant {TenantId} for user {Email}", tenantId, Input.Email);
         }
 
         user.TenantId = tenantId;
         await UserManager.UpdateAsync(user);
+        
+        // Utwórz powiązanie TenantUser
+        var existingTenantUser = await db.TenantUsers.FirstOrDefaultAsync(tu => tu.TenantId == tenantId && tu.UserId == user.Id);
+        if (existingTenantUser == null)
+        {
+            db.TenantUsers.Add(new TenantUser
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                UserId = user.Id,
+                Role = RoleNames.Owner
+            });
+            await db.SaveChangesAsync();
+        }
 
         if (!await UserManager.IsInRoleAsync(user, RoleNames.Owner))
         {
