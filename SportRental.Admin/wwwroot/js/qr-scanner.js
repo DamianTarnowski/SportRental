@@ -101,16 +101,24 @@ window.QrScanner = {
         console.log('iOS detected:', isIOS);
 
         try {
-            // Dynamic qrbox — prostokątny (szerszy) dla kodów kreskowych
             const container = document.getElementById(this.elementId);
-            const containerWidth = container ? container.clientWidth : 280;
-            const containerHeight = container ? container.clientHeight : 200;
-            const qrboxWidth = Math.max(150, Math.min(containerWidth - 40, 280));
-            const qrboxHeight = Math.max(80, Math.min(containerHeight - 60, 120));
 
+            // Dla kodów 1D (Code 128/39/EAN) qrbox = cała klatka daje najlepszą detekcję.
+            // html5-qrcode skanuje tylko obszar qrbox; jeśli kod wychodzi poza pasek,
+            // nie zostanie rozpoznany. Pełna klatka = większa szansa na trafienie.
             const config = {
-                fps: 10,
-                qrbox: { width: qrboxWidth, height: qrboxHeight },
+                fps: 15,
+                disableFlip: false,
+                experimentalFeatures: {
+                    // Natywne BarcodeDetector API (iOS 17+, Chrome) jest ~10× szybsze
+                    // i dokładniejsze niż ZXing fallback.
+                    useBarCodeDetectorIfSupported: true
+                },
+                videoConstraints: {
+                    facingMode: "environment",
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                },
             };
 
             // iOS Safari: aspectRatio w constraints powoduje OverconstrainedError

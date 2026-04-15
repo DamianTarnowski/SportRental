@@ -597,22 +597,24 @@ else
                             </MudSelect>
                         </MudItem>
                         <MudItem xs="6" md="3">
-                            <MudTimePicker Label="⏰ Godzina od"
-                                           Time="@startTime"
-                                           TimeChanged="OnStartTimeChanged"
-                                           Variant="Variant.Outlined"
-                                           Editable="true"
-                                           AmPm="false"
-                                           Class="rounded-lg" />
+                            <MudTextField T="string"
+                                          Label="⏰ Godzina od"
+                                          Value="@FormatTime(startTime)"
+                                          ValueChanged="@(v => OnStartTimeChanged(ParseTime(v)))"
+                                          InputType="InputType.Time"
+                                          Variant="Variant.Outlined"
+                                          Immediate="true"
+                                          Class="rounded-lg" />
                         </MudItem>
                         <MudItem xs="6" md="3">
-                            <MudTimePicker Label="⏰ Godzina do"
-                                           Time="@endTime"
-                                           TimeChanged="OnEndTimeChanged"
-                                           Variant="Variant.Outlined"
-                                           Editable="true"
-                                           AmPm="false"
-                                           Class="rounded-lg" />
+                            <MudTextField T="string"
+                                          Label="⏰ Godzina do"
+                                          Value="@FormatTime(endTime)"
+                                          ValueChanged="@(v => OnEndTimeChanged(ParseTime(v)))"
+                                          InputType="InputType.Time"
+                                          Variant="Variant.Outlined"
+                                          Immediate="true"
+                                          Class="rounded-lg" />
                         </MudItem>
                     </MudGrid>
                     
@@ -776,9 +778,9 @@ else
                     @if (_showScanner)
                     {
                         <MudPaper Elevation="2" Class="pa-3 mt-3" Style="border-radius: 12px; background: #000;">
-                            <SportRental.Admin.Components.QrScanner 
-                                OnScanned="OnQrScanned" 
-                                AutoStart="true" />
+                            <SportRental.Admin.Components.QrScanner
+                                OnScanned="OnQrScanned"
+                                AutoStart="false" />
                         </MudPaper>
                     }
                 </MudStack>
@@ -893,24 +895,23 @@ else
         </MudStack>
     </DialogContent>
     <DialogActions>
-        <MudPaper Elevation="0" Class="pa-4 mud-width-full" Style="background: #f5f5f5; border-top: 1px solid #e0e0e0;">
-            <MudStack Row="true" Class="mud-width-full mud-justify-space-between">
-                <MudButton Variant="Variant.Text" 
-                           Color="Color.Default"
-                           StartIcon="@Icons.Material.Filled.Close"
-                           OnClick="() => dialogOpen=false">
-                    Anuluj
-                </MudButton>
-                <MudButton Variant="Variant.Filled" 
-                           Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.Save"
-                           Disabled="@(editModel.CustomerId == Guid.Empty || !editItems.Any())"
-                           OnClick="Save"
-                           Class="rounded-pill px-6">
-                    @(editModel.Id == Guid.Empty ? "Utwórz wynajem" : "Zapisz zmiany")
-                </MudButton>
-            </MudStack>
-        </MudPaper>
+        <MudStack Row="true" Class="mud-width-full mud-justify-space-between pa-3"
+                  Style="background: #f5f5f5; border-top: 1px solid #e0e0e0;">
+            <MudButton Variant="Variant.Text"
+                       Color="Color.Default"
+                       StartIcon="@Icons.Material.Filled.Close"
+                       OnClick="CancelRentalDialog">
+                Anuluj
+            </MudButton>
+            <MudButton Variant="Variant.Filled"
+                       Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Save"
+                       Disabled="@(editModel.CustomerId == Guid.Empty || !editItems.Any())"
+                       OnClick="Save"
+                       Class="rounded-pill px-6">
+                @(editModel.Id == Guid.Empty ? "Utwórz wynajem" : "Zapisz zmiany")
+            </MudButton>
+        </MudStack>
     </DialogActions>
 </MudDialog>
 
@@ -1368,6 +1369,18 @@ else
         endTime = time;
         RecalculateHoursFromTime();
         Recalculate();
+    }
+
+    private static string FormatTime(TimeSpan? time) =>
+        time.HasValue ? time.Value.ToString(@"hh\:mm") : string.Empty;
+
+    private static TimeSpan? ParseTime(string? value) =>
+        TimeSpan.TryParse(value, out var ts) ? ts : null;
+
+    private void CancelRentalDialog()
+    {
+        _showScanner = false;
+        dialogOpen = false;
     }
 
     private void RecalculateHoursFromTime()

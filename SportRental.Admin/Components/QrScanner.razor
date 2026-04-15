@@ -168,9 +168,6 @@
         _error = null;
         StateHasChanged();
 
-        // Kontener musi być widoczny i mieć wymiary zanim start() obliczy qrbox
-        await Task.Delay(200);
-        
         try
         {
             var result = await JS.InvokeAsync<InitResult>("QrScanner.start", true);
