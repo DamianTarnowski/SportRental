@@ -156,7 +156,7 @@ public class PaymentsEndpointsTests : IClassFixture<WebApplicationFactory<Progra
         productDetails.TenantId.Should().Be(tenantId);
 
         using var client = _factory.CreateClient();
-        TestApiClientHelper.AuthenticateClient(client, tenantId);
+        TestApiClientHelper.AuthenticateAsCustomer(client, tenantId, customerId, "tester@example.com");
 
         var start = new DateTime(2025, 1, 10, 9, 0, 0, DateTimeKind.Utc);
         var end = start.AddDays(3);
@@ -229,7 +229,8 @@ public class PaymentsEndpointsTests : IClassFixture<WebApplicationFactory<Progra
         stored.DepositAmount.Should().Be(quote.DepositAmount);
         stored.Items.Should().HaveCount(1);
 
-        var listResponse = await client.GetAsync($"/api/my-rentals?customerId={customerId}");
+        // /api/my-rentals now scopes from the customer-id claim (not a query param) to prevent IDOR.
+        var listResponse = await client.GetAsync("/api/my-rentals");
         listResponse.EnsureSuccessStatusCode();
         var list = await listResponse.Content.ReadFromJsonAsync<List<MyRentalDto>>();
         list.Should().NotBeNull();

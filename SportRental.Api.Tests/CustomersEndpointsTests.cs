@@ -96,6 +96,9 @@ public class CustomersEndpointsTests : IClassFixture<WebApplicationFactory<Progr
         created!.FullName.Should().Be(createRequest.FullName);
         created.Email.Should().Be(createRequest.Email);
 
+        // Re-auth as the created customer (IDOR-safe endpoints below require customer-id claim matching the target id)
+        TestApiClientHelper.AuthenticateAsCustomer(client, tenantId, created.Id, created.Email);
+
         var lookupResponse = await client.GetAsync($"/api/customers/by-email?email={Uri.EscapeDataString(createRequest.Email)}");
         if (!lookupResponse.IsSuccessStatusCode)
         {
@@ -140,7 +143,7 @@ public class CustomersEndpointsTests : IClassFixture<WebApplicationFactory<Progr
     }
 
     [Fact]
-    public async Task CustomerEndpoints_WorkWithoutAuthentication()
+    public async Task CreateCustomer_AllowsAnonymous_ButRejectsDuplicateEmail()
     {
         var tenantId = Guid.NewGuid();
         await PrepareDatabaseAsync(tenantId);
@@ -158,6 +161,42 @@ public class CustomersEndpointsTests : IClassFixture<WebApplicationFactory<Progr
         var created = await response.Content.ReadFromJsonAsync<CustomerDto>();
         created.Should().NotBeNull();
         created!.Email.Should().Be("anon@example.com");
+
+        // Duplicate email: must not leak the existing record — security fix SEC-A03.
+        var duplicate = await client.PostAsJsonAsync("/api/customers", new CreateCustomerRequest
+        {
+            FullName = "Impostor",
+            Email = "anon@example.com"
+        });
+        duplicate.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task GetCustomer_BlocksCrossCustomerAccess()
+    {
+        var tenantId = Guid.NewGuid();
+        await PrepareDatabaseAsync(tenantId);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Tenant-Id", tenantId.ToString());
+
+        var victim = await client.PostAsJsonAsync("/api/customers", new CreateCustomerRequest
+        {
+            FullName = "Victim",
+            Email = "victim@example.com"
+        });
+        victim.StatusCode.Should().Be(HttpStatusCode.Created);
+        var victimDto = await victim.Content.ReadFromJsonAsync<CustomerDto>();
+        victimDto.Should().NotBeNull();
+
+        // Attacker authenticates with their own customer-id but tries to read the victim.
+        TestApiClientHelper.AuthenticateAsCustomer(client, tenantId, Guid.NewGuid(), "attacker@example.com");
+
+        var attempt = await client.GetAsync($"/api/customers/{victimDto!.Id}");
+        attempt.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var lookup = await client.GetAsync($"/api/customers/by-email?email={Uri.EscapeDataString(victimDto.Email!)}");
+        lookup.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     private async Task PrepareDatabaseAsync(Guid tenantId)

@@ -10,8 +10,10 @@ public class CartService : ICartService
     private readonly IApiService _apiService;
     private Cart _cart = new();
     private const string CART_KEY = "sport-rental-cart";
+    private const string HOLD_SESSION_KEY = "sport-rental-hold-session";
     private static readonly TimeSpan DefaultRefreshBeforeExpiry = TimeSpan.FromMinutes(2);
     private IReadOnlyCollection<Guid> _lastUnavailableProducts = Array.Empty<Guid>();
+    private string? _holdSessionId;
 
     public event EventHandler? CartChanged;
 
@@ -20,6 +22,29 @@ public class CartService : ICartService
         _jsRuntime = jsRuntime;
         _apiService = apiService;
         _ = LoadCartFromStorageAsync();
+    }
+
+    private async Task<string> GetHoldSessionIdAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(_holdSessionId)) return _holdSessionId!;
+        try
+        {
+            var existing = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", HOLD_SESSION_KEY);
+            if (!string.IsNullOrWhiteSpace(existing))
+            {
+                _holdSessionId = existing;
+                return existing;
+            }
+            var fresh = Guid.NewGuid().ToString("N");
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", HOLD_SESSION_KEY, fresh);
+            _holdSessionId = fresh;
+            return fresh;
+        }
+        catch
+        {
+            _holdSessionId = Guid.NewGuid().ToString("N");
+            return _holdSessionId;
+        }
     }
 
     public Cart GetCart() => _cart;
@@ -49,7 +74,7 @@ public class CartService : ICartService
         var item = _cart.Items.FirstOrDefault(i => i.ProductId == productId);
         if (item?.HoldId is Guid hid)
         {
-            _ = _apiService.DeleteHoldAsync(hid); // fire-and-forget
+            _ = DeleteHoldWithSessionAsync(hid); // fire-and-forget
         }
         _cart.RemoveItem(productId);
         await SaveCartToStorageAsync();
@@ -73,7 +98,7 @@ public class CartService : ICartService
             // Dates changed: previous hold becomes invalid; release it
             if (item.HoldId is Guid hid)
             {
-                _ = _apiService.DeleteHoldAsync(hid);
+                _ = DeleteHoldWithSessionAsync(hid);
                 item.HoldId = null;
                 item.HoldExpiresAtUtc = null;
             }
@@ -102,7 +127,7 @@ public class CartService : ICartService
         {
             if (it.HoldId is Guid hid)
             {
-                _ = _apiService.DeleteHoldAsync(hid);
+                _ = DeleteHoldWithSessionAsync(hid);
             }
         }
         _cart.Clear();
@@ -159,13 +184,15 @@ public class CartService : ICartService
         {
             if (it.HoldId == null)
             {
+                var sessionId = await GetHoldSessionIdAsync();
                 var resp = await _apiService.CreateHoldAsync(new CreateHoldRequest
                 {
                     ProductId = it.ProductId,
                     Quantity = it.Quantity,
                     StartDateUtc = it.StartDate.ToUniversalTime(),
                     EndDateUtc = it.EndDate.ToUniversalTime(),
-                    TtlMinutes = 10
+                    TtlMinutes = 10,
+                    SessionId = sessionId
                 });
                 if (resp == null)
                 {
@@ -192,6 +219,7 @@ public class CartService : ICartService
             if (it.HoldId == null || it.HoldExpiresAtUtc == null) continue;
             if (it.HoldExpiresAtUtc.Value - nowUtc <= threshold)
             {
+                var sessionId = await GetHoldSessionIdAsync();
                 // Recreate hold (no extend endpoint yet)
                 var newHold = await _apiService.CreateHoldAsync(new CreateHoldRequest
                 {
@@ -199,13 +227,14 @@ public class CartService : ICartService
                     Quantity = it.Quantity,
                     StartDateUtc = it.StartDate.ToUniversalTime(),
                     EndDateUtc = it.EndDate.ToUniversalTime(),
-                    TtlMinutes = 10
+                    TtlMinutes = 10,
+                    SessionId = sessionId
                 });
                 if (newHold != null)
                 {
                     // release old hold
                     var old = it.HoldId.Value;
-                    _ = _apiService.DeleteHoldAsync(old);
+                    _ = DeleteHoldWithSessionAsync(old);
                     it.HoldId = newHold.Id;
                     it.HoldExpiresAtUtc = newHold.ExpiresAtUtc;
                 }
@@ -220,12 +249,18 @@ public class CartService : ICartService
         var it = _cart.Items.FirstOrDefault(i => i.ProductId == productId);
         if (it?.HoldId is Guid hid)
         {
-            await _apiService.DeleteHoldAsync(hid);
+            await DeleteHoldWithSessionAsync(hid);
             it.HoldId = null;
             it.HoldExpiresAtUtc = null;
             await SaveCartToStorageAsync();
             CartChanged?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    private async Task DeleteHoldWithSessionAsync(Guid holdId)
+    {
+        var sessionId = await GetHoldSessionIdAsync();
+        await _apiService.DeleteHoldAsync(holdId, sessionId);
     }
 
     public async Task ReleaseAllHoldsAsync()
@@ -234,7 +269,7 @@ public class CartService : ICartService
         {
             if (it.HoldId is Guid hid)
             {
-                _ = _apiService.DeleteHoldAsync(hid);
+                _ = DeleteHoldWithSessionAsync(hid);
                 it.HoldId = null;
                 it.HoldExpiresAtUtc = null;
             }

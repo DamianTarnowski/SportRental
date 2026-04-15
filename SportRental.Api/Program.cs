@@ -220,6 +220,25 @@ Guid GetTenantId(HttpRequest request)
     return Guid.Empty;
 }
 
+Guid? GetCustomerId(HttpRequest request)
+{
+    var user = request.HttpContext.User;
+    if (user?.Identity?.IsAuthenticated != true) return null;
+    var claim = user.FindFirst("customer-id");
+    if (claim != null && Guid.TryParse(claim.Value, out var customerId) && customerId != Guid.Empty)
+    {
+        return customerId;
+    }
+    return null;
+}
+
+bool IsAdminOrOwner(HttpRequest request)
+{
+    var user = request.HttpContext.User;
+    return user?.Identity?.IsAuthenticated == true
+        && (user.IsInRole("Admin") || user.IsInRole("Owner") || user.IsInRole("Manager"));
+}
+
 // Swagger UI
 if (app.Environment.IsDevelopment())
 {
@@ -355,10 +374,28 @@ app.MapPost("/api/holds", async (HttpRequest http, ApplicationDbContext db, Crea
 .Produces<CreateHoldResponse>(StatusCodes.Status200OK)
 .AllowAnonymous();
 
-app.MapDelete("/api/holds/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CancellationToken ct) =>
+app.MapDelete("/api/holds/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, string? sessionId, CancellationToken ct) =>
 {
     var hold = await db.ReservationHolds.FirstOrDefaultAsync(h => h.Id == id, ct);
     if (hold is null) return Results.NotFound();
+
+    // Ownership: albo customer-id claim == hold.CustomerId, albo sessionId z query == hold.SessionId (guest flow),
+    // albo admin/owner/manager danego tenanta.
+    var callerCustomerId = GetCustomerId(http);
+    var isAdmin = IsAdminOrOwner(http);
+    var callerTenantId = GetTenantId(http);
+
+    bool ownsByCustomer = callerCustomerId.HasValue && hold.CustomerId == callerCustomerId.Value;
+    bool ownsBySession = !string.IsNullOrWhiteSpace(sessionId) && !string.IsNullOrWhiteSpace(hold.SessionId)
+        && string.Equals(sessionId, hold.SessionId, StringComparison.Ordinal);
+    bool ownsByAdmin = isAdmin && (callerTenantId == Guid.Empty || callerTenantId == hold.TenantId);
+
+    if (!ownsByCustomer && !ownsBySession && !ownsByAdmin)
+    {
+        // Nie ujawniamy istnienia rekordu
+        return Results.NotFound();
+    }
+
     db.ReservationHolds.Remove(hold);
     await db.SaveChangesAsync(ct);
     return Results.NoContent();
@@ -366,12 +403,15 @@ app.MapDelete("/api/holds/{id:guid}", async (HttpRequest http, ApplicationDbCont
 .WithName("DeleteHold")
 .WithTags("Holds")
 .WithSummary("Usuń hold")
-.WithDescription("Usuwa istniejący hold. Zwraca 404, gdy nie istnieje.")
+.WithDescription("Usuwa istniejący hold. Wymaga dowodu własności: JWT z customer-id, sessionId w query lub roli admina.")
 .Produces(StatusCodes.Status204NoContent)
 .Produces(StatusCodes.Status404NotFound)
 .AllowAnonymous();
 
 // Customers
+// POST /api/customers — anonimowo tworzy klienta dla guest checkoutu,
+// ale NIE ujawnia danych istniejącego rekordu (brak PII leak). Gdy email już istnieje → 409.
+// Dla zalogowanych użytkowników (Admin/Owner/Manager) pozwala tworzyć klientów w tenancie.
 app.MapPost("/api/customers", async (HttpRequest http, ApplicationDbContext db, CreateCustomerRequest req, CancellationToken ct) =>
 {
     var tenantId = GetTenantId(http);
@@ -379,23 +419,21 @@ app.MapPost("/api/customers", async (HttpRequest http, ApplicationDbContext db, 
 
     if (!string.IsNullOrEmpty(normalizedEmail))
     {
-        // For global customers (no tenant), check if email exists globally
-        // For tenant-specific customers, check within tenant
         var query = db.Customers.Where(c => c.Email != null && c.Email.ToLower() == normalizedEmail.ToLower());
         if (tenantId != Guid.Empty)
         {
             query = query.Where(c => c.TenantId == tenantId);
         }
-        
-        var existingCustomer = await query.FirstOrDefaultAsync(ct);
-        if (existingCustomer is not null)
+
+        var exists = await query.AnyAsync(ct);
+        if (exists)
         {
-            // If customer exists, return it instead of conflict (for WASM client convenience)
-            if (tenantId == Guid.Empty)
+            // Nie zwracamy rekordu — to byłaby enumeracja PII.
+            return Results.Conflict(new
             {
-                return Results.Ok(ToCustomerDto(existingCustomer));
-            }
-            return Results.Conflict(new { error = "Customer with the provided email already exists." });
+                error = "Customer with the provided email already exists.",
+                hint = "Zaloguj się lub użyj /api/auth/guest-session."
+            });
         }
     }
 
@@ -420,43 +458,44 @@ app.MapPost("/api/customers", async (HttpRequest http, ApplicationDbContext db, 
 .WithName("CreateCustomer")
 .WithTags("Customers")
 .WithSummary("Utwórz klienta")
-.WithDescription("Tworzy nowego klienta w kontekście tenanta.")
+.WithDescription("Tworzy nowego klienta. Jeśli email jest już zajęty - zwraca 409 (bez ujawnienia PII).")
 .Accepts<CreateCustomerRequest>("application/json")
 .Produces<CustomerDto>(StatusCodes.Status201Created)
 .Produces(StatusCodes.Status409Conflict)
 .AllowAnonymous();
 
+// PUT /api/customers/{id} — wymagamy auth. Klient (Guest/Client) może edytować wyłącznie siebie
+// (customer-id w JWT == id). Admin/Owner/Manager może edytować dowolnego klienta w swoim tenancie.
 app.MapPut("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CreateCustomerRequest req, CancellationToken ct) =>
 {
-    var tenantId = GetTenantId(http);
-    
-    // First try to find by ID only (for global customers or cross-tenant updates)
+    var callerCustomerId = GetCustomerId(http);
+    var isAdmin = IsAdminOrOwner(http);
+    if (callerCustomerId is null && !isAdmin) return Results.Unauthorized();
+
     var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == id, ct);
-    
-    // If not found, or if tenant-specific and customer belongs to different tenant, deny access
-    if (customer is null)
+    if (customer is null) return Results.NotFound();
+
+    if (!isAdmin && callerCustomerId != id)
+    {
+        // Nie ujawniamy istnienia rekordu (maska 404).
+        return Results.NotFound();
+    }
+
+    var tenantId = GetTenantId(http);
+    if (isAdmin && tenantId != Guid.Empty && customer.TenantId != Guid.Empty && customer.TenantId != tenantId)
     {
         return Results.NotFound();
     }
-    
-    // Security check: if request has tenant, customer must belong to that tenant OR be global (TenantId = Empty)
-    if (tenantId != Guid.Empty && customer.TenantId != Guid.Empty && customer.TenantId != tenantId)
-    {
-        return Results.NotFound(); // Don't reveal that customer exists in another tenant
-    }
 
     var normalizedEmail = req.Email?.Trim();
-    // Only check for email conflict if email is being changed
     var emailChanged = !string.Equals(customer.Email?.Trim(), normalizedEmail, StringComparison.OrdinalIgnoreCase);
     if (!string.IsNullOrEmpty(normalizedEmail) && emailChanged)
     {
-        // Check for email conflict within tenant (or globally if no tenant)
         var conflictQuery = db.Customers.Where(c => c.Id != id && c.Email != null && c.Email.ToLower() == normalizedEmail.ToLower());
         if (tenantId != Guid.Empty)
         {
             conflictQuery = conflictQuery.Where(c => c.TenantId == tenantId);
         }
-        
         if (await conflictQuery.AnyAsync(ct))
         {
             return Results.Conflict(new { error = "Customer with the provided email already exists." });
@@ -477,66 +516,84 @@ app.MapPut("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbCon
 .WithName("UpdateCustomer")
 .WithTags("Customers")
 .WithSummary("Aktualizuj dane klienta")
-.WithDescription("Aktualizuje istniejącego klienta dla danego tenanta.")
+.WithDescription("Wymaga auth. Klient może edytować tylko siebie (customer-id claim == id). Admin/Owner/Manager edytuje w swoim tenancie.")
 .Accepts<CreateCustomerRequest>("application/json")
 .Produces<CustomerDto>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status401Unauthorized)
 .Produces(StatusCodes.Status404NotFound)
 .Produces(StatusCodes.Status409Conflict)
-.AllowAnonymous();
+.RequireAuthorization();
 
+// GET /api/customers/{id} — wymagamy auth. Klient widzi tylko siebie. Admin w swoim tenancie.
 app.MapGet("/api/customers/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CancellationToken ct) =>
 {
+    var callerCustomerId = GetCustomerId(http);
+    var isAdmin = IsAdminOrOwner(http);
+    if (callerCustomerId is null && !isAdmin) return Results.Unauthorized();
+
+    var customer = await db.Customers.FirstOrDefaultAsync(c => c.Id == id, ct);
+    if (customer is null) return Results.NotFound();
+
+    if (!isAdmin && callerCustomerId != id) return Results.NotFound();
+
     var tenantId = GetTenantId(http);
-    
-    // For global customers (no tenant), find by ID only
-    // For tenant-specific, filter by tenant
-    var query = db.Customers.Where(c => c.Id == id);
-    if (tenantId != Guid.Empty)
+    if (isAdmin && tenantId != Guid.Empty && customer.TenantId != Guid.Empty && customer.TenantId != tenantId)
     {
-        query = query.Where(c => c.TenantId == tenantId);
+        return Results.NotFound();
     }
-    
-    var customer = await query.FirstOrDefaultAsync(ct);
-    return customer is null ? Results.NotFound() : Results.Ok(ToCustomerDto(customer));
+
+    return Results.Ok(ToCustomerDto(customer));
 })
 .WithName("GetCustomerById")
 .WithTags("Customers")
 .WithSummary("Pobierz klienta")
-.WithDescription("Zwraca klienta po identyfikatorze.")
+.WithDescription("Wymaga auth. Klient widzi tylko siebie (customer-id claim == id).")
 .Produces<CustomerDto>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status401Unauthorized)
 .Produces(StatusCodes.Status404NotFound)
-.AllowAnonymous();
+.RequireAuthorization();
 
+// GET /api/customers/by-email — WYŁĄCZNIE dla zalogowanego klienta, żeby sprawdzić/przełożyć SWOJE konto
+// (email musi być zgodny z claim). Brak tego endpointu dla admina; panel admina ma własne wyszukiwanie.
 app.MapGet("/api/customers/by-email", async (HttpRequest http, ApplicationDbContext db, string? email, CancellationToken ct) =>
 {
+    var callerCustomerId = GetCustomerId(http);
+    var isAdmin = IsAdminOrOwner(http);
+    if (callerCustomerId is null && !isAdmin) return Results.Unauthorized();
+
     if (string.IsNullOrWhiteSpace(email))
     {
         return Results.BadRequest(new { error = "Email query parameter is required." });
     }
 
-    var tenantId = GetTenantId(http);
     var normalizedEmail = email.Trim().ToLower();
-    
-    // For global search (no tenant), search across all customers
-    // For tenant-specific search, filter by tenant
+    var callerEmail = http.HttpContext.User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email)?.Value?.ToLower();
+
+    // Klient (nie admin) może lookupować wyłącznie własny email
+    if (!isAdmin && !string.Equals(callerEmail, normalizedEmail, StringComparison.Ordinal))
+    {
+        return Results.NotFound();
+    }
+
+    var tenantId = GetTenantId(http);
     var query = db.Customers.Where(c => c.Email != null && c.Email.ToLower() == normalizedEmail);
     if (tenantId != Guid.Empty)
     {
-        query = query.Where(c => c.TenantId == tenantId);
+        query = query.Where(c => c.TenantId == tenantId || c.TenantId == Guid.Empty);
     }
-    
-    var customer = await query.FirstOrDefaultAsync(ct);
 
+    var customer = await query.FirstOrDefaultAsync(ct);
     return customer is null ? Results.NotFound() : Results.Ok(ToCustomerDto(customer));
 })
 .WithName("GetCustomerByEmail")
 .WithTags("Customers")
-.WithSummary("Pobierz klienta po emailu")
-.WithDescription("Zwraca klienta w oparciu o adres email w ramach danego tenanta.")
+.WithSummary("Pobierz klienta po emailu (self-lookup)")
+.WithDescription("Wymaga auth. Klient może lookupować tylko własny email (z claim).")
 .Produces<CustomerDto>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status401Unauthorized)
 .Produces(StatusCodes.Status404NotFound)
 .Produces(StatusCodes.Status400BadRequest)
-.AllowAnonymous();
+.RequireAuthorization();
 
 // Payments
 app.MapPost("/api/payments/quote", async (HttpRequest http, ApplicationDbContext db, PaymentQuoteRequest req, CancellationToken ct) =>
@@ -640,15 +697,27 @@ app.MapGet("/api/payments/intents/{id}", async (HttpRequest http, IPaymentGatewa
 .AllowAnonymous();
 
 // My rentals
-app.MapGet("/api/my-rentals", async (HttpRequest http, ApplicationDbContext db, string? status, DateTime? from, DateTime? to, Guid? customerId, CancellationToken ct) =>
+app.MapGet("/api/my-rentals", async (HttpRequest http, ApplicationDbContext db, string? status, DateTime? from, DateTime? to, CancellationToken ct) =>
 {
     var tenantId = GetTenantId(http);
+    var callerCustomerId = GetCustomerId(http);
+    var isAdmin = IsAdminOrOwner(http);
+    if (callerCustomerId is null && !isAdmin) return Results.Unauthorized();
+
     var now = DateTime.UtcNow;
 
-    var query = db.Rentals
-        .Where(r => r.TenantId == tenantId)
-        .Include(r => r.Items)
-        .AsQueryable();
+    IQueryable<Rental> query = db.Rentals.Include(r => r.Items);
+
+    if (callerCustomerId.HasValue)
+    {
+        // Klient: tylko własne wynajmy (ignorujemy tenant, bo klient może wynajmować w wielu tenantach cross-marketplace).
+        query = query.Where(r => r.CustomerId == callerCustomerId.Value);
+    }
+    else
+    {
+        // Admin: ograniczamy do tenanta z claim/headera.
+        query = query.Where(r => r.TenantId == tenantId);
+    }
 
     if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<RentalStatus>(status, true, out var parsed))
         query = query.Where(r => r.Status == parsed);
@@ -656,8 +725,6 @@ app.MapGet("/api/my-rentals", async (HttpRequest http, ApplicationDbContext db, 
         query = query.Where(r => r.StartDateUtc >= from.Value);
     if (to.HasValue)
         query = query.Where(r => r.EndDateUtc <= to.Value);
-    if (customerId.HasValue)
-        query = query.Where(r => r.CustomerId == customerId.Value);
 
     var list = await query
         .OrderByDescending(r => r.CreatedAtUtc)
@@ -689,6 +756,17 @@ app.MapGet("/api/my-rentals", async (HttpRequest http, ApplicationDbContext db, 
 app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IPaymentGateway gateway, CreateRentalRequest req, CancellationToken ct) =>
 {
     var tenantId = GetTenantId(http);
+    var callerCustomerId = GetCustomerId(http);
+    var isAdmin = IsAdminOrOwner(http);
+    if (callerCustomerId is null && !isAdmin) return Results.Unauthorized();
+
+    // Klient: customer-id nadpisujemy z claima, nie wierzymy wartości z body (ochrona przed IDOR).
+    // Admin: może utworzyć rental w imieniu dowolnego klienta swojego tenanta.
+    var rentalCustomerId = callerCustomerId ?? req.CustomerId;
+    if (rentalCustomerId == Guid.Empty)
+    {
+        return Results.BadRequest(new { error = "CustomerId is required." });
+    }
 
     if (req.EndDateUtc <= req.StartDateUtc)
     {
@@ -739,7 +817,7 @@ app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IP
     {
         Id = Guid.NewGuid(),
         TenantId = tenantId,
-        CustomerId = req.CustomerId,
+        CustomerId = rentalCustomerId,
         StartDateUtc = req.StartDateUtc,
         EndDateUtc = req.EndDateUtc,
         Notes = req.Notes,
@@ -805,8 +883,23 @@ app.MapPost("/api/rentals", async (HttpRequest http, ApplicationDbContext db, IP
 app.MapDelete("/api/rentals/{id:guid}", async (HttpRequest http, ApplicationDbContext db, Guid id, CancellationToken ct) =>
 {
     var tenantId = GetTenantId(http);
-    var rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
+    var callerCustomerId = GetCustomerId(http);
+    var isAdmin = IsAdminOrOwner(http);
+    if (callerCustomerId is null && !isAdmin) return Results.Unauthorized();
+
+    var rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == id, ct);
     if (rental is null) return Results.NotFound();
+
+    // Klient: może anulować tylko swój wynajem. Admin: tylko w swoim tenancie.
+    if (callerCustomerId.HasValue)
+    {
+        if (rental.CustomerId != callerCustomerId.Value) return Results.NotFound();
+    }
+    else
+    {
+        if (tenantId != Guid.Empty && rental.TenantId != tenantId) return Results.NotFound();
+    }
+
     rental.Status = RentalStatus.Cancelled;
     await db.SaveChangesAsync(ct);
     return Results.NoContent();

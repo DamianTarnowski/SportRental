@@ -36,6 +36,100 @@ public static class AuthEndpoints
             .WithDescription("Unieważnienie refresh token (logout)")
             .Produces(204)
             .Produces<ProblemDetails>(400);
+
+        group.MapPost("/guest-session", GuestSession)
+            .WithName("CreateGuestSession")
+            .WithDescription("Tworzy sesję gościa (customer + krótki JWT) do checkout-u bez rejestracji konta.")
+            .Produces<GuestSessionResponse>(200)
+            .Produces<ProblemDetails>(400)
+            .Produces<ProblemDetails>(409);
+    }
+
+    private static async Task<IResult> GuestSession(
+        [FromBody] GuestSessionRequest request,
+        [FromServices] ApplicationDbContext dbContext,
+        [FromServices] JwtTokenService jwtTokenService,
+        HttpContext httpContext)
+    {
+        if (string.IsNullOrWhiteSpace(request.FullName) || string.IsNullOrWhiteSpace(request.Email))
+        {
+            return Results.BadRequest(new { error = "FullName i Email są wymagane." });
+        }
+
+        var normalizedEmail = request.Email.Trim();
+        var emailLower = normalizedEmail.ToLower();
+
+        // Tenant z headera lub Guid.Empty (marketplace cross-tenant)
+        var tenantIdHeader = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+        Guid tenantId = Guid.Empty;
+        if (!string.IsNullOrWhiteSpace(tenantIdHeader))
+        {
+            if (!Guid.TryParse(tenantIdHeader, out tenantId))
+            {
+                return Results.BadRequest(new { error = "Nieprawidłowy X-Tenant-Id." });
+            }
+        }
+
+        // Jeśli email należy do zarejestrowanego konta (ApplicationUser), nie wolno wydać gościa bez hasła.
+        var accountExists = await dbContext.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == emailLower);
+        if (accountExists)
+        {
+            return Results.Conflict(new { error = "Dla tego emaila istnieje już konto użytkownika. Zaloguj się." });
+        }
+
+        // Szukaj istniejącego gościa (Customer bez konta Identity) po email w tenancie (lub globalnie).
+        var customerQuery = dbContext.Customers.Where(c => c.Email != null && c.Email.ToLower() == emailLower);
+        if (tenantId != Guid.Empty)
+        {
+            customerQuery = customerQuery.Where(c => c.TenantId == tenantId || c.TenantId == Guid.Empty);
+        }
+        var customer = await customerQuery.OrderByDescending(c => c.CreatedAtUtc).FirstOrDefaultAsync();
+
+        if (customer is null)
+        {
+            customer = new Customer
+            {
+                Id = Guid.NewGuid(),
+                TenantId = tenantId,
+                FullName = request.FullName.Trim(),
+                Email = normalizedEmail,
+                PhoneNumber = request.PhoneNumber?.Trim(),
+                Address = request.Address,
+                DocumentNumber = request.DocumentNumber,
+                Notes = request.Notes,
+                CreatedAtUtc = DateTime.UtcNow
+            };
+            dbContext.Customers.Add(customer);
+            await dbContext.SaveChangesAsync();
+        }
+        else
+        {
+            // Nie ujawniamy danych istniejącego klienta — odświeżamy tylko pola z requestu,
+            // które gość sam podał (imię/telefon/adres), i wydajemy token sesji.
+            customer.FullName = request.FullName.Trim();
+            if (!string.IsNullOrWhiteSpace(request.PhoneNumber))
+                customer.PhoneNumber = request.PhoneNumber.Trim();
+            if (!string.IsNullOrWhiteSpace(request.Address))
+                customer.Address = request.Address;
+            if (!string.IsNullOrWhiteSpace(request.DocumentNumber))
+                customer.DocumentNumber = request.DocumentNumber;
+            if (!string.IsNullOrWhiteSpace(request.Notes))
+                customer.Notes = request.Notes;
+            await dbContext.SaveChangesAsync();
+        }
+
+        var token = jwtTokenService.CreateGuestToken(customer.Id, customer.TenantId, customer.Email!);
+
+        return Results.Ok(new GuestSessionResponse
+        {
+            AccessToken = token.AccessToken,
+            ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
+            TokenType = "Bearer",
+            CustomerId = customer.Id,
+            TenantId = customer.TenantId,
+            Email = customer.Email ?? string.Empty,
+            FullName = customer.FullName
+        });
     }
 
     private static async Task<IResult> Register(
@@ -107,8 +201,8 @@ public static class AuthEndpoints
         dbContext.Customers.Add(customer);
         await dbContext.SaveChangesAsync();
 
-        // Generate tokens
-        var (accessToken, refreshToken) = await GenerateTokens(user, tenantId, new[] { "Client" }, jwtTokenService, dbContext);
+        // Generate tokens (embed customer-id claim so downstream endpoints can scope data)
+        var (accessToken, refreshToken) = await GenerateTokens(user, tenantId, new[] { "Client" }, jwtTokenService, dbContext, customer.Id);
 
         return Results.Ok(new AuthResponse
         {
@@ -156,8 +250,9 @@ public static class AuthEndpoints
 
         var roles = await userManager.GetRolesAsync(user);
         var tenantId = user.TenantId ?? Guid.Empty;
+        var customerId = await LookupCustomerIdAsync(dbContext, user, tenantId);
 
-        var (accessToken, refreshToken) = await GenerateTokens(user, tenantId, roles, jwtTokenService, dbContext);
+        var (accessToken, refreshToken) = await GenerateTokens(user, tenantId, roles, jwtTokenService, dbContext, customerId);
 
         return Results.Ok(new AuthResponse
         {
@@ -206,8 +301,9 @@ public static class AuthEndpoints
 
         var roles = await userManager.GetRolesAsync(user);
         var tenantId = user.TenantId ?? Guid.Empty;
+        var customerId = await LookupCustomerIdAsync(dbContext, user, tenantId);
 
-        var (accessToken, newRefreshToken) = await GenerateTokens(user, tenantId, roles, jwtTokenService, dbContext);
+        var (accessToken, newRefreshToken) = await GenerateTokens(user, tenantId, roles, jwtTokenService, dbContext, customerId);
 
         storedToken.ReplacedByToken = newRefreshToken;
         await dbContext.SaveChangesAsync();
@@ -250,14 +346,28 @@ public static class AuthEndpoints
         return Results.NoContent();
     }
 
+    private static async Task<Guid?> LookupCustomerIdAsync(ApplicationDbContext dbContext, ApplicationUser user, Guid tenantId)
+    {
+        if (string.IsNullOrWhiteSpace(user.Email)) return null;
+        var normalized = user.Email.Trim().ToLower();
+        var query = dbContext.Customers.Where(c => c.Email != null && c.Email.ToLower() == normalized);
+        if (tenantId != Guid.Empty)
+        {
+            query = query.Where(c => c.TenantId == tenantId || c.TenantId == Guid.Empty);
+        }
+        var customer = await query.OrderByDescending(c => c.CreatedAtUtc).FirstOrDefaultAsync();
+        return customer?.Id;
+    }
+
     private static async Task<(string accessToken, string refreshToken)> GenerateTokens(
         ApplicationUser user,
         Guid tenantId,
         IEnumerable<string> roles,
         JwtTokenService jwtTokenService,
-        ApplicationDbContext dbContext)
+        ApplicationDbContext dbContext,
+        Guid? customerId = null)
     {
-        var tokenResult = jwtTokenService.CreateToken(user, tenantId, roles);
+        var tokenResult = jwtTokenService.CreateToken(user, tenantId, roles, customerId);
         var refreshTokenString = GenerateRefreshTokenString();
 
         var refreshToken = new RefreshToken

@@ -121,7 +121,8 @@ public class ApiService : IApiService
         try
         {
             var response = await _httpClient.GetAsync($"{_baseUrl}/api/customers/by-email?email={Uri.EscapeDataString(email)}");
-            if (response.StatusCode == HttpStatusCode.NotFound)
+            // 401 = anonimowy wywołujący; 404 = brak/nieuprawniony. Zwracamy null, nie lookuje cudzych.
+            if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.Unauthorized)
             {
                 return null;
             }
@@ -291,16 +292,46 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<bool> DeleteHoldAsync(Guid holdId)
+    public async Task<bool> DeleteHoldAsync(Guid holdId, string? sessionId = null)
     {
         try
         {
-            var response = await _httpClient.DeleteAsync($"{_baseUrl}/api/holds/{holdId}");
+            var url = $"{_baseUrl}/api/holds/{holdId}";
+            if (!string.IsNullOrWhiteSpace(sessionId))
+            {
+                url += $"?sessionId={Uri.EscapeDataString(sessionId)}";
+            }
+            var response = await _httpClient.DeleteAsync(url);
             return response.IsSuccessStatusCode;
         }
         catch (Exception)
         {
             return false;
+        }
+    }
+
+    public async Task<GuestSessionResult?> CreateGuestSessionAsync(GuestSessionPayload payload)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/auth/guest-session", new
+            {
+                payload.FullName,
+                payload.Email,
+                payload.PhoneNumber,
+                payload.Address,
+                payload.DocumentNumber,
+                payload.Notes
+            });
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            return await response.Content.ReadFromJsonAsync<GuestSessionResult>(_jsonOptions);
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 }

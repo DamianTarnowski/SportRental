@@ -37,5 +37,28 @@ public interface IApiService
 
     // Holds (tymczasowe rezerwacje)
     Task<CreateHoldResponse?> CreateHoldAsync(CreateHoldRequest request);
-    Task<bool> DeleteHoldAsync(Guid holdId);
+    Task<bool> DeleteHoldAsync(Guid holdId, string? sessionId = null);
+
+    // Guest session (bez rejestracji konta)
+    Task<GuestSessionResult?> CreateGuestSessionAsync(GuestSessionPayload payload);
+}
+
+public sealed class GuestSessionPayload
+{
+    public required string FullName { get; init; }
+    public required string Email { get; init; }
+    public string? PhoneNumber { get; init; }
+    public string? Address { get; init; }
+    public string? DocumentNumber { get; init; }
+    public string? Notes { get; init; }
+}
+
+public sealed class GuestSessionResult
+{
+    public required string AccessToken { get; init; }
+    public required int ExpiresIn { get; init; }
+    public required Guid CustomerId { get; init; }
+    public required Guid TenantId { get; init; }
+    public required string Email { get; init; }
+    public required string FullName { get; init; }
 }

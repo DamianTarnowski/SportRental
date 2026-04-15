@@ -26,7 +26,7 @@ public class CartServiceTests
                     ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10)
                 };
             });
-        api.Setup(a => a.DeleteHoldAsync(It.IsAny<Guid>())).ReturnsAsync(true);
+        api.Setup(a => a.DeleteHoldAsync(It.IsAny<Guid>(), It.IsAny<string?>())).ReturnsAsync(true);
         api.Setup(a => a.GetProductsAsync(It.IsAny<int>(), It.IsAny<int>()))
             .ReturnsAsync(new List<ProductDto>());
 
@@ -75,7 +75,7 @@ public class CartServiceTests
                 Id = holdIds.Dequeue(),
                 ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5)
             });
-        api.Setup(a => a.DeleteHoldAsync(It.IsAny<Guid>())).ReturnsAsync(true);
+        api.Setup(a => a.DeleteHoldAsync(It.IsAny<Guid>(), It.IsAny<string?>())).ReturnsAsync(true);
         api.Setup(a => a.GetProductsAsync(It.IsAny<int>(), It.IsAny<int>()))
             .ReturnsAsync(new List<ProductDto>());
 
@@ -101,7 +101,7 @@ public class CartServiceTests
         await service.UpdateDatesAsync(product.Id, newStart, newEnd);
 
         // Assert
-        api.Verify(a => a.DeleteHoldAsync(initialHold!.Value), Times.Once);
+        api.Verify(a => a.DeleteHoldAsync(initialHold!.Value, It.IsAny<string?>()), Times.Once);
         item.StartDate.Should().Be(newStart);
         item.EndDate.Should().Be(newEnd);
         item.HoldId.Should().NotBeNull();

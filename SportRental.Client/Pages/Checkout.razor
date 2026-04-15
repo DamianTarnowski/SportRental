@@ -687,17 +687,56 @@ else
 
             if (customer is null)
             {
+                // Dla gości (anonimowy checkout) uzyskujemy customer-session token przez /api/auth/guest-session,
+                // który wymusza auth na dalszych endpointach (my-rentals, rentals, PUT customers).
                 try
                 {
-                    customer = await Api.CreateCustomerAsync(new CreateCustomerRequest
+                    var guestAuth = await AuthStateProvider.GetAuthenticationStateAsync();
+                    var alreadyAuthenticated = guestAuth.User.Identity?.IsAuthenticated == true;
+
+                    if (alreadyAuthenticated)
                     {
-                        FullName = _customer.FullName,
-                        Email = _customer.Email,
-                        PhoneNumber = _customer.PhoneNumber,
-                        Address = _customer.Address,
-                        DocumentNumber = _customer.DocumentNumber,
-                        Notes = _customer.Notes
-                    });
+                        customer = await Api.CreateCustomerAsync(new CreateCustomerRequest
+                        {
+                            FullName = _customer.FullName,
+                            Email = _customer.Email,
+                            PhoneNumber = _customer.PhoneNumber,
+                            Address = _customer.Address,
+                            DocumentNumber = _customer.DocumentNumber,
+                            Notes = _customer.Notes
+                        });
+                    }
+                    else
+                    {
+                        var guest = await Api.CreateGuestSessionAsync(new GuestSessionPayload
+                        {
+                            FullName = _customer.FullName,
+                            Email = _customer.Email,
+                            PhoneNumber = _customer.PhoneNumber,
+                            Address = _customer.Address,
+                            DocumentNumber = _customer.DocumentNumber,
+                            Notes = _customer.Notes
+                        });
+                        if (guest is null)
+                        {
+                            Snackbar.Add("Nie udało się utworzyć sesji gościa. Jeśli masz już konto — zaloguj się.", Severity.Error);
+                            return;
+                        }
+                        // Zapisz token jako bieżącą sesję (używany przez inne endpointy wymagające auth).
+                        await ((SportRental.Client.Services.ApiAuthenticationStateProvider)AuthStateProvider)
+                            .MarkUserAsAuthenticated(guest.AccessToken, string.Empty, guest.CustomerId.ToString(), guest.Email);
+
+                        customer = new CustomerDto
+                        {
+                            Id = guest.CustomerId,
+                            FullName = guest.FullName,
+                            Email = guest.Email,
+                            PhoneNumber = _customer.PhoneNumber ?? string.Empty,
+                            Address = _customer.Address,
+                            DocumentNumber = _customer.DocumentNumber,
+                            Notes = _customer.Notes
+                        };
+                    }
                 }
                 catch (Exception ex)
                 {

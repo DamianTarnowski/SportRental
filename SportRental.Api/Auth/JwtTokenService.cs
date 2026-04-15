@@ -23,7 +23,7 @@ public sealed class JwtTokenService
         _signingKey = Encoding.UTF8.GetBytes(_options.SigningKey);
     }
 
-    public AuthTokenResult CreateToken(ApplicationUser user, Guid tenantId, IEnumerable<string> roles)
+    public AuthTokenResult CreateToken(ApplicationUser user, Guid tenantId, IEnumerable<string> roles, Guid? customerId = null)
     {
         var claims = new List<Claim>
         {
@@ -33,6 +33,11 @@ public sealed class JwtTokenService
             new("tenant-id", tenantId.ToString())
         };
 
+        if (customerId.HasValue && customerId.Value != Guid.Empty)
+        {
+            claims.Add(new Claim("customer-id", customerId.Value.ToString()));
+        }
+
         foreach (var role in roles)
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
@@ -40,6 +45,34 @@ public sealed class JwtTokenService
 
         var credentials = new SigningCredentials(new SymmetricSecurityKey(_signingKey), SecurityAlgorithms.HmacSha256);
         var expiresAtUtc = DateTime.UtcNow.AddMinutes(_options.AccessTokenLifetimeMinutes);
+
+        var token = new JwtSecurityToken(
+            issuer: _options.Issuer,
+            audience: _options.Audience,
+            claims: claims,
+            expires: expiresAtUtc,
+            signingCredentials: credentials);
+
+        var handler = new JwtSecurityTokenHandler();
+        return new AuthTokenResult(handler.WriteToken(token), expiresAtUtc);
+    }
+
+    public AuthTokenResult CreateGuestToken(Guid customerId, Guid tenantId, string email, TimeSpan? lifetime = null)
+    {
+        var ttl = lifetime ?? TimeSpan.FromDays(2);
+        var expiresAtUtc = DateTime.UtcNow.Add(ttl);
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, customerId.ToString()),
+            new(JwtRegisteredClaimNames.Email, email ?? string.Empty),
+            new(ClaimTypes.NameIdentifier, customerId.ToString()),
+            new("tenant-id", tenantId.ToString()),
+            new("customer-id", customerId.ToString()),
+            new(ClaimTypes.Role, "GuestCustomer")
+        };
+
+        var credentials = new SigningCredentials(new SymmetricSecurityKey(_signingKey), SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
             issuer: _options.Issuer,
