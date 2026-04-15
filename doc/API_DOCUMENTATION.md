@@ -9,7 +9,7 @@ Projekt **SportRental.Api** jest wyłączony - przygotowany na przyszłość.
 
 ## Podstawowe informacje
 - **Base URL (dev):** `http://localhost:5001` (SportRental.Admin)
-- **Base URL (prod):** `https://sradmin2.azurewebsites.net`
+- **Base URL (prod):** `https://sradmin.azurewebsites.net`
 - **Wersja:** v1 (minimal API)
 - **Naglowek tenant:** wszystkie zapytania, poza `GET /`, `OPTIONS` i `swagger`, wymagaja `X-Tenant-Id: <guid>`.
 - **Format danych:** JSON UTF-8 (camelCase).

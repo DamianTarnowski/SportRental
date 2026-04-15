@@ -55,7 +55,7 @@ var hostAddress = builder.HostEnvironment.BaseAddress;
 // Produkcja: Azure App Service lub Static Web Apps -> Admin na Azure App Service
 if (hostAddress.Contains("azurewebsites.net") || hostAddress.Contains("azurestaticapps.net") || hostAddress.Contains("nice-tree"))
 {
-    baseUrl = "https://sradmin2.azurewebsites.net";
+    baseUrl = "https://sradmin.azurewebsites.net";
 }
 // Development: użyj konfiguracji lub localhost Admin
 else if (string.IsNullOrWhiteSpace(baseUrl))

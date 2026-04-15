@@ -549,7 +549,7 @@ public class RentalsEndpointTests : IClassFixture<WebApplicationFactory<Program>
 dotnet publish SportRental.Admin -c Release -o ./publish/admin
 az webapp deployment source config-zip `
     --resource-group DefaultResourceGroup-PLC `
-    --name sradmin2 `
+    --name sradmin `
     --src ./publish/admin.zip
 
 # Client WASM (Static Web Apps)

@@ -562,3 +562,8 @@ sradmin-logs/
 inne/
 azure-logs/
 azure-logs.zip
+
+## Deprecated API project — nie wywoływany przez żadnego klienta (WASM mówi do
+## SportRental.Admin). Zostawiamy folder lokalnie jako referencję, ale nie śledzimy w git.
+_DEPRECATED_SportRental.Api/
+_DEPRECATED_SportRental.Api.Tests/

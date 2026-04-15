@@ -603,7 +603,7 @@ Poniżej dokładne komendy użyte podczas faktycznego wdrożenia na darmowe plan
 
 | Aplikacja | URL | Plan |
 |-----------|-----|------|
-| **Admin Panel** (Blazor Server) | https://sradmin2.azurewebsites.net | App Service F1 Free |
+| **Admin Panel** (Blazor Server) | https://sradmin.azurewebsites.net | App Service F1 Free |
 | **Klient WASM** | https://nice-tree-0359d8403.3.azurestaticapps.net | Static Web App Free |
 
 ### **1. Utworzenie darmowego App Service Plan (Poland Central)**
@@ -623,19 +623,19 @@ az appservice plan create `
 ```powershell
 # Utworzenie nowej aplikacji na darmowym planie
 az webapp create `
-  --name sradmin2 `
+  --name sradmin `
   --resource-group DefaultResourceGroup-PLC `
   --plan sportrental-free `
   --runtime "dotnet:10"
 
 # Włączenie Managed Identity
 az webapp identity assign `
-  --name sradmin2 `
+  --name sradmin `
   --resource-group DefaultResourceGroup-PLC
 
 # Pobranie Principal ID
 $principalId = az webapp identity show `
-  --name sradmin2 `
+  --name sradmin `
   --resource-group DefaultResourceGroup-PLC `
   --query principalId -o tsv
 
@@ -647,7 +647,7 @@ az role assignment create `
 
 # Konfiguracja App Settings
 az webapp config appsettings set `
-  --name sradmin2 `
+  --name sradmin `
   --resource-group DefaultResourceGroup-PLC `
   --settings `
     "KeyVault__Url=https://<YOUR_KEYVAULT_NAME>.vault.azure.net/" `
@@ -670,7 +670,7 @@ cd ..
 
 # Deploy przez ZIP
 az webapp deployment source config-zip `
-  --name sradmin2 `
+  --name sradmin `
   --resource-group DefaultResourceGroup-PLC `
   --src admin.zip
 ```
@@ -704,7 +704,7 @@ swa deploy "./publish/wwwroot" --deployment-token $token --env production
 ```powershell
 # Dodanie domeny Static Web App do CORS w Admin API
 az webapp cors add `
-  --name sradmin2 `
+  --name sradmin `
   --resource-group DefaultResourceGroup-PLC `
   --allowed-origins "https://nice-tree-0359d8403.3.azurestaticapps.net"
 ```
@@ -715,7 +715,7 @@ az webapp cors add `
 ```json
 {
   "Api": {
-    "BaseUrl": "https://sradmin2.azurewebsites.net",
+    "BaseUrl": "https://sradmin.azurewebsites.net",
     "TenantId": "547f5df7-a389-44b3-bcc6-090ff2fa92e5"
   }
 }

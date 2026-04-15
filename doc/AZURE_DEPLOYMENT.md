@@ -24,7 +24,7 @@ Projekt składa się z dwóch **aktywnych** aplikacji:
 
 ### Wymagania wstępne
 - Azure CLI zainstalowane i zalogowane (`az login`)
-- Istniejący App Service: `sradmin2` w resource group `DefaultResourceGroup-PLC`
+- Istniejący App Service: `sradmin` w resource group `DefaultResourceGroup-PLC`
 
 ### Kroki publikacji
 
@@ -45,21 +45,21 @@ Compress-Archive -Path "./publish/admin/*" -DestinationPath "./publish/admin.zip
 
 #### Krok 4: Deploy na Azure App Service
 ```powershell
-az webapp deployment source config-zip --resource-group DefaultResourceGroup-PLC --name sradmin2 --src ./publish/admin.zip
+az webapp deployment source config-zip --resource-group DefaultResourceGroup-PLC --name sradmin --src ./publish/admin.zip
 ```
 
 #### Krok 5: Restart aplikacji (opcjonalnie, dla pewności)
 ```powershell
-az webapp restart --resource-group DefaultResourceGroup-PLC --name sradmin2
+az webapp restart --resource-group DefaultResourceGroup-PLC --name sradmin
 ```
 
 ### Pełna komenda jednolinijkowa
 ```powershell
-dotnet publish SportRental.Admin -c Release -o ./publish/admin; Compress-Archive -Path "./publish/admin/*" -DestinationPath "./publish/admin.zip" -Force; az webapp deployment source config-zip --resource-group DefaultResourceGroup-PLC --name sradmin2 --src ./publish/admin.zip
+dotnet publish SportRental.Admin -c Release -o ./publish/admin; Compress-Archive -Path "./publish/admin/*" -DestinationPath "./publish/admin.zip" -Force; az webapp deployment source config-zip --resource-group DefaultResourceGroup-PLC --name sradmin --src ./publish/admin.zip
 ```
 
 ### URL po deploy
-- **Produkcja:** https://sradmin2.azurewebsites.net
+- **Produkcja:** https://sradmin.azurewebsites.net
 
 ---
 
@@ -108,7 +108,7 @@ dotnet publish SportRental.Client -c Release -o ./publish/client; swa deploy ./p
 # Admin
 dotnet publish SportRental.Admin -c Release -o ./publish/admin
 Compress-Archive -Path "./publish/admin/*" -DestinationPath "./publish/admin.zip" -Force
-az webapp deployment source config-zip --resource-group DefaultResourceGroup-PLC --name sradmin2 --src ./publish/admin.zip
+az webapp deployment source config-zip --resource-group DefaultResourceGroup-PLC --name sradmin --src ./publish/admin.zip
 
 # Client
 dotnet publish SportRental.Client -c Release -o ./publish/client
@@ -119,7 +119,7 @@ swa deploy ./publish/client/wwwroot --deployment-token <TOKEN> --env production
 
 ## 4. Konfiguracja Azure (już wykonana)
 
-### App Service (sradmin2)
+### App Service (sradmin)
 | Parametr | Wartość |
 |----------|---------|
 | Plan | `sportrental-free` (F1 Free) |
@@ -148,7 +148,7 @@ swa deploy ./publish/client/wwwroot --deployment-token <TOKEN> --env production
 }
 ```
 
-### CORS (w sradmin2)
+### CORS (w sradmin)
 Skonfigurowany dla Static Web App:
 - `https://nice-tree-0359d8403.3.azurestaticapps.net`
 
@@ -159,10 +159,10 @@ Skonfigurowany dla Static Web App:
 ### Problem: Aplikacja nie startuje po deploy
 ```powershell
 # Sprawdź logi
-az webapp log tail --resource-group DefaultResourceGroup-PLC --name sradmin2
+az webapp log tail --resource-group DefaultResourceGroup-PLC --name sradmin
 
 # Restart
-az webapp restart --resource-group DefaultResourceGroup-PLC --name sradmin2
+az webapp restart --resource-group DefaultResourceGroup-PLC --name sradmin
 ```
 
 ### Problem: 500 Internal Server Error
@@ -171,7 +171,7 @@ az webapp restart --resource-group DefaultResourceGroup-PLC --name sradmin2
 
 ### Problem: CORS błędy na kliencie
 ```powershell
-az webapp cors add --resource-group DefaultResourceGroup-PLC --name sradmin2 --allowed-origins "https://nice-tree-0359d8403.3.azurestaticapps.net"
+az webapp cors add --resource-group DefaultResourceGroup-PLC --name sradmin --allowed-origins "https://nice-tree-0359d8403.3.azurestaticapps.net"
 ```
 
 ### Problem: Static Web App zwraca 404
@@ -184,7 +184,7 @@ az webapp cors add --resource-group DefaultResourceGroup-PLC --name sradmin2 --a
 
 | Zasób | Nazwa | Resource Group |
 |-------|-------|----------------|
-| App Service (Admin) | `sradmin2` | `DefaultResourceGroup-PLC` |
+| App Service (Admin) | `sradmin` | `DefaultResourceGroup-PLC` |
 | App Service Plan | `sportrental-free` | `DefaultResourceGroup-PLC` |
 | Static Web App (Client) | `srclient-wasm` | `DefaultResourceGroup-PLC` |
 | PostgreSQL | `eduedu.postgres.database.azure.com` | - |
