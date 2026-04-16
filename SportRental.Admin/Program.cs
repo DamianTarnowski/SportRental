@@ -9,10 +9,14 @@ using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
 using SportRental.Infrastructure.Tenancy;
 using SportRental.Admin.Api;
+using SportRental.Admin.Services.Auth;
 using SportRental.Admin.Services.Contracts;
 using SportRental.Admin.Services.Sms;
 using SportRental.Admin.Services.Storage;
 using SportRental.Admin.Services.UI;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Diagnostics;
@@ -226,12 +230,43 @@ builder.Services.AddSingleton(new RegistrationFeatureFlags
 builder.Services.AddHostedService<SportRental.Admin.Services.Email.RentalReminderService>();
 builder.Services.AddHostedService<ExpiredHoldsCleaner>();
 
+// JWT Bearer for WASM / cross-origin API clients (sits alongside Identity cookies for Blazor Server).
+var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
+builder.Services.Configure<JwtOptions>(jwtSection);
+var jwtSigningKey = jwtSection["SigningKey"];
+if (string.IsNullOrWhiteSpace(jwtSigningKey) && builder.Environment.IsDevelopment())
+{
+    jwtSigningKey = "dev-only-signing-key-do-not-use-in-production-change-in-keyvault-aaaaaaaa";
+    jwtSection["SigningKey"] = jwtSigningKey;
+}
+if (string.IsNullOrWhiteSpace(jwtSigningKey))
+{
+    throw new InvalidOperationException("Jwt:SigningKey is required in production. Configure it in Azure Key Vault as 'Jwt--SigningKey'.");
+}
+builder.Services.AddScoped<JwtTokenService>();
+
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = IdentityConstants.ApplicationScheme;
         options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
     })
     .AddIdentityCookies();
+
+builder.Services.AddAuthentication()
+    .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSection["Issuer"] ?? "SportRental",
+            ValidAudience = jwtSection["Audience"] ?? "SportRental.Client",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 // Pooled factory dla Blazor Server - tworzy instancje DbContext na żądanie

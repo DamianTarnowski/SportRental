@@ -1,13 +1,17 @@
+using System.Security.Claims;
 using SportRental.Admin.Api.Models;
+using SportRental.Admin.Services.Auth;
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Tenancy;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using SportRental.Admin.Services.Contracts;
 using SportRental.Admin.Services.Sms;
 using SportRental.Admin.Services.Storage;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using SharedModels = SportRental.Shared.Models;
 
@@ -15,6 +19,25 @@ namespace SportRental.Admin.Api
 {
     public static class Endpoints
     {
+        // Accepts both JWT Bearer (WASM) and Identity cookie (Blazor Server).
+        private const string ApiAuthSchemes = JwtBearerDefaults.AuthenticationScheme + ",Identity.Application";
+
+        private static string GenerateSessionId()
+        {
+            Span<byte> buffer = stackalloc byte[32];
+            RandomNumberGenerator.Fill(buffer);
+            return Convert.ToBase64String(buffer).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        }
+
+        private static bool SessionIdEquals(string? a, string? b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+            var ab = System.Text.Encoding.UTF8.GetBytes(a);
+            var bb = System.Text.Encoding.UTF8.GetBytes(b);
+            if (ab.Length != bb.Length) return false;
+            return CryptographicOperations.FixedTimeEquals(ab, bb);
+        }
+
         // Helper to convert relative URLs to absolute URLs
         private static string? ToAbsoluteUrl(string? relativeUrl, HttpRequest request)
         {
@@ -761,15 +784,22 @@ namespace SportRental.Admin.Api
                 return Results.Ok(new { id = rental.Id, status = rental.Status.ToString() });
             });
 
-            // Lista wynajmów zalogowanego użytkownika/klienta (tenant scoped)
-            api.MapGet("/my-rentals", [AllowAnonymous] async (
+            // Lista wynajmów zalogowanego użytkownika/klienta (tenant scoped).
+            // customer-id pobierane z tokena, nie z query — zapobiega IDOR (SEC-A03).
+            api.MapGet("/my-rentals", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
                 IDbContextFactory<ApplicationDbContext> dbFactory,
                 ITenantProvider tenantProvider,
+                System.Security.Claims.ClaimsPrincipal user,
                 string? status,
                 DateTime? from,
-                DateTime? to,
-                Guid? customerId) =>
+                DateTime? to) =>
             {
+                var customerId = user.GetCustomerId();
+                if (customerId is null)
+                {
+                    return Results.Forbid();
+                }
+
                 await using var db = await dbFactory.CreateDbContextAsync();
                 var tid = tenantProvider.GetCurrentTenantId();
 
@@ -779,13 +809,8 @@ namespace SportRental.Admin.Api
                     .Include(r => r.Items)
                         .ThenInclude(i => i.Product)
                     .Include(r => r.Customer)
+                    .Where(r => r.CustomerId == customerId.Value)
                     .Where(r => tid == null || tid == Guid.Empty || r.TenantId == tid);
-
-                // Filtruj po customerId jeśli podano
-                if (customerId.HasValue)
-                {
-                    query = query.Where(r => r.CustomerId == customerId.Value);
-                }
 
                 if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<RentalStatus>(status, true, out var st))
                 {
@@ -839,26 +864,29 @@ namespace SportRental.Admin.Api
                 return Results.Ok(list);
             });
 
-            // Utworzenie krótkotrwałego holda na produkt
-            api.MapPost("/holds", [AllowAnonymous] async (CreateHoldRequest req, IDbContextFactory<ApplicationDbContext> dbFactory, ITenantProvider tenantProvider) =>
+            // Utworzenie krótkotrwałego holda na produkt.
+            // Zalogowany: customer-id bierzemy z tokena; gość: generujemy serwerowy sessionId i zwracamy klientowi.
+            // req.CustomerId jest ignorowane — poprzednio umożliwiało atakującemu podstawienie cudzego ID (SEC-A03).
+            api.MapPost("/holds", [AllowAnonymous] async (
+                CreateHoldRequest req,
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ITenantProvider tenantProvider,
+                System.Security.Claims.ClaimsPrincipal user) =>
             {
                 if (req == null) return Results.BadRequest("Brak danych");
                 if (req.Quantity <= 0) return Results.BadRequest("Ilość musi być > 0");
                 if (req.StartDateUtc >= req.EndDateUtc) return Results.BadRequest("Zakres dat niepoprawny");
 
                 await using var db = await dbFactory.CreateDbContextAsync();
-                
-                // Pobierz produkt (bez filtrowania po tenant - pokazujemy wszystkie)
+
                 var product = await db.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == req.ProductId);
                 if (product == null) return Results.NotFound("Nie znaleziono produktu");
 
-                // Tenant bierzemy Z PRODUKTU, nie z headera!
                 var tid = product.TenantId;
 
                 var ttl = Math.Clamp(req.TtlMinutes ?? 10, 5, 30);
                 var nowUtc = DateTime.UtcNow;
 
-                // policz zajętość: aktywne rezerwacje + aktywne holdy (IgnoreQueryFilters bo klient WASM nie ma tenant)
                 var overlappingReservedQty = await db.RentalItems
                     .IgnoreQueryFilters()
                     .Where(ri => ri.ProductId == req.ProductId)
@@ -881,32 +909,62 @@ namespace SportRental.Admin.Api
                 if (overlappingReservedQty + activeHoldsQty + req.Quantity > product.AvailableQuantity)
                     return Results.Conflict(new { message = $"Brak dostępności. Dostępne: {Math.Max(0, product.AvailableQuantity - overlappingReservedQty - activeHoldsQty)}" });
 
+                var customerIdFromClaim = user.GetCustomerId();
+                string? sessionId = null;
+                if (customerIdFromClaim is null)
+                {
+                    // Guest path: accept client-provided sessionId only if it's long enough to resist guessing.
+                    // Otherwise generate a cryptographically strong one server-side and return it.
+                    if (!string.IsNullOrEmpty(req.SessionId) && req.SessionId.Length >= 24)
+                    {
+                        sessionId = req.SessionId;
+                    }
+                    else
+                    {
+                        sessionId = GenerateSessionId();
+                    }
+                }
+
                 var hold = new ReservationHold
                 {
                     Id = Guid.NewGuid(),
-                    TenantId = tid, // tenant Z PRODUKTU
+                    TenantId = tid,
                     ProductId = req.ProductId,
                     Quantity = req.Quantity,
                     StartDateUtc = req.StartDateUtc,
                     EndDateUtc = req.EndDateUtc,
                     CreatedAtUtc = nowUtc,
                     ExpiresAtUtc = nowUtc.AddMinutes(ttl),
-                    CustomerId = req.CustomerId,
-                    SessionId = req.SessionId
+                    CustomerId = customerIdFromClaim,
+                    SessionId = sessionId
                 };
 
                 await db.ReservationHolds.AddAsync(hold);
                 await db.SaveChangesAsync();
-                return Results.Created($"/api/holds/{hold.Id}", new { hold.Id, hold.ExpiresAtUtc });
+                return Results.Created($"/api/holds/{hold.Id}", new { hold.Id, hold.ExpiresAtUtc, SessionId = sessionId });
             });
 
-            // Usunięcie (zwolnienie) holda
-            api.MapDelete("/holds/{id:guid}", [AllowAnonymous] async (Guid id, IDbContextFactory<ApplicationDbContext> dbFactory, ITenantProvider tenantProvider) =>
+            // Usunięcie (zwolnienie) holda — ownership: customer-id z tokena LUB sessionId z query (SEC-A03).
+            api.MapDelete("/holds/{id:guid}", [AllowAnonymous] async (
+                Guid id,
+                string? sessionId,
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                System.Security.Claims.ClaimsPrincipal user) =>
             {
                 await using var db = await dbFactory.CreateDbContextAsync();
-                // IgnoreQueryFilters bo klient WASM nie ma tenant
                 var hold = await db.ReservationHolds.IgnoreQueryFilters().FirstOrDefaultAsync(h => h.Id == id);
                 if (hold == null) return Results.NotFound();
+
+                var customerIdFromClaim = user.GetCustomerId();
+                var isAdmin = user.IsAdmin();
+                var ownedByCustomer = customerIdFromClaim.HasValue && hold.CustomerId == customerIdFromClaim.Value;
+                var ownedBySession = SessionIdEquals(hold.SessionId, sessionId);
+
+                if (!isAdmin && !ownedByCustomer && !ownedBySession)
+                {
+                    return Results.NotFound();
+                }
+
                 db.ReservationHolds.Remove(hold);
                 await db.SaveChangesAsync();
                 return Results.Ok();
@@ -919,13 +977,13 @@ namespace SportRental.Admin.Api
         {
             var auth = api.MapGroup("/auth");
 
-            // Register endpoint (cookie-based, no JWT needed)
+            // Register endpoint — creates user + customer, signs cookie AND returns JWT for WASM.
             auth.MapPost("/register", [AllowAnonymous] async (
                 RegisterRequest request,
                 UserManager<ApplicationUser> userManager,
                 SignInManager<ApplicationUser> signInManager,
+                JwtTokenService jwt,
                 IDbContextFactory<ApplicationDbContext> dbFactory,
-                ITenantProvider tenantProvider,
                 HttpContext httpContext) =>
             {
                 if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
@@ -933,7 +991,6 @@ namespace SportRental.Admin.Api
                     return Results.BadRequest(new { error = "Email i hasło są wymagane" });
                 }
 
-                // Tenant is optional — user is global, can see all rentals
                 Guid? tenantId = null;
                 var tenantIdHeader = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
                 if (!string.IsNullOrWhiteSpace(tenantIdHeader) && Guid.TryParse(tenantIdHeader, out var parsedTenantId))
@@ -946,7 +1003,6 @@ namespace SportRental.Admin.Api
                     }
                 }
 
-                // Check if email already exists
                 var existingUser = await userManager.FindByEmailAsync(request.Email);
                 if (existingUser != null)
                 {
@@ -958,7 +1014,7 @@ namespace SportRental.Admin.Api
                     UserName = request.Email,
                     Email = request.Email,
                     TenantId = tenantId,
-                    EmailConfirmed = true // Auto-confirm in development
+                    EmailConfirmed = true
                 };
 
                 var result = await userManager.CreateAsync(user, request.Password);
@@ -968,10 +1024,8 @@ namespace SportRental.Admin.Api
                     return Results.BadRequest(new { error = errors });
                 }
 
-                // Assign Client role
                 await userManager.AddToRoleAsync(user, "Client");
 
-                // Automatically create Customer record (use tenant if provided)
                 await using var db = await dbFactory.CreateDbContextAsync();
                 var customer = new Customer
                 {
@@ -983,34 +1037,36 @@ namespace SportRental.Admin.Api
                     DocumentNumber = request.DocumentNumber,
                     CreatedAtUtc = DateTime.UtcNow
                 };
-
                 db.Customers.Add(customer);
                 await db.SaveChangesAsync();
 
-                // Sign in the user (cookie-based)
                 await signInManager.SignInAsync(user, isPersistent: false);
 
-                // Return response (mock JWT format for compatibility)
+                var token = jwt.CreateUserToken(user, tenantId ?? Guid.Empty, new[] { "Client" }, customer.Id);
+
                 return Results.Ok(new
                 {
-                    AccessToken = "cookie-based-auth",
+                    AccessToken = token.AccessToken,
                     RefreshToken = "not-used",
-                    ExpiresIn = 3600,
-                    TokenType = "Cookie",
+                    ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
+                    TokenType = "Bearer",
                     User = new
                     {
                         Id = user.Id,
                         Email = user.Email,
-                        TenantId = tenantId
+                        TenantId = tenantId,
+                        CustomerId = customer.Id
                     }
                 });
             });
 
-            // Login endpoint
+            // Login endpoint — signs cookie AND returns JWT.
             auth.MapPost("/login", [AllowAnonymous] async (
                 LoginRequest request,
                 UserManager<ApplicationUser> userManager,
                 SignInManager<ApplicationUser> signInManager,
+                JwtTokenService jwt,
+                IDbContextFactory<ApplicationDbContext> dbFactory,
                 HttpContext httpContext) =>
             {
                 if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Password))
@@ -1029,33 +1085,126 @@ namespace SportRental.Admin.Api
                 {
                     if (result.IsLockedOut)
                         return Results.BadRequest(new { error = "Konto zablokowane" });
-                    
                     return Results.BadRequest(new { error = "Nieprawidłowy email lub hasło" });
                 }
 
+                var roles = await userManager.GetRolesAsync(user);
+
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var normalizedEmail = (user.Email ?? string.Empty).Trim().ToLower();
+                var customerQuery = db.Customers.IgnoreQueryFilters()
+                    .Where(c => c.Email != null && c.Email.ToLower() == normalizedEmail);
+                if (user.TenantId.HasValue && user.TenantId.Value != Guid.Empty)
+                {
+                    customerQuery = customerQuery.Where(c => c.TenantId == user.TenantId.Value);
+                }
+                var customer = await customerQuery.OrderBy(c => c.CreatedAtUtc).FirstOrDefaultAsync();
+
+                var token = jwt.CreateUserToken(user, user.TenantId ?? Guid.Empty, roles, customer?.Id);
+
                 return Results.Ok(new
                 {
-                    AccessToken = "cookie-based-auth",
+                    AccessToken = token.AccessToken,
                     RefreshToken = "not-used",
-                    ExpiresIn = 3600,
-                    TokenType = "Cookie",
+                    ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
+                    TokenType = "Bearer",
                     User = new
                     {
                         Id = user.Id,
                         Email = user.Email,
-                        TenantId = user.TenantId
+                        TenantId = user.TenantId,
+                        CustomerId = customer?.Id
                     }
                 });
             });
+
+            // Guest session — anonymous checkout path: creates/finds Customer, issues short-lived JWT bound to customer-id.
+            auth.MapPost("/guest-session", [AllowAnonymous] async (
+                GuestSessionRequest request,
+                UserManager<ApplicationUser> userManager,
+                JwtTokenService jwt,
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                HttpContext httpContext) =>
+            {
+                if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.FullName))
+                {
+                    return Results.BadRequest(new { error = "Email i imię i nazwisko są wymagane" });
+                }
+
+                // If user already has a registered account, force login (don't let attacker short-circuit with guest flow).
+                var existingUser = await userManager.FindByEmailAsync(request.Email);
+                if (existingUser != null)
+                {
+                    return Results.Conflict(new { error = "Masz już konto — zaloguj się, aby kontynuować." });
+                }
+
+                Guid tenantId = Guid.Empty;
+                var tenantIdHeader = httpContext.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(tenantIdHeader) && Guid.TryParse(tenantIdHeader, out var parsedTenantId))
+                {
+                    tenantId = parsedTenantId;
+                }
+
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var normalizedEmail = request.Email.Trim().ToLower();
+
+                var customerQuery = db.Customers.IgnoreQueryFilters()
+                    .Where(c => c.Email != null && c.Email.ToLower() == normalizedEmail);
+                if (tenantId != Guid.Empty)
+                {
+                    customerQuery = customerQuery.Where(c => c.TenantId == tenantId);
+                }
+
+                var customer = await customerQuery.OrderBy(c => c.CreatedAtUtc).FirstOrDefaultAsync();
+                if (customer is null)
+                {
+                    customer = new Customer
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = tenantId,
+                        FullName = request.FullName.Trim(),
+                        Email = normalizedEmail,
+                        PhoneNumber = request.PhoneNumber?.Trim(),
+                        Address = request.Address,
+                        DocumentNumber = request.DocumentNumber,
+                        Notes = request.Notes,
+                        CreatedAtUtc = DateTime.UtcNow
+                    };
+                    db.Customers.Add(customer);
+                    await db.SaveChangesAsync();
+                }
+
+                var token = jwt.CreateGuestToken(customer.Id, customer.TenantId, customer.Email ?? normalizedEmail);
+
+                return Results.Ok(new
+                {
+                    AccessToken = token.AccessToken,
+                    TokenType = "Bearer",
+                    ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
+                    CustomerId = customer.Id,
+                    Email = customer.Email,
+                    FullName = customer.FullName
+                });
+            });
         }
+
+        public sealed record GuestSessionRequest(
+            string Email,
+            string FullName,
+            string? PhoneNumber,
+            string? Address,
+            string? DocumentNumber,
+            string? Notes);
 
         // Customer endpoints for WASM client
         private static void MapCustomerEndpoints(IEndpointRouteBuilder api)
         {
             // GET /api/customers/by-email?email=xxx
-            api.MapGet("/customers/by-email", [AllowAnonymous] async (
-                IDbContextFactory<ApplicationDbContext> dbFactory, 
+            // Auth: tylko własny email (zapobiega enumeracji PII — SEC-A03) albo admin.
+            api.MapGet("/customers/by-email", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
                 ITenantProvider tenantProvider,
+                System.Security.Claims.ClaimsPrincipal user,
                 string? email,
                 CancellationToken ct) =>
             {
@@ -1064,47 +1213,63 @@ namespace SportRental.Admin.Api
                     return Results.BadRequest(new { error = "Email query parameter is required." });
                 }
 
+                var normalizedEmail = email.Trim().ToLower();
+                var ownEmail = user.FindFirst(ClaimTypes.Email)?.Value?.Trim().ToLower();
+
+                if (!user.IsAdmin() && !string.Equals(normalizedEmail, ownEmail, StringComparison.Ordinal))
+                {
+                    return Results.NotFound();
+                }
+
                 await using var db = await dbFactory.CreateDbContextAsync(ct);
                 var tenantId = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
-                var normalizedEmail = email.Trim().ToLower();
 
                 var query = db.Customers.IgnoreQueryFilters()
                     .Where(c => c.Email != null && c.Email.ToLower() == normalizedEmail);
-                
+
                 if (tenantId != Guid.Empty)
                 {
                     query = query.Where(c => c.TenantId == tenantId);
                 }
 
                 var customer = await query.FirstOrDefaultAsync(ct);
-                return customer is null 
-                    ? Results.NotFound() 
+                return customer is null
+                    ? Results.NotFound()
                     : Results.Ok(ToCustomerDto(customer));
             });
 
             // GET /api/customers/{id}
-            api.MapGet("/customers/{id:guid}", [AllowAnonymous] async (
+            // Auth: tylko własny customer-id (ownership) albo admin (SEC-A03).
+            api.MapGet("/customers/{id:guid}", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
                 IDbContextFactory<ApplicationDbContext> dbFactory,
                 ITenantProvider tenantProvider,
+                System.Security.Claims.ClaimsPrincipal user,
                 Guid id,
                 CancellationToken ct) =>
             {
+                var customerIdFromClaim = user.GetCustomerId();
+                if (!user.IsAdmin() && customerIdFromClaim != id)
+                {
+                    return Results.NotFound();
+                }
+
                 await using var db = await dbFactory.CreateDbContextAsync(ct);
                 var tenantId = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
 
                 var query = db.Customers.IgnoreQueryFilters().Where(c => c.Id == id);
-                if (tenantId != Guid.Empty)
+                if (tenantId != Guid.Empty && user.IsAdmin())
                 {
                     query = query.Where(c => c.TenantId == tenantId);
                 }
 
                 var customer = await query.FirstOrDefaultAsync(ct);
-                return customer is null 
-                    ? Results.NotFound() 
+                return customer is null
+                    ? Results.NotFound()
                     : Results.Ok(ToCustomerDto(customer));
             });
 
             // POST /api/customers
+            // Pozostaje AllowAnonymous jako punkt wejścia, ale nie ujawnia istniejącego klienta — duplicate email => 409 (SEC-A03).
             api.MapPost("/customers", [AllowAnonymous] async (
                 IDbContextFactory<ApplicationDbContext> dbFactory,
                 ITenantProvider tenantProvider,
@@ -1119,20 +1284,14 @@ namespace SportRental.Admin.Api
                 {
                     var query = db.Customers.IgnoreQueryFilters()
                         .Where(c => c.Email != null && c.Email.ToLower() == normalizedEmail.ToLower());
-                    
+
                     if (tenantId != Guid.Empty)
                     {
                         query = query.Where(c => c.TenantId == tenantId);
                     }
 
-                    var existingCustomer = await query.FirstOrDefaultAsync(ct);
-                    if (existingCustomer is not null)
+                    if (await query.AnyAsync(ct))
                     {
-                        // Return existing customer for WASM client convenience
-                        if (tenantId == Guid.Empty)
-                        {
-                            return Results.Ok(ToCustomerDto(existingCustomer));
-                        }
                         return Results.Conflict(new { error = "Customer with the provided email already exists." });
                     }
                 }
@@ -1157,13 +1316,21 @@ namespace SportRental.Admin.Api
             });
 
             // PUT /api/customers/{id}
-            api.MapPut("/customers/{id:guid}", [AllowAnonymous] async (
+            // Auth: tylko własny customer-id albo admin (SEC-A03).
+            api.MapPut("/customers/{id:guid}", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
                 IDbContextFactory<ApplicationDbContext> dbFactory,
                 ITenantProvider tenantProvider,
+                System.Security.Claims.ClaimsPrincipal user,
                 Guid id,
                 SharedModels.CreateCustomerRequest req,
                 CancellationToken ct) =>
             {
+                var customerIdFromClaim = user.GetCustomerId();
+                if (!user.IsAdmin() && customerIdFromClaim != id)
+                {
+                    return Results.NotFound();
+                }
+
                 await using var db = await dbFactory.CreateDbContextAsync(ct);
                 var tenantId = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
 
@@ -1175,19 +1342,19 @@ namespace SportRental.Admin.Api
                     return Results.NotFound();
                 }
 
-                if (tenantId != Guid.Empty && customer.TenantId != Guid.Empty && customer.TenantId != tenantId)
+                if (user.IsAdmin() && tenantId != Guid.Empty && customer.TenantId != Guid.Empty && customer.TenantId != tenantId)
                 {
                     return Results.NotFound();
                 }
 
                 var normalizedEmail = req.Email?.Trim();
                 var emailChanged = !string.Equals(customer.Email?.Trim(), normalizedEmail, StringComparison.OrdinalIgnoreCase);
-                
+
                 if (!string.IsNullOrEmpty(normalizedEmail) && emailChanged)
                 {
                     var conflictQuery = db.Customers.IgnoreQueryFilters()
                         .Where(c => c.Id != id && c.Email != null && c.Email.ToLower() == normalizedEmail.ToLower());
-                    
+
                     if (tenantId != Guid.Empty)
                     {
                         conflictQuery = conflictQuery.Where(c => c.TenantId == tenantId);
