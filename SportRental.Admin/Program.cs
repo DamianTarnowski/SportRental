@@ -388,9 +388,12 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
-// Swagger UI dla API
-app.UseSwagger();
-app.UseSwaggerUI();
+// Swagger UI tylko w dev — w produkcji ujawniałby powierzchnię API (SEC-005)
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseRateLimiter();
 
