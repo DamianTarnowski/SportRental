@@ -388,6 +388,18 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 
+// SEC-004: security headers (defense-in-depth). CSP celowo pominięte na tym etapie —
+// wymaga osobnej konfiguracji pod Blazor Server + MudBlazor + Stripe.
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    await next();
+});
+
 // Swagger UI tylko w dev — w produkcji ujawniałby powierzchnię API (SEC-005)
 if (app.Environment.IsDevelopment())
 {
