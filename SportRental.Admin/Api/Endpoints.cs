@@ -147,7 +147,8 @@ namespace SportRental.Admin.Api
             });
             
             var api = app.MapGroup("/api")
-                .RequireCors(); // Enable CORS for all API endpoints
+                .RequireCors() // Enable CORS for all API endpoints
+                .RequireRateLimiting("api"); // SEC-006: 100 req/min/IP baseline
             
             // Auth endpoints
             MapAuthEndpoints(api);
@@ -975,7 +976,8 @@ namespace SportRental.Admin.Api
 
         private static void MapAuthEndpoints(RouteGroupBuilder api)
         {
-            var auth = api.MapGroup("/auth");
+            // SEC-006: tighter limit for credential endpoints (5 req/min/IP).
+            var auth = api.MapGroup("/auth").RequireRateLimiting("auth");
 
             // Register endpoint — creates user + customer, signs cookie AND returns JWT for WASM.
             auth.MapPost("/register", [AllowAnonymous] async (
