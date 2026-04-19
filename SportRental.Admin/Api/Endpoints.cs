@@ -1049,7 +1049,6 @@ namespace SportRental.Admin.Api
                 return Results.Ok(new
                 {
                     AccessToken = token.AccessToken,
-                    RefreshToken = "not-used",
                     ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
                     TokenType = "Bearer",
                     User = new
@@ -1107,7 +1106,6 @@ namespace SportRental.Admin.Api
                 return Results.Ok(new
                 {
                     AccessToken = token.AccessToken,
-                    RefreshToken = "not-used",
                     ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
                     TokenType = "Bearer",
                     User = new

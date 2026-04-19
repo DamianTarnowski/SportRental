@@ -57,8 +57,7 @@ public class AuthService
                 return AuthResult.Failure("Nieprawidłowa odpowiedź serwera");
 
             await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsAuthenticated(
-                result.AccessToken, 
-                result.RefreshToken,
+                result.AccessToken,
                 result.User?.Id.ToString(),
                 result.User?.Email);
 
@@ -106,8 +105,7 @@ public class AuthService
                 return AuthResult.Failure("Nieprawidłowa odpowiedź serwera");
 
             await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsAuthenticated(
-                result.AccessToken, 
-                result.RefreshToken,
+                result.AccessToken,
                 result.User?.Id.ToString(),
                 result.User?.Email);
 
@@ -124,7 +122,7 @@ public class AuthService
         await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsLoggedOut();
     }
 
-    private record AuthResponse(string AccessToken, string RefreshToken, int ExpiresIn, string TokenType, UserInfo User);
+    private record AuthResponse(string AccessToken, int ExpiresIn, string TokenType, UserInfo User);
     private record UserInfo(Guid Id, string Email, Guid TenantId);
     private record ErrorResponse(string Error);
 }

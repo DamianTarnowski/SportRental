@@ -1,5 +1,4 @@
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
 using Blazored.LocalStorage;
@@ -62,20 +61,12 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
                 var expiryDate = DateTimeOffset.FromUnixTimeSeconds(exp);
                 if (expiryDate < DateTimeOffset.UtcNow)
                 {
-                    // Token expired, try to refresh
-                    var refreshed = await TryRefreshTokenAsync();
-                    if (!refreshed)
-                    {
-                        await MarkUserAsLoggedOut();
-                        return _anonymous;
-                    }
-                    
-                    // Get new token and parse again
-                    token = await _localStorage.GetItemAsync<string>("authToken");
-                    if (string.IsNullOrWhiteSpace(token))
-                        return _anonymous;
-                        
-                    claims = ParseClaimsFromJwt(token).ToList();
+                    // Token expired. Server does not currently expose a refresh
+                    // endpoint, so we simply log the user out and they must
+                    // re-authenticate. (Historical refresh flow was dead code,
+                    // removed as part of SEC-010 cleanup.)
+                    await MarkUserAsLoggedOut();
+                    return _anonymous;
                 }
             }
         }
@@ -86,11 +77,10 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
         return new AuthenticationState(user);
     }
 
-    public async Task MarkUserAsAuthenticated(string token, string refreshToken, string? userId = null, string? email = null)
+    public async Task MarkUserAsAuthenticated(string token, string? userId = null, string? email = null)
     {
         await _localStorage.SetItemAsync("authToken", token);
-        await _localStorage.SetItemAsync("refreshToken", refreshToken);
-        
+
         // Store user info for cookie-based auth
         if (!string.IsNullOrEmpty(userId))
             await _localStorage.SetItemAsync("userId", userId);
@@ -121,6 +111,7 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
     public async Task MarkUserAsLoggedOut()
     {
         await _localStorage.RemoveItemAsync("authToken");
+        // Legacy key from the removed refresh-token flow — clear to avoid stale data.
         await _localStorage.RemoveItemAsync("refreshToken");
         await _localStorage.RemoveItemAsync("userId");
         await _localStorage.RemoveItemAsync("userEmail");
@@ -128,35 +119,6 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
         _httpClient.DefaultRequestHeaders.Authorization = null;
 
         NotifyAuthenticationStateChanged(Task.FromResult(_anonymous));
-    }
-
-    private async Task<bool> TryRefreshTokenAsync()
-    {
-        try
-        {
-            var refreshToken = await _localStorage.GetItemAsync<string>("refreshToken");
-            if (string.IsNullOrWhiteSpace(refreshToken))
-                return false;
-
-            var response = await _httpClient.PostAsJsonAsync("/api/auth/refresh", new { RefreshToken = refreshToken });
-
-            if (!response.IsSuccessStatusCode)
-                return false;
-
-            var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
-            if (result == null)
-                return false;
-
-            await _localStorage.SetItemAsync("authToken", result.AccessToken);
-            await _localStorage.SetItemAsync("refreshToken", result.RefreshToken);
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", result.AccessToken);
-
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
     }
 
     private static IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
@@ -213,5 +175,4 @@ public class ApiAuthenticationStateProvider : AuthenticationStateProvider
         return Convert.FromBase64String(base64);
     }
 
-    private record AuthResponse(string AccessToken, string RefreshToken, int ExpiresIn, string TokenType);
 }

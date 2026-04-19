@@ -724,7 +724,7 @@ else
                         }
                         // Zapisz token jako bieżącą sesję (używany przez inne endpointy wymagające auth).
                         await ((SportRental.Client.Services.ApiAuthenticationStateProvider)AuthStateProvider)
-                            .MarkUserAsAuthenticated(guest.AccessToken, string.Empty, guest.CustomerId.ToString(), guest.Email);
+                            .MarkUserAsAuthenticated(guest.AccessToken, guest.CustomerId.ToString(), guest.Email);
 
                         customer = new CustomerDto
                         {
