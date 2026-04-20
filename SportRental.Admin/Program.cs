@@ -242,6 +242,7 @@ builder.Services.AddSingleton(new RegistrationFeatureFlags
 
 // Background services
 builder.Services.AddHostedService<SportRental.Admin.Services.Email.RentalReminderService>();
+builder.Services.AddHostedService<SportRental.Admin.Services.Email.ReviewRequestService>();
 builder.Services.AddHostedService<ExpiredHoldsCleaner>();
 
 // JWT Bearer for WASM / cross-origin API clients (sits alongside Identity cookies for Blazor Server).

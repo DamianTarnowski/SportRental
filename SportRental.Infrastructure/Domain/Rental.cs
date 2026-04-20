@@ -58,6 +58,10 @@ namespace SportRental.Infrastructure.Domain
         public bool IsReminderEmailSent { get; set; } = false;
         public DateTime? ReminderEmailSentAtUtc { get; set; }
 
+        // Prośby o wystawienie opinii po zakończeniu wynajmu — do 3 prób (+24h, +3d, +7d).
+        public int ReviewRequestCount { get; set; } = 0;
+        public DateTime? LastReviewRequestSentAtUtc { get; set; }
+
         // Źródło wypożyczenia
         public RentalSource Source { get; set; } = RentalSource.Online;
 

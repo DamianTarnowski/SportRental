@@ -6,6 +6,7 @@ using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using SportRental.Admin.Services.Contracts;
 using SportRental.Admin.Services.Sms;
 using SportRental.Admin.Services.Storage;
@@ -1604,6 +1605,41 @@ namespace SportRental.Admin.Api
                     AverageService = Math.Round(agg.AvgS, 2),
                     AverageOverall = Math.Round((agg.AvgQ + agg.AvgP + agg.AvgS) / 3.0, 2)
                 });
+            });
+
+            // POST /api/reviews/opt-out — link z maila. Token = Customer.Id chroniony przez DataProtection.
+            api.MapPost("/reviews/opt-out", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                IDataProtectionProvider protectorProvider,
+                string? token,
+                CancellationToken ct) =>
+            {
+                if (string.IsNullOrWhiteSpace(token)) return Results.BadRequest(new { error = "Token required." });
+
+                Guid customerId;
+                try
+                {
+                    var protector = protectorProvider.CreateProtector("ReviewOptOut");
+                    var raw = protector.Unprotect(token);
+                    if (!Guid.TryParseExact(raw, "N", out customerId)) return Results.BadRequest(new { error = "Invalid token." });
+                }
+                catch
+                {
+                    return Results.BadRequest(new { error = "Invalid token." });
+                }
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                var customer = await db.Customers.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(c => c.Id == customerId, ct);
+                if (customer is null) return Results.NotFound();
+
+                if (!customer.ReviewEmailsOptOut)
+                {
+                    customer.ReviewEmailsOptOut = true;
+                    await db.SaveChangesAsync(ct);
+                }
+
+                return Results.Ok(new { optedOut = true });
             });
 
             // Moderacja — tylko admin. Zwraca wszystkie opinie (również ukryte) dla tenanta admina.

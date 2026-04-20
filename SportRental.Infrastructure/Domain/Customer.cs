@@ -28,6 +28,9 @@ namespace SportRental.Infrastructure.Domain
         public string? Notes { get; set; }
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+        // Rezygnacja z e-maili z prośbą o opinię. Link rezygnacji w mailu.
+        public bool ReviewEmailsOptOut { get; set; } = false;
     }
 }
 

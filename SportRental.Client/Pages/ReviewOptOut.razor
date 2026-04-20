@@ -1,0 +1,60 @@
+@page "/reviews/opt-out"
+@using MudBlazor
+@inject HttpClient Http
+@inject NavigationManager Nav
+
+<PageTitle>Rezygnacja z e-maili o opinie - SportRental</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    <MudPaper Class="pa-6 text-center" Elevation="2">
+        @if (_isLoading)
+        {
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" Class="mb-3" />
+            <MudText Typo="Typo.body1">Przetwarzanie...</MudText>
+        }
+        else if (_success)
+        {
+            <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" Size="Size.Large" Class="mb-3" />
+            <MudText Typo="Typo.h5" Class="mb-2">Gotowe</MudText>
+            <MudText Typo="Typo.body1">
+                Nie będziemy więcej wysyłać Ci e-maili z prośbą o opinię.
+            </MudText>
+        }
+        else
+        {
+            <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Color="Color.Error" Size="Size.Large" Class="mb-3" />
+            <MudText Typo="Typo.h5" Class="mb-2">Link nieprawidłowy</MudText>
+            <MudText Typo="Typo.body1">Nie udało się zrealizować żądania. Link mógł wygasnąć.</MudText>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [SupplyParameterFromQuery] public string? Token { get; set; }
+
+    private bool _isLoading = true;
+    private bool _success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Token))
+        {
+            _isLoading = false;
+            return;
+        }
+
+        try
+        {
+            var resp = await Http.PostAsync($"/api/reviews/opt-out?token={Uri.EscapeDataString(Token)}", content: null);
+            _success = resp.IsSuccessStatusCode;
+        }
+        catch
+        {
+            _success = false;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
