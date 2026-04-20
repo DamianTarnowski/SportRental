@@ -55,6 +55,8 @@ namespace SportRental.Infrastructure.Domain
         public bool IsEmailSent { get; set; } = false;
         public bool IsReminderSmsSent { get; set; } = false;
         public DateTime? ReminderSmsSentAtUtc { get; set; }
+        public bool IsReminderEmailSent { get; set; } = false;
+        public DateTime? ReminderEmailSentAtUtc { get; set; }
 
         // Źródło wypożyczenia
         public RentalSource Source { get; set; } = RentalSource.Online;

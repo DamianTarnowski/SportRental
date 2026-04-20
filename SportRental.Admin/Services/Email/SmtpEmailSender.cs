@@ -26,7 +26,7 @@ namespace SportRental.Admin.Services.Email
 
         public async Task SendEmailWithAttachmentAsync(string email, string subject, string htmlMessage, string? attachmentPath = null)
         {
-            // Walidacja parametrĂłw
+            // Walidacja parametrów
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("Email address cannot be null or empty.", nameof(email));
             if (string.IsNullOrWhiteSpace(subject))
@@ -47,7 +47,7 @@ namespace SportRental.Admin.Services.Email
 
                 var bodyBuilder = new BodyBuilder();
                 
-                // SprawdĹş czy htmlMessage zawiera HTML
+                // Sprawdź czy htmlMessage zawiera HTML
                 if (htmlMessage.Contains("<html>") || htmlMessage.Contains("<p>") || htmlMessage.Contains("<br"))
                 {
                     bodyBuilder.HtmlBody = htmlMessage;
@@ -57,7 +57,7 @@ namespace SportRental.Admin.Services.Email
                     bodyBuilder.TextBody = htmlMessage;
                 }
 
-                // DoĹ‚Ä…cz zaĹ‚Ä…cznik jeĹ›li istnieje
+                // Dołącz załącznik jeśli istnieje
                 if (!string.IsNullOrEmpty(attachmentPath) && File.Exists(attachmentPath))
                 {
                     bodyBuilder.Attachments.Add(attachmentPath);
@@ -80,18 +80,18 @@ namespace SportRental.Admin.Services.Email
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
 
-                _logger.LogInformation("Email wysĹ‚any pomyĹ›lnie do {Email}", email);
+                _logger.LogInformation("Email wysłany pomyślnie do {Email}", email);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "BĹ‚Ä…d podczas wysyĹ‚ania emaila do {Email}", email);
+                _logger.LogError(ex, "Błąd podczas wysyłania emaila do {Email}", email);
                 throw;
             }
         }
 
         public async Task SendRentalContractAsync(string email, string customerName, byte[] contractPdf)
         {
-            // Walidacja parametrĂłw
+            // Walidacja parametrów
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("Email address cannot be null or empty.", nameof(email));
             if (string.IsNullOrWhiteSpace(customerName))
@@ -108,18 +108,18 @@ namespace SportRental.Admin.Services.Email
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(smtpSettings.SenderName, smtpSettings.SenderEmail));
                 message.To.Add(new MailboxAddress(customerName, email));
-                message.Subject = "Nowa umowa wypoĹĽyczenia SportRental";
+                message.Subject = "Nowa umowa wypożyczenia SportRental";
 
                 var bodyBuilder = new BodyBuilder();
                 bodyBuilder.HtmlBody = $@"
-                    <h2>DzieĹ„ dobry {customerName}!</h2>
-                    <p>W zaĹ‚Ä…czniku znajduje siÄ™ umowa wypoĹĽyczenia sprzÄ™tu sportowego.</p>
-                    <p>Prosimy o zapoznanie siÄ™ z treĹ›ciÄ… umowy.</p>
+                    <h2>Dzień dobry {customerName}!</h2>
+                    <p>W załączniku znajduje się umowa wypożyczenia sprzętu sportowego.</p>
+                    <p>Prosimy o zapoznanie się z treścią umowy.</p>
                     <br>
                     <p>Pozdrawiamy,<br>
-                    ZespĂłĹ‚ SportRental</p>";
+                    Zespół SportRental</p>";
 
-                // DoĹ‚Ä…cz PDF jako zaĹ‚Ä…cznik
+                // Dołącz PDF jako załącznik
                 bodyBuilder.Attachments.Add("umowa_najmu.pdf", contractPdf, ContentType.Parse("application/pdf"));
 
                 message.Body = bodyBuilder.ToMessageBody();
@@ -139,18 +139,18 @@ namespace SportRental.Admin.Services.Email
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
 
-                _logger.LogInformation("Umowa wysĹ‚ana emailem do {Email} dla klienta {CustomerName}", email, customerName);
+                _logger.LogInformation("Umowa wysłana emailem do {Email} dla klienta {CustomerName}", email, customerName);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "BĹ‚Ä…d podczas wysyĹ‚ania umowy do {Email}", email);
+                _logger.LogError(ex, "Błąd podczas wysyłania umowy do {Email}", email);
                 throw;
             }
         }
 
         public async Task SendReminderAsync(string email, string customerName, string reminderText)
         {
-            // Walidacja parametrĂłw
+            // Walidacja parametrów
             if (string.IsNullOrWhiteSpace(email))
                 throw new ArgumentException("Email address cannot be null or empty.", nameof(email));
             if (string.IsNullOrWhiteSpace(customerName))
@@ -158,13 +158,13 @@ namespace SportRental.Admin.Services.Email
             if (string.IsNullOrWhiteSpace(reminderText))
                 throw new ArgumentException("Reminder text cannot be null or empty.", nameof(reminderText));
 
-            var subject = "Przypomnienie o zwrocie sprzÄ™tu - SportRental";
+            var subject = "Przypomnienie o zwrocie sprzętu - SportRental";
             var htmlBody = $@"
-                <h2>DzieĹ„ dobry {customerName}!</h2>
+                <h2>Dzień dobry {customerName}!</h2>
                 <p>{reminderText}</p>
                 <br>
                 <p>Pozdrawiamy,<br>
-                ZespĂłĹ‚ SportRental</p>";
+                Zespół SportRental</p>";
 
             await SendEmailAsync(email, subject, htmlBody);
         }
