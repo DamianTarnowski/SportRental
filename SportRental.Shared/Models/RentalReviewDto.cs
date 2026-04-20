@@ -41,4 +41,25 @@ namespace SportRental.Shared.Models
         public double AverageService { get; set; }
         public double AverageOverall { get; set; }
     }
+
+    public class AdminReviewDto
+    {
+        public Guid Id { get; set; }
+        public Guid RentalId { get; set; }
+        public Guid CustomerId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public string? CustomerEmail { get; set; }
+        public int QualityScore { get; set; }
+        public int PriceScore { get; set; }
+        public int ServiceScore { get; set; }
+        public double AverageScore { get; set; }
+        public string? Comment { get; set; }
+        public bool IsHidden { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+    }
+
+    public class UpdateReviewVisibilityRequest
+    {
+        public bool IsHidden { get; set; }
+    }
 }

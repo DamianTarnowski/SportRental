@@ -1605,6 +1605,101 @@ namespace SportRental.Admin.Api
                     AverageOverall = Math.Round((agg.AvgQ + agg.AvgP + agg.AvgS) / 3.0, 2)
                 });
             });
+
+            // Moderacja — tylko admin. Zwraca wszystkie opinie (również ukryte) dla tenanta admina.
+            api.MapGet("/admin/reviews", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ITenantProvider tenantProvider,
+                ClaimsPrincipal user,
+                int? page,
+                int? pageSize,
+                CancellationToken ct) =>
+            {
+                if (!user.IsAdmin()) return Results.Forbid();
+
+                var tenantId = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+                if (tenantId == Guid.Empty) return Results.BadRequest(new { error = "Tenant context required." });
+
+                var take = Math.Clamp(pageSize ?? 50, 1, 200);
+                var skip = Math.Max(0, ((page ?? 1) - 1) * take);
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var items = await db.RentalReviews.IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Where(r => r.TenantId == tenantId)
+                    .OrderByDescending(r => r.CreatedAtUtc)
+                    .Skip(skip).Take(take)
+                    .Select(r => new SharedModels.AdminReviewDto
+                    {
+                        Id = r.Id,
+                        RentalId = r.RentalId,
+                        CustomerId = r.CustomerId,
+                        CustomerName = r.Customer != null ? r.Customer.FullName : "Klient",
+                        CustomerEmail = r.Customer != null ? r.Customer.Email : null,
+                        QualityScore = r.QualityScore,
+                        PriceScore = r.PriceScore,
+                        ServiceScore = r.ServiceScore,
+                        AverageScore = (r.QualityScore + r.PriceScore + r.ServiceScore) / 3.0,
+                        Comment = r.Comment,
+                        IsHidden = r.IsHidden,
+                        CreatedAtUtc = r.CreatedAtUtc
+                    })
+                    .ToListAsync(ct);
+
+                return Results.Ok(items);
+            });
+
+            // PUT /api/admin/reviews/{id}/visibility — ukryj/przywróć opinię.
+            api.MapPut("/admin/reviews/{id:guid}/visibility", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ITenantProvider tenantProvider,
+                ClaimsPrincipal user,
+                Guid id,
+                SharedModels.UpdateReviewVisibilityRequest req,
+                CancellationToken ct) =>
+            {
+                if (!user.IsAdmin()) return Results.Forbid();
+
+                var tenantId = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+                if (tenantId == Guid.Empty) return Results.BadRequest(new { error = "Tenant context required." });
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var review = await db.RentalReviews.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
+
+                if (review is null) return Results.NotFound();
+
+                review.IsHidden = req.IsHidden;
+                await db.SaveChangesAsync(ct);
+                return Results.NoContent();
+            });
+
+            // DELETE /api/admin/reviews/{id} — usunięcie opinii (np. obraźliwa).
+            api.MapDelete("/admin/reviews/{id:guid}", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ITenantProvider tenantProvider,
+                ClaimsPrincipal user,
+                Guid id,
+                CancellationToken ct) =>
+            {
+                if (!user.IsAdmin()) return Results.Forbid();
+
+                var tenantId = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+                if (tenantId == Guid.Empty) return Results.BadRequest(new { error = "Tenant context required." });
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var review = await db.RentalReviews.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId, ct);
+
+                if (review is null) return Results.NotFound();
+
+                db.RentalReviews.Remove(review);
+                await db.SaveChangesAsync(ct);
+                return Results.NoContent();
+            });
         }
 
         private static SharedModels.RentalReviewDto ToReviewDto(RentalReview r, string? customerAnonymized) => new()

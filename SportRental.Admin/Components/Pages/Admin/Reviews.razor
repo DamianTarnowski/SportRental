@@ -1,0 +1,203 @@
+@page "/admin/reviews"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
+
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.RateReview" Class="mr-2" />
+            Opinie klientów
+        </MudText>
+        <MudChip T="string" Color="Color.Primary">@_reviews.Count</MudChip>
+    </MudStack>
+
+    <MudPaper Class="pa-3 mb-3" Elevation="1">
+        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <MudSwitch T="bool" @bind-Value="_showHidden" Color="Color.Warning" Label="Pokaż ukryte" />
+            <MudTextField @bind-Value="_search" Placeholder="Szukaj (imię, komentarz)..."
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 240px;" />
+        </MudStack>
+    </MudPaper>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="pa-6 text-center"><MudProgressCircular Indeterminate="true" /></MudPaper>
+    }
+    else if (Filtered.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Brak opinii.</MudAlert>
+    }
+    else
+    {
+        <MudStack Spacing="2">
+            @foreach (var r in Filtered)
+            {
+                <MudPaper Class="pa-3" Elevation="1" Style="@(r.IsHidden ? "opacity: 0.6;" : "")">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Class="mb-2" Wrap="Wrap.Wrap">
+                        <MudStack Spacing="0">
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold">@r.CustomerName</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @r.CustomerEmail · @r.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="1">
+                            @if (r.IsHidden)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Warning">Ukryta</MudChip>
+                            }
+                            <MudIconButton Icon="@(r.IsHidden ? Icons.Material.Filled.Visibility : Icons.Material.Filled.VisibilityOff)"
+                                           Size="Size.Small"
+                                           Color="@(r.IsHidden ? Color.Success : Color.Warning)"
+                                           OnClick="@(() => ToggleHiddenAsync(r))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteAsync(r))" />
+                        </MudStack>
+                    </MudStack>
+
+                    <MudStack Row="true" Spacing="2" Class="mb-2" Wrap="Wrap.Wrap">
+                        <MudChip T="string" Size="Size.Small" Color="@ColorFor(r.QualityScore)">Jakość: @r.QualityScore/10</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@ColorFor(r.PriceScore)">Cena: @r.PriceScore/10</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="@ColorFor(r.ServiceScore)">Obsługa: @r.ServiceScore/10</MudChip>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">Średnia: @r.AverageScore.ToString("0.0")/10</MudChip>
+                    </MudStack>
+
+                    @if (!string.IsNullOrWhiteSpace(r.Comment))
+                    {
+                        <MudText Typo="Typo.body2">@r.Comment</MudText>
+                    }
+                </MudPaper>
+            }
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
+
+    private List<ReviewRow> _reviews = new();
+    private bool _isLoading = true;
+    private bool _showHidden = true;
+    private string _search = string.Empty;
+
+    private List<ReviewRow> Filtered =>
+        _reviews
+            .Where(r => _showHidden || !r.IsHidden)
+            .Where(r => string.IsNullOrWhiteSpace(_search)
+                        || (r.CustomerName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)
+                        || (r.Comment?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false))
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        _reviews = await db.RentalReviews.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(r => r.TenantId == tenantId)
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Select(r => new ReviewRow
+            {
+                Id = r.Id,
+                RentalId = r.RentalId,
+                CustomerName = r.Customer != null ? r.Customer.FullName : "Klient",
+                CustomerEmail = r.Customer != null ? r.Customer.Email : null,
+                QualityScore = r.QualityScore,
+                PriceScore = r.PriceScore,
+                ServiceScore = r.ServiceScore,
+                Comment = r.Comment,
+                IsHidden = r.IsHidden,
+                CreatedAtUtc = r.CreatedAtUtc
+            })
+            .ToListAsync();
+
+        _isLoading = false;
+    }
+
+    private async Task ToggleHiddenAsync(ReviewRow row)
+    {
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var entity = await db.RentalReviews.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(r => r.Id == row.Id && r.TenantId == tenantId);
+        if (entity == null)
+        {
+            Snackbar.Add("Opinia nie znaleziona.", Severity.Warning);
+            return;
+        }
+
+        entity.IsHidden = !entity.IsHidden;
+        await db.SaveChangesAsync();
+
+        row.IsHidden = entity.IsHidden;
+        Snackbar.Add(entity.IsHidden ? "Opinia ukryta." : "Opinia przywrócona.", Severity.Success);
+    }
+
+    private async Task DeleteAsync(ReviewRow row)
+    {
+        var confirmed = await DialogService.ShowMessageBox(
+            "Usunąć opinię?",
+            "Tej operacji nie można cofnąć.",
+            yesText: "Usuń",
+            cancelText: "Anuluj");
+
+        if (confirmed != true) return;
+
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var entity = await db.RentalReviews.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(r => r.Id == row.Id && r.TenantId == tenantId);
+        if (entity == null)
+        {
+            Snackbar.Add("Opinia nie znaleziona.", Severity.Warning);
+            return;
+        }
+
+        db.RentalReviews.Remove(entity);
+        await db.SaveChangesAsync();
+
+        _reviews.RemoveAll(x => x.Id == row.Id);
+        Snackbar.Add("Opinia usunięta.", Severity.Success);
+    }
+
+    private static Color ColorFor(int score) => score switch
+    {
+        >= 8 => Color.Success,
+        >= 5 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private class ReviewRow
+    {
+        public Guid Id { get; set; }
+        public Guid RentalId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public string? CustomerEmail { get; set; }
+        public int QualityScore { get; set; }
+        public int PriceScore { get; set; }
+        public int ServiceScore { get; set; }
+        public double AverageScore => (QualityScore + PriceScore + ServiceScore) / 3.0;
+        public string? Comment { get; set; }
+        public bool IsHidden { get; set; }
+        public DateTime CreatedAtUtc { get; set; }
+    }
+}
