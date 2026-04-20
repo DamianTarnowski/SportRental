@@ -41,6 +41,11 @@ public interface IApiService
 
     // Guest session (bez rejestracji konta)
     Task<GuestSessionResult?> CreateGuestSessionAsync(GuestSessionPayload payload);
+
+    // Opinie
+    Task<RentalReviewDto?> PostRentalReviewAsync(CreateRentalReviewRequest request);
+    Task<List<RentalReviewDto>> GetTenantReviewsAsync(Guid tenantId, int page = 1, int pageSize = 20);
+    Task<ReviewSummaryDto> GetTenantReviewSummaryAsync(Guid tenantId);
 }
 
 public sealed class GuestSessionPayload

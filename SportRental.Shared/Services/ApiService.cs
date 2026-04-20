@@ -334,4 +334,42 @@ public class ApiService : IApiService
             return null;
         }
     }
+
+    public async Task<RentalReviewDto?> PostRentalReviewAsync(CreateRentalReviewRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/reviews", request);
+        if (!response.IsSuccessStatusCode)
+        {
+            return null;
+        }
+        return await response.Content.ReadFromJsonAsync<RentalReviewDto>(_jsonOptions);
+    }
+
+    public async Task<List<RentalReviewDto>> GetTenantReviewsAsync(Guid tenantId, int page = 1, int pageSize = 20)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/api/tenants/{tenantId}/reviews?page={page}&pageSize={pageSize}";
+            var list = await _httpClient.GetFromJsonAsync<List<RentalReviewDto>>(url, _jsonOptions);
+            return list ?? new List<RentalReviewDto>();
+        }
+        catch (Exception)
+        {
+            return new List<RentalReviewDto>();
+        }
+    }
+
+    public async Task<ReviewSummaryDto> GetTenantReviewSummaryAsync(Guid tenantId)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/api/tenants/{tenantId}/reviews/summary";
+            var summary = await _httpClient.GetFromJsonAsync<ReviewSummaryDto>(url, _jsonOptions);
+            return summary ?? new ReviewSummaryDto();
+        }
+        catch (Exception)
+        {
+            return new ReviewSummaryDto();
+        }
+    }
 }

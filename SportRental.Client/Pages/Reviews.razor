@@ -1,0 +1,154 @@
+@page "/reviews"
+@using MudBlazor
+@using SportRental.Shared.Models
+@using SportRental.Shared.Services
+@inject IApiService Api
+@inject TenantService Tenants
+
+<PageTitle>Opinie klientów - SportRental</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-6">
+    <MudText Typo="Typo.h4" Class="mb-4">
+        <MudIcon Icon="@Icons.Material.Filled.RateReview" Class="mr-2" />
+        Opinie klientów
+    </MudText>
+
+    @if (_tenantId == Guid.Empty)
+    {
+        <MudAlert Severity="Severity.Info">
+            Wybierz najpierw wypożyczalnię na stronie głównej, aby zobaczyć opinie.
+        </MudAlert>
+    }
+    else if (_isLoading)
+    {
+        <MudPaper Class="pa-6 text-center" Elevation="0">
+            <MudProgressCircular Indeterminate="true" Size="Size.Large" />
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="pa-4 mb-4" Elevation="2">
+            <MudStack Row="true" Spacing="4" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <MudStack Spacing="0" AlignItems="AlignItems.Center">
+                    <MudText Typo="Typo.h3" Color="Color.Primary" Class="fw-bold">
+                        @_summary.AverageOverall.ToString("0.0")
+                    </MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                        @_summary.Count @Plural(_summary.Count, "opinia", "opinie", "opinii")
+                    </MudText>
+                </MudStack>
+                <MudDivider Vertical="true" FlexItem="true" />
+                <MudStack Spacing="1" Style="flex: 1;">
+                    <ScoreBar Label="Jakość" Value="_summary.AverageQuality" />
+                    <ScoreBar Label="Cena" Value="_summary.AveragePrice" />
+                    <ScoreBar Label="Obsługa" Value="_summary.AverageService" />
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+
+        @if (_reviews.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info">Brak opinii. Bądź pierwszy!</MudAlert>
+        }
+        else
+        {
+            <MudStack Spacing="3">
+                @foreach (var r in _reviews)
+                {
+                    <MudPaper Class="pa-4" Elevation="1">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+                            <MudText Typo="Typo.subtitle1" Class="fw-bold">@r.CustomerName</MudText>
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                @r.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Spacing="2" Class="mb-2" Wrap="Wrap.Wrap">
+                            <MudChip T="string" Size="Size.Small" Color="@ColorFor(r.QualityScore)">Jakość: @r.QualityScore/10</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="@ColorFor(r.PriceScore)">Cena: @r.PriceScore/10</MudChip>
+                            <MudChip T="string" Size="Size.Small" Color="@ColorFor(r.ServiceScore)">Obsługa: @r.ServiceScore/10</MudChip>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">Średnia: @r.AverageScore.ToString("0.0")/10</MudChip>
+                        </MudStack>
+                        @if (!string.IsNullOrWhiteSpace(r.Comment))
+                        {
+                            <MudText Typo="Typo.body2">@r.Comment</MudText>
+                        }
+                    </MudPaper>
+                }
+            </MudStack>
+
+            @if (_reviews.Count == _pageSize)
+            {
+                <div class="d-flex justify-center mt-4">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadMoreAsync" Disabled="_isLoadingMore">
+                        @(_isLoadingMore ? "Ładowanie..." : "Pokaż więcej")
+                    </MudButton>
+                </div>
+            }
+        }
+    }
+</MudContainer>
+
+@code {
+    private Guid _tenantId;
+    private bool _isLoading = true;
+    private bool _isLoadingMore;
+    private int _page = 1;
+    private const int _pageSize = 20;
+    private ReviewSummaryDto _summary = new();
+    private readonly List<RentalReviewDto> _reviews = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tenantIdStr = await Tenants.GetSelectedTenantIdAsync();
+        if (Guid.TryParse(tenantIdStr, out var tid) && tid != Guid.Empty)
+        {
+            _tenantId = tid;
+            await LoadFirstPageAsync();
+        }
+        _isLoading = false;
+    }
+
+    private async Task LoadFirstPageAsync()
+    {
+        _summary = await Api.GetTenantReviewSummaryAsync(_tenantId);
+        var first = await Api.GetTenantReviewsAsync(_tenantId, 1, _pageSize);
+        _reviews.Clear();
+        _reviews.AddRange(first);
+        _page = 1;
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        _isLoadingMore = true;
+        try
+        {
+            var next = await Api.GetTenantReviewsAsync(_tenantId, _page + 1, _pageSize);
+            if (next.Count > 0)
+            {
+                _reviews.AddRange(next);
+                _page++;
+            }
+        }
+        finally
+        {
+            _isLoadingMore = false;
+        }
+    }
+
+    private static Color ColorFor(int score) => score switch
+    {
+        >= 8 => Color.Success,
+        >= 5 => Color.Warning,
+        _ => Color.Error
+    };
+
+    private static string Plural(int n, string one, string few, string many)
+    {
+        if (n == 1) return one;
+        var mod10 = n % 10;
+        var mod100 = n % 100;
+        if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+        return many;
+    }
+}
+

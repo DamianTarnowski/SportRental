@@ -1,0 +1,22 @@
+@using MudBlazor
+
+<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+    <MudText Typo="Typo.body2" Style="min-width: 70px;">@Label</MudText>
+    <MudProgressLinear Value="@(Value * 10)"
+                       Max="100"
+                       Color="@GetColor()"
+                       Style="flex: 1; height: 8px;" />
+    <MudText Typo="Typo.body2" Class="fw-bold" Style="min-width: 40px;">@Value.ToString("0.0")</MudText>
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public double Value { get; set; }
+
+    private Color GetColor() => Value switch
+    {
+        >= 8 => Color.Success,
+        >= 5 => Color.Warning,
+        _ => Color.Error
+    };
+}

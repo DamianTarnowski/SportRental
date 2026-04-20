@@ -156,13 +156,24 @@
 
                         @if (CanCancelRental(_rental.Status))
                         {
-                            <MudButton Variant="Variant.Outlined" 
-                                       Color="Color.Error" 
+                            <MudButton Variant="Variant.Outlined"
+                                       Color="Color.Error"
                                        StartIcon="@Icons.Material.Filled.Cancel"
                                        FullWidth="true"
                                        OnClick="CancelRentalAsync"
                                        Disabled="@_isCancelling">
                                 @(_isCancelling ? "Anulowanie..." : "Anuluj wypożyczenie")
+                            </MudButton>
+                        }
+
+                        @if (IsReviewable(_rental.Status))
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Secondary"
+                                       StartIcon="@Icons.Material.Filled.RateReview"
+                                       FullWidth="true"
+                                       OnClick="OpenReviewDialog">
+                                Wystaw opinię
                             </MudButton>
                         }
 
@@ -343,6 +354,21 @@
     private bool CanCancelRental(string status)
     {
         return status is "Reserved" or "Confirmed";
+    }
+
+    private static bool IsReviewable(string status) => status == "Completed";
+
+    private async Task OpenReviewDialog()
+    {
+        if (_rental == null) return;
+
+        var parameters = new DialogParameters
+        {
+            [nameof(ReviewDialog.RentalId)] = _rental.Id
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<ReviewDialog>("Oceń wypożyczenie", parameters, options);
+        await dialog.Result;
     }
 
     private Color GetStatusColor(string status)

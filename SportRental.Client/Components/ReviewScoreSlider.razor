@@ -1,0 +1,29 @@
+@using MudBlazor
+
+<MudStack Spacing="0">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
+        <MudText Typo="Typo.body1">@Label</MudText>
+        <MudText Typo="Typo.h6" Color="@GetColor()" Class="fw-bold">@Value / 10</MudText>
+    </MudStack>
+    <MudSlider T="int" Min="0" Max="10" Step="1" Value="Value" ValueChanged="OnValueChanged" Color="@GetColor()" />
+</MudStack>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+
+    private async Task OnValueChanged(int v)
+    {
+        Value = v;
+        if (ValueChanged.HasDelegate)
+            await ValueChanged.InvokeAsync(v);
+    }
+
+    private Color GetColor() => Value switch
+    {
+        >= 8 => Color.Success,
+        >= 5 => Color.Warning,
+        _ => Color.Error
+    };
+}

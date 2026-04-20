@@ -1,0 +1,83 @@
+@using MudBlazor
+@using SportRental.Shared.Models
+@using SportRental.Shared.Services
+@inject IApiService Api
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3" Style="min-width: 320px; max-width: 520px;">
+            <MudText Typo="Typo.h6">Oceń wypożyczenie</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Oceny 0–10. Twoja opinia pomaga innym klientom.
+            </MudText>
+
+            <ReviewScoreSlider Label="Jakość sprzętu" @bind-Value="_quality" />
+            <ReviewScoreSlider Label="Cena" @bind-Value="_price" />
+            <ReviewScoreSlider Label="Obsługa" @bind-Value="_service" />
+
+            <MudTextField T="string"
+                          Label="Komentarz (opcjonalnie)"
+                          @bind-Value="_comment"
+                          Lines="4"
+                          MaxLength="2000"
+                          Variant="Variant.Outlined" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Disabled="_submitting">Anuluj</MudButton>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Submit"
+                   Disabled="_submitting"
+                   StartIcon="@Icons.Material.Filled.Send">
+            @(_submitting ? "Wysyłanie..." : "Wyślij opinię")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] public IDialogReference DialogReference { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid RentalId { get; set; }
+
+    private int _quality = 8;
+    private int _price = 8;
+    private int _service = 8;
+    private string _comment = string.Empty;
+    private bool _submitting;
+
+    private void Cancel() => DialogReference.Close(DialogResult.Cancel());
+
+    private async Task Submit()
+    {
+        _submitting = true;
+        try
+        {
+            var result = await Api.PostRentalReviewAsync(new CreateRentalReviewRequest
+            {
+                RentalId = RentalId,
+                QualityScore = _quality,
+                PriceScore = _price,
+                ServiceScore = _service,
+                Comment = string.IsNullOrWhiteSpace(_comment) ? null : _comment.Trim()
+            });
+
+            if (result == null)
+            {
+                Snackbar.Add("Nie udało się zapisać opinii. Opinia może już istnieć lub wynajem nie jest zakończony.", Severity.Warning);
+                return;
+            }
+
+            Snackbar.Add("Dziękujemy za opinię!", Severity.Success);
+            DialogReference.Close(DialogResult.Ok(result));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}
