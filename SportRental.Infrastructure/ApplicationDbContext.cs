@@ -41,6 +41,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
     public DbSet<RentalConfirmation> RentalConfirmations => Set<RentalConfirmation>();
+    public DbSet<RentalReview> RentalReviews => Set<RentalReview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -285,6 +286,23 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(rc => rc.Token).IsUnique();
             entity.HasIndex(rc => new { rc.TenantId, rc.RentalId });
             entity.HasQueryFilter(rc => TenantId == null || rc.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<RentalReview>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Comment).HasMaxLength(2000);
+            entity.HasOne(r => r.Rental)
+                .WithMany()
+                .HasForeignKey(r => r.RentalId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(r => r.Customer)
+                .WithMany()
+                .HasForeignKey(r => r.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(r => r.RentalId).IsUnique();
+            entity.HasIndex(r => new { r.TenantId, r.CreatedAtUtc });
+            entity.HasQueryFilter(r => TenantId == null || r.TenantId == TenantId);
         });
 
         modelBuilder.Entity<CheckoutSession>(entity =>

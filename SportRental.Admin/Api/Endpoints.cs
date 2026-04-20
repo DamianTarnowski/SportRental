@@ -187,6 +187,9 @@ namespace SportRental.Admin.Api
             // Customer endpoints for WASM client
             MapCustomerEndpoints(api);
 
+            // Rental review endpoints (public read, auth'd write by rental owner)
+            MapReviewEndpoints(api);
+
             api.MapGet("/products", [AllowAnonymous] async (
                 HttpRequest request,
                 IDbContextFactory<ApplicationDbContext> dbFactory, 
@@ -1445,6 +1448,186 @@ namespace SportRental.Admin.Api
             DocumentNumber = c.DocumentNumber,
             Notes = c.Notes
         };
+
+        // Opinie klientów po zakończonym wynajmie.
+        // - POST wymaga auth: ustawia opinię tylko klient który faktycznie wypożyczył (Rental.CustomerId)
+        //   i tylko gdy Rental.Status = Completed. Jeden review per Rental (unique index).
+        // - GET publiczny (anonymous), filtrowany po tenantId z routy. Ukryte przez moderację (IsHidden=true) nie są zwracane.
+        private static void MapReviewEndpoints(IEndpointRouteBuilder api)
+        {
+            // POST /api/reviews — klient wystawia opinię dla swojego zakończonego wynajmu.
+            api.MapPost("/reviews", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ITenantProvider tenantProvider,
+                ClaimsPrincipal user,
+                SharedModels.CreateRentalReviewRequest req,
+                CancellationToken ct) =>
+            {
+                var customerId = user.GetCustomerId();
+                if (customerId is null)
+                {
+                    return Results.Forbid();
+                }
+
+                if (req.QualityScore is < 0 or > 10 ||
+                    req.PriceScore is < 0 or > 10 ||
+                    req.ServiceScore is < 0 or > 10)
+                {
+                    return Results.BadRequest(new { error = "Scores must be between 0 and 10." });
+                }
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var rental = await db.Rentals.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(r => r.Id == req.RentalId, ct);
+
+                if (rental is null || rental.CustomerId != customerId.Value)
+                {
+                    return Results.NotFound();
+                }
+
+                if (rental.Status != RentalStatus.Completed)
+                {
+                    return Results.BadRequest(new { error = "Review can be added only for completed rentals." });
+                }
+
+                var alreadyExists = await db.RentalReviews.IgnoreQueryFilters()
+                    .AnyAsync(rr => rr.RentalId == rental.Id, ct);
+
+                if (alreadyExists)
+                {
+                    return Results.Conflict(new { error = "Review for this rental already exists." });
+                }
+
+                var review = new RentalReview
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = rental.TenantId,
+                    RentalId = rental.Id,
+                    CustomerId = customerId.Value,
+                    QualityScore = req.QualityScore,
+                    PriceScore = req.PriceScore,
+                    ServiceScore = req.ServiceScore,
+                    Comment = string.IsNullOrWhiteSpace(req.Comment) ? null : req.Comment.Trim(),
+                    IsHidden = false,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+
+                await db.RentalReviews.AddAsync(review, ct);
+                await db.SaveChangesAsync(ct);
+
+                return Results.Created($"/api/reviews/{review.Id}", ToReviewDto(review, customerAnonymized: null));
+            });
+
+            // GET /api/tenants/{tenantId}/reviews — publiczna lista opinii dla tenanta.
+            api.MapGet("/tenants/{tenantId:guid}/reviews", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                Guid tenantId,
+                int? page,
+                int? pageSize,
+                CancellationToken ct) =>
+            {
+                var take = Math.Clamp(pageSize ?? 20, 1, 100);
+                var skip = Math.Max(0, ((page ?? 1) - 1) * take);
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var query = db.RentalReviews.IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Where(r => r.TenantId == tenantId && !r.IsHidden);
+
+                var items = await query
+                    .OrderByDescending(r => r.CreatedAtUtc)
+                    .Skip(skip).Take(take)
+                    .Select(r => new
+                    {
+                        r.Id,
+                        r.RentalId,
+                        CustomerName = r.Customer != null ? r.Customer.FullName : "Klient",
+                        r.QualityScore,
+                        r.PriceScore,
+                        r.ServiceScore,
+                        r.Comment,
+                        r.CreatedAtUtc
+                    })
+                    .ToListAsync(ct);
+
+                var result = items.Select(r => new SharedModels.RentalReviewDto
+                {
+                    Id = r.Id,
+                    RentalId = r.RentalId,
+                    CustomerName = AnonymizeName(r.CustomerName),
+                    QualityScore = r.QualityScore,
+                    PriceScore = r.PriceScore,
+                    ServiceScore = r.ServiceScore,
+                    AverageScore = (r.QualityScore + r.PriceScore + r.ServiceScore) / 3.0,
+                    Comment = r.Comment,
+                    CreatedAtUtc = r.CreatedAtUtc
+                }).ToList();
+
+                return Results.Ok(result);
+            });
+
+            // GET /api/tenants/{tenantId}/reviews/summary — średnie i łączna liczba opinii.
+            api.MapGet("/tenants/{tenantId:guid}/reviews/summary", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                Guid tenantId,
+                CancellationToken ct) =>
+            {
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var query = db.RentalReviews.IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Where(r => r.TenantId == tenantId && !r.IsHidden);
+
+                var count = await query.CountAsync(ct);
+                if (count == 0)
+                {
+                    return Results.Ok(new SharedModels.ReviewSummaryDto());
+                }
+
+                var agg = await query
+                    .GroupBy(_ => 1)
+                    .Select(g => new
+                    {
+                        AvgQ = g.Average(r => (double)r.QualityScore),
+                        AvgP = g.Average(r => (double)r.PriceScore),
+                        AvgS = g.Average(r => (double)r.ServiceScore)
+                    })
+                    .FirstAsync(ct);
+
+                return Results.Ok(new SharedModels.ReviewSummaryDto
+                {
+                    Count = count,
+                    AverageQuality = Math.Round(agg.AvgQ, 2),
+                    AveragePrice = Math.Round(agg.AvgP, 2),
+                    AverageService = Math.Round(agg.AvgS, 2),
+                    AverageOverall = Math.Round((agg.AvgQ + agg.AvgP + agg.AvgS) / 3.0, 2)
+                });
+            });
+        }
+
+        private static SharedModels.RentalReviewDto ToReviewDto(RentalReview r, string? customerAnonymized) => new()
+        {
+            Id = r.Id,
+            RentalId = r.RentalId,
+            CustomerName = customerAnonymized ?? (r.Customer != null ? AnonymizeName(r.Customer.FullName) : "Klient"),
+            QualityScore = r.QualityScore,
+            PriceScore = r.PriceScore,
+            ServiceScore = r.ServiceScore,
+            AverageScore = r.AverageScore,
+            Comment = r.Comment,
+            CreatedAtUtc = r.CreatedAtUtc
+        };
+
+        // Zwraca imię + pierwsza litera nazwiska — nie ujawniamy pełnych danych w publicznej liście.
+        private static string AnonymizeName(string? fullName)
+        {
+            if (string.IsNullOrWhiteSpace(fullName)) return "Klient";
+            var parts = fullName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 1) return parts[0];
+            return $"{parts[0]} {parts[^1][..1]}.";
+        }
 
         // Checkout endpoints for Stripe redirect flow
         private static void MapCheckoutEndpoints(IEndpointRouteBuilder api)
