@@ -586,7 +586,9 @@ else
                     
                     <MudGrid Spacing="3">
                         <MudItem xs="12" md="6">
-                            <MudSelect T="RentalType" @bind-Value="editModel.RentalType" 
+                            <MudSelect T="RentalType"
+                                       Value="editModel.RentalType"
+                                       ValueChanged="OnRentalTypeChanged"
                                        Label="Typ wynajmu"
                                        Variant="Variant.Outlined"
                                        Adornment="Adornment.Start"
@@ -603,7 +605,6 @@ else
                                           ValueChanged="@(v => OnStartTimeChanged(ParseTime(v)))"
                                           InputType="InputType.Time"
                                           Variant="Variant.Outlined"
-                                          Immediate="true"
                                           Class="rounded-lg" />
                         </MudItem>
                         <MudItem xs="6" md="3">
@@ -613,7 +614,6 @@ else
                                           ValueChanged="@(v => OnEndTimeChanged(ParseTime(v)))"
                                           InputType="InputType.Time"
                                           Variant="Variant.Outlined"
-                                          Immediate="true"
                                           Class="rounded-lg" />
                         </MudItem>
                     </MudGrid>
@@ -1121,8 +1121,9 @@ else
         editItems = new();
         startDate = DateTime.Today;
         endDate = DateTime.Today.AddDays(1);
-        startTime = null;
-        endTime = null;
+        startTime = TimeSpan.FromHours(9);
+        endTime = TimeSpan.FromHours(10);
+        RecalculateHoursFromTime();
         customTotalPrice = null;
         dialogOpen = true;
         _ = UpdateReservedMap();
@@ -1354,6 +1355,18 @@ else
     {
         endDate = date;
         await UpdateReservedMap();
+        Recalculate();
+    }
+
+    private void OnRentalTypeChanged(RentalType type)
+    {
+        editModel.RentalType = type;
+        if (type == RentalType.Hourly)
+        {
+            if (!startTime.HasValue) startTime = TimeSpan.FromHours(9);
+            if (!endTime.HasValue) endTime = TimeSpan.FromHours(10);
+            RecalculateHoursFromTime();
+        }
         Recalculate();
     }
 
