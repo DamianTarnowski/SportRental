@@ -280,6 +280,22 @@ builder.Services.AddAuthentication()
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSigningKey)),
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+
+        // SEC-009: WASM trzyma JWT w HttpOnly cookie zamiast w localStorage.
+        // Jeśli nie ma nagłówka Authorization, weź token z cookie.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = ctx =>
+            {
+                if (string.IsNullOrEmpty(ctx.Token) &&
+                    ctx.Request.Cookies.TryGetValue(SportRental.Admin.Api.Endpoints.AccessTokenCookieName, out var cookieToken) &&
+                    !string.IsNullOrWhiteSpace(cookieToken))
+                {
+                    ctx.Token = cookieToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");

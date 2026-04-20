@@ -567,3 +567,4 @@ azure-logs.zip
 ## SportRental.Admin). Zostawiamy folder lokalnie jako referencję, ale nie śledzimy w git.
 _DEPRECATED_SportRental.Api/
 _DEPRECATED_SportRental.Api.Tests/
+tmp-playwright/

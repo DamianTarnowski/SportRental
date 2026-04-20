@@ -53,12 +53,12 @@ public sealed class GuestSessionPayload
     public string? Notes { get; init; }
 }
 
+// SEC-009: access token trafia do HttpOnly cookie po stronie serwera,
+// więc WASM go nie widzi i nie potrzebuje w tej odpowiedzi.
 public sealed class GuestSessionResult
 {
-    public required string AccessToken { get; init; }
     public required int ExpiresIn { get; init; }
     public required Guid CustomerId { get; init; }
-    public required Guid TenantId { get; init; }
     public required string Email { get; init; }
     public required string FullName { get; init; }
 }

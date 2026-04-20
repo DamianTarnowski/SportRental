@@ -22,8 +22,13 @@ if (response.IsSuccessStatusCode)
     builder.Configuration.AddJsonStream(stream);
 }
 
+// SEC-009: wszystkie fetch-e przez HttpClient muszą wysyłać credentials (HttpOnly cookie z JWT).
+builder.Services.AddTransient<BrowserCredentialsHandler>();
+builder.Services.AddHttpClient("SportRentalApi")
+    .AddHttpMessageHandler<BrowserCredentialsHandler>();
+
 // Konfiguracja HttpClient - BEZ BaseAddress, bo ApiService ustawi go na API URL
-builder.Services.AddScoped(sp => new HttpClient());
+builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("SportRentalApi"));
 
 // Blazored LocalStorage
 builder.Services.AddBlazoredLocalStorage();

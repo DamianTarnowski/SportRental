@@ -722,9 +722,9 @@ else
                             Snackbar.Add("Nie udało się utworzyć sesji gościa. Jeśli masz już konto — zaloguj się.", Severity.Error);
                             return;
                         }
-                        // Zapisz token jako bieżącą sesję (używany przez inne endpointy wymagające auth).
+                        // SEC-009: serwer ustawił HttpOnly cookie — zapisujemy tylko id/email do UI.
                         await ((SportRental.Client.Services.ApiAuthenticationStateProvider)AuthStateProvider)
-                            .MarkUserAsAuthenticated(guest.AccessToken, guest.CustomerId.ToString(), guest.Email);
+                            .MarkUserAsAuthenticated(guest.CustomerId.ToString(), guest.Email);
 
                         customer = new CustomerDto
                         {

@@ -38,6 +38,37 @@ namespace SportRental.Admin.Api
             return CryptographicOperations.FixedTimeEquals(ab, bb);
         }
 
+        // SEC-009: nazwa HttpOnly cookie z tokenem dostępu dla WASM.
+        public const string AccessTokenCookieName = "sr_access_token";
+
+        // SEC-009: zapisuje JWT w HttpOnly cookie (zamiast oddawać go klientowi do localStorage).
+        //
+        // SameSite=None + Secure jest wymagane dla cross-origin (WASM serwowany z innego portu/hosta niż API).
+        // W Development dopuszczamy HTTP przez IsHttps, ale wtedy przeglądarka odrzuca cookie z SameSite=None —
+        // więc dev MUSI używać profilu HTTPS (launchSettings już go definiuje).
+        private static void WriteAccessTokenCookie(HttpContext httpContext, string token, DateTime expiresAtUtc)
+        {
+            httpContext.Response.Cookies.Append(AccessTokenCookieName, token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Expires = expiresAtUtc,
+                Path = "/"
+            });
+        }
+
+        private static void DeleteAccessTokenCookie(HttpContext httpContext)
+        {
+            httpContext.Response.Cookies.Delete(AccessTokenCookieName, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None,
+                Path = "/"
+            });
+        }
+
         // Helper to convert relative URLs to absolute URLs
         private static string? ToAbsoluteUrl(string? relativeUrl, HttpRequest request)
         {
@@ -1045,12 +1076,11 @@ namespace SportRental.Admin.Api
                 await signInManager.SignInAsync(user, isPersistent: false);
 
                 var token = jwt.CreateUserToken(user, tenantId ?? Guid.Empty, new[] { "Client" }, customer.Id);
+                WriteAccessTokenCookie(httpContext, token.AccessToken, token.ExpiresAtUtc);
 
                 return Results.Ok(new
                 {
-                    AccessToken = token.AccessToken,
                     ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
-                    TokenType = "Bearer",
                     User = new
                     {
                         Id = user.Id,
@@ -1061,7 +1091,7 @@ namespace SportRental.Admin.Api
                 });
             });
 
-            // Login endpoint — signs cookie AND returns JWT.
+            // Login endpoint — writes HttpOnly access-token cookie (SEC-009).
             auth.MapPost("/login", [AllowAnonymous] async (
                 LoginRequest request,
                 UserManager<ApplicationUser> userManager,
@@ -1102,12 +1132,11 @@ namespace SportRental.Admin.Api
                 var customer = await customerQuery.OrderBy(c => c.CreatedAtUtc).FirstOrDefaultAsync();
 
                 var token = jwt.CreateUserToken(user, user.TenantId ?? Guid.Empty, roles, customer?.Id);
+                WriteAccessTokenCookie(httpContext, token.AccessToken, token.ExpiresAtUtc);
 
                 return Results.Ok(new
                 {
-                    AccessToken = token.AccessToken,
                     ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
-                    TokenType = "Bearer",
                     User = new
                     {
                         Id = user.Id,
@@ -1175,15 +1204,42 @@ namespace SportRental.Admin.Api
                 }
 
                 var token = jwt.CreateGuestToken(customer.Id, customer.TenantId, customer.Email ?? normalizedEmail);
+                WriteAccessTokenCookie(httpContext, token.AccessToken, token.ExpiresAtUtc);
 
                 return Results.Ok(new
                 {
-                    AccessToken = token.AccessToken,
-                    TokenType = "Bearer",
                     ExpiresIn = (int)(token.ExpiresAtUtc - DateTime.UtcNow).TotalSeconds,
                     CustomerId = customer.Id,
                     Email = customer.Email,
                     FullName = customer.FullName
+                });
+            });
+
+            // SEC-009: logout — usuwa HttpOnly cookie z tokenem.
+            auth.MapPost("/logout", [AllowAnonymous] (HttpContext httpContext) =>
+            {
+                DeleteAccessTokenCookie(httpContext);
+                return Results.Ok();
+            });
+
+            // SEC-009: /auth/me — WASM pyta tu o stan uwierzytelnienia przy starcie
+            // (bo token jest teraz w HttpOnly cookie i niedostępny z JS).
+            // Tylko JwtBearer — żeby brak auth zwracał 401 (Identity.Application czaruje 302 do /Account/Login).
+            auth.MapGet("/me", [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)] (ClaimsPrincipal user) =>
+            {
+                var id = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                var email = user.FindFirst(ClaimTypes.Email)?.Value;
+                var tenantIdStr = user.FindFirst("tenant-id")?.Value;
+                var customerIdStr = user.FindFirst("customer-id")?.Value;
+                var roles = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToArray();
+
+                return Results.Ok(new
+                {
+                    Id = id,
+                    Email = email,
+                    TenantId = Guid.TryParse(tenantIdStr, out var tid) ? tid : (Guid?)null,
+                    CustomerId = Guid.TryParse(customerIdStr, out var cid) ? cid : (Guid?)null,
+                    Roles = roles
                 });
             });
         }
