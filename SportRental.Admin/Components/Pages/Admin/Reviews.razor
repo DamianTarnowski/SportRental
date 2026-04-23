@@ -5,10 +5,14 @@
 @using SportRental.Infrastructure.Data
 @using SportRental.Infrastructure.Domain
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
+@inject AuthenticationStateProvider AuthStateProvider
+@inject UserManager<ApplicationUser> UserManager
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
@@ -83,12 +87,11 @@
 </MudContainer>
 
 @code {
-    [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
-
     private List<ReviewRow> _reviews = new();
     private bool _isLoading = true;
     private bool _showHidden = true;
     private string _search = string.Empty;
+    private Guid? _tenantId;
 
     private List<ReviewRow> Filtered =>
         _reviews
@@ -100,13 +103,18 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Blazor Server circuit nie ma HttpContext z X-Tenant-Id ani wygodnie dostępnego JWT,
+        // więc tenant bierzemy bezpośrednio z ApplicationUser zalogowanego admina.
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var appUser = await UserManager.GetUserAsync(authState.User);
+        _tenantId = appUser?.TenantId;
         await LoadAsync();
     }
 
     private async Task LoadAsync()
     {
         _isLoading = true;
-        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        var tenantId = _tenantId ?? Guid.Empty;
 
         await using var db = await DbFactory.CreateDbContextAsync();
         _reviews = await db.RentalReviews.IgnoreQueryFilters()
@@ -133,7 +141,7 @@
 
     private async Task ToggleHiddenAsync(ReviewRow row)
     {
-        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        var tenantId = _tenantId ?? Guid.Empty;
 
         await using var db = await DbFactory.CreateDbContextAsync();
         var entity = await db.RentalReviews.IgnoreQueryFilters()
@@ -161,7 +169,7 @@
 
         if (confirmed != true) return;
 
-        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        var tenantId = _tenantId ?? Guid.Empty;
 
         await using var db = await DbFactory.CreateDbContextAsync();
         var entity = await db.RentalReviews.IgnoreQueryFilters()
