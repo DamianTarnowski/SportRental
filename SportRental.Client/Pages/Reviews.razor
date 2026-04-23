@@ -3,7 +3,6 @@
 @using SportRental.Shared.Models
 @using SportRental.Shared.Services
 @inject IApiService Api
-@inject TenantService Tenants
 
 <PageTitle>Opinie klientów - SportRental</PageTitle>
 
@@ -13,13 +12,7 @@
         Opinie klientów
     </MudText>
 
-    @if (_tenantId == Guid.Empty)
-    {
-        <MudAlert Severity="Severity.Info">
-            Wybierz najpierw wypożyczalnię na stronie głównej, aby zobaczyć opinie.
-        </MudAlert>
-    }
-    else if (_isLoading)
+    @if (_isLoading)
     {
         <MudPaper Class="pa-6 text-center" Elevation="0">
             <MudProgressCircular Indeterminate="true" Size="Size.Large" />
@@ -89,7 +82,6 @@
 </MudContainer>
 
 @code {
-    private Guid _tenantId;
     private bool _isLoading = true;
     private bool _isLoadingMore;
     private int _page = 1;
@@ -99,19 +91,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var tenantIdStr = await Tenants.GetSelectedTenantIdAsync();
-        if (Guid.TryParse(tenantIdStr, out var tid) && tid != Guid.Empty)
-        {
-            _tenantId = tid;
-            await LoadFirstPageAsync();
-        }
+        await LoadFirstPageAsync();
         _isLoading = false;
     }
 
     private async Task LoadFirstPageAsync()
     {
-        _summary = await Api.GetTenantReviewSummaryAsync(_tenantId);
-        var first = await Api.GetTenantReviewsAsync(_tenantId, 1, _pageSize);
+        _summary = await Api.GetReviewSummaryAsync();
+        var first = await Api.GetReviewsAsync(1, _pageSize);
         _reviews.Clear();
         _reviews.AddRange(first);
         _page = 1;
@@ -122,7 +109,7 @@
         _isLoadingMore = true;
         try
         {
-            var next = await Api.GetTenantReviewsAsync(_tenantId, _page + 1, _pageSize);
+            var next = await Api.GetReviewsAsync(_page + 1, _pageSize);
             if (next.Count > 0)
             {
                 _reviews.AddRange(next);

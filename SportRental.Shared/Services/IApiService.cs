@@ -46,6 +46,8 @@ public interface IApiService
     Task<RentalReviewDto?> PostRentalReviewAsync(CreateRentalReviewRequest request);
     Task<List<RentalReviewDto>> GetTenantReviewsAsync(Guid tenantId, int page = 1, int pageSize = 20);
     Task<ReviewSummaryDto> GetTenantReviewSummaryAsync(Guid tenantId);
+    Task<List<RentalReviewDto>> GetReviewsAsync(int page = 1, int pageSize = 20);
+    Task<ReviewSummaryDto> GetReviewSummaryAsync();
 }
 
 public sealed class GuestSessionPayload

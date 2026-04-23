@@ -14,6 +14,7 @@ namespace SportRental.Shared.Models
         public string Status { get; set; } = string.Empty;
         public bool CanCancel { get; set; }
         public string? ContractUrl { get; set; }
+        public bool HasReview { get; set; }
         public List<MyRentalItemDto> Items { get; set; } = new();
         
         // Nowe pola do śledzenia wydania/zwrotu

@@ -372,4 +372,32 @@ public class ApiService : IApiService
             return new ReviewSummaryDto();
         }
     }
+
+    public async Task<List<RentalReviewDto>> GetReviewsAsync(int page = 1, int pageSize = 20)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/api/reviews?page={page}&pageSize={pageSize}";
+            var list = await _httpClient.GetFromJsonAsync<List<RentalReviewDto>>(url, _jsonOptions);
+            return list ?? new List<RentalReviewDto>();
+        }
+        catch (Exception)
+        {
+            return new List<RentalReviewDto>();
+        }
+    }
+
+    public async Task<ReviewSummaryDto> GetReviewSummaryAsync()
+    {
+        try
+        {
+            var url = $"{_baseUrl}/api/reviews/summary";
+            var summary = await _httpClient.GetFromJsonAsync<ReviewSummaryDto>(url, _jsonOptions);
+            return summary ?? new ReviewSummaryDto();
+        }
+        catch (Exception)
+        {
+            return new ReviewSummaryDto();
+        }
+    }
 }

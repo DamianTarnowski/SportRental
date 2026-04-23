@@ -1,11 +1,14 @@
 @page "/my-rentals"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@using SportRental.Client.Components
 @using SportRental.Shared.Models
 @using SportRental.Shared.Services
+@using MudBlazor
 @inject IApiService Api
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject IDialogService DialogService
 @implements IAsyncDisposable
 
 <PageTitle>Moje wypożyczenia - SportRental</PageTitle>
@@ -101,6 +104,18 @@
                                 Szczegóły →
                             </button>
                         </div>
+                        @if (CanReview(rental))
+                        {
+                            <button class="rental-mobile-review-cta" @onclick="@(() => OpenReviewDialog(rental))">
+                                ⭐ Oceń wypożyczenie
+                            </button>
+                        }
+                        else if (rental.HasReview)
+                        {
+                            <div class="rental-mobile-review-done">
+                                ✅ Dziękujemy za opinię
+                            </div>
+                        }
                     </div>
                 }
             </div>
@@ -196,6 +211,16 @@ else
                                 @rental.TotalAmount.ToString("C")
                             </div>
                             <div class="rental-actions">
+                                @if (CanReview(rental))
+                                {
+                                    <button class="rental-btn rental-btn-review" @onclick="@(() => OpenReviewDialog(rental))">
+                                        ⭐ Oceń
+                                    </button>
+                                }
+                                else if (rental.HasReview)
+                                {
+                                    <span class="rental-review-done-badge">✅ Oceniono</span>
+                                }
                                 <button class="rental-btn rental-btn-primary" @onclick="@(() => ViewDetails(rental.Id))">
                                     👁️ Szczegóły
                                 </button>
@@ -349,5 +374,23 @@ else
     private void ViewDetails(Guid rentalId)
     {
         Nav.NavigateTo($"/my-rentals/{rentalId}");
+    }
+
+    private static bool CanReview(MyRentalDto rental) =>
+        !rental.HasReview && !string.Equals(rental.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+
+    private async Task OpenReviewDialog(MyRentalDto rental)
+    {
+        var parameters = new DialogParameters
+        {
+            [nameof(ReviewDialog.RentalId)] = rental.Id
+        };
+        var options = new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+        var dialog = await DialogService.ShowAsync<ReviewDialog>("Oceń wypożyczenie", parameters, options);
+        var result = await dialog.Result;
+        if (result is { Canceled: false })
+        {
+            await LoadRentalsAsync();
+        }
     }
 }

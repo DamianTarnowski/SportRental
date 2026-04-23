@@ -880,6 +880,7 @@ namespace SportRental.Admin.Api
                         Status = r.Status.ToString(),
                         CanCancel = r.Status != RentalStatus.Cancelled && r.StartDateUtc > DateTime.UtcNow,
                         ContractUrl = r.ContractUrl,
+                        HasReview = db.RentalReviews.IgnoreQueryFilters().Any(rv => rv.RentalId == r.Id),
                         // Nowe pola do śledzenia wydania/zwrotu
                         IssuedAtUtc = r.IssuedAtUtc,
                         ReturnedAtUtc = r.ReturnedAtUtc,
@@ -1487,9 +1488,11 @@ namespace SportRental.Admin.Api
                     return Results.NotFound();
                 }
 
-                if (rental.Status != RentalStatus.Completed)
+                // Opinie wolno wystawiać na dowolnym statusie wynajmu (poza Cancelled),
+                // żeby klient mógł ocenić nawet w trakcie trwania wypożyczenia.
+                if (rental.Status == RentalStatus.Cancelled)
                 {
-                    return Results.BadRequest(new { error = "Review can be added only for completed rentals." });
+                    return Results.BadRequest(new { error = "Cannot review a cancelled rental." });
                 }
 
                 var alreadyExists = await db.RentalReviews.IgnoreQueryFilters()
@@ -1580,6 +1583,90 @@ namespace SportRental.Admin.Api
                 var query = db.RentalReviews.IgnoreQueryFilters()
                     .AsNoTracking()
                     .Where(r => r.TenantId == tenantId && !r.IsHidden);
+
+                var count = await query.CountAsync(ct);
+                if (count == 0)
+                {
+                    return Results.Ok(new SharedModels.ReviewSummaryDto());
+                }
+
+                var agg = await query
+                    .GroupBy(_ => 1)
+                    .Select(g => new
+                    {
+                        AvgQ = g.Average(r => (double)r.QualityScore),
+                        AvgP = g.Average(r => (double)r.PriceScore),
+                        AvgS = g.Average(r => (double)r.ServiceScore)
+                    })
+                    .FirstAsync(ct);
+
+                return Results.Ok(new SharedModels.ReviewSummaryDto
+                {
+                    Count = count,
+                    AverageQuality = Math.Round(agg.AvgQ, 2),
+                    AveragePrice = Math.Round(agg.AvgP, 2),
+                    AverageService = Math.Round(agg.AvgS, 2),
+                    AverageOverall = Math.Round((agg.AvgQ + agg.AvgP + agg.AvgS) / 3.0, 2)
+                });
+            });
+
+            // GET /api/reviews — publiczna globalna lista opinii (wszystkich tenantów).
+            // Klient WASM z reguły nie ma wybranej wypożyczalni, więc ta jest domyślnym źródłem.
+            api.MapGet("/reviews", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                int? page,
+                int? pageSize,
+                CancellationToken ct) =>
+            {
+                var take = Math.Clamp(pageSize ?? 20, 1, 100);
+                var skip = Math.Max(0, ((page ?? 1) - 1) * take);
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var items = await db.RentalReviews.IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Where(r => !r.IsHidden)
+                    .OrderByDescending(r => r.CreatedAtUtc)
+                    .Skip(skip).Take(take)
+                    .Select(r => new
+                    {
+                        r.Id,
+                        r.RentalId,
+                        CustomerName = r.Customer != null ? r.Customer.FullName : "Klient",
+                        r.QualityScore,
+                        r.PriceScore,
+                        r.ServiceScore,
+                        r.Comment,
+                        r.CreatedAtUtc
+                    })
+                    .ToListAsync(ct);
+
+                var result = items.Select(r => new SharedModels.RentalReviewDto
+                {
+                    Id = r.Id,
+                    RentalId = r.RentalId,
+                    CustomerName = AnonymizeName(r.CustomerName),
+                    QualityScore = r.QualityScore,
+                    PriceScore = r.PriceScore,
+                    ServiceScore = r.ServiceScore,
+                    AverageScore = (r.QualityScore + r.PriceScore + r.ServiceScore) / 3.0,
+                    Comment = r.Comment,
+                    CreatedAtUtc = r.CreatedAtUtc
+                }).ToList();
+
+                return Results.Ok(result);
+            });
+
+            // GET /api/reviews/summary — agregat globalny wszystkich opinii.
+            api.MapGet("/reviews/summary", [AllowAnonymous] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                CancellationToken ct) =>
+            {
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var query = db.RentalReviews.IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .Where(r => !r.IsHidden);
 
                 var count = await query.CountAsync(ct);
                 if (count == 0)
@@ -1825,12 +1912,14 @@ namespace SportRental.Admin.Api
 
                     Stripe.StripeConfiguration.ApiKey = stripe.SecretKey;
 
-                    // Automatyczne wykrywanie URL klienta na podstawie środowiska
-                    var isDevelopment = configuration["ASPNETCORE_ENVIRONMENT"] == "Development" 
+                    // URL klienta dla Stripe redirectów — preferuj konfig,
+                    // fallback na SWA (srclient-blazor App Service nigdy nie został wdrożony i zwraca 403).
+                    var isDevelopment = configuration["ASPNETCORE_ENVIRONMENT"] == "Development"
                         || Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
-                    var clientBaseUrl = isDevelopment 
-                        ? "http://localhost:5014" 
-                        : "https://srclient-blazor.azurewebsites.net";
+                    var clientBaseUrl = configuration["ClientApp:PublicBaseUrl"]?.TrimEnd('/')
+                        ?? (isDevelopment
+                            ? "http://localhost:5014"
+                            : "https://nice-tree-0359d8403.3.azurestaticapps.net");
                     
                     var successUrl = stripe.SuccessUrl ?? configuration["Stripe:SuccessUrl"] ?? $"{clientBaseUrl}/checkout/success";
                     var cancelUrl = stripe.CancelUrl ?? configuration["Stripe:CancelUrl"] ?? $"{clientBaseUrl}/checkout/cancel";
