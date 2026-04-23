@@ -169,6 +169,43 @@ namespace SportRental.Admin.Services.Email
             await SendEmailAsync(email, subject, htmlBody);
         }
 
+        public async Task SendReturnThankYouAsync(string email, string customerName, string? reviewUrl, string? optOutUrl, string? companyName)
+        {
+            if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException("Email address cannot be null or empty.", nameof(email));
+            if (string.IsNullOrWhiteSpace(customerName)) throw new ArgumentException("Customer name cannot be null or empty.", nameof(customerName));
+
+            var company = string.IsNullOrWhiteSpace(companyName) ? "SportRental" : companyName;
+            var subject = $"Dziękujemy za skorzystanie z naszych usług - {company}";
+
+            var reviewCta = string.IsNullOrEmpty(reviewUrl)
+                ? string.Empty
+                : $@"<p style=""margin:24px 0;"">
+                        <a href=""{reviewUrl}""
+                           style=""display:inline-block;padding:14px 26px;background:linear-gradient(135deg,#f093fb 0%,#f5576c 100%);color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:16px;"">
+                            ⭐ Wystaw opinię
+                        </a>
+                     </p>";
+
+            var optOutBlock = string.IsNullOrEmpty(optOutUrl)
+                ? string.Empty
+                : $@"<p style=""font-size:12px;color:#777;margin-top:24px;"">
+                        Jeśli nie chcesz otrzymywać od nas maili z prośbą o opinię,
+                        <a href=""{optOutUrl}"" style=""color:#777;"">zrezygnuj tutaj</a>.
+                     </p>";
+
+            var htmlBody = $@"
+                <div style=""font-family:sans-serif;max-width:560px;margin:0 auto;"">
+                    <h2 style=""color:#1f2937;"">Dzień dobry {customerName}!</h2>
+                    <p>Potwierdzamy przyjęcie zwrotu sprzętu. <strong>Dziękujemy, że wybrałeś/aś {company}</strong> — mamy nadzieję, że wypożyczenie spełniło Twoje oczekiwania.</p>
+                    <p>Jeśli masz chwilę, prosimy o krótką opinię — 3 oceny (jakość sprzętu, cena, obsługa) i opcjonalny komentarz. Twoja opinia pomaga nam się rozwijać i innym klientom wybrać dobrze.</p>
+                    {reviewCta}
+                    <p>Pozdrawiamy,<br/>Zespół {company}</p>
+                    {optOutBlock}
+                </div>";
+
+            await SendEmailAsync(email, subject, htmlBody);
+        }
+
         private static void EnsureValidEmail(string email)
         {
             if (!MailAddress.TryCreate(email, out _))

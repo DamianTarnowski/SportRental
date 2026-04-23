@@ -2,9 +2,15 @@
 @using SportRental.Infrastructure.Data
 @using SportRental.Infrastructure.Domain
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.DataProtection
+@using SportRental.Admin.Services.Email
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject ISnackbar Snackbar
+@inject IEmailSender EmailSender
+@inject IDataProtectionProvider ProtectorProvider
+@inject IConfiguration Config
+@inject ILogger<ReturnEquipmentDialog> Logger
 
 <MudDialog>
     <TitleContent>
@@ -133,7 +139,9 @@
     private string? _returnNotes;
     private decimal _depositRefund;
     private decimal _damageCharge;
-    private string? _equipmentCondition;
+    // Domyślnie "Dobry" — żeby Potwierdź było od razu klikalne. Inwestor zgłaszał że
+    // "ciężko kliknąć, nic nie można" — to była ta blokada. Pracownik może zmienić.
+    private string? _equipmentCondition = "good";
     private bool _isProcessing;
 
     protected override void OnParametersSet()
@@ -150,27 +158,31 @@
     private async Task Submit()
     {
         if (Rental == null || string.IsNullOrEmpty(_equipmentCondition)) return;
-        
+
         _isProcessing = true;
-        
+
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
-            
-            var rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == Rental.Id);
+
+            var rental = await db.Rentals
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == Rental.Id);
+
             if (rental == null)
             {
                 Snackbar.Add("Nie znaleziono wypożyczenia", Severity.Error);
                 MudDialog?.Cancel();
                 return;
             }
-            
-            rental.ReturnedAtUtc = DateTime.UtcNow;
+
+            var now = DateTime.UtcNow;
+            rental.ReturnedAtUtc = now;
             rental.ReturnNotes = _returnNotes;
             rental.ReturnDepositRefund = _depositRefund;
             rental.DamageCharge = _damageCharge > 0 ? _damageCharge : null;
             rental.Status = RentalStatus.Completed;
-            
+
             var conditionText = _equipmentCondition switch
             {
                 "good" => "Stan: dobry",
@@ -178,16 +190,25 @@
                 "damaged" => "Stan: poważne uszkodzenia",
                 _ => ""
             };
-            
+
             if (!string.IsNullOrEmpty(conditionText))
             {
-                rental.ReturnNotes = string.IsNullOrEmpty(rental.ReturnNotes) 
-                    ? conditionText 
+                rental.ReturnNotes = string.IsNullOrEmpty(rental.ReturnNotes)
+                    ? conditionText
                     : $"{conditionText}. {rental.ReturnNotes}";
             }
-            
+
+            // Thank-you mail + pierwsza prośba o opinię (zastępuje slot +24h w ReviewRequestService).
+            // Jeśli się nie uda wysłać, zwrot i tak zapisujemy — mail to "best effort".
+            var mailSent = await TrySendReturnThankYouAsync(rental, now);
+            if (mailSent)
+            {
+                rental.ReviewRequestCount = 1;
+                rental.LastReviewRequestSentAtUtc = now;
+            }
+
             await db.SaveChangesAsync();
-            
+
             MudDialog?.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)
@@ -198,6 +219,48 @@
         finally
         {
             _isProcessing = false;
+        }
+    }
+
+    private async Task<bool> TrySendReturnThankYouAsync(Rental rental, DateTime now)
+    {
+        if (rental.Customer?.Email is null) return false;
+        if (rental.Customer.ReviewEmailsOptOut) return false;
+
+        try
+        {
+            var clientBaseUrl = Config["ClientApp:PublicBaseUrl"]?.TrimEnd('/') ?? string.Empty;
+            var reviewUrl = string.IsNullOrEmpty(clientBaseUrl)
+                ? null
+                : $"{clientBaseUrl}/my-rentals/{rental.Id}";
+
+            string? optOutUrl = null;
+            if (!string.IsNullOrEmpty(clientBaseUrl))
+            {
+                var protector = ProtectorProvider.CreateProtector("ReviewOptOut");
+                var token = protector.Protect(rental.Customer.Id.ToString("N"));
+                optOutUrl = $"{clientBaseUrl}/reviews/opt-out?token={Uri.EscapeDataString(token)}";
+            }
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var companyName = await db.CompanyInfos.AsNoTracking()
+                .Where(c => c.TenantId == rental.TenantId)
+                .Select(c => c.Name)
+                .FirstOrDefaultAsync();
+
+            await EmailSender.SendReturnThankYouAsync(
+                rental.Customer.Email,
+                rental.Customer.FullName,
+                reviewUrl,
+                optOutUrl,
+                companyName);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Nie udało się wysłać thank-you maila po zwrocie dla wynajmu {RentalId}", rental.Id);
+            return false;
         }
     }
 }

@@ -43,6 +43,14 @@ namespace SportRental.Admin.Services.Email
             return Task.CompletedTask;
         }
 
+        public Task SendReturnThankYouAsync(string email, string customerName, string? reviewUrl, string? optOutUrl, string? companyName)
+        {
+            if (string.IsNullOrWhiteSpace(customerName)) throw new ArgumentException("Customer name cannot be null or empty.", nameof(customerName));
+            Validate(email, "Thank you", "Return thank you");
+            _logger.LogInformation("[NoOpEmailSender] SendReturnThankYouAsync to {Email} for {Customer} (suppressed in tests). Review: {Review}", email, customerName, reviewUrl);
+            return Task.CompletedTask;
+        }
+
         private static void Validate(string email, string subject, string htmlMessage)
         {
             if (string.IsNullOrWhiteSpace(email)) throw new ArgumentException("Email address cannot be null or empty.", nameof(email));

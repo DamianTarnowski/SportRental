@@ -58,6 +58,11 @@ namespace SportRental.Infrastructure.Domain
         public bool IsReminderEmailSent { get; set; } = false;
         public DateTime? ReminderEmailSentAtUtc { get; set; }
 
+        // Dodatkowy "final" reminder 15 min przed końcem — niezależnie od RentalType.
+        // Daily rental: primary (24h) + final (15min). Hourly: primary IS 15min — final pomijany.
+        public bool IsFinalReminderSent { get; set; } = false;
+        public DateTime? FinalReminderSentAtUtc { get; set; }
+
         // Prośby o wystawienie opinii po zakończeniu wynajmu — do 3 prób (+24h, +3d, +7d).
         public int ReviewRequestCount { get; set; } = 0;
         public DateTime? LastReviewRequestSentAtUtc { get; set; }
