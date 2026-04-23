@@ -1,4 +1,5 @@
 using SportRental.Admin.Services.Sms;
+using SportRental.Admin.Services.Time;
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Tenancy;
@@ -18,10 +19,13 @@ namespace SportRental.Admin.Services.Email
             _logger = logger;
         }
 
-        // Daily rental: remind 24h before end. Hourly rental: remind 15 min before end.
-        // Timer cadence must be <= shortest lead so we don't miss the hourly window.
+        // Primary reminder: 24h przed końcem dla Daily, 15 min dla Hourly.
+        // Final reminder: zawsze 15 min przed końcem — dla Daily jest to DODATKOWY mail po primary,
+        // dla Hourly jest już pokryty przez primary (nie wysyłamy drugiego).
+        // Timer cadence musi być <= najkrótszego leada, żeby nie przegapić okna.
         private static readonly TimeSpan DailyReminderLead = TimeSpan.FromHours(24);
         private static readonly TimeSpan HourlyReminderLead = TimeSpan.FromMinutes(15);
+        private static readonly TimeSpan FinalReminderLead = TimeSpan.FromMinutes(15);
         private static readonly TimeSpan TickInterval = TimeSpan.FromMinutes(5);
 
         public Task StartAsync(CancellationToken cancellationToken)
@@ -86,7 +90,7 @@ namespace SportRental.Admin.Services.Email
                          && (r.Status == RentalStatus.Active || r.Status == RentalStatus.Confirmed)
                          && r.EndDateUtc > currentTimeUtc
                          && r.EndDateUtc <= maxWindowUtc
-                         && (!r.IsReminderEmailSent || !r.IsReminderSmsSent))
+                         && (!r.IsReminderEmailSent || !r.IsReminderSmsSent || !r.IsFinalReminderSent))
                 .ToListAsync();
 
             if (candidates.Count == 0) return;
@@ -97,21 +101,37 @@ namespace SportRental.Admin.Services.Email
                 .ToDictionaryAsync(p => p.Id, p => p.Name);
 
             var emailCount = 0;
+            var finalEmailCount = 0;
             var smsCount = 0;
 
             foreach (var rental in candidates)
             {
-                var lead = rental.RentalType == RentalType.Hourly ? HourlyReminderLead : DailyReminderLead;
-                var dueAtUtc = rental.EndDateUtc - lead;
-                if (currentTimeUtc < dueAtUtc) continue; // za wcześnie
+                var primaryLead = rental.RentalType == RentalType.Hourly ? HourlyReminderLead : DailyReminderLead;
+                var primaryDueAtUtc = rental.EndDateUtc - primaryLead;
+                var finalDueAtUtc = rental.EndDateUtc - FinalReminderLead;
 
-                if (!rental.IsReminderEmailSent && !string.IsNullOrEmpty(rental.Customer?.Email))
+                // Primary reminder (24h dla Daily, 15 min dla Hourly).
+                if (currentTimeUtc >= primaryDueAtUtc
+                    && !rental.IsReminderEmailSent
+                    && !string.IsNullOrEmpty(rental.Customer?.Email))
                 {
                     await SendReminderEmail(rental, emailService, db);
                     emailCount++;
                 }
 
+                // Final reminder (15 min przed końcem) — tylko dla Daily, bo Hourly
+                // ma już primary = 15min. Gdy primary = final nie wysyłamy drugiej kopii.
+                if (rental.RentalType == RentalType.Daily
+                    && currentTimeUtc >= finalDueAtUtc
+                    && !rental.IsFinalReminderSent
+                    && !string.IsNullOrEmpty(rental.Customer?.Email))
+                {
+                    await SendFinalReminderEmail(rental, emailService, db);
+                    finalEmailCount++;
+                }
+
                 if (company.SmsReminderEnabled
+                    && currentTimeUtc >= primaryDueAtUtc
                     && !rental.IsReminderSmsSent
                     && !string.IsNullOrWhiteSpace(rental.Customer?.PhoneNumber))
                 {
@@ -120,11 +140,11 @@ namespace SportRental.Admin.Services.Email
                 }
             }
 
-            if (emailCount > 0 || smsCount > 0)
+            if (emailCount > 0 || finalEmailCount > 0 || smsCount > 0)
             {
                 _logger.LogInformation(
-                    "Tenant {TenantId}: wysłano {EmailCount} email i {SmsCount} SMS przypomnień",
-                    company.TenantId, emailCount, smsCount);
+                    "Tenant {TenantId}: wysłano {EmailCount} email, {FinalEmailCount} final email, {SmsCount} SMS przypomnień",
+                    company.TenantId, emailCount, finalEmailCount, smsCount);
             }
         }
 
@@ -170,7 +190,7 @@ namespace SportRental.Admin.Services.Email
             }
 
             var customerName = rental.Customer?.FullName ?? "Kliencie";
-            var endDate = rental.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm");
+            var endDate = PolishTimeZone.FromUtc(rental.EndDateUtc).ToString("dd.MM.yyyy HH:mm");
             var equipmentList = string.Join(", ",
                 rental.Items.Select(i => products.GetValueOrDefault(i.ProductId, "sprzet")));
             if (string.IsNullOrEmpty(equipmentList)) equipmentList = "sprzet sportowy";
@@ -193,8 +213,9 @@ namespace SportRental.Admin.Services.Email
             {
                 var remaining = rental.EndDateUtc - DateTime.UtcNow;
                 var timePhrase = FormatRemaining(remaining);
+                var endLocal = PolishTimeZone.FromUtc(rental.EndDateUtc);
                 var reminderText = $@"
-                    Przypominamy, że Twój wynajem sprzętu sportowego kończy się {timePhrase} (dnia {rental.EndDateUtc.ToLocalTime():yyyy-MM-dd} o {rental.EndDateUtc.ToLocalTime():HH:mm}).
+                    Przypominamy, że Twój wynajem sprzętu sportowego kończy się {timePhrase} (dnia {endLocal:yyyy-MM-dd} o {endLocal:HH:mm}).
 
                     Prosimy o terminowy zwrot wypożyczonego sprzętu.
 
@@ -216,6 +237,39 @@ namespace SportRental.Admin.Services.Email
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Błąd podczas wysyłania przypomnienia do {Email}", rental.Customer?.Email);
+            }
+        }
+
+        private async Task SendFinalReminderEmail(Rental rental, IEmailSender emailService, ApplicationDbContext db)
+        {
+            if (rental.Customer?.Email == null) return;
+
+            try
+            {
+                var remaining = rental.EndDateUtc - DateTime.UtcNow;
+                var timePhrase = FormatRemaining(remaining);
+                var endLocal = PolishTimeZone.FromUtc(rental.EndDateUtc);
+                var reminderText = $@"
+                    Ostatnie przypomnienie: Twój wynajem sprzętu sportowego kończy się {timePhrase} (o godz. {endLocal:HH:mm}).
+
+                    Prosimy o przygotowanie sprzętu do zwrotu lub kontakt w sprawie przedłużenia.";
+
+                await emailService.SendReminderAsync(
+                    rental.Customer.Email,
+                    rental.Customer.FullName,
+                    reminderText);
+
+                rental.IsFinalReminderSent = true;
+                rental.FinalReminderSentAtUtc = DateTime.UtcNow;
+                db.Rentals.Update(rental);
+                await db.SaveChangesAsync();
+
+                _logger.LogInformation("Final reminder wysłany do {Email} dla wynajmu {RentalId}",
+                    rental.Customer.Email, rental.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Błąd podczas wysyłania final reminder do {Email}", rental.Customer?.Email);
             }
         }
 
