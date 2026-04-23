@@ -37,7 +37,9 @@
 </MudDialog>
 
 @code {
-    [CascadingParameter] public IDialogReference DialogReference { get; set; } = default!;
+    // MudBlazor 8 wstrzykuje IMudDialogInstance, nie IDialogReference — wcześniejsza wersja
+    // rzucała NullReferenceException w Close() i blokowała zamknięcie dialogu po submit.
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
     [Parameter, EditorRequired] public Guid RentalId { get; set; }
 
     private int _quality = 8;
@@ -46,7 +48,7 @@
     private string _comment = string.Empty;
     private bool _submitting;
 
-    private void Cancel() => DialogReference.Close(DialogResult.Cancel());
+    private void Cancel() => MudDialog.Cancel();
 
     private async Task Submit()
     {
@@ -69,7 +71,7 @@
             }
 
             Snackbar.Add("Dziękujemy za opinię!", Severity.Success);
-            DialogReference.Close(DialogResult.Ok(result));
+            MudDialog.Close(DialogResult.Ok(result));
         }
         catch (Exception ex)
         {
