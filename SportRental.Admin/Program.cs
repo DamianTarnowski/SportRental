@@ -427,7 +427,11 @@ app.Use(async (context, next) =>
     headers["X-Content-Type-Options"] = "nosniff";
     headers["X-Frame-Options"] = "DENY";
     headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    // Kamera DOZWOLONA dla same-origin — skaner kodów kreskowych w /admin/rentals
+    // używa getUserMedia() przez bibliotekę html5-qrcode. Wcześniejsze `camera=()`
+    // blokowało skaner na wszystkich urządzeniach (bug zgłoszony przez inwestora).
+    // Latarka (torch) jest konfigurowana przez `camera` permission — nie ma osobnego tokena.
+    headers["Permissions-Policy"] = "camera=(self), microphone=(), geolocation=()";
     await next();
 });
 
