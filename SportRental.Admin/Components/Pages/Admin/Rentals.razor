@@ -598,24 +598,29 @@ else
                                 <MudSelectItem Value="RentalType.Hourly">⏰ Godzinowy</MudSelectItem>
                             </MudSelect>
                         </MudItem>
-                        <MudItem xs="6" md="3">
-                            <MudTextField T="string"
-                                          Label="⏰ Godzina od"
-                                          Value="@FormatTime(startTime)"
-                                          ValueChanged="@(v => OnStartTimeChanged(ParseTime(v)))"
-                                          InputType="InputType.Time"
-                                          Variant="Variant.Outlined"
-                                          Class="rounded-lg" />
-                        </MudItem>
-                        <MudItem xs="6" md="3">
-                            <MudTextField T="string"
-                                          Label="⏰ Godzina do"
-                                          Value="@FormatTime(endTime)"
-                                          ValueChanged="@(v => OnEndTimeChanged(ParseTime(v)))"
-                                          InputType="InputType.Time"
-                                          Variant="Variant.Outlined"
-                                          Class="rounded-lg" />
-                        </MudItem>
+                        @* Godziny pokazujemy TYLKO dla wynajmu godzinowego — dla Dziennego zbędne
+                           i klient widzi mylący dialog (bug inwestor zgłosił 22.04). *@
+                        @if (editModel.RentalType == RentalType.Hourly)
+                        {
+                            <MudItem xs="6" md="3">
+                                <MudTextField T="string"
+                                              Label="⏰ Godzina od"
+                                              Value="@FormatTime(startTime)"
+                                              ValueChanged="@(v => OnStartTimeChanged(ParseTime(v)))"
+                                              InputType="InputType.Time"
+                                              Variant="Variant.Outlined"
+                                              Class="rounded-lg" />
+                            </MudItem>
+                            <MudItem xs="6" md="3">
+                                <MudTextField T="string"
+                                              Label="⏰ Godzina do"
+                                              Value="@FormatTime(endTime)"
+                                              ValueChanged="@(v => OnEndTimeChanged(ParseTime(v)))"
+                                              InputType="InputType.Time"
+                                              Variant="Variant.Outlined"
+                                              Class="rounded-lg" />
+                            </MudItem>
+                        }
                     </MudGrid>
                     
                     @if (startDate.HasValue && endDate.HasValue)
