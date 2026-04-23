@@ -437,6 +437,11 @@ test-db-connection.csx
 **/publish/
 **/publish-swa/
 **/pub/
+# Wyjątek: web.config musi być trackowany bo publish do srclient-blazor App Service
+# kopiuje go do output (rewrite rules dla SPA + _client subpath). Re-ignorujemy resztę.
+!SportRental.Client/pub/
+SportRental.Client/pub/*
+!SportRental.Client/pub/web.config
 
 ## Development notes (internal, not for public repo)
 .dev-notes/
