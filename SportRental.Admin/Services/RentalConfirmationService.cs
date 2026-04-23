@@ -102,14 +102,35 @@ public class RentalConfirmationService : IRentalConfirmationService
         if (rental?.Customer == null)
             throw new InvalidOperationException("Rental or customer not found");
 
-        // Remove existing confirmations for this rental
+        var now = DateTime.UtcNow;
+
+        // Reużyj istniejący ważny token, zamiast generować nowy — edycja wynajmu nie
+        // powinna unieważniać linku, który klient już dostał mailem.
         var existing = await context.RentalConfirmations
             .Where(rc => rc.RentalId == rentalId)
             .ToListAsync(ct);
+
+        var reusable = existing
+            .Where(rc => !rc.IsConfirmed && rc.ExpiresAt > now)
+            .OrderByDescending(rc => rc.CreatedAt)
+            .FirstOrDefault();
+
+        if (reusable != null)
+        {
+            // Zaktualizuj email/telefon (mogły się zmienić przy edycji), wydłuż okno ważności.
+            reusable.PhoneNumber = rental.Customer.PhoneNumber;
+            reusable.Email = rental.Customer.Email;
+            if (reusable.ExpiresAt < now.AddHours(24))
+                reusable.ExpiresAt = now.AddHours(48);
+            await context.SaveChangesAsync(ct);
+            _logger.LogInformation("Reusing existing confirmation token for rental {RentalId}", rentalId);
+            return reusable.Token;
+        }
+
+        // Usuń stare (wygasłe / potwierdzone) aby unique index na Token nie kolidował.
         if (existing.Any())
             context.RentalConfirmations.RemoveRange(existing);
 
-        // Generate URL-safe token
         var token = GenerateToken();
 
         var confirmation = new RentalConfirmation
@@ -120,8 +141,8 @@ public class RentalConfirmationService : IRentalConfirmationService
             Token = token,
             PhoneNumber = rental.Customer.PhoneNumber,
             Email = rental.Customer.Email,
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddHours(48)
+            CreatedAt = now,
+            ExpiresAt = now.AddHours(48)
         };
 
         context.RentalConfirmations.Add(confirmation);
@@ -140,17 +161,34 @@ public class RentalConfirmationService : IRentalConfirmationService
             .FirstOrDefaultAsync(rc => rc.Token == token, ct);
 
         if (confirmation == null)
+        {
+            _logger.LogWarning("Confirmation token not found (length={Length})", token?.Length ?? 0);
             return null;
+        }
 
         context.SetTenant(confirmation.TenantId);
 
+        // IgnoreQueryFilters — token już autoryzuje dostęp; bez tego ewentualna
+        // rozbieżność tenanta (np. kliknięcie linku po zmianie sesji) daje null.
         var rental = await context.Rentals
+            .IgnoreQueryFilters()
             .Include(r => r.Customer)
             .Include(r => r.Items).ThenInclude(i => i.Product)
             .FirstOrDefaultAsync(r => r.Id == confirmation.RentalId, ct);
 
-        if (rental?.Customer == null)
+        if (rental == null)
+        {
+            _logger.LogWarning("Rental {RentalId} not found for confirmation token {Token}",
+                confirmation.RentalId, token);
             return null;
+        }
+
+        if (rental.Customer == null)
+        {
+            _logger.LogWarning("Customer missing for rental {RentalId} (CustomerId={CustomerId})",
+                rental.Id, rental.CustomerId);
+            return null;
+        }
 
         var company = await context.CompanyInfos
             .FirstOrDefaultAsync(ct);
@@ -199,6 +237,7 @@ public class RentalConfirmationService : IRentalConfirmationService
         context.SetTenant(confirmation.TenantId);
 
         var rental = await context.Rentals
+            .IgnoreQueryFilters()
             .Include(r => r.Customer)
             .FirstOrDefaultAsync(r => r.Id == confirmation.RentalId, ct);
 
