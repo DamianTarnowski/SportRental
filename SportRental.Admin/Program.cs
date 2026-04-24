@@ -83,7 +83,7 @@ builder.Services.AddCors(options =>
             "http://localhost:5014",
             "https://localhost:7083",
             "http://localhost:5015",  // dodatkowy port dla backupu
-            "https://nice-tree-0359d8403.3.azurestaticapps.net",  // Azure Static Web Apps
+            "https://kind-tree-0efa2aa03.7.azurestaticapps.net",  // Azure Static Web Apps (odtworzony 2026-04-24)
             "https://srclient.azurewebsites.net",  // Azure App Service (stary)
             "https://srclient-blazor.azurewebsites.net"  // Azure App Service WASM client (nowy)
         )
@@ -449,7 +449,38 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
+// Client WASM pod /_client/* — izolowany branch pipeline który OMIJA endpoint routing.
+// Powód: MapStaticAssets() rejestruje endpointy z manifestu Admin które mają nieaktualne
+// wpisy dla /_client/* (hashowane WASM Client nie są w manifeście Admin, niektóre
+// AssetFile-entries wyrzucają 500 mimo że plik fizycznie jest). MapWhen tworzy branch
+// pipeline — request na /_client/* nigdy nie dochodzi do global endpoint routing.
+var clientWebRoot = Path.Combine(app.Environment.WebRootPath, "_client");
+if (Directory.Exists(clientWebRoot))
+{
+    var clientFileProvider = new PhysicalFileProvider(clientWebRoot);
+    // Używamy Map() (nie MapWhen) bo Map ZMIENIA PathBase — zjada prefix /_client z Path,
+    // dzięki czemu UseStaticFiles bez RequestPath bezpośrednio szuka pliku w FileProvider
+    // (wwwroot/_client). MapWhen zostawiał /_client w Path, więc UseStaticFiles z
+    // RequestPath="/_client" nie trafiał, a wszystko trafiało do SPA fallback.
+    app.Map("/_client", branch =>
+    {
+        branch.UseStaticFiles(new StaticFileOptions
+        {
+            FileProvider = clientFileProvider,
+            ServeUnknownFileTypes = true
+        });
+        // SPA fallback dla Blazor routing (/_client/reviews, /_client/my-rentals, itp.)
+        branch.Run(async ctx =>
+        {
+            ctx.Response.ContentType = "text/html";
+            ctx.Response.Headers.CacheControl = "no-cache";
+            await ctx.Response.SendFileAsync(clientFileProvider.GetFileInfo("index.html"));
+        });
+    });
+}
+
 app.MapStaticAssets();
+
 // Serwowanie plikĂłw z App_Data (wewnÄ™trzny blob) pod /files
 var filesRequestPath = builder.Configuration["Storage:RequestPath"] ?? "/files";
 var filesRoot = builder.Configuration["Storage:RootPath"] ?? Path.Combine(AppContext.BaseDirectory, "App_Data");
@@ -475,6 +506,9 @@ app.MapSmsApiCallbacks(); // SMSAPI delivery report callbacks
 app.MapConfirmationEndpoints(); // Public rental confirmation page
 app.MapControllers();
 app.MapHub<SportRental.Admin.Hubs.RentalNotificationHub>("/hubs/rentals");
+
+// (/_client/* obsługiwany przez MapWhen branch wcześniej — SPA fallback + static files
+// załatwione tam, endpoint routing dla _client nie potrzebny.)
 
 // Seed test data in development (from test-data.json)
 if (app.Environment.IsDevelopment())

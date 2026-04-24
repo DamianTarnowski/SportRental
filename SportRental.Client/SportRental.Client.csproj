@@ -28,4 +28,104 @@
     </Content>
   </ItemGroup>
 
+  <!--
+    Post-publish automation:
+    1. Nadpisuje $(PublishDir)\web.config naszym z pub\ — dotnet SDK generuje stary template
+       bez rewrite do _client\ (efekt StaticWebAssetBasePath=_client).
+    2. Deployuje output do drugiego miejsca — Azure Static Web Apps `srclient-wasm` —
+       jako zapas/drugi link. Token z secrets\azure-secrets.json (gitignored).
+
+    Wyłącz drugi deploy: `dotnet publish -p:SkipSwaDeploy=true` lub ustaw env SKIP_SWA_DEPLOY=true.
+  -->
+  <Target Name="FixWebConfigAfterPublish" AfterTargets="Publish">
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\pub\web.config"
+          DestinationFiles="$(PublishDir)web.config"
+          OverwriteReadOnlyFiles="true" />
+    <Message Importance="high" Text="[publish] web.config zsynchronizowany z pub\web.config (_client rewrite rules)" />
+  </Target>
+
+  <Target Name="DeployToStaticWebAppAfterPublish"
+          AfterTargets="FixWebConfigAfterPublish"
+          Condition=" '$(Configuration)' == 'Release' AND '$(SkipSwaDeploy)' != 'true' AND '$(SKIP_SWA_DEPLOY)' != 'true' ">
+    <PropertyGroup>
+      <SwaSecretsFile>$(MSBuildProjectDirectory)\..\secrets\azure-secrets.json</SwaSecretsFile>
+      <!--
+        SwaAppFolder musi być POZA $(PublishDir) — SWA CLI odrzuca upload ~44MB z pełnych
+        artefaktów (pre-compressed .br + .gz podwajają rozmiar 3x i zawieszają Azure w stanie
+        `Uploading` bez końca). Kopiujemy tylko pliki bez .br i .gz do obj\swa-upload\ —
+        Azure SWA i tak kompresuje sam.
+      -->
+      <SwaAppFolder>$(MSBuildProjectDirectory)\obj\swa-upload</SwaAppFolder>
+      <SwaSourceFolder>$(PublishDir)wwwroot\_client</SwaSourceFolder>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="[publish] Odczyt tokenu SWA z $(SwaSecretsFile)" />
+
+    <Exec Command='powershell -NoProfile -ExecutionPolicy Bypass -Command "(Get-Content -Raw -LiteralPath &quot;$(SwaSecretsFile)&quot; | ConvertFrom-Json).Deployment.ClientStaticWebAppDeploymentToken"'
+          ConsoleToMSBuild="true"
+          EchoOff="true"
+          ContinueOnError="true"
+          StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="SwaDeploymentToken" />
+      <Output TaskParameter="ExitCode" PropertyName="SwaTokenExitCode" />
+    </Exec>
+
+    <Message Condition=" '$(SwaTokenExitCode)' != '0' OR '$(SwaDeploymentToken)' == '' "
+             Importance="high"
+             Text="[publish] Brak tokenu SWA — pomijam drugi deploy (sprawdź secrets\azure-secrets.json)" />
+
+    <PropertyGroup Condition=" '$(SwaDeploymentToken)' != '' ">
+      <!--
+        WorkingDirectory MUSI być poza artefaktami, inaczej SWA CLI wypluwa:
+        "Current directory cannot be identical to or contained within artifact folders"
+        i kończy exit=0, ale nic nie uploaduje. Używamy obj/swa-work (poza publish).
+      -->
+      <SwaWorkDir>$(MSBuildProjectDirectory)\obj\swa-work</SwaWorkDir>
+    </PropertyGroup>
+
+    <MakeDir Condition=" '$(SwaDeploymentToken)' != '' " Directories="$(SwaWorkDir)" />
+
+    <!-- Przygotuj SwaAppFolder: skopiuj zawartość publish _client\ ale bez .br i .gz.
+         SWA i tak kompresuje sam; dołączenie pre-compressed blokuje upload na Free tier. -->
+    <RemoveDir Condition=" '$(SwaDeploymentToken)' != '' " Directories="$(SwaAppFolder)" />
+    <ItemGroup Condition=" '$(SwaDeploymentToken)' != '' ">
+      <SwaFilesToUpload Include="$(SwaSourceFolder)\**\*.*"
+                        Exclude="$(SwaSourceFolder)\**\*.br;$(SwaSourceFolder)\**\*.gz" />
+    </ItemGroup>
+    <Copy Condition=" '$(SwaDeploymentToken)' != '' "
+          SourceFiles="@(SwaFilesToUpload)"
+          DestinationFiles="@(SwaFilesToUpload->'$(SwaAppFolder)\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+
+    <Message Condition=" '$(SwaDeploymentToken)' != '' "
+             Importance="high"
+             Text="[publish] Deploy do Static Web Apps (srclient-wasm) z $(SwaAppFolder) (bez .br/.gz, cwd: $(SwaWorkDir))..." />
+
+    <Exec Condition=" '$(SwaDeploymentToken)' != '' "
+          Command='npx -y @azure/static-web-apps-cli deploy "$(SwaAppFolder)" --deployment-token "$(SwaDeploymentToken)" --env production'
+          WorkingDirectory="$(SwaWorkDir)"
+          ContinueOnError="true"
+          IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="SwaDeployExitCode" />
+    </Exec>
+
+    <!-- Smoke test: SWA CLI kłamie exitcode=0 nawet przy błędzie "Current directory...".
+         Sprawdzamy faktyczny upload przez ping /_framework/blazor.webassembly.js. -->
+    <Exec Condition=" '$(SwaDeployExitCode)' == '0' "
+          Command='powershell -NoProfile -Command "try { (Invoke-WebRequest -UseBasicParsing -Method Head -Uri https://kind-tree-0efa2aa03.7.azurestaticapps.net/_framework/blazor.webassembly.js).StatusCode } catch { $_.Exception.Response.StatusCode.value__ }"'
+          ConsoleToMSBuild="true"
+          EchoOff="true"
+          ContinueOnError="true">
+      <Output TaskParameter="ConsoleOutput" PropertyName="SwaSmokeStatus" />
+    </Exec>
+
+    <Message Condition=" '$(SwaDeployExitCode)' == '0' AND '$(SwaSmokeStatus)' == '200' "
+             Importance="high"
+             Text="[publish] SWA deploy OK (smoke /_framework/blazor.webassembly.js → 200) → https://kind-tree-0efa2aa03.7.azurestaticapps.net" />
+    <Warning Condition=" '$(SwaDeployExitCode)' == '0' AND '$(SwaSmokeStatus)' != '' AND '$(SwaSmokeStatus)' != '200' "
+             Text="[publish] SWA deploy zwrócił exit 0, ale smoke test /_framework/blazor.webassembly.js = $(SwaSmokeStatus). Upload mógł zostać pominięty." />
+    <Warning Condition=" '$(SwaDeployExitCode)' != '' AND '$(SwaDeployExitCode)' != '0' "
+             Text="[publish] SWA deploy nie powiódł się (exit $(SwaDeployExitCode)) — główny deploy (App Service) przeszedł, zapas pominięty" />
+  </Target>
+
 </Project>

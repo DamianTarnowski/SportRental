@@ -48,4 +48,108 @@
     </None>
   </ItemGroup>
 
+  <!--
+    Publish Client WASM i skopiuj jego output do $(PublishDir)wwwroot\_client\ — tak żeby
+    Admin hostował aktualną wersję Client pod /_client/ po każdym Admin deploy.
+
+    Dlaczego to trzeba wymusić ręcznie:
+    - ProjectReference do Client + MapStaticAssets() działają w dev, ale `dotnet publish` Admin
+      NIE kopiuje WASM artefaktów Client do wwwroot\_client\ automatycznie (SDK w .NET 10
+      traktuje static web assets jako linkowe — runtime szuka ich z manifestu, ale w App
+      Service Windows z IIS to nie działa).
+    - Skutek: https://sradmin.azurewebsites.net/_client/ miało grudniowy kod tygodniami,
+      bo Admin publish nigdy nie zastępował Client assets; tylko inkrementalnie nadpisywał DLL-e.
+    - SkipSwaDeploy=true = nie wyzwalaj SWA deploy Client z poziomu Admin publish
+      (Admin idzie na srclient-blazor/sradmin; SWA ma osobny deploy z Client publish).
+  -->
+  <Target Name="PublishClientWasmIntoAdmin" BeforeTargets="Publish">
+    <PropertyGroup>
+      <ClientWasmTempDir>$(MSBuildProjectDirectory)\obj\ClientWasmForAdmin</ClientWasmTempDir>
+    </PropertyGroup>
+
+    <RemoveDir Directories="$(ClientWasmTempDir)" />
+    <MakeDir Directories="$(ClientWasmTempDir)" />
+
+    <Message Importance="high" Text="[admin publish] Publikuję SportRental.Client do $(ClientWasmTempDir)..." />
+    <!--
+      Używamy Exec (osobny proces dotnet), NIE <MSBuild Targets="Publish">. Ten drugi
+      w .NET 10 z pubxml generuje cykl:
+        Publish<-_CopyAspNetCoreFilesToIntermediateOutputPath<-CorePublish<-DotNetPublish<-_PublishBuildAlternative<-Publish
+      bo SDK rozwija `_PublishBuildAlternative` który dependOn'uje od Publish globalnie
+      w tym samym grafie MSBuild.
+    -->
+    <Exec Command='dotnet publish "$(MSBuildProjectDirectory)\..\SportRental.Client\SportRental.Client.csproj" -c $(Configuration) -o "$(ClientWasmTempDir)" -p:SkipSwaDeploy=true --nologo' />
+
+    <!-- Kopiujemy WSZYSTKIE pliki (łącznie z .br i .gz). Manifest Admin
+         `SportRental.staticwebassets.endpoints.json` zawiera endpoint entries wskazujące na
+         .br/.gz AssetFile (pre-compressed). Gdyby ich brakło fizycznie, MapStaticAssets
+         próbuje je otworzyć i wyrzuca 500 (obserwowany bug: GET /_client/_framework/dotnet.js
+         → status 200 w HEAD ale 500 JSON body w GET). Rozmiar ~60MB zamiast 27MB, OK dla
+         App Service — SWA inaczej bo tam ma limit uploadu. -->
+    <ItemGroup>
+      <ClientWasmFiles Include="$(ClientWasmTempDir)\wwwroot\_client\**\*.*" />
+    </ItemGroup>
+
+    <RemoveDir Directories="$(PublishDir)wwwroot\_client" Condition=" '$(PublishDir)' != '' " />
+    <Copy SourceFiles="@(ClientWasmFiles)"
+          DestinationFiles="@(ClientWasmFiles->'$(PublishDir)wwwroot\_client\%(RecursiveDir)%(Filename)%(Extension)')"
+          Condition=" '$(PublishDir)' != '' " />
+
+    <Message Importance="high" Text="[admin publish] Skopiowano Client WASM (@(ClientWasmFiles->Count()) plików) do $(PublishDir)wwwroot\_client\" />
+
+    <!--
+      Fix <base href="/"> na <base href="/_client/"> w index.html hostowanym przez Admin.
+      Blazor WASM ładuje wszystkie relative assets od base href. Gdy Client jest na subpath
+      (/_client/) bez tej poprawki przeglądarka szuka assets w ROOT adminu (brak → 404 → pusty
+      ekran). Oryginalny index.html z Client zostaje nieruszony dla srclient-blazor + SWA
+      (one hostują na root, więc base="/" jest poprawne).
+    -->
+    <ReplaceFileText Condition=" '$(PublishDir)' != '' "
+                     InputFile="$(PublishDir)wwwroot\_client\index.html"
+                     Find='&lt;base href="/" /&gt;'
+                     Replace='&lt;base href="/_client/" /&gt;' />
+    <Message Importance="high" Text="[admin publish] Poprawiono base href w $(PublishDir)wwwroot\_client\index.html na /_client/" />
+
+    <!--
+      Usuń wpisy _client/* z SportRental.staticwebassets.endpoints.json żeby MapStaticAssets
+      NIE rejestrował endpointów dla ścieżek w Client WASM (tylko dla Admin own assets).
+      Inaczej endpoint routing łapie /_client/_framework/dotnet.js i serwuje BROKEN asset
+      z manifestu (mimo fizycznej obecności pliku). Po usunięciu tych wpisów, requests dla
+      /_client/* trafiają do app.Map("/_client") branchu który czyta z dysku.
+    -->
+    <!-- PowerShell (Newtonsoft.Json nie jest dostępny w tym MSBuild; System.Text.Json też nie
+         w RoslynCodeTaskFactory bez explicit ref). PowerShell ConvertFrom-Json działa stabilnie. -->
+    <Exec Condition=" '$(PublishDir)' != '' "
+          Command='powershell -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\strip-client-endpoints.ps1" -ManifestFile "$(PublishDir)SportRental.staticwebassets.endpoints.json"' />
+    <Message Importance="high" Text="[admin publish] Wyczyszczono _client/* entries z manifestu" />
+  </Target>
+
+  <!-- Inline task do podmiany tekstu w pliku (cross-platform, bez zewnętrznego shell). -->
+  <UsingTask TaskName="ReplaceFileText" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <InputFile ParameterType="System.String" Required="true" />
+      <Find ParameterType="System.String" Required="true" />
+      <Replace ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+        if (System.IO.File.Exists(InputFile))
+        {
+            var text = System.IO.File.ReadAllText(InputFile);
+            if (text.Contains(Find))
+            {
+                text = text.Replace(Find, Replace);
+                System.IO.File.WriteAllText(InputFile, text);
+                Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High,
+                    $"  [ReplaceFileText] {InputFile}: '{Find}' -> '{Replace}'");
+            }
+        }
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+
 </Project>
