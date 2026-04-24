@@ -63,11 +63,14 @@ namespace SportRental.Admin.Services.Email
                 var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>();
                 var protectorProvider = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
                 var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+                var surveyTokenService = scope.ServiceProvider.GetRequiredService<IReviewSurveyTokenService>();
 
-                var clientBaseUrl = config["ClientApp:PublicBaseUrl"]?.TrimEnd('/') ?? string.Empty;
+                // Admin URL — dla survey linku; ClientApp URL — dla opt-out. Fallback do Admin jeśli nie ma client.
+                var adminBaseUrl = config["Admin:PublicBaseUrl"]?.TrimEnd('/') ?? string.Empty;
+                var clientBaseUrl = config["ClientApp:PublicBaseUrl"]?.TrimEnd('/') ?? adminBaseUrl;
 
                 await using var db = await dbFactory.CreateDbContextAsync();
-                await ProcessAsync(db, emailSender, protectorProvider, clientBaseUrl);
+                await ProcessAsync(db, emailSender, protectorProvider, surveyTokenService, adminBaseUrl, clientBaseUrl);
             }
             catch (Exception ex)
             {
@@ -79,6 +82,8 @@ namespace SportRental.Admin.Services.Email
             ApplicationDbContext db,
             IEmailSender emailSender,
             IDataProtectionProvider protectorProvider,
+            IReviewSurveyTokenService surveyTokenService,
+            string adminBaseUrl,
             string clientBaseUrl)
         {
             var now = DateTime.UtcNow;
@@ -133,7 +138,12 @@ namespace SportRental.Admin.Services.Email
                         ? string.Empty
                         : $"{clientBaseUrl}/reviews/opt-out?token={Uri.EscapeDataString(token)}";
 
-                    var body = BuildBody(rental, clientBaseUrl, optOutUrl);
+                    var surveyToken = surveyTokenService.Generate(rental.Id);
+                    var surveyUrl = string.IsNullOrEmpty(adminBaseUrl)
+                        ? string.Empty
+                        : $"{adminBaseUrl}/ankieta/{rental.Id:D}?t={Uri.EscapeDataString(surveyToken)}";
+
+                    var body = BuildBody(rental, surveyUrl, optOutUrl);
                     await emailSender.SendEmailAsync(
                         rental.Customer.Email!,
                         "Podziel się opinią o wypożyczeniu",
@@ -158,15 +168,11 @@ namespace SportRental.Admin.Services.Email
             }
         }
 
-        private static string BuildBody(Rental rental, string clientBaseUrl, string optOutUrl)
+        private static string BuildBody(Rental rental, string surveyUrl, string optOutUrl)
         {
-            var reviewUrl = string.IsNullOrEmpty(clientBaseUrl)
+            var ctaBlock = string.IsNullOrEmpty(surveyUrl)
                 ? string.Empty
-                : $"{clientBaseUrl}/my-rentals/{rental.Id}";
-
-            var ctaBlock = string.IsNullOrEmpty(reviewUrl)
-                ? string.Empty
-                : $"<p><a href=\"{reviewUrl}\" style=\"display:inline-block;padding:10px 18px;background:#2e7d32;color:#fff;text-decoration:none;border-radius:6px;\">Wystaw opinię</a></p>";
+                : $"<p><a href=\"{surveyUrl}\" style=\"display:inline-block;padding:10px 18px;background:#2e7d32;color:#fff;text-decoration:none;border-radius:6px;\">Wystaw opinię</a></p>";
 
             var optOutBlock = string.IsNullOrEmpty(optOutUrl)
                 ? string.Empty

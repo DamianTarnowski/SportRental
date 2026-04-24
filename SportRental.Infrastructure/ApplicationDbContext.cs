@@ -42,6 +42,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
     public DbSet<RentalConfirmation> RentalConfirmations => Set<RentalConfirmation>();
     public DbSet<RentalReview> RentalReviews => Set<RentalReview>();
+    public DbSet<RentalItemReview> RentalItemReviews => Set<RentalItemReview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -303,6 +304,26 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(r => r.RentalId).IsUnique();
             entity.HasIndex(r => new { r.TenantId, r.CreatedAtUtc });
             entity.HasQueryFilter(r => TenantId == null || r.TenantId == TenantId);
+            entity.HasMany(r => r.ItemReviews)
+                .WithOne(ir => ir.RentalReview)
+                .HasForeignKey(ir => ir.RentalReviewId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RentalItemReview>(entity =>
+        {
+            entity.HasKey(ir => ir.Id);
+            entity.Property(ir => ir.Comment).HasMaxLength(1000);
+            entity.HasOne(ir => ir.RentalItem)
+                .WithMany()
+                .HasForeignKey(ir => ir.RentalItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(ir => ir.Product)
+                .WithMany()
+                .HasForeignKey(ir => ir.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Nie można dwa razy ocenić tego samego itemu w ramach jednej opinii
+            entity.HasIndex(ir => new { ir.RentalReviewId, ir.RentalItemId }).IsUnique();
         });
 
         modelBuilder.Entity<CheckoutSession>(entity =>

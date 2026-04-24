@@ -1503,6 +1503,39 @@ namespace SportRental.Admin.Api
                     return Results.Conflict(new { error = "Review for this rental already exists." });
                 }
 
+                // Walidacja per-item reviews (opcjonalnych)
+                List<RentalItemReview>? itemReviews = null;
+                if (req.ItemReviews is { Count: > 0 })
+                {
+                    var rentalItemIds = await db.RentalItems.IgnoreQueryFilters()
+                        .Where(ri => ri.RentalId == rental.Id)
+                        .Select(ri => new { ri.Id, ri.ProductId })
+                        .ToListAsync(ct);
+                    var validItemIds = rentalItemIds.ToDictionary(x => x.Id, x => x.ProductId);
+
+                    var seen = new HashSet<Guid>();
+                    itemReviews = new List<RentalItemReview>();
+                    foreach (var ir in req.ItemReviews)
+                    {
+                        if (ir.Rating is < 0 or > 10)
+                            return Results.BadRequest(new { error = $"Item rating must be 0-10 (got {ir.Rating})." });
+                        if (!validItemIds.TryGetValue(ir.RentalItemId, out var productId))
+                            return Results.BadRequest(new { error = $"RentalItem {ir.RentalItemId} does not belong to this rental." });
+                        if (!seen.Add(ir.RentalItemId))
+                            return Results.BadRequest(new { error = "Duplicate per-item review." });
+
+                        itemReviews.Add(new RentalItemReview
+                        {
+                            Id = Guid.NewGuid(),
+                            RentalItemId = ir.RentalItemId,
+                            ProductId = productId,
+                            Rating = ir.Rating,
+                            Comment = string.IsNullOrWhiteSpace(ir.Comment) ? null : ir.Comment.Trim(),
+                            CreatedAtUtc = DateTime.UtcNow
+                        });
+                    }
+                }
+
                 var review = new RentalReview
                 {
                     Id = Guid.NewGuid(),
@@ -1516,6 +1549,15 @@ namespace SportRental.Admin.Api
                     IsHidden = false,
                     CreatedAtUtc = DateTime.UtcNow
                 };
+
+                if (itemReviews is not null)
+                {
+                    foreach (var ir in itemReviews)
+                    {
+                        ir.RentalReviewId = review.Id;
+                        review.ItemReviews.Add(ir);
+                    }
+                }
 
                 await db.RentalReviews.AddAsync(review, ct);
                 await db.SaveChangesAsync(ct);
@@ -1552,7 +1594,16 @@ namespace SportRental.Admin.Api
                         r.PriceScore,
                         r.ServiceScore,
                         r.Comment,
-                        r.CreatedAtUtc
+                        r.CreatedAtUtc,
+                        ItemReviews = r.ItemReviews.Select(ir => new SharedModels.RentalItemReviewDto
+                        {
+                            Id = ir.Id,
+                            RentalItemId = ir.RentalItemId,
+                            ProductId = ir.ProductId,
+                            ProductName = ir.Product != null ? ir.Product.Name : "Sprzęt",
+                            Rating = ir.Rating,
+                            Comment = ir.Comment
+                        }).ToList()
                     })
                     .ToListAsync(ct);
 
@@ -1566,7 +1617,8 @@ namespace SportRental.Admin.Api
                     ServiceScore = r.ServiceScore,
                     AverageScore = (r.QualityScore + r.PriceScore + r.ServiceScore) / 3.0,
                     Comment = r.Comment,
-                    CreatedAtUtc = r.CreatedAtUtc
+                    CreatedAtUtc = r.CreatedAtUtc,
+                    ItemReviews = r.ItemReviews
                 }).ToList();
 
                 return Results.Ok(result);
@@ -1637,7 +1689,16 @@ namespace SportRental.Admin.Api
                         r.PriceScore,
                         r.ServiceScore,
                         r.Comment,
-                        r.CreatedAtUtc
+                        r.CreatedAtUtc,
+                        ItemReviews = r.ItemReviews.Select(ir => new SharedModels.RentalItemReviewDto
+                        {
+                            Id = ir.Id,
+                            RentalItemId = ir.RentalItemId,
+                            ProductId = ir.ProductId,
+                            ProductName = ir.Product != null ? ir.Product.Name : "Sprzęt",
+                            Rating = ir.Rating,
+                            Comment = ir.Comment
+                        }).ToList()
                     })
                     .ToListAsync(ct);
 
@@ -1651,7 +1712,8 @@ namespace SportRental.Admin.Api
                     ServiceScore = r.ServiceScore,
                     AverageScore = (r.QualityScore + r.PriceScore + r.ServiceScore) / 3.0,
                     Comment = r.Comment,
-                    CreatedAtUtc = r.CreatedAtUtc
+                    CreatedAtUtc = r.CreatedAtUtc,
+                    ItemReviews = r.ItemReviews
                 }).ToList();
 
                 return Results.Ok(result);

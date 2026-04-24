@@ -11,6 +11,8 @@
 @inject IDataProtectionProvider ProtectorProvider
 @inject IConfiguration Config
 @inject ILogger<ReturnEquipmentDialog> Logger
+@inject SportRental.Admin.Services.IReviewSurveyTokenService SurveyTokenService
+@inject NavigationManager NavigationManager
 
 <MudDialog>
     <TitleContent>
@@ -229,18 +231,18 @@
 
         try
         {
-            var clientBaseUrl = Config["ClientApp:PublicBaseUrl"]?.TrimEnd('/') ?? string.Empty;
-            var reviewUrl = string.IsNullOrEmpty(clientBaseUrl)
-                ? null
-                : $"{clientBaseUrl}/my-rentals/{rental.Id}";
+            // Link do ankiety kieruje na sradmin (Blazor Server) — ładuje się natychmiast, bez
+            // logowania, token-validated. Host pobieramy z bieżącego requestu, żeby dev i prod
+            // działały bez osobnej konfiguracji (w dev np. https://localhost:7083/ankieta/...).
+            var adminBaseUrl = new Uri(NavigationManager.BaseUri).GetLeftPart(UriPartial.Authority);
+            var surveyToken = SurveyTokenService.Generate(rental.Id);
+            var reviewUrl = $"{adminBaseUrl}/ankieta/{rental.Id:D}?t={Uri.EscapeDataString(surveyToken)}";
 
-            string? optOutUrl = null;
-            if (!string.IsNullOrEmpty(clientBaseUrl))
-            {
-                var protector = ProtectorProvider.CreateProtector("ReviewOptOut");
-                var token = protector.Protect(rental.Customer.Id.ToString("N"));
-                optOutUrl = $"{clientBaseUrl}/reviews/opt-out?token={Uri.EscapeDataString(token)}";
-            }
+            // Opt-out zostaje na kliencie WASM (tam jest publiczna lista opinii z linkiem "zrezygnuj").
+            var clientBaseUrl = Config["ClientApp:PublicBaseUrl"]?.TrimEnd('/') ?? adminBaseUrl;
+            var optOutProtector = ProtectorProvider.CreateProtector("ReviewOptOut");
+            var optOutToken = optOutProtector.Protect(rental.Customer.Id.ToString("N"));
+            var optOutUrl = $"{clientBaseUrl}/reviews/opt-out?token={Uri.EscapeDataString(optOutToken)}";
 
             await using var db = await DbFactory.CreateDbContextAsync();
             var companyName = await db.CompanyInfos.AsNoTracking()

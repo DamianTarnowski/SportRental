@@ -18,6 +18,21 @@ namespace SportRental.Shared.Models
 
         [StringLength(2000)]
         public string? Comment { get; set; }
+
+        /// <summary>Opcjonalne oceny per sprzęt z wynajmu (mogą być pominięte — wtedy tylko główna opinia).</summary>
+        public List<CreateRentalItemReviewRequest> ItemReviews { get; set; } = new();
+    }
+
+    public class CreateRentalItemReviewRequest
+    {
+        [Required]
+        public Guid RentalItemId { get; set; }
+
+        [Range(0, 10)]
+        public int Rating { get; set; }
+
+        [StringLength(1000)]
+        public string? Comment { get; set; }
     }
 
     public class RentalReviewDto
@@ -31,6 +46,17 @@ namespace SportRental.Shared.Models
         public double AverageScore { get; set; }
         public string? Comment { get; set; }
         public DateTime CreatedAtUtc { get; set; }
+        public List<RentalItemReviewDto> ItemReviews { get; set; } = new();
+    }
+
+    public class RentalItemReviewDto
+    {
+        public Guid Id { get; set; }
+        public Guid RentalItemId { get; set; }
+        public Guid ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public string? Comment { get; set; }
     }
 
     public class ReviewSummaryDto

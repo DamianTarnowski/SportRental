@@ -39,6 +39,7 @@ namespace SportRental.Infrastructure.Domain
         public Rental? Rental { get; set; }
         public Customer? Customer { get; set; }
         public Tenant? Tenant { get; set; }
+        public ICollection<RentalItemReview> ItemReviews { get; set; } = new List<RentalItemReview>();
 
         [NotMapped]
         public double AverageScore => (QualityScore + PriceScore + ServiceScore) / 3.0;

@@ -1,0 +1,12 @@
+@inherits LayoutComponentBase
+
+@* Pusty layout — bez nawigacji admina. Użyty dla publicznych stron takich jak /ankieta/{id}. *@
+<div style="min-height: 100vh; background: linear-gradient(135deg, #e3f2fd 0%, #fff 40%);">
+    <MudThemeProvider />
+    <MudPopoverProvider />
+    <MudDialogProvider />
+    <MudSnackbarProvider />
+    <main>
+        @Body
+    </main>
+</div>

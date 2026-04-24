@@ -1,0 +1,24 @@
+@* Reusable rating row: etykieta + 5-gwiazdkowa ocena mapowana na 0-10 (1 gwiazdka = 2 punkty). *@
+<div class="d-flex align-center gap-3 my-2 flex-wrap">
+    <MudText Style="min-width: 120px;">@Label</MudText>
+    <MudRating SelectedValue="StarValue" SelectedValueChanged="OnStarChanged" MaxValue="5" Size="Size.Medium" />
+    <MudText Typo="Typo.caption" Class="mud-text-secondary">@($"{Value}/10")</MudText>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public int Value { get; set; }
+    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+
+    private int StarValue => (int)Math.Round(Value / 2.0);
+
+    private async Task OnStarChanged(int stars)
+    {
+        var v = Math.Clamp(stars * 2, 0, 10);
+        if (v != Value)
+        {
+            Value = v;
+            await ValueChanged.InvokeAsync(v);
+        }
+    }
+}
