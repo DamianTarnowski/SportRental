@@ -1974,14 +1974,16 @@ namespace SportRental.Admin.Api
 
                     Stripe.StripeConfiguration.ApiKey = stripe.SecretKey;
 
-                    // URL klienta dla Stripe redirectów — preferuj konfig, fallback na prod App Service
-                    // (srclient-blazor to obecny aktywny deploy klienta WASM).
+                    // URL klienta dla Stripe redirectów — preferuj konfig, fallback na Admin /_client
+                    // (Client WASM bundled w Admin pod /_client/ od kwietnia 2026 — to jedyne
+                    // aktywne miejsce hostingu, srclient-blazor App Service i kind-tree SWA
+                    // zostały wyłączone z aktualizacji).
                     var isDevelopment = configuration["ASPNETCORE_ENVIRONMENT"] == "Development"
                         || Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
                     var clientBaseUrl = configuration["ClientApp:PublicBaseUrl"]?.TrimEnd('/')
                         ?? (isDevelopment
                             ? "http://localhost:5014"
-                            : "https://srclient-blazor.azurewebsites.net");
+                            : "https://sradmin.azurewebsites.net/_client");
                     
                     var successUrl = stripe.SuccessUrl ?? configuration["Stripe:SuccessUrl"] ?? $"{clientBaseUrl}/checkout/success";
                     var cancelUrl = stripe.CancelUrl ?? configuration["Stripe:CancelUrl"] ?? $"{clientBaseUrl}/checkout/cancel";

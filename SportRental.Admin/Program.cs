@@ -78,14 +78,18 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
+        // Po kwietniu 2026 Client WASM hostowany jest tylko bundled w Admin pod /_client/
+        // (same-origin → CORS niepotrzebny). Zewnętrzne hostingi (srclient-blazor App Service,
+        // kind-tree SWA) zostały wyłączone z deploy automation; jeśli ktoś tam wejdzie, dostanie
+        // ostatni deploy ale request do API z innego origin nadal go wpuszcza dla wstecznej
+        // kompatybilności.
         policy.WithOrigins(
-            "http://localhost:5002",  // WASM client dev
+            "http://localhost:5002",   // WASM client dev
             "http://localhost:5014",
             "https://localhost:7083",
-            "http://localhost:5015",  // dodatkowy port dla backupu
-            "https://kind-tree-0efa2aa03.7.azurestaticapps.net",  // Azure Static Web Apps (odtworzony 2026-04-24)
-            "https://srclient.azurewebsites.net",  // Azure App Service (stary)
-            "https://srclient-blazor.azurewebsites.net"  // Azure App Service WASM client (nowy)
+            "http://localhost:5015",   // dodatkowy port dla backupu
+            "https://kind-tree-0efa2aa03.7.azurestaticapps.net",  // SWA — nieaktualizowany
+            "https://srclient-blazor.azurewebsites.net"           // App Service — nieaktualizowany
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
