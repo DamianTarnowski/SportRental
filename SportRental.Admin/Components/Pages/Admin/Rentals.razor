@@ -2055,11 +2055,15 @@ else
     private void ExtendRental(Rental rental)
     {
         Edit(rental);
-        
+
+        // BUG sprzed 2026-04-25: brałem DateTime.Now (local) i zapisywał z Kind=Utc bez
+        // konwersji — efekt: rental kończył się 2h za późno (Polska UTC+2 latem), a
+        // RentalReminderService wysyłał SMS "kończy się o {godzina}" 2h za wcześnie niż
+        // klient się spodziewał. Maciej zgłosił "Mamy 11:47 a przychodzi SMS że kończy się 10:00".
         var newEndDate = DateTime.Now.AddDays(7);
         endDate = newEndDate;
-        editModel.EndDateUtc = DateTime.SpecifyKind(newEndDate, DateTimeKind.Utc);
-        
+        editModel.EndDateUtc = DateTime.SpecifyKind(newEndDate, DateTimeKind.Local).ToUniversalTime();
+
         Snackbar.Add("Zmień datę zakończenia aby przedłużyć wynajem", MudBlazor.Severity.Warning);
     }
     
