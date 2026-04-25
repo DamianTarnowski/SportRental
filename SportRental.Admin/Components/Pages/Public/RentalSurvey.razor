@@ -1,6 +1,6 @@
 @page "/ankieta/{RentalId:guid}"
 @attribute [AllowAnonymous]
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @layout EmptyLayout
 
 @using Microsoft.AspNetCore.Authorization
@@ -155,6 +155,20 @@
     private string? _errorMessage;
 
     protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadAsync();
+        }
+        catch (Exception)
+        {
+            // Bezpiecznie spadamy do "link wygasł" zamiast 500. Logi serwera złapią właściwy
+            // exception, klientowi pokazujemy bezpieczne UI.
+            _state = PageState.InvalidToken;
+        }
+    }
+
+    private async Task LoadAsync()
     {
         if (string.IsNullOrWhiteSpace(Token))
         {
