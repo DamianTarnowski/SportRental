@@ -43,6 +43,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<RentalConfirmation> RentalConfirmations => Set<RentalConfirmation>();
     public DbSet<RentalReview> RentalReviews => Set<RentalReview>();
     public DbSet<RentalItemReview> RentalItemReviews => Set<RentalItemReview>();
+    public DbSet<CustomerReview> CustomerReviews => Set<CustomerReview>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -324,6 +325,27 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Restrict);
             // Nie można dwa razy ocenić tego samego itemu w ramach jednej opinii
             entity.HasIndex(ir => new { ir.RentalReviewId, ir.RentalItemId }).IsUnique();
+        });
+
+        modelBuilder.Entity<CustomerReview>(entity =>
+        {
+            entity.HasKey(cr => cr.Id);
+            entity.HasOne(cr => cr.Customer)
+                .WithMany()
+                .HasForeignKey(cr => cr.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(cr => cr.Rental)
+                .WithMany()
+                .HasForeignKey(cr => cr.RentalId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Jedna ocena per wynajem — wypożyczalnia ocenia tylko raz po zwrocie.
+            entity.HasIndex(cr => cr.RentalId).IsUnique();
+            // Cross-tenant agregat — query dla per-customer trust nie filtruje po TenantId
+            // (każdy admin widzi globalny poziom zaufania), ale ENDPOINT-level autoryzacja
+            // filtruje listę szczegółową do tenant-a wystawiającego.
+            entity.HasIndex(cr => new { cr.CustomerId, cr.CreatedAtUtc });
+            entity.HasIndex(cr => new { cr.TenantId, cr.CreatedAtUtc });
+            entity.HasQueryFilter(cr => TenantId == null || cr.TenantId == TenantId);
         });
 
         modelBuilder.Entity<CheckoutSession>(entity =>

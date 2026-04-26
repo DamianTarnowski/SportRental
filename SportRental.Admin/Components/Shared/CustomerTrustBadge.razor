@@ -1,0 +1,56 @@
+@* Reusable badge pokazujący TrustLevel klienta. RODO-friendly: tylko poziom + liczby zagregowane,
+   bez detali per-tenant. Tooltip ujawnia metryki agregowane (count/avg/incidents). *@
+@using SportRental.Infrastructure.Domain
+
+<MudTooltip Text="@TooltipText">
+    <MudChip T="string"
+             Size="@Size"
+             Variant="Variant.Filled"
+             Color="@ChipColor"
+             Class="ma-0">
+        @Emoji @Label
+        @if (ShowMetrics && Customer.TrustCompletedRentalsCount > 0)
+        {
+            <span class="ml-1" style="opacity: 0.85; font-size: 0.85em;">
+                · @Customer.TrustCompletedRentalsCount @(Customer.TrustCompletedRentalsCount == 1 ? "ocena" : "ocen") · @Customer.TrustAverageScore.ToString("F1")/10
+            </span>
+        }
+    </MudChip>
+</MudTooltip>
+
+@code {
+    [Parameter, EditorRequired] public Customer Customer { get; set; } = default!;
+    [Parameter] public Size Size { get; set; } = Size.Small;
+    [Parameter] public bool ShowMetrics { get; set; } = true;
+
+    private string Emoji => Customer.TrustLevel switch
+    {
+        CustomerTrustLevel.Good => "🟢",
+        CustomerTrustLevel.Watch => "🟡",
+        CustomerTrustLevel.Restricted => "🔴",
+        _ => "✅"
+    };
+
+    private string Label => Customer.TrustLevel switch
+    {
+        CustomerTrustLevel.Good => "Bez szkód",
+        CustomerTrustLevel.Watch => "Wymaga uwagi",
+        CustomerTrustLevel.Restricted => "Ograniczone",
+        _ => "Zweryfikowany"
+    };
+
+    private Color ChipColor => Customer.TrustLevel switch
+    {
+        CustomerTrustLevel.Good => Color.Success,
+        CustomerTrustLevel.Watch => Color.Warning,
+        CustomerTrustLevel.Restricted => Color.Error,
+        _ => Color.Default
+    };
+
+    private string TooltipText => Customer.TrustCompletedRentalsCount == 0
+        ? "Brak ocen — nowy klient. Status będzie liczony po zwrotach."
+        : $"Wynajmów ocenionych: {Customer.TrustCompletedRentalsCount}, "
+        + $"średnia: {Customer.TrustAverageScore:F2}/10, "
+        + $"incydenty: {Customer.TrustIncidentCount}"
+        + (Customer.TrustLevelManualOverride.HasValue ? " (override admina)" : "");
+}

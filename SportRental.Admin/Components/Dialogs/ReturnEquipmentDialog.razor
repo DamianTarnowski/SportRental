@@ -12,6 +12,7 @@
 @inject IConfiguration Config
 @inject ILogger<ReturnEquipmentDialog> Logger
 @inject SportRental.Admin.Services.IReviewSurveyTokenService SurveyTokenService
+@inject SportRental.Admin.Services.ICustomerTrustCalculator TrustCalc
 @inject NavigationManager NavigationManager
 
 <MudDialog>
@@ -106,12 +107,36 @@
             </MudStack>
             
             @* Uwagi *@
-            <MudTextField @bind-Value="_returnNotes" 
+            <MudTextField @bind-Value="_returnNotes"
                           Label="Uwagi (opcjonalne)"
                           Variant="Variant.Outlined"
                           Lines="2"
                           Dense="true"
                           Placeholder="Stan sprzętu, uszkodzenia..." />
+
+            @* Ocena klienta — RODO-friendly, bez tekstu, dla budowy historii zaufania.
+               Opcjonalne: jeśli admin pominie, recenzja nie zostaje utworzona. *@
+            <MudExpansionPanels Elevation="0" Class="mt-1">
+                <MudExpansionPanel Text="@(_rateCustomer ? "📊 Oceniasz klienta (3 oceny, opcjonalnie)" : "📊 Oceń klienta (opcjonalnie)")"
+                                   Expanded="_rateCustomer"
+                                   ExpandedChanged="(v) => _rateCustomer = v">
+                    <MudText Typo="Typo.caption" Class="mb-2 mud-text-secondary">
+                        Bez komentarzy (RODO). Inni właściciele wypożyczalni widzą tylko poziom zaufania, nie szczegóły.
+                    </MudText>
+                    <div class="d-flex align-center gap-2 my-1">
+                        <MudText Style="min-width: 130px;" Typo="Typo.body2">Terminowość zwrotu</MudText>
+                        <MudRating @bind-SelectedValue="_timelinessStars" MaxValue="5" Size="Size.Small" />
+                    </div>
+                    <div class="d-flex align-center gap-2 my-1">
+                        <MudText Style="min-width: 130px;" Typo="Typo.body2">Stan sprzętu</MudText>
+                        <MudRating @bind-SelectedValue="_conditionStars" MaxValue="5" Size="Size.Small" />
+                    </div>
+                    <div class="d-flex align-center gap-2 my-1">
+                        <MudText Style="min-width: 130px;" Typo="Typo.body2">Komunikacja</MudText>
+                        <MudRating @bind-SelectedValue="_communicationStars" MaxValue="5" Size="Size.Small" />
+                    </div>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
         </MudStack>
     </DialogContent>
     <DialogActions>
@@ -145,6 +170,12 @@
     // "ciężko kliknąć, nic nie można" — to była ta blokada. Pracownik może zmienić.
     private string? _equipmentCondition = "good";
     private bool _isProcessing;
+
+    // Ocena klienta (RODO-friendly, opcjonalna). 1 gwiazdka = 2 punkty (skala 0-10 w bazie).
+    private bool _rateCustomer = false;
+    private int _timelinessStars = 0;
+    private int _conditionStars = 0;
+    private int _communicationStars = 0;
 
     protected override void OnParametersSet()
     {
@@ -209,7 +240,39 @@
                 rental.LastReviewRequestSentAtUtc = now;
             }
 
+            // Ocena klienta (opcjonalna) — RODO-friendly, bez tekstów. Pomijamy jeśli admin
+            // nie kliknął żadnej gwiazdki w żadnym wymiarze.
+            var hasAnyRating = _timelinessStars > 0 || _conditionStars > 0 || _communicationStars > 0;
+            CustomerReview? newCustomerReview = null;
+            if (_rateCustomer && hasAnyRating)
+            {
+                var alreadyExists = await db.CustomerReviews.IgnoreQueryFilters()
+                    .AnyAsync(cr => cr.RentalId == rental.Id);
+                if (!alreadyExists)
+                {
+                    newCustomerReview = new CustomerReview
+                    {
+                        Id = Guid.NewGuid(),
+                        TenantId = rental.TenantId,
+                        CustomerId = rental.CustomerId,
+                        RentalId = rental.Id,
+                        TimelinessScore = Math.Clamp(_timelinessStars * 2, 0, 10),
+                        ConditionScore = Math.Clamp(_conditionStars * 2, 0, 10),
+                        CommunicationScore = Math.Clamp(_communicationStars * 2, 0, 10),
+                        CreatedAtUtc = now
+                    };
+                    db.CustomerReviews.Add(newCustomerReview);
+                }
+            }
+
             await db.SaveChangesAsync();
+
+            // Recalc trust level — dopiero po SaveChanges, bo Recalculate czyta z bazy.
+            if (newCustomerReview != null)
+            {
+                try { await TrustCalc.RecalculateAsync(rental.CustomerId); }
+                catch (Exception ex) { Logger.LogError(ex, "Trust recalc failed for {CustomerId}", rental.CustomerId); }
+            }
 
             MudDialog?.Close(DialogResult.Ok(true));
         }

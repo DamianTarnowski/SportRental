@@ -52,6 +52,7 @@
                                     <MudText Typo="Typo.body2" Style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                         @customer.FullName
                                     </MudText>
+                                    <SportRental.Admin.Components.Shared.CustomerTrustBadge Customer="customer" ShowMetrics="false" />
                                     @if (!string.IsNullOrEmpty(customer.PhoneNumber))
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Success">
@@ -169,6 +170,9 @@ else
                                             <MudText Typo="Typo.h6" Style="font-weight: 600;" Class="mb-1">
                                                 @customer.FullName
                                             </MudText>
+                                            <div class="mb-1">
+                                                <SportRental.Admin.Components.Shared.CustomerTrustBadge Customer="customer" />
+                                            </div>
                                             <MudText Typo="Typo.body2" Color="Color.Default">
                                                 <MudIcon Icon="@Icons.Material.Filled.Schedule" Size="Size.Small" Class="mr-1" />
                                                 Utworzony: @customer.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")

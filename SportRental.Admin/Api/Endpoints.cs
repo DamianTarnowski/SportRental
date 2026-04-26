@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using SportRental.Admin.Api.Models;
+using SportRental.Admin.Services;
 using SportRental.Admin.Services.Auth;
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
@@ -190,6 +191,9 @@ namespace SportRental.Admin.Api
 
             // Rental review endpoints (public read, auth'd write by rental owner)
             MapReviewEndpoints(api);
+
+            // Customer trust endpoints (admin-only — wystawia ocenę klienta po zwrocie)
+            MapCustomerTrustEndpoints(api);
 
             api.MapGet("/products", [AllowAnonymous] async (
                 HttpRequest request,
@@ -1908,6 +1912,148 @@ namespace SportRental.Admin.Api
             if (parts.Length == 1) return parts[0];
             return $"{parts[0]} {parts[^1][..1]}.";
         }
+
+        // Customer trust scoring — RODO-friendly (3 oceny, brak komentarzy).
+        // Cross-tenant agregat: każdy admin widzi globalny TrustLevel klienta, ale szczegóły
+        // (kto co wystawił) są ukryte; własne recenzje widoczne tylko dla wystawiającego tenant-a.
+        private static void MapCustomerTrustEndpoints(IEndpointRouteBuilder api)
+        {
+            // POST /api/admin/customer-reviews — wystawia ocenę klienta po zwrocie sprzętu.
+            api.MapPost("/admin/customer-reviews", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ITenantProvider tenantProvider,
+                ICustomerTrustCalculator trustCalc,
+                ClaimsPrincipal user,
+                SharedModels.CreateCustomerReviewRequest req,
+                CancellationToken ct) =>
+            {
+                if (!user.IsAdmin()) return Results.Forbid();
+
+                var tenantId = tenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+                if (tenantId == Guid.Empty) return Results.BadRequest(new { error = "Tenant context required." });
+
+                if (req.TimelinessScore is < 0 or > 10
+                    || req.ConditionScore is < 0 or > 10
+                    || req.CommunicationScore is < 0 or > 10)
+                {
+                    return Results.BadRequest(new { error = "Scores must be between 0 and 10." });
+                }
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var rental = await db.Rentals.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(r => r.Id == req.RentalId, ct);
+                if (rental is null || rental.TenantId != tenantId)
+                {
+                    return Results.NotFound(new { error = "Rental not found in current tenant." });
+                }
+                if (rental.Status != RentalStatus.Completed)
+                {
+                    return Results.BadRequest(new { error = "Customer rating only after rental is Completed." });
+                }
+
+                var alreadyExists = await db.CustomerReviews.IgnoreQueryFilters()
+                    .AnyAsync(cr => cr.RentalId == req.RentalId, ct);
+                if (alreadyExists)
+                {
+                    return Results.Conflict(new { error = "Customer review for this rental already exists." });
+                }
+
+                var review = new CustomerReview
+                {
+                    Id = Guid.NewGuid(),
+                    TenantId = tenantId,
+                    CustomerId = rental.CustomerId,
+                    RentalId = rental.Id,
+                    TimelinessScore = req.TimelinessScore,
+                    ConditionScore = req.ConditionScore,
+                    CommunicationScore = req.CommunicationScore,
+                    CreatedAtUtc = DateTime.UtcNow
+                };
+
+                db.CustomerReviews.Add(review);
+                await db.SaveChangesAsync(ct);
+
+                // Recalc cache fields on Customer (cross-tenant)
+                await trustCalc.RecalculateAsync(rental.CustomerId, ct);
+
+                return Results.Created($"/api/admin/customer-reviews/{review.Id}", new { id = review.Id });
+            });
+
+            // GET /api/admin/customers/{id}/trust-summary — agregat zaufania (cross-tenant).
+            api.MapGet("/admin/customers/{id:guid}/trust-summary", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ClaimsPrincipal user,
+                Guid id,
+                CancellationToken ct) =>
+            {
+                if (!user.IsAdmin()) return Results.Forbid();
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+                var customer = await db.Customers.IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == id, ct);
+                if (customer is null) return Results.NotFound();
+
+                var (label, emoji) = TrustDescription(customer.TrustLevel);
+                return Results.Ok(new SharedModels.CustomerTrustSummaryDto
+                {
+                    CustomerId = customer.Id,
+                    TrustLevel = (int)customer.TrustLevel,
+                    TrustLabel = label,
+                    TrustEmoji = emoji,
+                    CompletedRentals = customer.TrustCompletedRentalsCount,
+                    AverageScore = customer.TrustAverageScore,
+                    IncidentCount = customer.TrustIncidentCount,
+                    CalculatedAtUtc = customer.TrustLevelCalculatedAtUtc,
+                    IsManualOverride = customer.TrustLevelManualOverride.HasValue
+                });
+            });
+
+            // PATCH /api/admin/customers/{id}/trust-override — manual block / override.
+            api.MapPatch("/admin/customers/{id:guid}/trust-override", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ITenantProvider tenantProvider,
+                ICustomerTrustCalculator trustCalc,
+                ClaimsPrincipal user,
+                Guid id,
+                SharedModels.UpdateCustomerTrustOverrideRequest req,
+                CancellationToken ct) =>
+            {
+                if (!user.IsAdmin()) return Results.Forbid();
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                var customer = await db.Customers.IgnoreQueryFilters()
+                    .FirstOrDefaultAsync(c => c.Id == id, ct);
+                if (customer is null) return Results.NotFound();
+
+                if (req.TrustLevel is null)
+                {
+                    customer.TrustLevelManualOverride = null;
+                    customer.TrustLevelManualReason = null;
+                }
+                else
+                {
+                    if (req.TrustLevel is < 0 or > 3)
+                        return Results.BadRequest(new { error = "TrustLevel must be 0-3 (Unverified..Restricted)." });
+                    customer.TrustLevelManualOverride = (CustomerTrustLevel)req.TrustLevel.Value;
+                    customer.TrustLevelManualReason = string.IsNullOrWhiteSpace(req.Reason) ? null : req.Reason.Trim();
+                }
+                await db.SaveChangesAsync(ct);
+
+                await trustCalc.RecalculateAsync(customer.Id, ct);
+                return Results.NoContent();
+            });
+        }
+
+        private static (string label, string emoji) TrustDescription(CustomerTrustLevel level) => level switch
+        {
+            CustomerTrustLevel.Good       => ("Bez szkód", "🟢"),
+            CustomerTrustLevel.Watch      => ("Wymaga uwagi", "🟡"),
+            CustomerTrustLevel.Restricted => ("Konto ograniczone", "🔴"),
+            _                             => ("Zweryfikowany", "✅")
+        };
 
         // Checkout endpoints for Stripe redirect flow
         private static void MapCheckoutEndpoints(IEndpointRouteBuilder api)

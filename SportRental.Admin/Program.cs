@@ -163,6 +163,7 @@ builder.Services.AddSingleton<ISmsSender, SmsSenderRouter>();
 builder.Services.AddScoped<ISmsConfirmationService, SmsConfirmationService>();
 builder.Services.AddScoped<SportRental.Admin.Services.IRentalConfirmationService, SportRental.Admin.Services.RentalConfirmationService>();
 builder.Services.AddSingleton<SportRental.Admin.Services.IReviewSurveyTokenService, SportRental.Admin.Services.ReviewSurveyTokenService>();
+builder.Services.AddScoped<SportRental.Admin.Services.ICustomerTrustCalculator, SportRental.Admin.Services.CustomerTrustCalculator>();
 
 // SignalR Hub for real-time rental notifications
 builder.Services.AddSingleton<SportRental.Admin.Hubs.IRentalNotificationService, SportRental.Admin.Hubs.RentalNotificationService>();
