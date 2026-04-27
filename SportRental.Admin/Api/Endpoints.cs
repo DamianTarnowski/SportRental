@@ -1980,6 +1980,46 @@ namespace SportRental.Admin.Api
                 return Results.Created($"/api/admin/customer-reviews/{review.Id}", new { id = review.Id });
             });
 
+            // GET /api/customers/me/trust — własny status klienta (auth'd, sam siebie).
+            // Zwracamy TYLKO pozytywne/neutralne poziomy (Unverified ✅ i Good 🟢) razem z
+            // licznikiem ukończonych wynajmów. Statusy negatywne (Watch, Restricted) są
+            // mapowane na neutralny — klient nie widzi że jest pod obserwacją; gdyby zobaczył,
+            // może to wpłynąć na decyzje biznesowe (RODO ma prawo wglądu na żądanie email-owe,
+            // ale w UI ukrywamy by uniknąć szantażu/odejścia klienta).
+            api.MapGet("/customers/me/trust", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                ClaimsPrincipal user,
+                CancellationToken ct) =>
+            {
+                var customerId = user.GetCustomerId();
+                if (customerId is null) return Results.Forbid();
+
+                await using var db = await dbFactory.CreateDbContextAsync(ct);
+                var customer = await db.Customers.IgnoreQueryFilters()
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == customerId, ct);
+                if (customer is null) return Results.NotFound();
+
+                // Map negative statuses to neutral for client-facing view
+                var publicLevel = customer.TrustLevel == CustomerTrustLevel.Good
+                    ? CustomerTrustLevel.Good
+                    : CustomerTrustLevel.Unverified;
+                var (label, emoji) = TrustDescription(publicLevel);
+
+                return Results.Ok(new SharedModels.CustomerTrustSummaryDto
+                {
+                    CustomerId = customer.Id,
+                    TrustLevel = (int)publicLevel,
+                    TrustLabel = label,
+                    TrustEmoji = emoji,
+                    CompletedRentals = customer.TrustCompletedRentalsCount,
+                    AverageScore = customer.TrustAverageScore,
+                    IncidentCount = 0,           // ukrywamy przed klientem
+                    CalculatedAtUtc = customer.TrustLevelCalculatedAtUtc,
+                    IsManualOverride = false     // ukrywamy przed klientem
+                });
+            });
+
             // GET /api/admin/customers/{id}/trust-summary — agregat zaufania (cross-tenant).
             api.MapGet("/admin/customers/{id:guid}/trust-summary", [Authorize(AuthenticationSchemes = ApiAuthSchemes)] async (
                 IDbContextFactory<ApplicationDbContext> dbFactory,

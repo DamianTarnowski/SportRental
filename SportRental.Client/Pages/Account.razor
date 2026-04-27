@@ -1,7 +1,10 @@
 @page "/account"
 @using Microsoft.AspNetCore.Components.Authorization
+@using SportRental.Shared.Models
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @inject AuthenticationStateProvider AuthStateProvider
+@inject HttpClient Http
+@inject IConfiguration Config
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
     <MudPaper Elevation="4" Class="pa-8">
@@ -25,6 +28,34 @@
                                       Class="mb-4" />
                     </MudItem>
                 </MudGrid>
+
+                @* Status zaufania — pozytywne wzmocnienie. Pokazujemy tylko ✅/🟢 (Unverified/Good).
+                   Statusy negatywne są mapowane do neutralnego po stronie API. *@
+                @if (_trust is not null)
+                {
+                    <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); border-radius: 12px;">
+                        <div class="d-flex align-center gap-3">
+                            <div style="font-size: 2.5rem;">@_trust.TrustEmoji</div>
+                            <div class="flex-1">
+                                <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@_trust.TrustLabel</MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    @if (_trust.CompletedRentals == 0)
+                                    {
+                                        <text>Twój status zaktualizuje się po pierwszym zwrocie sprzętu.</text>
+                                    }
+                                    else if (_trust.TrustLevel == 1)
+                                    {
+                                        <text>@_trust.CompletedRentals @(_trust.CompletedRentals == 1 ? "ocena" : "ocen") · średnia @_trust.AverageScore.ToString("F1")/10</text>
+                                    }
+                                    else
+                                    {
+                                        <text>@_trust.CompletedRentals @(_trust.CompletedRentals == 1 ? "ocena" : "ocen") · dziękujemy za korzystanie z naszych usług</text>
+                                    }
+                                </MudText>
+                            </div>
+                        </div>
+                    </MudPaper>
+                }
 
                 <MudDivider Class="my-6" />
 
@@ -65,6 +96,23 @@
 </MudContainer>
 
 @code {
+    private CustomerTrustSummaryDto? _trust;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var apiBase = (Config["Api:BaseUrl"] ?? "").TrimEnd('/');
+        if (string.IsNullOrEmpty(apiBase)) return;
+        try
+        {
+            var resp = await Http.GetAsync($"{apiBase}/api/customers/me/trust");
+            if (resp.IsSuccessStatusCode)
+            {
+                _trust = await resp.Content.ReadFromJsonAsync<CustomerTrustSummaryDto>();
+            }
+        }
+        catch { /* tichy fallback — bez statusu */ }
+    }
+
     private string GetTenantId(AuthenticationState state)
     {
         var claim = state.User.FindFirst("tenant-id");

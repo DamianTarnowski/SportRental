@@ -79,7 +79,7 @@
                                         </MudAvatar>
                                         <div class="flex-1 overflow-hidden">
                                             <MudText Typo="Typo.body2" Style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                                @item.CustomerName
+                                                @TrustEmoji(item.CustomerTrustLevel) @item.CustomerName
                                             </MudText>
                                             <div class="d-flex align-center gap-2">
                                                 <MudText Typo="Typo.caption" Color="Color.Success">@item.StartLocal.ToString("HH:mm")</MudText>
@@ -232,7 +232,7 @@ else
                                                     <MudAvatar Size="Size.Small" Color="Color.Primary">
                                                         <MudIcon Icon="@Icons.Material.Filled.Person" />
                                                     </MudAvatar>
-                                                    <MudText Typo="Typo.subtitle2" Class="fw-bold">@item.CustomerName</MudText>
+                                                    <MudText Typo="Typo.subtitle2" Class="fw-bold">@TrustEmoji(item.CustomerTrustLevel) @item.CustomerName</MudText>
                                                 </MudStack>
                                                 <MudStack Row="true" Spacing="4">
                                                     <MudStack Row="true" Spacing="1" Class="mud-align-center">
@@ -341,20 +341,25 @@ else
 
         var customerMap = await Db.Customers.AsNoTracking()
             .Where(c => c.TenantId == tid && baseQuery.Select(b => b.CustomerId).Contains(c.Id))
-            .ToDictionaryAsync(c => c.Id, c => c.FullName);
+            .ToDictionaryAsync(c => c.Id, c => new { c.FullName, c.TrustLevel });
 
         var itemsMap = await Db.RentalItems.AsNoTracking()
             .Where(ri => baseQuery.Select(b => b.Id).Contains(ri.RentalId))
             .GroupBy(ri => ri.RentalId)
             .ToDictionaryAsync(g => g.Key, g => g.Sum(x => x.Quantity));
 
-        var list = baseQuery.Select(b => new ItemVm
+        var list = baseQuery.Select(b =>
         {
-            Day = b.StartDateUtc.ToLocalTime().Date,
-            CustomerName = customerMap.GetValueOrDefault(b.CustomerId) ?? b.CustomerId.ToString(),
-            StartLocal = b.StartDateUtc.ToLocalTime(),
-            EndLocal = b.EndDateUtc.ToLocalTime(),
-            ItemsSummary = $"{itemsMap.GetValueOrDefault(b.Id, 0)} szt."
+            var c = customerMap.GetValueOrDefault(b.CustomerId);
+            return new ItemVm
+            {
+                Day = b.StartDateUtc.ToLocalTime().Date,
+                CustomerName = c?.FullName ?? b.CustomerId.ToString(),
+                CustomerTrustLevel = c?.TrustLevel ?? CustomerTrustLevel.Unverified,
+                StartLocal = b.StartDateUtc.ToLocalTime(),
+                EndLocal = b.EndDateUtc.ToLocalTime(),
+                ItemsSummary = $"{itemsMap.GetValueOrDefault(b.Id, 0)} szt."
+            };
         }).OrderBy(x => x.Day).ThenBy(x => x.StartLocal).ToList();
 
         grouped = list
@@ -416,10 +421,19 @@ else
         return 0;
     }
 
+    private static string TrustEmoji(CustomerTrustLevel level) => level switch
+    {
+        CustomerTrustLevel.Good => "🟢",
+        CustomerTrustLevel.Watch => "🟡",
+        CustomerTrustLevel.Restricted => "🔴",
+        _ => "✅"
+    };
+
     private sealed class ItemVm
     {
         public DateTime Day { get; set; }
         public string CustomerName { get; set; } = string.Empty;
+        public CustomerTrustLevel CustomerTrustLevel { get; set; } = CustomerTrustLevel.Unverified;
         public DateTime StartLocal { get; set; }
         public DateTime EndLocal { get; set; }
         public string ItemsSummary { get; set; } = string.Empty;

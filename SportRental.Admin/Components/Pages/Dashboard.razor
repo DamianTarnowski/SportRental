@@ -286,7 +286,7 @@
                         <RowTemplate>
                             <MudTd>
                                 <MudChip T="string" Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Default">
-                                    @context.CustomerName
+                                    @TrustEmoji(context.CustomerTrustLevel) @context.CustomerName
                                 </MudChip>
                             </MudTd>
                             <MudTd>
@@ -335,7 +335,7 @@
                         <RowTemplate>
                             <MudTd>
                                 <MudChip T="string" Icon="@Icons.Material.Filled.Person" Size="Size.Small" Color="Color.Default">
-                                    @context.CustomerName
+                                    @TrustEmoji(context.CustomerTrustLevel) @context.CustomerName
                                 </MudChip>
                             </MudTd>
                             <MudTd>@context.StartDateLocal.ToString("MM-dd")</MudTd>
@@ -400,21 +400,36 @@
             })
             .ToListAsync();
 
+        // Aktywne teraz — pobieramy najpierw, żeby customerMap pokrył oba zestawy.
+        var now = DateTime.UtcNow;
+        var actives = await Db.Rentals.AsNoTracking()
+            .Where(r => r.StartDateUtc <= now && r.EndDateUtc >= now && r.Status != RentalStatus.Cancelled)
+            .Select(r => new { r.Id, r.CustomerId, r.StartDateUtc, r.EndDateUtc, r.TotalAmount })
+            .OrderBy(r => r.EndDateUtc)
+            .Take(20)
+            .ToListAsync();
+
+        var allCustomerIds = data.Select(d => d.CustomerId).Concat(actives.Select(a => a.CustomerId)).Distinct().ToList();
         var customerMap = await Db.Customers.AsNoTracking()
-            .Where(c => data.Select(d => d.CustomerId).Contains(c.Id))
-            .ToDictionaryAsync(c => c.Id, c => c.FullName);
+            .Where(c => allCustomerIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => new { c.FullName, c.TrustLevel });
 
         var itemsMap = await Db.RentalItems.AsNoTracking()
             .Where(ri => data.Select(d => d.Id).Contains(ri.RentalId))
             .GroupBy(ri => ri.RentalId)
             .ToDictionaryAsync(g => g.Key, g => g.Sum(x => x.Quantity));
 
-        upcomingReturns = data.Select(d => new UpcomingReturnVm
+        upcomingReturns = data.Select(d =>
         {
-            CustomerName = customerMap.GetValueOrDefault(d.CustomerId) ?? d.CustomerId.ToString(),
-            EndDateLocal = d.EndDateUtc.ToLocalTime(),
-            ItemsSummary = $"{itemsMap.GetValueOrDefault(d.Id, 0)} szt.",
-            TotalAmount = d.TotalAmount
+            var c = customerMap.GetValueOrDefault(d.CustomerId);
+            return new UpcomingReturnVm
+            {
+                CustomerName = c?.FullName ?? d.CustomerId.ToString(),
+                CustomerTrustLevel = c?.TrustLevel ?? CustomerTrustLevel.Unverified,
+                EndDateLocal = d.EndDateUtc.ToLocalTime(),
+                ItemsSummary = $"{itemsMap.GetValueOrDefault(d.Id, 0)} szt.",
+                TotalAmount = d.TotalAmount
+            };
         }).ToList();
 
         // Wykres: ostatnie 7 dni wg startu wynajmu
@@ -433,26 +448,32 @@
             new MudBlazor.ChartSeries { Name = "Wynajmy", Data = values.ToArray() }
         };
 
-        // Aktywne teraz
-        var now = DateTime.UtcNow;
-        var actives = await Db.Rentals.AsNoTracking()
-            .Where(r => r.StartDateUtc <= now && r.EndDateUtc >= now && r.Status != RentalStatus.Cancelled)
-            .Select(r => new { r.Id, r.CustomerId, r.StartDateUtc, r.EndDateUtc, r.TotalAmount })
-            .OrderBy(r => r.EndDateUtc)
-            .Take(20)
-            .ToListAsync();
-        activeNow = actives.Select(a => new ActiveVm
+        activeNow = actives.Select(a =>
         {
-            CustomerName = customerMap.GetValueOrDefault(a.CustomerId) ?? a.CustomerId.ToString(),
-            StartDateLocal = a.StartDateUtc.ToLocalTime(),
-            EndDateLocal = a.EndDateUtc.ToLocalTime(),
-            TotalAmount = a.TotalAmount
+            var c = customerMap.GetValueOrDefault(a.CustomerId);
+            return new ActiveVm
+            {
+                CustomerName = c?.FullName ?? a.CustomerId.ToString(),
+                CustomerTrustLevel = c?.TrustLevel ?? CustomerTrustLevel.Unverified,
+                StartDateLocal = a.StartDateUtc.ToLocalTime(),
+                EndDateLocal = a.EndDateUtc.ToLocalTime(),
+                TotalAmount = a.TotalAmount
+            };
         }).ToList();
     }
+
+    private static string TrustEmoji(CustomerTrustLevel level) => level switch
+    {
+        CustomerTrustLevel.Good => "🟢",
+        CustomerTrustLevel.Watch => "🟡",
+        CustomerTrustLevel.Restricted => "🔴",
+        _ => "✅"
+    };
 
     private sealed class UpcomingReturnVm
     {
         public string CustomerName { get; set; } = string.Empty;
+        public CustomerTrustLevel CustomerTrustLevel { get; set; } = CustomerTrustLevel.Unverified;
         public DateTime EndDateLocal { get; set; }
         public string ItemsSummary { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
@@ -461,6 +482,7 @@
     private sealed class ActiveVm
     {
         public string CustomerName { get; set; } = string.Empty;
+        public CustomerTrustLevel CustomerTrustLevel { get; set; } = CustomerTrustLevel.Unverified;
         public DateTime StartDateLocal { get; set; }
         public DateTime EndDateLocal { get; set; }
         public decimal TotalAmount { get; set; }

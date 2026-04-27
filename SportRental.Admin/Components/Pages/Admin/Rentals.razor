@@ -82,6 +82,13 @@
                                     <MudText Typo="Typo.body2" Style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                         @(customersDict.GetValueOrDefault(rental.CustomerId)?.FullName ?? "—")
                                     </MudText>
+                                    @{
+                                        var rentalCustomer = customersDict.GetValueOrDefault(rental.CustomerId);
+                                    }
+                                    @if (rentalCustomer is not null)
+                                    {
+                                        <SportRental.Admin.Components.Shared.CustomerTrustBadge Customer="rentalCustomer" ShowMetrics="false" />
+                                    }
                                     <div class="d-flex align-center gap-1 flex-wrap">
                                         <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">
                                             @rental.TotalAmount.ToString("0") zł
@@ -271,6 +278,13 @@ else
                                                     <MudIcon Icon="@Icons.Material.Filled.Person" Size="Size.Small" Class="mr-1" />
                                                     @(customersDict.GetValueOrDefault(rental.CustomerId)?.FullName ?? "brak")
                                                 </MudText>
+                                                @{
+                                                    var rentalDeskCustomer = customersDict.GetValueOrDefault(rental.CustomerId);
+                                                }
+                                                @if (rentalDeskCustomer is not null)
+                                                {
+                                                    <SportRental.Admin.Components.Shared.CustomerTrustBadge Customer="rentalDeskCustomer" ShowMetrics="true" />
+                                                }
                                             </div>
                                         </div>
                                         
@@ -562,6 +576,30 @@ else
                             </MudTooltip>
                         }
                     </MudStack>
+
+                    @* Trust badge wybranego klienta + ostrzeżenie dla Restricted/Watch przed zatwierdzeniem wynajmu *@
+                    @if (editModel.CustomerId != Guid.Empty)
+                    {
+                        var selectedCustomer = customers.FirstOrDefault(c => c.Id == editModel.CustomerId);
+                        if (selectedCustomer is not null)
+                        {
+                            <div class="d-flex align-center gap-2 my-2">
+                                <SportRental.Admin.Components.Shared.CustomerTrustBadge Customer="selectedCustomer" ShowMetrics="true" />
+                                @if (selectedCustomer.TrustLevel == CustomerTrustLevel.Restricted)
+                                {
+                                    <MudAlert Severity="Severity.Error" Dense="true" NoIcon="false" Class="pa-2 flex-1">
+                                        Klient ma konto ograniczone. Rozważ czy wypożyczać.
+                                    </MudAlert>
+                                }
+                                else if (selectedCustomer.TrustLevel == CustomerTrustLevel.Watch)
+                                {
+                                    <MudAlert Severity="Severity.Warning" Dense="true" NoIcon="false" Class="pa-2 flex-1">
+                                        Klient wymaga uwagi — sprawdź historię ocen.
+                                    </MudAlert>
+                                }
+                            </div>
+                        }
+                    }
                     
                     <MudGrid Spacing="3">
                         <MudItem xs="12" md="6">
