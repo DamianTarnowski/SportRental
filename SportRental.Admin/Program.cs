@@ -542,7 +542,12 @@ using (var scope = app.Services.CreateScope())
     var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     
-    await db.Database.MigrateAsync();
+    // Migrate tylko gdy provider jest relacyjny — w testach DbContext jest InMemory
+    // i MigrateAsync() rzuca InvalidOperationException.
+    if (db.Database.IsRelational())
+    {
+        await db.Database.MigrateAsync();
+    }
     
     // Ensure default tenant exists - use existing tenant with products if available
     var tenantId = config.GetValue<Guid?>("Tenant:Id") ?? Guid.Empty;
