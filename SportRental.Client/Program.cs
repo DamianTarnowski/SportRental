@@ -57,10 +57,13 @@ var tenantService = host.Services.GetRequiredService<TenantService>();
 var baseUrl = configuration["Api:BaseUrl"];
 var hostAddress = builder.HostEnvironment.BaseAddress;
 
-// Produkcja: Azure App Service lub Static Web Apps -> Admin na Azure App Service
-if (hostAddress.Contains("azurewebsites.net") || hostAddress.Contains("azurestaticapps.net") || hostAddress.Contains("nice-tree"))
+// Produkcja: Client jest bundled w Admin pod /_client/ → API żyje na tym samym hoście (sradmin
+// albo srental2). HostEnvironment.BaseAddress to "https://srental2.azurewebsites.net/_client/".
+// SportRentalApi HttpClient nie ma BaseAddress (linia 27-31), więc ApiService MUSI dostać
+// absolute URL — wycinamy "/_client/" suffix żeby zostało "https://srental2.azurewebsites.net".
+if (hostAddress.Contains("azurewebsites.net") || hostAddress.Contains("azurestaticapps.net"))
 {
-    baseUrl = "https://sradmin.azurewebsites.net";
+    baseUrl = new Uri(hostAddress).GetLeftPart(UriPartial.Authority);  // np. https://srental2.azurewebsites.net
 }
 // Development: użyj konfiguracji lub localhost Admin
 else if (string.IsNullOrWhiteSpace(baseUrl))
