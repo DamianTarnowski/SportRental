@@ -32,6 +32,8 @@ namespace SportRental.Admin.Tests.Integration;
 /// 
 /// ⚠️ This test sends REAL emails - use sparingly!
 /// </summary>
+[Trait("Category", "RequiresLiveDb")]
+[Trait("Category", "RequiresLiveServices")]
 public class RentalContractEmailE2ETests : IAsyncLifetime
 {
     private readonly ITestOutputHelper _output;

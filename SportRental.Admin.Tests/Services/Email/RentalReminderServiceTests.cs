@@ -2,6 +2,7 @@ using System.Reflection;
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 using SportRental.Admin.Services.Email;
+using SportRental.Admin.Services.Sms;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -31,6 +32,7 @@ public class RentalReminderServiceTests : IDisposable
         _loggerMock = new Mock<ILogger<RentalReminderService>>();
         _serviceScopeMock = new Mock<IServiceScope>();
         _serviceScopeFactoryMock = new Mock<IServiceScopeFactory>();
+        var smsSenderMock = new Mock<ISmsSender>();
 
         _serviceScopeFactoryMock.Setup(x => x.CreateScope()).Returns(_serviceScopeMock.Object);
 
@@ -41,6 +43,9 @@ public class RentalReminderServiceTests : IDisposable
         scopedServiceProviderMock
             .Setup(x => x.GetService(typeof(IEmailSender)))
             .Returns(_emailSenderMock.Object);
+        scopedServiceProviderMock
+            .Setup(x => x.GetService(typeof(ISmsSender)))
+            .Returns(smsSenderMock.Object);
 
         _serviceScopeMock.Setup(x => x.ServiceProvider).Returns(scopedServiceProviderMock.Object);
 
@@ -109,6 +114,16 @@ public class RentalReminderServiceTests : IDisposable
         _dbContext.Customers.Add(customer);
         _dbContext.Products.Add(product);
         _dbContext.Rentals.AddRange(rentalSoon, rentalLater, rentalCompleted);
+        // RentalReminderService iterates db.CompanyInfos per tenant — bez wpisu nie wystartuje pętla.
+        _dbContext.CompanyInfos.Add(new CompanyInfo
+        {
+            Id = Guid.NewGuid(),
+            TenantId = _testTenantId,
+            Name = "Test Tenant",
+            Address = "ul. Testowa 1",
+            PhoneNumber = "+48000000000",
+            Email = "test@tenant.local"
+        });
         _dbContext.SaveChanges();
     }
 

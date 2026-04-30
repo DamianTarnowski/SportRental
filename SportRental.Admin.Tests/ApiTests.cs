@@ -12,6 +12,7 @@ using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
@@ -34,6 +35,7 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     {
         _factory = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseEnvironment("Testing");
             builder.ConfigureAppConfiguration((context, config) =>
             {
                 config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -97,8 +99,10 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
 
         var res = await client.GetAsync("/api/products");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        var items = await res.Content.ReadFromJsonAsync<List<object>>();
-        Assert.NotNull(items);
+        var page = await res.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(page.TryGetProperty("items", out var items) || page.TryGetProperty("Items", out items));
+        Assert.Equal(JsonValueKind.Array, items.ValueKind);
+        Assert.Equal(0, items.GetArrayLength());
     }
 
     [Fact]
@@ -219,9 +223,9 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
 
         var res = await client.GetAsync("/api/products?page=2&pageSize=10");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-        var list = await res.Content.ReadFromJsonAsync<List<Dictionary<string, object>>>();
-        Assert.NotNull(list);
-        Assert.Equal(10, list!.Count);
+        var page = await res.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(page.TryGetProperty("items", out var items) || page.TryGetProperty("Items", out items));
+        Assert.Equal(10, items.GetArrayLength());
     }
 
     [Fact]

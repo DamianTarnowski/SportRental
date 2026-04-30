@@ -23,6 +23,7 @@ namespace SportRental.Admin.Tests.Integration;
 /// - Detached entity concurrency fix (the bug where Update() on detached entity throws)
 /// - Full rental save → email → SMS flow
 /// </summary>
+[Trait("Category", "RequiresLiveDb")]
 public class EmailSmsIntegrationTests : IAsyncLifetime
 {
     private readonly ITestOutputHelper _output;

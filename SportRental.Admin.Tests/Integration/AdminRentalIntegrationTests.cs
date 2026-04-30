@@ -11,7 +11,9 @@ namespace SportRental.Admin.Tests.Integration;
 /// <summary>
 /// Integration tests for Admin Panel rental operations on real PostgreSQL database.
 /// Simulates creating rentals from admin panel and verifying they appear correctly.
+/// Wymaga żywego Postgresa — domyślnie pomijane filtrem `Category!=RequiresLiveDb`.
 /// </summary>
+[Trait("Category", "RequiresLiveDb")]
 public class AdminRentalIntegrationTests : IAsyncLifetime
 {
     private readonly ITestOutputHelper _output;

@@ -534,7 +534,10 @@ if (app.Environment.IsDevelopment())
     }
 }
 
-// Seed ról na starcie (SuperAdmin, Owner, Employee, Client)
+// Seed ról na starcie (SuperAdmin, Owner, Employee, Client) — pomijamy w środowisku testowym,
+// bo WebApplicationFactory<Program> recyklingowanego pomiędzy testami zamyka stdout writer
+// i Console.WriteLine z tej sekcji rzuca ObjectDisposedException w drugim cyklu.
+if (!app.Environment.IsEnvironment("Testing"))
 using (var scope = app.Services.CreateScope())
 {
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();

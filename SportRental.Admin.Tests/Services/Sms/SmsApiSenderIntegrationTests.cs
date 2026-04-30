@@ -7,6 +7,7 @@ using SportRental.Admin.Services.Sms;
 
 namespace SportRental.Admin.Tests.Services.Sms;
 
+[Trait("Category", "RequiresLiveServices")]
 public class SmsApiSenderIntegrationTests
 {
     [Fact]

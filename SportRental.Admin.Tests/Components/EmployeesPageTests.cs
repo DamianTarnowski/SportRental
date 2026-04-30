@@ -1,217 +1,283 @@
 using Bunit;
-using SportRental.Admin.Components.Pages.Admin;
-using SportRental.Infrastructure.Domain;
-using Microsoft.Extensions.DependencyInjection;
-using MudBlazor.Services;
-using MudBlazor;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components;
-using System;
-using System.Linq;
-using System.Security.Claims;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using MudBlazor;
+using MudBlazor.Services;
+using SportRental.Admin.Components.Pages.Admin;
 using SportRental.Infrastructure.Data;
-using SportRental.Infrastructure.Tenancy;
+using SportRental.Infrastructure.Domain;
+using System.Security.Claims;
 
 namespace SportRental.Admin.Tests.Components;
 
 public class EmployeesPageTests : TestContext
 {
+    private readonly Guid _tenantId = Guid.NewGuid();
+    private readonly string _dbName;
+
     public EmployeesPageTests()
     {
+        _dbName = $"emp-tests-{Guid.NewGuid():N}";
+
         Services.AddMudServices();
-        
-        // Add authorization services
         Services.AddAuthorizationCore();
-        Services.AddScoped<AuthenticationStateProvider, TestAuthStateProvider>();
-        
-        // Mock ITenantProvider
-        Services.AddScoped<ITenantProvider, MockTenantProvider>();
-        
-        // Mock IDbContextFactory  
-        Services.AddScoped<IDbContextFactory<ApplicationDbContext>, MockDbContextFactory>();
-        
-        // Mock ISnackbar
-        Services.AddScoped<ISnackbar, MockSnackbar>();
-        
-        // Mock NavigationManager 
-        Services.AddSingleton<Microsoft.AspNetCore.Components.NavigationManager, MockNavigationManager>();
-    }
 
-        [Fact]
-    public void EmployeesPage_ShouldRenderCorrectly()
-    {
-        var component = RenderComponent<Employees>();
+        Services.AddDbContextFactory<ApplicationDbContext>(opt =>
+            opt.UseInMemoryDatabase(_dbName)
+               .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning)));
 
-        component.Find("h4").TextContent.Should().StartWith("Zarz");
-        component.FindAll("button").Any(element => element.TextContent.Contains("Dodaj Pracownika", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
+        Services.AddSingleton<AuthenticationStateProvider>(_ =>
+            new TestAuthStateProvider(_tenantId, role: "Owner"));
+
+        Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
+
+        // bUnit provides NavigationManager + JSRuntime via TestContext, but MudBlazor expects
+        // a real-ish JSRuntime — TestContext already wires JSInterop in loose mode (no asserts).
+        JSInterop.Mode = JSRuntimeMode.Loose;
     }
 
     [Fact]
-    public void EmployeesPage_WithNoEmployees_ShouldShowEmptyState()
+    public void EmployeesPage_RequiresOwnerOrSuperAdminRole()
     {
-        // Act
-        var component = RenderComponent<Employees>();
-        
-        // Wait for component to load
-        component.WaitForState(() => !component.Markup.Contains("mud-progress-linear"), TimeSpan.FromSeconds(5));
-
-        // Assert
-        component.FindAll(".mud-expansion-panel").Should().BeEmpty();
-    }
-
-    [Fact]
-    public void EmployeesPage_WithEmployees_ShouldDisplayEmployeeList()
-    {
-        // Act - Component will load with empty data from mocked database
-        var component = RenderComponent<Employees>();
-        component.WaitForState(() => !component.Markup.Contains("mud-progress-linear"), TimeSpan.FromSeconds(5));
-
-        // Assert - Component should render without employees
-        component.FindAll(".mud-expansion-panel").Should().BeEmpty();
-    }
-
-        [Fact]
-    public void EmployeesPage_ClickAddButton_ShouldShowDialog()
-    {
-        var component = RenderComponent<Employees>();
-
-        var addButton = component.FindAll("button")
-            .First(element => element.TextContent.Contains("Dodaj Pracownika", StringComparison.OrdinalIgnoreCase));
-
-        addButton.Invoking(btn => btn.Click()).Should().NotThrow();
-        component.WaitForState(() => component.Markup.Contains("Dodaj Pracownika"));
-        component.Markup.Should().Contain("Dodaj Pracownika");
-    }
-
-    [Fact]
-    public void EmployeesPage_ExpandEmployee_ShouldShowDetails()
-    {
-        // Act - Component will load with empty data from mocked database  
-        var component = RenderComponent<Employees>();
-        component.WaitForState(() => !component.Markup.Contains("mud-progress-linear"), TimeSpan.FromSeconds(5));
-
-        // Assert - Component should render without employees to expand
-        component.FindAll(".mud-expansion-panel").Should().BeEmpty();
-    }
-
-    [Fact]
-    public void EmployeesPage_WithError_ShouldShowErrorMessage()
-    {
-        // Act - Component will handle database errors gracefully
-        var component = RenderComponent<Employees>();
-        component.WaitForState(() => !component.Markup.Contains("mud-progress-linear"), TimeSpan.FromSeconds(5));
-
-        // Assert - Component should render without errors
-        component.Should().NotBeNull();
-    }
-
-    [Fact]
-    public void EmployeesPage_Authorization_ShouldRequireSuperAdminRole()
-    {
-        // Assert - The component should have the Authorize attribute with correct roles
-        var authorizeAttribute = typeof(Employees).GetCustomAttributes(typeof(AuthorizeAttribute), false)
+        var attr = typeof(Employees)
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)
             .Cast<AuthorizeAttribute>()
             .FirstOrDefault();
 
-        authorizeAttribute.Should().NotBeNull();
-        authorizeAttribute!.Roles.Should().Be("SuperAdmin");
+        attr.Should().NotBeNull();
+        attr!.Roles.Should().Contain("Owner");
+        attr.Roles.Should().Contain("SuperAdmin");
     }
 
-
-    private class TestAuthStateProvider : AuthenticationStateProvider
+    private IRenderedFragment RenderEmployeesWithProviders()
     {
+        // MudBlazor requires several providers (popover/dialog/snackbar/theme) to be rendered
+        // somewhere in the tree before MudSelect/MudDialog components can initialise.
+        return Render(builder =>
+        {
+            builder.OpenComponent<MudThemeProvider>(0);
+            builder.CloseComponent();
+            builder.OpenComponent<MudPopoverProvider>(1);
+            builder.CloseComponent();
+            builder.OpenComponent<MudDialogProvider>(2);
+            builder.CloseComponent();
+            builder.OpenComponent<MudSnackbarProvider>(3);
+            builder.CloseComponent();
+            builder.OpenComponent<Employees>(4);
+            builder.CloseComponent();
+        });
+    }
+
+    [Fact]
+    public void EmployeesPage_WithoutTenantClaim_RendersEmptyState()
+    {
+        // Replace default AuthStateProvider with a no-tenant variant.
+        ServiceCollectionDescriptorExtensions.RemoveAll<AuthenticationStateProvider>(Services);
+        Services.AddSingleton<AuthenticationStateProvider>(_ =>
+            new TestAuthStateProvider(tenantId: null, role: "Owner"));
+
+        var cut = RenderEmployeesWithProviders();
+
+        cut.Markup.Should().Contain("Brak pracowników");
+    }
+
+    [Fact]
+    public async Task EmployeesPage_DisplaysSeededEmployees()
+    {
+        await SeedEmployeesAsync(
+            ("Jan Kowalski", "jan@test.pl", EmployeeRole.Pracownik),
+            ("Anna Nowak", "anna@test.pl", EmployeeRole.Manager));
+
+        var cut = RenderEmployeesWithProviders();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Jan Kowalski");
+            cut.Markup.Should().Contain("Anna Nowak");
+            cut.Markup.Should().Contain("Aktywni pracownicy (2)");
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task EmployeesPage_DisplaysPendingInvitations()
+    {
+        await SeedInvitationsAsync(
+            ("kandydat1@test.pl", EmployeeRole.Pracownik),
+            ("kandydat2@test.pl", EmployeeRole.Kierownik));
+
+        var cut = RenderEmployeesWithProviders();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Oczekujące zaproszenia");
+            cut.Markup.Should().Contain("kandydat1@test.pl");
+            cut.Markup.Should().Contain("kandydat2@test.pl");
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task EmployeesPage_DoesNotShowOtherTenantEmployees()
+    {
+        var otherTenantId = Guid.NewGuid();
+
+        await using (var db = await ResolveFactory().CreateDbContextAsync())
+        {
+            db.Tenants.Add(new Tenant { Id = _tenantId, Name = "Tenant A" });
+            db.Tenants.Add(new Tenant { Id = otherTenantId, Name = "Tenant B" });
+
+            db.Employees.Add(new Employee
+            {
+                Id = Guid.NewGuid(), TenantId = _tenantId, FullName = "Mine", Email = "mine@x.pl",
+                Role = EmployeeRole.Pracownik, IsDeleted = false, CreatedAtUtc = DateTime.UtcNow
+            });
+            db.Employees.Add(new Employee
+            {
+                Id = Guid.NewGuid(), TenantId = otherTenantId, FullName = "Other Tenant Person",
+                Email = "other@x.pl", Role = EmployeeRole.Pracownik, IsDeleted = false,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var cut = RenderEmployeesWithProviders();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Mine");
+            cut.Markup.Should().NotContain("Other Tenant Person");
+            cut.Markup.Should().Contain("Aktywni pracownicy (1)");
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task EmployeesPage_DoesNotShowSoftDeletedEmployees()
+    {
+        await using var db = await ResolveFactory().CreateDbContextAsync();
+        db.Employees.Add(new Employee
+        {
+            Id = Guid.NewGuid(), TenantId = _tenantId, FullName = "Active Emp",
+            Email = "active@x.pl", Role = EmployeeRole.Pracownik, IsDeleted = false,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        db.Employees.Add(new Employee
+        {
+            Id = Guid.NewGuid(), TenantId = _tenantId, FullName = "Deleted Emp",
+            Email = "deleted@x.pl", Role = EmployeeRole.Pracownik, IsDeleted = true,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var cut = RenderEmployeesWithProviders();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("Active Emp");
+            cut.Markup.Should().NotContain("Deleted Emp");
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task EmployeesPage_DoesNotShowExpiredInvitations()
+    {
+        await using var db = await ResolveFactory().CreateDbContextAsync();
+        db.EmployeeInvitations.Add(new EmployeeInvitation
+        {
+            Id = Guid.NewGuid(), TenantId = _tenantId, Email = "valid@x.pl",
+            Role = EmployeeRole.Pracownik, IsUsed = false,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(3),
+            CreatedAtUtc = DateTime.UtcNow,
+            Token = "valid-token"
+        });
+        db.EmployeeInvitations.Add(new EmployeeInvitation
+        {
+            Id = Guid.NewGuid(), TenantId = _tenantId, Email = "expired@x.pl",
+            Role = EmployeeRole.Pracownik, IsUsed = false,
+            ExpiresAtUtc = DateTime.UtcNow.AddDays(-1),
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-10),
+            Token = "expired-token"
+        });
+        await db.SaveChangesAsync();
+
+        var cut = RenderEmployeesWithProviders();
+
+        cut.WaitForAssertion(() =>
+        {
+            cut.Markup.Should().Contain("valid@x.pl");
+            cut.Markup.Should().NotContain("expired@x.pl");
+        }, TimeSpan.FromSeconds(5));
+    }
+
+    private IDbContextFactory<ApplicationDbContext> ResolveFactory() =>
+        Services.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+
+    private async Task SeedEmployeesAsync(params (string Name, string Email, EmployeeRole Role)[] employees)
+    {
+        await using var db = await ResolveFactory().CreateDbContextAsync();
+        foreach (var (name, email, role) in employees)
+        {
+            db.Employees.Add(new Employee
+            {
+                Id = Guid.NewGuid(),
+                TenantId = _tenantId,
+                FullName = name,
+                Email = email,
+                Role = role,
+                IsDeleted = false,
+                CreatedAtUtc = DateTime.UtcNow
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SeedInvitationsAsync(params (string Email, EmployeeRole Role)[] invitations)
+    {
+        await using var db = await ResolveFactory().CreateDbContextAsync();
+        foreach (var (email, role) in invitations)
+        {
+            db.EmployeeInvitations.Add(new EmployeeInvitation
+            {
+                Id = Guid.NewGuid(),
+                TenantId = _tenantId,
+                Email = email,
+                Role = role,
+                IsUsed = false,
+                ExpiresAtUtc = DateTime.UtcNow.AddDays(7),
+                CreatedAtUtc = DateTime.UtcNow,
+                Token = Guid.NewGuid().ToString("N")
+            });
+        }
+        await db.SaveChangesAsync();
+    }
+
+    private sealed class TestAuthStateProvider : AuthenticationStateProvider
+    {
+        private readonly Guid? _tenantId;
+        private readonly string _role;
+
+        public TestAuthStateProvider(Guid? tenantId, string role)
+        {
+            _tenantId = tenantId;
+            _role = role;
+        }
+
         public override Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            var claims = new[]
+            var claims = new List<Claim>
             {
-                new Claim(ClaimTypes.Name, "test@example.com"),
-                new Claim(ClaimTypes.Role, "Owner")
+                new(ClaimTypes.Name, "test@example.com"),
+                new(ClaimTypes.Role, _role)
             };
-            var identity = new ClaimsIdentity(claims, "test");
-            var user = new ClaimsPrincipal(identity);
-            return Task.FromResult(new AuthenticationState(user));
-        }
-    }
+            if (_tenantId.HasValue)
+                claims.Add(new Claim("tenant-id", _tenantId.Value.ToString()));
 
-    private class MockSnackbar : ISnackbar
-    {
-        public List<string> Messages { get; } = new();
-        
-        public SnackbarConfiguration Configuration { get; set; } = new();
-        public IEnumerable<Snackbar> ShownSnackbars => throw new NotImplementedException();
-
-        public Snackbar Add(string message, Severity severity = Severity.Normal, Action<SnackbarOptions>? configure = null, string key = "")
-        {
-            Messages.Add(message);
-            return null!;
-        }
-
-        public Snackbar Add(RenderFragment message, Severity severity = Severity.Normal, Action<SnackbarOptions>? configure = null, string key = "")
-        {
-            Messages.Add("RenderFragment message");
-            return null!;
-        }
-
-        public Snackbar Add<T>(Dictionary<string, object> componentParameters, Severity severity = Severity.Normal, Action<SnackbarOptions>? configure = null, string key = "") where T : IComponent
-        {
-            Messages.Add($"Component message: {typeof(T).Name}");
-            return null!;
-        }
-
-        public Snackbar Add(MarkupString message, Severity severity = Severity.Normal, Action<SnackbarOptions>? configure = null, string? key = null)
-        {
-            Messages.Add("MarkupString message");
-            return null!;
-        }
-
-        public Snackbar AddNew(Severity severity, string key, Action<SnackbarOptions>? configure = null)
-        {
-            Messages.Add($"New snackbar: {severity}");
-            return null!;
-        }
-
-        public void Clear() => Messages.Clear();
-        public void Remove(Snackbar snackbar) { }
-        public void RemoveByKey(string key) { }
-        public Task<bool> VisibleStateBoundsReached => Task.FromResult(false);
-        public event Action? OnSnackbarsUpdated;
-
-        public void Dispose() { }
-    }
-
-    private class MockNavigationManager : Microsoft.AspNetCore.Components.NavigationManager
-    {
-        public MockNavigationManager() : base()
-        {
-            Initialize("https://localhost/", "https://localhost/");
-        }
-
-        protected override void NavigateToCore(string uri, bool forceLoad)
-        {
-            // Mock navigation - do nothing or store the URI for verification
-        }
-    }
-
-    private class MockTenantProvider : ITenantProvider
-    {
-        public Guid? GetCurrentTenantId() => Guid.NewGuid();
-    }
-
-    private class MockDbContextFactory : IDbContextFactory<ApplicationDbContext>
-    {
-        public ApplicationDbContext CreateDbContext()
-        {
-            // This will fail gracefully in tests
-            return null!;
-        }
-
-        public Task<ApplicationDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
-        {
-            // This will fail gracefully in tests
-            return Task.FromResult<ApplicationDbContext>(null!);
+            var identity = new ClaimsIdentity(claims, authenticationType: "test");
+            return Task.FromResult(new AuthenticationState(new ClaimsPrincipal(identity)));
         }
     }
 }

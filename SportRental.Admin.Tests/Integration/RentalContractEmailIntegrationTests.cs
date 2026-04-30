@@ -18,6 +18,8 @@ namespace SportRental.Admin.Tests.Integration;
 /// Tests the full flow: create rental → generate contract PDF → send email with attachment.
 /// Uses real PostgreSQL database and real email sending (to test email).
 /// </summary>
+[Trait("Category", "RequiresLiveDb")]
+[Trait("Category", "RequiresLiveServices")]
 public class RentalContractEmailIntegrationTests : IAsyncLifetime
 {
     private readonly ITestOutputHelper _output;

@@ -5,8 +5,12 @@ namespace SportRental.E2ETests;
 
 public class BaseTest : PageTest
 {
-    protected const string BaseUrl = "http://localhost:5014";
-    protected const string ApiBaseUrl = "http://localhost:5001";
+    // Admin hostuje wszystko: API pod /api/*, klienta WASM pod /_client/.
+    // Override przez env var dla testów na srental2 albo innym środowisku.
+    protected static readonly string AdminUrl =
+        Environment.GetEnvironmentVariable("SR_ADMIN_URL") ?? "http://localhost:5001";
+    protected static readonly string BaseUrl = $"{AdminUrl.TrimEnd('/')}/_client";
+    protected static readonly string ApiBaseUrl = AdminUrl;
 
     [SetUp]
     public async Task Setup()

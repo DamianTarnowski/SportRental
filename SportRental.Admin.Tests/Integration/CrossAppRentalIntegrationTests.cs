@@ -13,7 +13,9 @@ namespace SportRental.Admin.Tests.Integration;
 /// Verifies that rentals created by WASM client are visible in Admin panel and vice versa.
 /// This simulates the real-world scenario where customers book through the website
 /// and admins manage those bookings in the admin panel.
+/// Wymaga żywego Postgresa — domyślnie pomijane filtrem `Category!=RequiresLiveDb`.
 /// </summary>
+[Trait("Category", "RequiresLiveDb")]
 public class CrossAppRentalIntegrationTests : IAsyncLifetime
 {
     private readonly ITestOutputHelper _output;
