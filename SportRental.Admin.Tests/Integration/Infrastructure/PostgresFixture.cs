@@ -1,4 +1,6 @@
+using DotNet.Testcontainers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using SportRental.Infrastructure.Data;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -13,6 +15,16 @@ namespace SportRental.Admin.Tests.Integration.Infrastructure;
 /// </summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
+    static PostgresFixture()
+    {
+        // Testcontainers domyślnie loguje do Console (ConsoleLogger). xUnit recyklingu je
+        // StringWriter per-test, więc kiedy fixture odpala się DRUGI raz w tym samym test
+        // hoście (wszystkie testy z innej kolekcji już zamknęły ich writery), Console.WriteLine
+        // rzuca ObjectDisposedException — patrz DotNet.Testcontainers.ConsoleLogger:110.
+        // Wyłączamy logger globalnie — diagnostyka kontenerów i tak idzie do `docker logs`.
+        TestcontainersSettings.Logger = NullLogger.Instance;
+    }
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
         .WithDatabase("sr_tests")
