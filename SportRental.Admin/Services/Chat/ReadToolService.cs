@@ -141,6 +141,285 @@ public sealed class ReadToolService
     }
 
     /// <summary>
+    /// Wyszukiwanie wynajmów: po fragmencie nazwy/email klienta, statusie i oknie czasowym.
+    /// </summary>
+    public async Task<string> SearchRentalsAsync(
+        Guid tenantId,
+        string? customerQuery,
+        string? status,
+        int? daysAhead,
+        int? daysBehind,
+        CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        var q = db.Rentals.Include(r => r.Customer).Include(r => r.Items).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(customerQuery))
+        {
+            var qLower = customerQuery.Trim().ToLowerInvariant();
+            q = q.Where(r => r.Customer != null &&
+                (r.Customer.FullName.ToLower().Contains(qLower) ||
+                 (r.Customer.Email != null && r.Customer.Email.ToLower().Contains(qLower)) ||
+                 (r.Customer.PhoneNumber != null && r.Customer.PhoneNumber.Contains(customerQuery.Trim()))));
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (Enum.TryParse<RentalStatus>(status, ignoreCase: true, out var st))
+                q = q.Where(r => r.Status == st);
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        if (daysAhead.HasValue && daysAhead.Value > 0)
+        {
+            var threshold = nowUtc.AddDays(daysAhead.Value);
+            q = q.Where(r => r.StartDateUtc <= threshold);
+        }
+        if (daysBehind.HasValue && daysBehind.Value > 0)
+        {
+            var threshold = nowUtc.AddDays(-daysBehind.Value);
+            q = q.Where(r => r.EndDateUtc >= threshold);
+        }
+
+        var rentals = await q
+            .OrderByDescending(r => r.StartDateUtc)
+            .Take(15)
+            .Select(r => new
+            {
+                id = r.Id,
+                customer = r.Customer != null ? r.Customer.FullName : "(nieznany)",
+                customerEmail = r.Customer != null ? r.Customer.Email : null,
+                status = r.Status.ToString(),
+                startsAt = r.StartDateUtc,
+                endsAt = r.EndDateUtc,
+                itemsCount = r.Items.Count,
+                totalAmount = r.TotalAmount
+            })
+            .ToListAsync(ct);
+
+        return JsonSerializer.Serialize(new { count = rentals.Count, rentals });
+    }
+
+    /// <summary>Wynajmy zaległe — EndDate &lt; teraz, status nie Completed/Cancelled.</summary>
+    public async Task<string> GetOverdueRentalsAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        var nowUtc = DateTime.UtcNow;
+        var raw = await db.Rentals
+            .Include(r => r.Customer)
+            .Where(r => r.EndDateUtc < nowUtc
+                     && r.Status != RentalStatus.Completed
+                     && r.Status != RentalStatus.Cancelled)
+            .OrderBy(r => r.EndDateUtc)
+            .Take(20)
+            .Select(r => new
+            {
+                id = r.Id,
+                customer = r.Customer != null ? r.Customer.FullName : "(nieznany)",
+                customerEmail = r.Customer != null ? r.Customer.Email : null,
+                customerPhone = r.Customer != null ? r.Customer.PhoneNumber : null,
+                status = r.Status.ToString(),
+                endsAt = r.EndDateUtc,
+                totalAmount = r.TotalAmount
+            })
+            .ToListAsync(ct);
+
+        // daysOverdue liczone w C# — Postgres nie ma DateDiffDay, w EF6+/Npgsql trzeba lokalnie.
+        var rentals = raw.Select(r => new
+        {
+            r.id, r.customer, r.customerEmail, r.customerPhone, r.status, r.endsAt,
+            daysOverdue = (int)(nowUtc - r.endsAt).TotalDays,
+            r.totalAmount
+        }).ToList();
+
+        return JsonSerializer.Serialize(new { count = rentals.Count, rentals });
+    }
+
+    /// <summary>
+    /// Co użytkownik powinien zrobić DZIŚ: do wydania (Confirmed/Active starting today),
+    /// do zwrotu (kończące dziś), niepotwierdzone SMSy, draft do dokończenia.
+    /// </summary>
+    public async Task<string> GetPendingActionsAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        var nowUtc = DateTime.UtcNow;
+        var todayStartUtc = DateTime.UtcNow.Date;
+        var tomorrowStartUtc = todayStartUtc.AddDays(1);
+
+        var stats = await db.Rentals
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                toIssueToday = g.Count(r => (r.Status == RentalStatus.Confirmed || r.Status == RentalStatus.Active)
+                                          && r.StartDateUtc >= todayStartUtc && r.StartDateUtc < tomorrowStartUtc
+                                          && r.IssuedAtUtc == null),
+                toReturnToday = g.Count(r => (r.Status == RentalStatus.Active || r.Status == RentalStatus.Confirmed)
+                                          && r.EndDateUtc >= todayStartUtc && r.EndDateUtc < tomorrowStartUtc),
+                drafts = g.Count(r => r.Status == RentalStatus.Draft),
+                pendingSmsConfirmation = g.Count(r => r.Status == RentalStatus.Confirmed
+                                                   && r.IsSmsConfirmationSent && !r.IsSmsConfirmed),
+                overdue = g.Count(r => r.EndDateUtc < nowUtc
+                                    && r.Status != RentalStatus.Completed
+                                    && r.Status != RentalStatus.Cancelled)
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return JsonSerializer.Serialize(stats ?? new
+        {
+            toIssueToday = 0, toReturnToday = 0, drafts = 0, pendingSmsConfirmation = 0, overdue = 0
+        });
+    }
+
+    /// <summary>Przychody za period: today / week / month / year.</summary>
+    public async Task<string> GetRevenueSummaryAsync(Guid tenantId, string? period, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        var nowUtc = DateTime.UtcNow;
+        var periodLower = (period ?? "month").Trim().ToLowerInvariant();
+        var (label, since) = periodLower switch
+        {
+            "today" or "dzisiaj" => ("dzisiaj", nowUtc.Date),
+            "week" or "tydzien" or "tydzień" => ("tydzień", nowUtc.Date.AddDays(-7)),
+            "year" or "rok" => ("rok", nowUtc.Date.AddDays(-365)),
+            _ => ("miesiąc", nowUtc.Date.AddDays(-30))
+        };
+
+        var revenue = await db.Rentals
+            .Where(r => r.CreatedAtUtc >= since
+                     && r.Status != RentalStatus.Cancelled
+                     && r.Status != RentalStatus.Draft)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                period = label,
+                since,
+                rentalsCount = g.Count(),
+                totalAmount = g.Sum(r => r.TotalAmount),
+                completedCount = g.Count(r => r.Status == RentalStatus.Completed),
+                completedAmount = g.Where(r => r.Status == RentalStatus.Completed).Sum(r => r.TotalAmount),
+                averageAmount = g.Average(r => (decimal?)r.TotalAmount) ?? 0m
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return JsonSerializer.Serialize(revenue ?? new
+        {
+            period = label,
+            since,
+            rentalsCount = 0,
+            totalAmount = 0m,
+            completedCount = 0,
+            completedAmount = 0m,
+            averageAmount = 0m
+        });
+    }
+
+    /// <summary>
+    /// Pełna historia klienta — wszystkie wynajmy + trust info. Akceptuje email/phone/imię.
+    /// </summary>
+    public async Task<string> GetCustomerHistoryAsync(Guid tenantId, string emailOrPhoneOrName, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        if (string.IsNullOrWhiteSpace(emailOrPhoneOrName))
+            return JsonSerializer.Serialize(new { error = "query required" });
+
+        var qLower = emailOrPhoneOrName.Trim().ToLowerInvariant();
+        var customer = await db.Customers
+            .Where(c =>
+                (c.Email != null && c.Email.ToLower() == qLower) ||
+                (c.PhoneNumber != null && c.PhoneNumber == emailOrPhoneOrName.Trim()) ||
+                c.FullName.ToLower().Contains(qLower))
+            .FirstOrDefaultAsync(ct);
+
+        if (customer is null)
+            return JsonSerializer.Serialize(new { found = false, query = emailOrPhoneOrName });
+
+        var rentals = await db.Rentals
+            .Where(r => r.CustomerId == customer.Id)
+            .OrderByDescending(r => r.StartDateUtc)
+            .Take(15)
+            .Select(r => new
+            {
+                id = r.Id,
+                status = r.Status.ToString(),
+                startsAt = r.StartDateUtc,
+                endsAt = r.EndDateUtc,
+                totalAmount = r.TotalAmount
+            })
+            .ToListAsync(ct);
+
+        return JsonSerializer.Serialize(new
+        {
+            found = true,
+            customer = new
+            {
+                id = customer.Id,
+                fullName = customer.FullName,
+                email = customer.Email,
+                phone = customer.PhoneNumber,
+                trustLevel = customer.TrustLevel.ToString(),
+                completedRentals = customer.TrustCompletedRentalsCount,
+                averageScore = customer.TrustAverageScore,
+                incidentCount = customer.TrustIncidentCount
+            },
+            rentalsCount = rentals.Count,
+            rentals
+        });
+    }
+
+    /// <summary>Znajdź wynajem powiązany z konkretnym sprzętem (po SKU produktu).</summary>
+    public async Task<string> FindRentalBySkuAsync(Guid tenantId, string sku, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        if (string.IsNullOrWhiteSpace(sku))
+            return JsonSerializer.Serialize(new { error = "sku required" });
+
+        var product = await db.Products.FirstOrDefaultAsync(
+            p => p.Sku.ToLower() == sku.Trim().ToLowerInvariant(), ct);
+        if (product is null)
+            return JsonSerializer.Serialize(new { found = false, message = "Brak produktu o SKU '" + sku + "'" });
+
+        var rentals = await db.RentalItems
+            .Include(ri => ri.Rental).ThenInclude(r => r!.Customer)
+            .Where(ri => ri.ProductId == product.Id
+                     && ri.Rental != null
+                     && ri.Rental.Status != RentalStatus.Completed
+                     && ri.Rental.Status != RentalStatus.Cancelled)
+            .OrderByDescending(ri => ri.Rental!.StartDateUtc)
+            .Take(5)
+            .Select(ri => new
+            {
+                rentalId = ri.RentalId,
+                customer = ri.Rental!.Customer != null ? ri.Rental.Customer.FullName : "(nieznany)",
+                customerPhone = ri.Rental.Customer != null ? ri.Rental.Customer.PhoneNumber : null,
+                status = ri.Rental.Status.ToString(),
+                startsAt = ri.Rental.StartDateUtc,
+                endsAt = ri.Rental.EndDateUtc,
+                quantity = ri.Quantity
+            })
+            .ToListAsync(ct);
+
+        return JsonSerializer.Serialize(new
+        {
+            found = true,
+            product = new { id = product.Id, sku = product.Sku, name = product.Name },
+            activeRentalsCount = rentals.Count,
+            activeRentals = rentals
+        });
+    }
+
+    /// <summary>
     /// Liczba aktywnych wynajmów + krótki breakdown.
     /// </summary>
     public async Task<string> CountActiveRentalsAsync(Guid tenantId, CancellationToken ct = default)

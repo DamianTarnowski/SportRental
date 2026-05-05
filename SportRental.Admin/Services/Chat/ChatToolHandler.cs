@@ -42,6 +42,13 @@ public sealed class ChatToolHandler
                 "get_product_status" => await HandleGetProduct(argsJson, context, ct),
                 "get_customer_trust" => await HandleGetCustomer(argsJson, context, ct),
                 "count_active_rentals" => await _read.CountActiveRentalsAsync(context.TenantId, ct),
+                // Faza 4 — extended read tools
+                "search_rentals" => await HandleSearchRentals(argsJson, context, ct),
+                "get_overdue_rentals" => await _read.GetOverdueRentalsAsync(context.TenantId, ct),
+                "get_pending_actions" => await _read.GetPendingActionsAsync(context.TenantId, ct),
+                "get_revenue_summary" => await HandleRevenueSummary(argsJson, context, ct),
+                "get_customer_history" => await HandleCustomerHistory(argsJson, context, ct),
+                "find_rental_by_sku" => await HandleFindRentalBySku(argsJson, context, ct),
                 _ => JsonSerializer.Serialize(new { error = $"Unknown tool: {functionName}" })
             };
         }
@@ -64,6 +71,30 @@ public sealed class ChatToolHandler
         return await _read.GetCustomerTrustAsync(ctx.TenantId, args.Query ?? string.Empty, ct);
     }
 
+    private async Task<string> HandleSearchRentals(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<SearchRentalsArgs>(argsJson) ?? new SearchRentalsArgs();
+        return await _read.SearchRentalsAsync(ctx.TenantId, args.CustomerQuery, args.Status, args.DaysAhead, args.DaysBehind, ct);
+    }
+
+    private async Task<string> HandleRevenueSummary(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<PeriodArgs>(argsJson) ?? new PeriodArgs();
+        return await _read.GetRevenueSummaryAsync(ctx.TenantId, args.Period, ct);
+    }
+
+    private async Task<string> HandleCustomerHistory(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<GetCustomerArgs>(argsJson) ?? new GetCustomerArgs();
+        return await _read.GetCustomerHistoryAsync(ctx.TenantId, args.Query ?? string.Empty, ct);
+    }
+
+    private async Task<string> HandleFindRentalBySku(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<SkuArgs>(argsJson) ?? new SkuArgs();
+        return await _read.FindRentalBySkuAsync(ctx.TenantId, args.Sku ?? string.Empty, ct);
+    }
+
     private sealed class GetProductArgs
     {
         [System.Text.Json.Serialization.JsonPropertyName("sku_or_name")] public string? SkuOrName { get; set; }
@@ -72,6 +103,24 @@ public sealed class ChatToolHandler
     private sealed class GetCustomerArgs
     {
         [System.Text.Json.Serialization.JsonPropertyName("query")] public string? Query { get; set; }
+    }
+
+    private sealed class SearchRentalsArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("customer_query")] public string? CustomerQuery { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("status")] public string? Status { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("days_ahead")] public int? DaysAhead { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("days_behind")] public int? DaysBehind { get; set; }
+    }
+
+    private sealed class PeriodArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("period")] public string? Period { get; set; }
+    }
+
+    private sealed class SkuArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("sku")] public string? Sku { get; set; }
     }
 
     private async Task<string> HandleReportBug(string argsJson, ChatToolContext ctx, CancellationToken ct)

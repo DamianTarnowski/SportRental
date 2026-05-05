@@ -131,6 +131,110 @@ public static class ChatToolDefinitions
               "properties": {},
               "required": []
             }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "search_rentals",
+            functionDescription:
+                "Wyszukuje wynajmy po wielu kryteriach. Wszystkie parametry opcjonalne — możesz zawęzić " +
+                "po kliencie (nazwisko / email / telefon), statusie (Active, Confirmed, Completed, " +
+                "Cancelled, Draft), oknie czasowym (days_ahead = StartDate w ciągu N dni od teraz, " +
+                "days_behind = EndDate nie starszy niż N dni). Zwraca max 15 wynajmów posortowanych " +
+                "od najnowszego StartDate. Używaj gdy user pyta 'pokaż mi wynajmy klienta X', " +
+                "'co miałem w zeszłym tygodniu?', 'pokaż mi szkice wynajmów'.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "customer_query": { "type": "string", "description": "Fragment imienia, email lub telefonu klienta." },
+                "status": { "type": "string", "enum": ["Draft", "Confirmed", "Active", "Completed", "Cancelled"] },
+                "days_ahead": { "type": "integer", "description": "StartDate w ciągu N dni od teraz." },
+                "days_behind": { "type": "integer", "description": "EndDate nie starszy niż N dni." }
+              },
+              "required": []
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "get_overdue_rentals",
+            functionDescription:
+                "Zwraca wynajmy zaległe — sprzęt który powinien być już zwrócony (EndDate w przeszłości) " +
+                "ale klient go jeszcze nie oddał, ani wynajem nie został anulowany. KRYTYCZNE — " +
+                "to potencjalnie utracone $ albo zguby. Pokazuje klienta, telefon, ile dni po terminie. " +
+                "Używaj gdy user pyta 'kto nie oddał?', 'jakie mam zaległości?', 'kogo wezwać?'.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {},
+              "required": []
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "get_pending_actions",
+            functionDescription:
+                "Co użytkownik ma do zrobienia DZIŚ. Zwraca: ile wynajmów do wydania dziś, do zwrotu dziś, " +
+                "ile szkiców (draft) do dokończenia, ile niepotwierdzonych SMS-ów u klientów, ile zaległych. " +
+                "Używaj gdy user pyta 'co robić?', 'co mam dziś?', 'jakie zadania na teraz?'.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {},
+              "required": []
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "get_revenue_summary",
+            functionDescription:
+                "Przychody z wynajmów za podany okres. Zwraca liczbę wynajmów, łączną kwotę, ile " +
+                "zakończonych, ile w toku, średnią wartość. Używaj gdy user pyta 'ile zarobiłem?', " +
+                "'jaki przychód w tym miesiącu?', 'przychód za ostatni tydzień'.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "period": {
+                  "type": "string",
+                  "enum": ["today", "week", "month", "year"],
+                  "description": "Okres: today=dzisiaj, week=ost. 7 dni, month=ost. 30 dni, year=ost. 365 dni."
+                }
+              },
+              "required": []
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "get_customer_history",
+            functionDescription:
+                "Pełna historia klienta — wszystkie wynajmy + trust level + dane kontaktowe. " +
+                "Akceptuje email, telefon lub fragment imienia. Zwraca dane klienta + max 15 ostatnich " +
+                "wynajmów. Używaj gdy user pyta 'historia klienta X', 'co kiedyś brał Y?', " +
+                "'pokaż wynajmy Damiana'.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "query": { "type": "string", "description": "Email, telefon albo imię/nazwisko klienta." }
+              },
+              "required": ["query"]
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "find_rental_by_sku",
+            functionDescription:
+                "Znajdź aktywny wynajem powiązany z konkretnym sprzętem po jego SKU/kodzie kreskowym. " +
+                "Idealne gdy user mówi 'kto ma teraz ROW-001?' albo zeskanował kod sprzętu i chce wiedzieć " +
+                "z kim to jest. Zwraca produkt + wszystkie aktywne wynajmy które go zawierają.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "sku": { "type": "string", "description": "SKU/kod kreskowy sprzętu, dokładny." }
+              },
+              "required": ["sku"]
+            }
             """)))
     };
 }

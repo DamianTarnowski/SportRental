@@ -206,6 +206,78 @@ public static class RealtimeEndpoints
                 name = "count_active_rentals",
                 description = "Zwraca statystyki wynajmów dla mojego tenanta.",
                 parameters = new { type = "object", properties = new { }, required = Array.Empty<string>() }
+            },
+            // Faza 4 — extended read tools
+            new
+            {
+                type = "function",
+                name = "search_rentals",
+                description = "Wyszukuje wynajmy po kliencie/statusie/oknie czasowym.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        customer_query = new { type = "string" },
+                        status = new { type = "string", @enum = new[] { "Draft", "Confirmed", "Active", "Completed", "Cancelled" } },
+                        days_ahead = new { type = "integer" },
+                        days_behind = new { type = "integer" }
+                    },
+                    required = Array.Empty<string>()
+                }
+            },
+            new
+            {
+                type = "function",
+                name = "get_overdue_rentals",
+                description = "Sprzęt nieoddany w terminie (przeterminowane).",
+                parameters = new { type = "object", properties = new { }, required = Array.Empty<string>() }
+            },
+            new
+            {
+                type = "function",
+                name = "get_pending_actions",
+                description = "Co user ma do zrobienia dziś (wydania, zwroty, drafty, oczekujące SMS).",
+                parameters = new { type = "object", properties = new { }, required = Array.Empty<string>() }
+            },
+            new
+            {
+                type = "function",
+                name = "get_revenue_summary",
+                description = "Przychody za period today/week/month/year.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        period = new { type = "string", @enum = new[] { "today", "week", "month", "year" } }
+                    },
+                    required = Array.Empty<string>()
+                }
+            },
+            new
+            {
+                type = "function",
+                name = "get_customer_history",
+                description = "Pełna historia klienta + jego trust.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new { query = new { type = "string" } },
+                    required = new[] { "query" }
+                }
+            },
+            new
+            {
+                type = "function",
+                name = "find_rental_by_sku",
+                description = "Aktywny wynajem powiązany z konkretnym SKU sprzętu.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new { sku = new { type = "string" } },
+                    required = new[] { "sku" }
+                }
             }
         };
     }
