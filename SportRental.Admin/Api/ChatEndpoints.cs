@@ -62,7 +62,7 @@ public static class ChatEndpoints
             var result = await openAi.ChatAsync(
                 systemPrompt: systemPrompt,
                 history: turns,
-                tools: ChatToolDefinitions.Phase1Tools,
+                tools: ChatToolDefinitions.All,
                 toolHandler: (name, args) => toolHandler.HandleAsync(name, args, context, ct),
                 ct: ct);
 

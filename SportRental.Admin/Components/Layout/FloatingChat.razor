@@ -232,7 +232,7 @@
             var result = await OpenAi.ChatAsync(
                 systemPrompt: systemPrompt,
                 history: turns,
-                tools: ChatToolDefinitions.Phase1Tools,
+                tools: ChatToolDefinitions.All,
                 toolHandler: (name, args) => ToolHandler.HandleAsync(name, args, ctx));
 
             ChatService.AddAssistantMessage(result.Content);

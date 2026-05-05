@@ -11,11 +11,13 @@ namespace SportRental.Admin.Services.Chat;
 public sealed class ChatToolHandler
 {
     private readonly FeedbackService _feedback;
+    private readonly ReadToolService _read;
     private readonly ILogger<ChatToolHandler> _logger;
 
-    public ChatToolHandler(FeedbackService feedback, ILogger<ChatToolHandler> logger)
+    public ChatToolHandler(FeedbackService feedback, ReadToolService read, ILogger<ChatToolHandler> logger)
     {
         _feedback = feedback;
+        _read = read;
         _logger = logger;
     }
 
@@ -32,8 +34,14 @@ public sealed class ChatToolHandler
         {
             return functionName switch
             {
+                // Faza 1 — write tools
                 "report_bug" => await HandleReportBug(argsJson, context, ct),
                 "submit_feedback" => await HandleSubmitFeedback(argsJson, context, ct),
+                // Faza 2 — read tools
+                "get_today_rentals" => await _read.GetTodayRentalsAsync(context.TenantId, ct),
+                "get_product_status" => await HandleGetProduct(argsJson, context, ct),
+                "get_customer_trust" => await HandleGetCustomer(argsJson, context, ct),
+                "count_active_rentals" => await _read.CountActiveRentalsAsync(context.TenantId, ct),
                 _ => JsonSerializer.Serialize(new { error = $"Unknown tool: {functionName}" })
             };
         }
@@ -42,6 +50,28 @@ public sealed class ChatToolHandler
             _logger.LogError(ex, "Tool {Name} failed", functionName);
             return JsonSerializer.Serialize(new { error = "tool_execution_failed", details = ex.Message });
         }
+    }
+
+    private async Task<string> HandleGetProduct(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<GetProductArgs>(argsJson) ?? new GetProductArgs();
+        return await _read.GetProductStatusAsync(ctx.TenantId, args.SkuOrName ?? string.Empty, ct);
+    }
+
+    private async Task<string> HandleGetCustomer(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<GetCustomerArgs>(argsJson) ?? new GetCustomerArgs();
+        return await _read.GetCustomerTrustAsync(ctx.TenantId, args.Query ?? string.Empty, ct);
+    }
+
+    private sealed class GetProductArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("sku_or_name")] public string? SkuOrName { get; set; }
+    }
+
+    private sealed class GetCustomerArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("query")] public string? Query { get; set; }
     }
 
     private async Task<string> HandleReportBug(string argsJson, ChatToolContext ctx, CancellationToken ct)

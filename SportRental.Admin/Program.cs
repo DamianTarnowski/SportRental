@@ -188,6 +188,7 @@ builder.Services.AddSingleton(sp =>
 });
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.FloatingChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.FeedbackService>();
+builder.Services.AddScoped<SportRental.Admin.Services.Chat.ReadToolService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
 

@@ -42,11 +42,24 @@ public static class SystemPromptBuilder
         sb.AppendLine("- `/admin/employees` — Pracownicy + zaproszenia");
         sb.AppendLine();
         sb.AppendLine("## DOSTĘPNE NARZĘDZIA (function calls)");
+        sb.AppendLine("### Write — zgłoszenia");
         sb.AppendLine("- `report_bug(message, severity)` — zapisz zgłoszenie błędu od użytkownika.");
         sb.AppendLine("  Używaj gdy mówi 'nie działa', 'błąd', 'crash', 'dziwne zachowanie'.");
         sb.AppendLine("  Najpierw dopytaj o szczegóły (co próbował, co się stało, jaki komunikat).");
         sb.AppendLine("- `submit_feedback(message, type)` — ogólny feedback (suggestion / general / question / praise).");
         sb.AppendLine("  Po zapisie podziękuj i potwierdź że zespół to zobaczy.");
+        sb.AppendLine();
+        sb.AppendLine("### Read — dane domeny (TYLKO twojego tenanta — uprawnienia są wymuszane na backendzie)");
+        sb.AppendLine("- `get_today_rentals()` — wynajmy aktywne dziś (do wydania, do zwrotu, w toku).");
+        sb.AppendLine("  Używaj gdy user pyta 'co mam dziś?', 'kto przychodzi po sprzęt?', 'jakie wynajmy są w toku?'.");
+        sb.AppendLine("- `get_product_status(sku_or_name)` — sprawdza dostępność produktu po SKU lub nazwie.");
+        sb.AppendLine("  Używaj gdy user pyta 'czy jest rower X?', 'ile sztuk SKU ROW-001?', 'pokaż mi narty'.");
+        sb.AppendLine("- `get_customer_trust(query)` — trust level klienta po email/telefonie/imieniu.");
+        sb.AppendLine("  Używaj gdy user pyta 'jaki ma trust ten klient?', 'czy klient X ma jakieś flagi?'.");
+        sb.AppendLine("- `count_active_rentals()` — szybkie statystyki: ile aktywnych, draft, dziś, tygodnia.");
+        sb.AppendLine("  Używaj gdy user pyta 'ile mam wynajmów?', 'jaki ruch?', 'jaki status mojej wypożyczalni?'.");
+        sb.AppendLine();
+        sb.AppendLine("ZASADA: **zawsze używaj read tools** zamiast zgadywać liczby. Nie halucynuj nazw klientów ani SKU.");
         sb.AppendLine();
         sb.AppendLine("## ZASADY ODPOWIADANIA");
         sb.AppendLine("- Po polsku, zwięźle ale konkretnie. Krótkie odpowiedzi (3-6 zdań) chyba że");
@@ -56,8 +69,8 @@ public static class SystemPromptBuilder
         sb.AppendLine("- Bądź przyjazny ale nie nadmiernie. Mów do usera per ty.");
         sb.AppendLine("- Jeśli problem techniczny i jest sens zgłoszenia — sam zaproponuj 'Zapiszę to do");
         sb.AppendLine("  zespołu, ok?' i po zgodzie wywołaj `report_bug`.");
-        sb.AppendLine("- NIE wymyślaj danych klientów / wynajmów — w fazie 1 nie masz read tools, więc");
-        sb.AppendLine("  przekierowuj 'kliknij w menu Wynajmy żeby zobaczyć...' zamiast halucynacji.");
+        sb.AppendLine("- NIE wymyślaj danych klientów / wynajmów — masz read tools (`get_today_rentals`,");
+        sb.AppendLine("  `get_product_status`, `get_customer_trust`, `count_active_rentals`). Używaj ich.");
 
         if (!string.IsNullOrWhiteSpace(chatHistory))
         {
