@@ -235,6 +235,105 @@ public static class ChatToolDefinitions
               },
               "required": ["sku"]
             }
+            """))),
+
+        // Faza 5b — additional read tools
+        ChatTool.CreateFunctionTool(
+            functionName: "get_top_customers",
+            functionDescription: "Najlepsi klienci po liczbie wynajmów lub łącznej wartości. by: rentals|revenue.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "by": { "type": "string", "enum": ["rentals", "revenue"] },
+                "limit": { "type": "integer", "description": "Max ile zwrócić (default 10, max 50)." }
+              },
+              "required": []
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "get_employee_list",
+            functionDescription: "Lista pracowników wypożyczalni + oczekujące zaproszenia.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {},
+              "required": []
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "forecast_demand",
+            functionDescription:
+                "Forecast: porównuje liczbę wynajmów z ostatniego okna N dni vs poprzednie N dni " +
+                "i szacuje trend. Opcjonalnie filter po nazwie produktu/SKU.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "product_query": { "type": "string", "description": "Fragment nazwy/SKU sprzętu (opcjonalne)." },
+                "days": { "type": "integer", "description": "Okno dni (default 30, max 90)." }
+              },
+              "required": []
+            }
+            """))),
+
+        // Faza 5c — write tools z dwustopniowym confirmation
+        ChatTool.CreateFunctionTool(
+            functionName: "update_customer_notes",
+            functionDescription:
+                "Dopisuje notatkę do profilu klienta. ZAWSZE wywołuj NAJPIERW z confirm=false — " +
+                "dostaniesz preview do pokazania userowi. Wywołaj ponownie z confirm=true DOPIERO po " +
+                "explicit zgodzie ('tak', 'ok', 'zapisz'). Mode: append (dopisz na końcu) lub replace.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "customer_id_or_email": { "type": "string", "description": "Guid id ALBO email/telefon." },
+                "notes": { "type": "string", "description": "Treść notatki." },
+                "mode": { "type": "string", "enum": ["append", "replace"], "description": "append (default) / replace." },
+                "confirm": { "type": "boolean", "description": "false = preview, true = wykonaj." }
+              },
+              "required": ["customer_id_or_email", "notes"]
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "mark_rental_returned",
+            functionDescription:
+                "Oznacz wynajem jako zwrócony (Status → Completed, ReturnedAtUtc → teraz). " +
+                "ZAWSZE NAJPIERW z confirm=false dla preview. Tylko po explicit zgodzie usera " +
+                "ponów z confirm=true. condition: ok / damaged / lost.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "rental_id": { "type": "string", "description": "Guid wynajmu." },
+                "condition": { "type": "string", "enum": ["ok", "damaged", "lost"] },
+                "return_notes": { "type": "string", "description": "Opcjonalne notatki ze zwrotu." },
+                "confirm": { "type": "boolean", "description": "false = preview, true = wykonaj." }
+              },
+              "required": ["rental_id"]
+            }
+            """))),
+
+        ChatTool.CreateFunctionTool(
+            functionName: "send_reminder_sms",
+            functionDescription:
+                "Wyślij SMS-em przypomnienie do klienta z konkretnego wynajmu. ZAWSZE NAJPIERW preview " +
+                "(confirm=false) — pokaż user numer i treść. Po explicit zgodzie z confirm=true wyślij. " +
+                "Default treść: 'Cześć [imię], przypominamy o zwrocie sprzętu do [data]'.",
+            functionParameters: BinaryData.FromBytes(System.Text.Encoding.UTF8.GetBytes("""
+            {
+              "type": "object",
+              "properties": {
+                "rental_id": { "type": "string", "description": "Guid wynajmu (numer telefonu pobierzemy z klienta)." },
+                "custom_message": { "type": "string", "description": "Opcjonalne — własna treść (max 320 znaków)." },
+                "confirm": { "type": "boolean", "description": "false = preview, true = wyślij." }
+              },
+              "required": ["rental_id"]
+            }
             """)))
     };
 }

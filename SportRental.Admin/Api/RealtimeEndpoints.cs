@@ -278,6 +278,100 @@ public static class RealtimeEndpoints
                     properties = new { sku = new { type = "string" } },
                     required = new[] { "sku" }
                 }
+            },
+            // Faza 5b read
+            new
+            {
+                type = "function",
+                name = "get_top_customers",
+                description = "Najlepsi klienci po liczbie wynajmów lub łącznej wartości.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        by = new { type = "string", @enum = new[] { "rentals", "revenue" } },
+                        limit = new { type = "integer" }
+                    },
+                    required = Array.Empty<string>()
+                }
+            },
+            new
+            {
+                type = "function",
+                name = "get_employee_list",
+                description = "Lista pracowników wypożyczalni + oczekujące zaproszenia.",
+                parameters = new { type = "object", properties = new { }, required = Array.Empty<string>() }
+            },
+            new
+            {
+                type = "function",
+                name = "forecast_demand",
+                description = "Trend wynajmów (porównanie ostatnie N dni vs poprzednie N).",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        product_query = new { type = "string" },
+                        days = new { type = "integer" }
+                    },
+                    required = Array.Empty<string>()
+                }
+            },
+            // Faza 5c write z confirmation
+            new
+            {
+                type = "function",
+                name = "update_customer_notes",
+                description = "Dopisuje notatkę do profilu klienta. ZAWSZE NAJPIERW confirm=false dla preview.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        customer_id_or_email = new { type = "string" },
+                        notes = new { type = "string" },
+                        mode = new { type = "string", @enum = new[] { "append", "replace" } },
+                        confirm = new { type = "boolean" }
+                    },
+                    required = new[] { "customer_id_or_email", "notes" }
+                }
+            },
+            new
+            {
+                type = "function",
+                name = "mark_rental_returned",
+                description = "Oznacz wynajem jako zwrócony. ZAWSZE NAJPIERW confirm=false.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        rental_id = new { type = "string" },
+                        condition = new { type = "string", @enum = new[] { "ok", "damaged", "lost" } },
+                        return_notes = new { type = "string" },
+                        confirm = new { type = "boolean" }
+                    },
+                    required = new[] { "rental_id" }
+                }
+            },
+            new
+            {
+                type = "function",
+                name = "send_reminder_sms",
+                description = "Wyślij SMS do klienta. ZAWSZE NAJPIERW confirm=false dla preview.",
+                parameters = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        rental_id = new { type = "string" },
+                        custom_message = new { type = "string" },
+                        confirm = new { type = "boolean" }
+                    },
+                    required = new[] { "rental_id" }
+                }
             }
         };
     }

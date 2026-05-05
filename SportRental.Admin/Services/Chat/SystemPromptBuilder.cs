@@ -9,7 +9,7 @@ namespace SportRental.Admin.Services.Chat;
 /// </summary>
 public static class SystemPromptBuilder
 {
-    public static string Build(string? userEmail, string? userRole, string? currentPage, string? chatHistory)
+    public static string Build(string? userEmail, string? userRole, string? currentPage, string? chatHistory, string? crossSessionHistory = null)
     {
         var sb = new StringBuilder();
         sb.AppendLine("Jesteś pomocnym asystentem AI w aplikacji **SportRental** — systemie zarządzania");
@@ -78,6 +78,23 @@ public static class SystemPromptBuilder
         sb.AppendLine("'sprawdź klienta X i jego ostatnie wynajmy' wywołaj get_customer_history. Łącz odpowiedzi z toolów");
         sb.AppendLine("z konkretnymi liczbami i zachęcaj do dalszych pytań.");
         sb.AppendLine();
+        sb.AppendLine("### Read — biznesowe analitykę (faza 5b)");
+        sb.AppendLine("- `get_top_customers(by, limit)` — najlepsi klienci. by=rentals lub by=revenue.");
+        sb.AppendLine("- `get_employee_list()` — pracownicy wypożyczalni + oczekujące zaproszenia.");
+        sb.AppendLine("- `forecast_demand(product_query, days)` — trend wynajmów (rosnące / stabilnie / spadek).");
+        sb.AppendLine();
+        sb.AppendLine("### Write — modyfikacja danych (faza 5c) — DWUSTOPNIOWY confirmation");
+        sb.AppendLine("**KRYTYCZNE**: każdy write tool MUSI być wywołany NAJPIERW z `confirm=false` (preview).");
+        sb.AppendLine("Pokaż user co zamierzasz zrobić, poczekaj na explicit zgodę ('tak', 'ok', 'potwierdzam'),");
+        sb.AppendLine("DOPIERO POTEM wywołaj ten sam tool z `confirm=true` żeby naprawdę commitnąć zmianę.");
+        sb.AppendLine("- `update_customer_notes(customer_id_or_email, notes, mode, confirm)` — dopisuje notatkę do klienta.");
+        sb.AppendLine("- `mark_rental_returned(rental_id, condition, return_notes, confirm)` — oznacz wynajem jako zwrócony.");
+        sb.AppendLine("- `send_reminder_sms(rental_id, custom_message, confirm)` — wyślij SMS do klienta.");
+        sb.AppendLine();
+        sb.AppendLine("**NIGDY** nie wywołuj write tool z confirm=true bez wcześniejszej zgody usera w tej samej rozmowie.");
+        sb.AppendLine("Jeśli user wprost mówi 'zrób X bez pytania' — i tak najpierw pokaż preview, potem wykonaj");
+        sb.AppendLine("(podwójne potwierdzenie). To bezpiecznik przeciwko przypadkowym/halucynowanym akcjom.");
+        sb.AppendLine();
         sb.AppendLine("## ZASADY ODPOWIADANIA");
         sb.AppendLine("- Po polsku, zwięźle ale konkretnie. Krótkie odpowiedzi (3-6 zdań) chyba że");
         sb.AppendLine("  user prosi o szczegóły.");
@@ -88,6 +105,12 @@ public static class SystemPromptBuilder
         sb.AppendLine("  zespołu, ok?' i po zgodzie wywołaj `report_bug`.");
         sb.AppendLine("- NIE wymyślaj danych klientów / wynajmów — masz read tools (`get_today_rentals`,");
         sb.AppendLine("  `get_product_status`, `get_customer_trust`, `count_active_rentals`). Używaj ich.");
+
+        if (!string.IsNullOrWhiteSpace(crossSessionHistory))
+        {
+            sb.AppendLine();
+            sb.AppendLine(crossSessionHistory);
+        }
 
         if (!string.IsNullOrWhiteSpace(chatHistory))
         {

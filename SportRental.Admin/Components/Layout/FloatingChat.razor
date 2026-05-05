@@ -12,6 +12,7 @@
 @inject OpenAiChatService OpenAi
 @inject ChatToolHandler ToolHandler
 @inject FeedbackService Feedback
+@inject ChatPersistenceService ChatPersistence
 @inject IJSRuntime JS
 
 <AuthorizeView>
@@ -161,6 +162,7 @@
     private Guid _tenantId;
     private string? _userId;
     private string? _userRole;
+    private Guid _conversationId;
 
     protected override async Task OnInitializedAsync()
     {
@@ -232,11 +234,12 @@
         return InvokeAsync(StateHasChanged);
     }
 
-    [JSInvokable] public Task OnUserTranscript(string transcript)
+    [JSInvokable] public async Task OnUserTranscript(string transcript)
     {
-        if (!string.IsNullOrWhiteSpace(transcript))
-            ChatService.AddUserMessage(transcript);
-        return InvokeAsync(StateHasChanged);
+        if (string.IsNullOrWhiteSpace(transcript)) return;
+        ChatService.AddUserMessage(transcript);
+        await PersistVoiceMessage("user", transcript);
+        await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable] public Task OnTranscriptDelta(string delta)
@@ -245,13 +248,23 @@
         return Task.CompletedTask;
     }
 
-    [JSInvokable] public Task OnTranscriptDone(string transcript)
+    [JSInvokable] public async Task OnTranscriptDone(string transcript)
     {
         var finalText = !string.IsNullOrWhiteSpace(transcript) ? transcript : _voiceTranscriptBuffer;
-        if (!string.IsNullOrWhiteSpace(finalText))
-            ChatService.AddAssistantMessage(finalText);
         _voiceTranscriptBuffer = string.Empty;
-        return InvokeAsync(StateHasChanged);
+        if (string.IsNullOrWhiteSpace(finalText)) return;
+        ChatService.AddAssistantMessage(finalText);
+        await PersistVoiceMessage("assistant", finalText);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task PersistVoiceMessage(string role, string content)
+    {
+        if (_tenantId == Guid.Empty || string.IsNullOrWhiteSpace(_userId)) return;
+        if (_conversationId == Guid.Empty)
+            _conversationId = await ChatPersistence.GetOrCreateConversationAsync(_tenantId, _userId, _currentUserEmail, _userRole, "voice");
+        var page = new Uri(Nav.Uri).PathAndQuery;
+        await ChatPersistence.SaveMessageAsync(_conversationId, _tenantId, role, content, page, null);
     }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
@@ -293,11 +306,24 @@
         try
         {
             var currentPage = new Uri(Nav.Uri).PathAndQuery;
+
+            // Lazy init konwersacji — jedna na 30 minut idle.
+            if (_conversationId == Guid.Empty)
+                _conversationId = await ChatPersistence.GetOrCreateConversationAsync(
+                    _tenantId, _userId, _currentUserEmail, _userRole, "text");
+
+            // Persist user message + load cross-session history dla prompt.
+            await ChatPersistence.SaveMessageAsync(_conversationId, _tenantId, "user", text, currentPage, null);
+            var crossHistory = string.IsNullOrWhiteSpace(_userId)
+                ? string.Empty
+                : await ChatPersistence.BuildCrossSessionHistoryAsync(_tenantId, _userId!, 10);
+
             var systemPrompt = SystemPromptBuilder.Build(
                 userEmail: _currentUserEmail,
                 userRole: _userRole,
                 currentPage: currentPage,
-                chatHistory: ChatService.BuildHistoryForPrompt(10));
+                chatHistory: ChatService.BuildHistoryForPrompt(10),
+                crossSessionHistory: crossHistory);
 
             // Historia dla modelu — bez ostatniej wiadomości użytkownika (jest już w systemPrompt+input)
             var turns = ChatService.Messages
@@ -323,6 +349,12 @@
                 toolHandler: (name, args) => ToolHandler.HandleAsync(name, args, ctx));
 
             ChatService.AddAssistantMessage(result.Content);
+
+            // Persist assistant response + tool calls (jeśli były) dla audytu.
+            var toolCallsJson = result.ToolCallsExecuted.Count > 0
+                ? System.Text.Json.JsonSerializer.Serialize(result.ToolCallsExecuted.Select(t => new { t.FunctionName, t.ArgumentsJson }))
+                : null;
+            await ChatPersistence.SaveMessageAsync(_conversationId, _tenantId, "assistant", result.Content, currentPage, toolCallsJson);
         }
         catch (Exception ex)
         {

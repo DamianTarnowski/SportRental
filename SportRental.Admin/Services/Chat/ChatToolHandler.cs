@@ -12,12 +12,14 @@ public sealed class ChatToolHandler
 {
     private readonly FeedbackService _feedback;
     private readonly ReadToolService _read;
+    private readonly WriteToolService _write;
     private readonly ILogger<ChatToolHandler> _logger;
 
-    public ChatToolHandler(FeedbackService feedback, ReadToolService read, ILogger<ChatToolHandler> logger)
+    public ChatToolHandler(FeedbackService feedback, ReadToolService read, WriteToolService write, ILogger<ChatToolHandler> logger)
     {
         _feedback = feedback;
         _read = read;
+        _write = write;
         _logger = logger;
     }
 
@@ -49,6 +51,14 @@ public sealed class ChatToolHandler
                 "get_revenue_summary" => await HandleRevenueSummary(argsJson, context, ct),
                 "get_customer_history" => await HandleCustomerHistory(argsJson, context, ct),
                 "find_rental_by_sku" => await HandleFindRentalBySku(argsJson, context, ct),
+                // Faza 5b — additional read tools
+                "get_top_customers" => await HandleTopCustomers(argsJson, context, ct),
+                "get_employee_list" => await _read.GetEmployeeListAsync(context.TenantId, ct),
+                "forecast_demand" => await HandleForecast(argsJson, context, ct),
+                // Faza 5c — write tools z confirmation
+                "update_customer_notes" => await HandleUpdateNotes(argsJson, context, ct),
+                "mark_rental_returned" => await HandleMarkReturned(argsJson, context, ct),
+                "send_reminder_sms" => await HandleSendSms(argsJson, context, ct),
                 _ => JsonSerializer.Serialize(new { error = $"Unknown tool: {functionName}" })
             };
         }
@@ -121,6 +131,76 @@ public sealed class ChatToolHandler
     private sealed class SkuArgs
     {
         [System.Text.Json.Serialization.JsonPropertyName("sku")] public string? Sku { get; set; }
+    }
+
+    private async Task<string> HandleTopCustomers(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<TopCustomersArgs>(argsJson) ?? new TopCustomersArgs();
+        return await _read.GetTopCustomersAsync(ctx.TenantId, args.By, args.Limit ?? 10, ct);
+    }
+
+    private async Task<string> HandleForecast(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<ForecastArgs>(argsJson) ?? new ForecastArgs();
+        return await _read.ForecastDemandAsync(ctx.TenantId, args.ProductQuery, args.Days ?? 30, ct);
+    }
+
+    private async Task<string> HandleUpdateNotes(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<UpdateNotesArgs>(argsJson) ?? new UpdateNotesArgs();
+        if (string.IsNullOrWhiteSpace(args.CustomerIdOrEmail) || string.IsNullOrWhiteSpace(args.Notes))
+            return JsonSerializer.Serialize(new { error = "missing_required" });
+        return await _write.UpdateCustomerNotesAsync(
+            ctx.TenantId, args.CustomerIdOrEmail!, args.Notes!, args.Mode, args.Confirm ?? false, ct);
+    }
+
+    private async Task<string> HandleMarkReturned(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<MarkReturnedArgs>(argsJson) ?? new MarkReturnedArgs();
+        if (!Guid.TryParse(args.RentalId, out var rid))
+            return JsonSerializer.Serialize(new { error = "invalid_rental_id" });
+        return await _write.MarkRentalReturnedAsync(
+            ctx.TenantId, rid, args.Condition, args.ReturnNotes, args.Confirm ?? false, ct);
+    }
+
+    private async Task<string> HandleSendSms(string argsJson, ChatToolContext ctx, CancellationToken ct)
+    {
+        var args = JsonSerializer.Deserialize<SendSmsArgs>(argsJson) ?? new SendSmsArgs();
+        if (!Guid.TryParse(args.RentalId, out var rid))
+            return JsonSerializer.Serialize(new { error = "invalid_rental_id" });
+        return await _write.SendReminderSmsAsync(
+            ctx.TenantId, rid, args.CustomMessage, args.Confirm ?? false, ct);
+    }
+
+    private sealed class TopCustomersArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("by")] public string? By { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("limit")] public int? Limit { get; set; }
+    }
+    private sealed class ForecastArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("product_query")] public string? ProductQuery { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("days")] public int? Days { get; set; }
+    }
+    private sealed class UpdateNotesArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("customer_id_or_email")] public string? CustomerIdOrEmail { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("notes")] public string? Notes { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("mode")] public string? Mode { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("confirm")] public bool? Confirm { get; set; }
+    }
+    private sealed class MarkReturnedArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("rental_id")] public string? RentalId { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("condition")] public string? Condition { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("return_notes")] public string? ReturnNotes { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("confirm")] public bool? Confirm { get; set; }
+    }
+    private sealed class SendSmsArgs
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("rental_id")] public string? RentalId { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("custom_message")] public string? CustomMessage { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("confirm")] public bool? Confirm { get; set; }
     }
 
     private async Task<string> HandleReportBug(string argsJson, ChatToolContext ctx, CancellationToken ct)

@@ -376,6 +376,144 @@ public sealed class ReadToolService
         });
     }
 
+    /// <summary>
+    /// Najlepsi klienci według liczby wynajmów albo łącznej wartości. Max N (default 10).
+    /// </summary>
+    public async Task<string> GetTopCustomersAsync(Guid tenantId, string? by, int limit, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        var byLower = (by ?? "rentals").Trim().ToLowerInvariant();
+        var actualLimit = Math.Clamp(limit <= 0 ? 10 : limit, 1, 50);
+
+        var query = db.Rentals
+            .Where(r => r.Status != RentalStatus.Cancelled && r.Status != RentalStatus.Draft)
+            .GroupBy(r => r.CustomerId)
+            .Select(g => new
+            {
+                customerId = g.Key,
+                rentalsCount = g.Count(),
+                totalAmount = g.Sum(r => r.TotalAmount),
+                lastRentalAt = g.Max(r => r.StartDateUtc)
+            });
+
+        query = byLower switch
+        {
+            "revenue" or "amount" or "wartosc" or "wartość" => query.OrderByDescending(x => x.totalAmount),
+            _ => query.OrderByDescending(x => x.rentalsCount)
+        };
+
+        var topAggregates = await query.Take(actualLimit).ToListAsync(ct);
+        if (topAggregates.Count == 0)
+            return JsonSerializer.Serialize(new { count = 0, by = byLower, customers = Array.Empty<object>() });
+
+        var customerIds = topAggregates.Select(x => x.customerId).ToList();
+        var customers = await db.Customers
+            .Where(c => customerIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.FullName, c.Email, c.PhoneNumber, c.TrustLevel })
+            .ToListAsync(ct);
+
+        var result = topAggregates
+            .Select(t => new
+            {
+                t.customerId,
+                customer = customers.FirstOrDefault(c => c.Id == t.customerId)?.FullName ?? "(nieznany)",
+                email = customers.FirstOrDefault(c => c.Id == t.customerId)?.Email,
+                phone = customers.FirstOrDefault(c => c.Id == t.customerId)?.PhoneNumber,
+                trustLevel = customers.FirstOrDefault(c => c.Id == t.customerId)?.TrustLevel.ToString(),
+                rentalsCount = t.rentalsCount,
+                totalAmount = t.totalAmount,
+                lastRentalAt = t.lastRentalAt
+            })
+            .ToList();
+
+        return JsonSerializer.Serialize(new { count = result.Count, by = byLower, customers = result });
+    }
+
+    /// <summary>Lista pracowników wypożyczalni (wraz z rolą).</summary>
+    public async Task<string> GetEmployeeListAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        var employees = await db.Employees
+            .Where(e => !e.IsDeleted)
+            .OrderBy(e => e.FullName)
+            .Select(e => new
+            {
+                id = e.Id,
+                fullName = e.FullName,
+                email = e.Email,
+                phone = e.Telephone,
+                role = e.Role.ToString(),
+                position = e.Position,
+                city = e.City
+            })
+            .ToListAsync(ct);
+
+        var pendingInvitations = await db.EmployeeInvitations
+            .IgnoreQueryFilters()
+            .Where(i => i.TenantId == tenantId && !i.IsUsed && i.ExpiresAtUtc > DateTime.UtcNow)
+            .Select(i => new { i.Email, role = i.Role.ToString(), expiresAt = i.ExpiresAtUtc })
+            .ToListAsync(ct);
+
+        return JsonSerializer.Serialize(new
+        {
+            employeesCount = employees.Count,
+            pendingInvitationsCount = pendingInvitations.Count,
+            employees,
+            pendingInvitations
+        });
+    }
+
+    /// <summary>
+    /// Forecast prosty — porównuje liczbę wynajmów ostatnich 30 dni vs poprzednich 30 dni
+    /// i wyciąga linear extrapolation na następne 30 dni. Opcjonalnie filter po nazwie produktu.
+    /// </summary>
+    public async Task<string> ForecastDemandAsync(Guid tenantId, string? productQuery, int days, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        db.SetTenant(tenantId);
+
+        var window = days <= 0 ? 30 : Math.Min(days, 90);
+        var now = DateTime.UtcNow;
+        var sinceA = now.AddDays(-window);          // ostatnie N dni
+        var sinceB = now.AddDays(-window * 2);     // poprzednie N dni
+
+        var baseQuery = db.Rentals
+            .Where(r => r.Status != RentalStatus.Cancelled && r.Status != RentalStatus.Draft);
+
+        // Filter po produkcie (po nazwie/SKU contains)
+        if (!string.IsNullOrWhiteSpace(productQuery))
+        {
+            var q = productQuery.Trim().ToLowerInvariant();
+            baseQuery = baseQuery.Where(r => r.Items.Any(i =>
+                db.Products.Any(p => p.Id == i.ProductId
+                    && (p.Name.ToLower().Contains(q) || p.Sku.ToLower().Contains(q)))));
+        }
+
+        var recent = await baseQuery.Where(r => r.StartDateUtc >= sinceA).CountAsync(ct);
+        var previous = await baseQuery.Where(r => r.StartDateUtc >= sinceB && r.StartDateUtc < sinceA).CountAsync(ct);
+
+        var trendPct = previous == 0 ? (recent > 0 ? 100.0 : 0.0)
+                                     : Math.Round((recent - previous) * 100.0 / previous, 1);
+        var projection = previous == 0 ? recent : (int)Math.Round(recent * (1 + trendPct / 100.0));
+
+        return JsonSerializer.Serialize(new
+        {
+            windowDays = window,
+            productFilter = productQuery,
+            rentalsLastWindow = recent,
+            rentalsPreviousWindow = previous,
+            trendPct,
+            projectedNextWindow = projection,
+            interpretation = trendPct >= 25 ? "rosnące zainteresowanie"
+                : trendPct <= -25 ? "spadek zainteresowania"
+                : "stabilnie"
+        });
+    }
+
     /// <summary>Znajdź wynajem powiązany z konkretnym sprzętem (po SKU produktu).</summary>
     public async Task<string> FindRentalBySkuAsync(Guid tenantId, string sku, CancellationToken ct = default)
     {

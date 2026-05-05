@@ -45,6 +45,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<RentalItemReview> RentalItemReviews => Set<RentalItemReview>();
     public DbSet<CustomerReview> CustomerReviews => Set<CustomerReview>();
     public DbSet<UserFeedback> UserFeedbacks => Set<UserFeedback>();
+    public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -238,6 +240,32 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(uf => new { uf.TenantId, uf.IsResolved });
             // SuperAdmin (TenantId = null) widzi wszystko cross-tenant.
             entity.HasQueryFilter(uf => TenantId == null || uf.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<ChatConversation>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.UserEmail).HasMaxLength(256);
+            entity.Property(c => c.UserRole).HasMaxLength(64);
+            entity.Property(c => c.Source).HasMaxLength(16);
+            entity.HasIndex(c => new { c.TenantId, c.UserId, c.StartedAtUtc });
+            entity.HasQueryFilter(c => TenantId == null || c.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.HasKey(m => m.Id);
+            entity.Property(m => m.Role).HasMaxLength(16).IsRequired();
+            entity.Property(m => m.Content).IsRequired();
+            entity.Property(m => m.CurrentPage).HasMaxLength(512);
+            entity.Property(m => m.ToolCallsJson).HasColumnType("jsonb");
+            entity.HasOne(m => m.Conversation)
+                  .WithMany(c => c.Messages)
+                  .HasForeignKey(m => m.ConversationId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(m => new { m.ConversationId, m.CreatedAtUtc });
+            entity.HasIndex(m => new { m.TenantId, m.CreatedAtUtc });
+            entity.HasQueryFilter(m => TenantId == null || m.TenantId == TenantId);
         });
 
         modelBuilder.Entity<SmsConfirmation>(entity =>
