@@ -538,6 +538,7 @@ app.MapSportRentalApi();
 app.MapSmsApiCallbacks(); // SMSAPI delivery report callbacks
 app.MapConfirmationEndpoints(); // Public rental confirmation page
 app.MapChatEndpoints(); // Floating chat asystent — /api/chat/send, /api/chat/feedback
+app.MapRealtimeEndpoints(); // Voice (Azure Realtime API) — /api/realtime/session, /function/{name}
 app.MapControllers();
 app.MapHub<SportRental.Admin.Hubs.RentalNotificationHub>("/hubs/rentals");
 

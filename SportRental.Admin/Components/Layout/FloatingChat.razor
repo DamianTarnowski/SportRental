@@ -27,10 +27,15 @@
                             </div>
                             <div class="chat-header-text">
                                 <span class="chat-title">Asystent SportRental</span>
-                                <span class="chat-status">@(_isThinking ? "Myślę..." : "Online")</span>
+                                <span class="chat-status">@VoiceStatusText()</span>
                             </div>
                         </div>
                         <div class="d-flex align-center gap-1">
+                            <MudIconButton Icon="@(_voiceStatus == "disconnected" ? Icons.Material.Filled.Mic : Icons.Material.Filled.MicOff)"
+                                           Size="Size.Small"
+                                           OnClick="ToggleVoice"
+                                           Class="chat-close-btn"
+                                           Title="@(_voiceStatus == "disconnected" ? "Włącz głos" : $"Wyłącz głos ({_voiceStatus})")" />
                             <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" OnClick="ClearChat" Class="chat-close-btn" Title="Wyczyść rozmowę" />
                             <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="ToggleChat" Class="chat-close-btn" Title="Zamknij" />
                         </div>
@@ -148,6 +153,11 @@
         .UseAdvancedExtensions()
         .Build();
 
+    // Voice state
+    private string _voiceStatus = "disconnected"; // disconnected | connecting | connected | listening | thinking | speaking | error
+    private DotNetObjectReference<FloatingChat>? _voiceDotNetRef;
+    private string _voiceTranscriptBuffer = string.Empty;
+
     private Guid _tenantId;
     private string? _userId;
     private string? _userRole;
@@ -165,7 +175,84 @@
         if (Guid.TryParse(u.FindFirst("tenant-id")?.Value, out var tid)) _tenantId = tid;
     }
 
-    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnLocationChanged;
+        _voiceDotNetRef?.Dispose();
+        // Best-effort disconnect voice peer connection on component teardown.
+        _ = JS.InvokeVoidAsync("realtimeVoice.disconnect").AsTask();
+    }
+
+    private string VoiceStatusText() => _voiceStatus switch
+    {
+        "connecting" => "Łączę głos…",
+        "connected" => "🎙️ Głos online",
+        "listening" => "🎤 Słucham…",
+        "thinking" => "💭 Myślę…",
+        "speaking" => "🔊 Mówię…",
+        "error" => "⚠️ Błąd głosu",
+        _ => _isThinking ? "Myślę…" : "Online"
+    };
+
+    private async Task ToggleVoice()
+    {
+        if (_voiceStatus == "disconnected" || _voiceStatus == "error")
+        {
+            _voiceStatus = "connecting";
+            _voiceDotNetRef ??= DotNetObjectReference.Create(this);
+            try
+            {
+                var currentPage = new Uri(Nav.Uri).PathAndQuery;
+                await JS.InvokeVoidAsync("realtimeVoice.connect", _voiceDotNetRef, currentPage);
+            }
+            catch (Exception ex)
+            {
+                _voiceStatus = "error";
+                ChatService.AddAssistantMessage($"⚠️ Nie udało się włączyć głosu: {ex.Message}");
+            }
+        }
+        else
+        {
+            try { await JS.InvokeVoidAsync("realtimeVoice.disconnect"); } catch { }
+            _voiceStatus = "disconnected";
+        }
+        StateHasChanged();
+    }
+
+    [JSInvokable] public Task OnVoiceStatusChanged(string status)
+    {
+        _voiceStatus = status;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable] public Task OnVoiceError(string message)
+    {
+        _voiceStatus = "error";
+        ChatService.AddAssistantMessage($"⚠️ Voice: {message}");
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable] public Task OnUserTranscript(string transcript)
+    {
+        if (!string.IsNullOrWhiteSpace(transcript))
+            ChatService.AddUserMessage(transcript);
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable] public Task OnTranscriptDelta(string delta)
+    {
+        _voiceTranscriptBuffer += delta;
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable] public Task OnTranscriptDone(string transcript)
+    {
+        var finalText = !string.IsNullOrWhiteSpace(transcript) ? transcript : _voiceTranscriptBuffer;
+        if (!string.IsNullOrWhiteSpace(finalText))
+            ChatService.AddAssistantMessage(finalText);
+        _voiceTranscriptBuffer = string.Empty;
+        return InvokeAsync(StateHasChanged);
+    }
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
         => InvokeAsync(StateHasChanged);
