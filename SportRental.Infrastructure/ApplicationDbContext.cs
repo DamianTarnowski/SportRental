@@ -47,6 +47,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<UserFeedback> UserFeedbacks => Set<UserFeedback>();
     public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ChatSettings> ChatSettings => Set<ChatSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -266,6 +267,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(m => new { m.ConversationId, m.CreatedAtUtc });
             entity.HasIndex(m => new { m.TenantId, m.CreatedAtUtc });
             entity.HasQueryFilter(m => TenantId == null || m.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<ChatSettings>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.DefaultModel).HasMaxLength(64).IsRequired();
+            entity.Property(s => s.UpdatedBy).HasMaxLength(256);
+            // Brak query filtra — globalne ustawienie.
         });
 
         modelBuilder.Entity<SmsConfirmation>(entity =>

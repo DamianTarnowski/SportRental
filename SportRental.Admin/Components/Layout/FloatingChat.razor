@@ -13,6 +13,7 @@
 @inject ChatToolHandler ToolHandler
 @inject FeedbackService Feedback
 @inject ChatPersistenceService ChatPersistence
+@inject ChatSettingsService SettingsService
 @inject IJSRuntime JS
 
 <AuthorizeView>
@@ -32,9 +33,12 @@
                             </div>
                         </div>
                         <div class="d-flex align-center gap-1">
-                            <button class="chat-model-toggle" @onclick="ToggleModel" title="@($"Model: {ModelLabel(_selectedModel)} (klik = przełącz)")">
-                                @ModelIcon(_selectedModel)
-                            </button>
+                            @if (_allowUserModelChoice)
+                            {
+                                <button class="chat-model-toggle" @onclick="ToggleModel" title="@($"Model: {ModelLabel(_selectedModel)} (klik = przełącz)")">
+                                    @ModelIcon(_selectedModel)
+                                </button>
+                            }
                             <MudIconButton Icon="@(_voiceStatus == "disconnected" ? Icons.Material.Filled.Mic : Icons.Material.Filled.MicOff)"
                                            Size="Size.Small"
                                            OnClick="ToggleVoice"
@@ -166,7 +170,8 @@
     private string? _userId;
     private string? _userRole;
     private Guid _conversationId;
-    private string _selectedModel = "gpt-5.5";  // default; nadpisywane z localStorage w OnAfterRenderAsync
+    private string _selectedModel = "gpt-5.5";  // overridowany z settings + localStorage w OnAfterRenderAsync
+    private bool _allowUserModelChoice = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -193,17 +198,23 @@
     {
         if (firstRender)
         {
-            // Pobierz wybrany model z localStorage; jeśli pusty, zostaje default (gpt-5.5).
+            // Najpierw globalne settings od SuperAdmina — defaultModel + czy user może wybrać.
             try
             {
-                var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "sportrental.chatModel");
-                if (!string.IsNullOrWhiteSpace(stored))
+                var settings = await SettingsService.GetAsync();
+                _selectedModel = settings.DefaultModel;
+                _allowUserModelChoice = settings.AllowUserModelChoice;
+
+                // Jeśli choice włączony — pozwól localStorage nadpisać default per browser.
+                if (_allowUserModelChoice)
                 {
-                    _selectedModel = stored;
-                    StateHasChanged();
+                    var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "sportrental.chatModel");
+                    if (!string.IsNullOrWhiteSpace(stored) && OpenAiChatService.AllowedDeployments.Contains(stored))
+                        _selectedModel = stored;
                 }
+                StateHasChanged();
             }
-            catch { }
+            catch { /* settings unavailable — leave defaults */ }
         }
     }
 

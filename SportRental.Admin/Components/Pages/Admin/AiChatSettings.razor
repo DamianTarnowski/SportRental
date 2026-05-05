@@ -1,0 +1,119 @@
+@page "/admin/chat-settings"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "SuperAdmin")]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using SportRental.Admin.Services.Chat
+@using SportRental.Infrastructure.Domain
+
+@inject ChatSettingsService SettingsService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Spacing="2">
+        <MudIcon Icon="@Icons.Material.Filled.Tune" />
+        <MudText Typo="Typo.h4">Ustawienia floating chatu</MudText>
+        <MudChip T="string" Color="Color.Warning" Size="Size.Small">SuperAdmin only</MudChip>
+    </MudStack>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="pa-6 text-center"><MudProgressCircular Indeterminate="true" /></MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="pa-4" Elevation="2">
+            <MudStack Spacing="4">
+                <MudSelect T="string" @bind-Value="_defaultModel" Label="Domyślny model" Variant="Variant.Outlined">
+                    <MudSelectItem Value="@("gpt-5.5")">🧠 gpt-5.5 (mądrzejszy, droższy)</MudSelectItem>
+                    <MudSelectItem Value="@("gpt-5.4-mini")">🚀 gpt-5.4-mini (szybszy, tańszy)</MudSelectItem>
+                </MudSelect>
+
+                <MudSwitch T="bool" @bind-Value="_allowUserChoice"
+                           Label="Pozwól użytkownikom przełączać model w UI chatu"
+                           Color="Color.Primary" />
+
+                <MudAlert Severity="@(_allowUserChoice ? Severity.Info : Severity.Warning)" Dense="true">
+                    @if (_allowUserChoice)
+                    {
+                        <span>Każdy user widzi 🧠/🚀 toggle w nagłówku chatu i może wybrać. Jego wybór trzymany w localStorage przeglądarki, jeśli pierwszy raz — startuje z domyślnego.</span>
+                    }
+                    else
+                    {
+                        <span>Toggle ukryty u userów — wszyscy używają <strong>@_defaultModel</strong>. Idealnie gdy chcesz zminimalizować koszty (gpt-5.4-mini) lub odwrotnie wymusić jakość (gpt-5.5).</span>
+                    }
+                </MudAlert>
+
+                <MudStack Row="true" Spacing="2" Justify="Justify.FlexEnd">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                               StartIcon="@Icons.Material.Filled.Save"
+                               OnClick="SaveAsync"
+                               Disabled="@_isSaving">
+                        @(_isSaving ? "Zapisuję..." : "Zapisz")
+                    </MudButton>
+                </MudStack>
+
+                @if (_lastUpdated.HasValue)
+                {
+                    <MudText Typo="Typo.caption" Color="Color.Default">
+                        Ostatnio zmienione: @_lastUpdated.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                        @if (!string.IsNullOrWhiteSpace(_lastUpdatedBy)) { <span> przez @_lastUpdatedBy</span> }
+                    </MudText>
+                }
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string _defaultModel = "gpt-5.5";
+    private bool _allowUserChoice = true;
+    private DateTime? _lastUpdated;
+    private string? _lastUpdatedBy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var s = await SettingsService.GetAsync();
+            _defaultModel = s.DefaultModel;
+            _allowUserChoice = s.AllowUserModelChoice;
+            _lastUpdated = s.UpdatedAtUtc;
+            _lastUpdatedBy = s.UpdatedBy;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _isSaving = true;
+        try
+        {
+            var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+            var who = auth.User.FindFirst(ClaimTypes.Name)?.Value ?? auth.User.FindFirst(ClaimTypes.Email)?.Value;
+            await SettingsService.UpdateAsync(_defaultModel, _allowUserChoice, who);
+            _lastUpdated = DateTime.UtcNow;
+            _lastUpdatedBy = who;
+            Snackbar.Add("Zapisano. Zmiany dotrą do userów po reload chatu.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd zapisu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

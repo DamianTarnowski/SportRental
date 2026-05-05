@@ -1,8 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using SportRental.Admin.Services.Chat;
-using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 
 namespace SportRental.Admin.Api;
@@ -83,6 +81,42 @@ public static class ChatEndpoints
             return Results.NoContent();
         });
 
+        // GET /api/chat/settings — pobiera globalne settings (każdy zalogowany; UI floating
+        // chat-a z tego korzysta przy starcie żeby wiedzieć czy pokazać toggle modelu).
+        chat.MapGet("/settings", [Authorize] async (
+            ChatSettingsService settings,
+            CancellationToken ct) =>
+        {
+            var s = await settings.GetAsync(ct);
+            return Results.Ok(new
+            {
+                defaultModel = s.DefaultModel,
+                allowUserModelChoice = s.AllowUserModelChoice,
+                allowedModels = OpenAiChatService.AllowedDeployments.ToArray()
+            });
+        });
+
+        // PUT /api/chat/settings — TYLKO SuperAdmin może zmieniać.
+        chat.MapPut("/settings", [Authorize(Roles = "SuperAdmin")] async (
+            ChatSettingsRequest req,
+            ClaimsPrincipal user,
+            ChatSettingsService settings,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.DefaultModel))
+                return Results.BadRequest(new { error = "DefaultModel required" });
+            try
+            {
+                var who = user.FindFirst(ClaimTypes.Name)?.Value ?? user.FindFirst(ClaimTypes.Email)?.Value;
+                await settings.UpdateAsync(req.DefaultModel, req.AllowUserModelChoice, who, ct);
+                return Results.NoContent();
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
         // POST /api/feedback — bezpośredni zapis feedbacku bez asystenta (np. przycisk
         // „Zgłoś błąd" z poziomu UI, albo 👎 pod odpowiedzią asystenta).
         chat.MapPost("/feedback", [Authorize] async (
@@ -155,4 +189,10 @@ public sealed class FeedbackDirectRequest
     public string? Type { get; set; }
     public string? CurrentPage { get; set; }
     public string? ContextJson { get; set; }
+}
+
+public sealed class ChatSettingsRequest
+{
+    public string DefaultModel { get; set; } = "gpt-5.5";
+    public bool AllowUserModelChoice { get; set; } = true;
 }

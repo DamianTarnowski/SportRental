@@ -191,6 +191,7 @@ builder.Services.AddScoped<SportRental.Admin.Services.Chat.FeedbackService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ReadToolService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.WriteToolService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatPersistenceService>();
+builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatSettingsService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
 
