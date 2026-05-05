@@ -112,6 +112,25 @@
     background: rgba(255, 255, 255, 0.18) !important;
 }
 
+.chat-model-toggle {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0;
+    transition: background 0.15s, transform 0.12s;
+}
+
+.chat-model-toggle:hover {
+    background: rgba(255, 255, 255, 0.28);
+    transform: scale(1.06);
+}
+
 /* === Messages list === */
 .chat-messages {
     flex: 1;

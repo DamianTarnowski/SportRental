@@ -32,6 +32,9 @@
                             </div>
                         </div>
                         <div class="d-flex align-center gap-1">
+                            <button class="chat-model-toggle" @onclick="ToggleModel" title="@($"Model: {ModelLabel(_selectedModel)} (klik = przełącz)")">
+                                @ModelIcon(_selectedModel)
+                            </button>
                             <MudIconButton Icon="@(_voiceStatus == "disconnected" ? Icons.Material.Filled.Mic : Icons.Material.Filled.MicOff)"
                                            Size="Size.Small"
                                            OnClick="ToggleVoice"
@@ -163,6 +166,7 @@
     private string? _userId;
     private string? _userRole;
     private Guid _conversationId;
+    private string _selectedModel = "gpt-5.5";  // default; nadpisywane z localStorage w OnAfterRenderAsync
 
     protected override async Task OnInitializedAsync()
     {
@@ -183,6 +187,43 @@
         _voiceDotNetRef?.Dispose();
         // Best-effort disconnect voice peer connection on component teardown.
         _ = JS.InvokeVoidAsync("realtimeVoice.disconnect").AsTask();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Pobierz wybrany model z localStorage; jeśli pusty, zostaje default (gpt-5.5).
+            try
+            {
+                var stored = await JS.InvokeAsync<string?>("localStorage.getItem", "sportrental.chatModel");
+                if (!string.IsNullOrWhiteSpace(stored))
+                {
+                    _selectedModel = stored;
+                    StateHasChanged();
+                }
+            }
+            catch { }
+        }
+    }
+
+    private static string ModelIcon(string m) => m switch
+    {
+        "gpt-5.4-mini" => "🚀",
+        _ => "🧠"
+    };
+
+    private static string ModelLabel(string m) => m switch
+    {
+        "gpt-5.4-mini" => "Szybki (5.4-mini)",
+        _ => "Mądry (5.5)"
+    };
+
+    private async Task ToggleModel()
+    {
+        _selectedModel = _selectedModel == "gpt-5.5" ? "gpt-5.4-mini" : "gpt-5.5";
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "sportrental.chatModel", _selectedModel); } catch { }
+        StateHasChanged();
     }
 
     private string VoiceStatusText() => _voiceStatus switch
@@ -346,7 +387,8 @@
                 systemPrompt: systemPrompt,
                 history: turns,
                 tools: ChatToolDefinitions.All,
-                toolHandler: (name, args) => ToolHandler.HandleAsync(name, args, ctx));
+                toolHandler: (name, args) => ToolHandler.HandleAsync(name, args, ctx),
+                overrideDeployment: _selectedModel);
 
             ChatService.AddAssistantMessage(result.Content);
 

@@ -12,21 +12,31 @@ namespace SportRental.Admin.Services.Chat;
 public sealed class OpenAiChatService
 {
     private readonly AzureOpenAIClient _client;
-    private readonly string _deployment;
+    private readonly string _defaultDeployment;
     private readonly ILogger<OpenAiChatService> _logger;
+
+    /// <summary>Whitelist deploymentów na które user może się przełączyć z UI.</summary>
+    public static readonly HashSet<string> AllowedDeployments = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "gpt-5.5",
+        "gpt-5.4-mini"
+    };
 
     public OpenAiChatService(AzureOpenAIClient client, IConfiguration config, ILogger<OpenAiChatService> logger)
     {
         _client = client;
-        _deployment = config["OpenAI:TextDeployment"] ?? "gpt-5.5";
+        _defaultDeployment = config["OpenAI:TextDeployment"] ?? "gpt-5.5";
         _logger = logger;
     }
+
+    public string DefaultDeployment => _defaultDeployment;
 
     public async Task<ChatCompletionResult> ChatAsync(
         string systemPrompt,
         IReadOnlyList<ChatTurn> history,
         IReadOnlyList<ChatTool> tools,
         Func<string, string, Task<string>> toolHandler,
+        string? overrideDeployment = null,
         CancellationToken ct = default)
     {
         // Hard cap całego flow chat (3 rundy + tool dispatch). Po 60s dla całego ChatAsync
@@ -35,7 +45,11 @@ public sealed class OpenAiChatService
         timeoutCts.CancelAfter(TimeSpan.FromSeconds(60));
         ct = timeoutCts.Token;
 
-        var chat = _client.GetChatClient(_deployment);
+        // Sprawdź whitelist override → fallback na default jeśli ktoś podał śmieci
+        var deployment = !string.IsNullOrWhiteSpace(overrideDeployment) && AllowedDeployments.Contains(overrideDeployment)
+            ? overrideDeployment
+            : _defaultDeployment;
+        var chat = _client.GetChatClient(deployment);
 
         // Buildujemy listę wiadomości — DeveloperChatMessage (nowy odpowiednik System dla
         // gpt-5+) plus historia user/assistant. ToolChatMessage jest dodawany w pętli niżej.
@@ -48,7 +62,13 @@ public sealed class OpenAiChatService
             messages.Add(turn.IsUser ? new UserChatMessage(turn.Content) : new AssistantChatMessage(turn.Content));
         }
 
-        var options = new ChatCompletionOptions();
+        var options = new ChatCompletionOptions
+        {
+            // Niski reasoning effort = szybsze odpowiedzi. Dla chat-asystenta UI nie potrzebuje
+            // głębokiego "thinking" (jak w długich kodach/analizach) — chcemy interaktywności.
+            // Action: zauważalnie skraca czas pierwszego tokenu z ~5-8s do ~1-2s na gpt-5.x.
+            ReasoningEffortLevel = ChatReasoningEffortLevel.Low
+        };
         foreach (var t in tools) options.Tools.Add(t);
 
         var toolCallsExecuted = new List<ExecutedToolCall>();
