@@ -1,0 +1,211 @@
+@page "/admin/feedback"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@using SportRental.Admin.Services.Chat
+@using SportRental.Infrastructure.Domain
+
+@inject FeedbackService FeedbackService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+        <MudText Typo="Typo.h4">
+            <MudIcon Icon="@Icons.Material.Filled.Feedback" Class="mr-2" />
+            Zgłoszenia od użytkowników
+        </MudText>
+        <MudStack Row="true" Spacing="1">
+            <MudChip T="string" Color="Color.Primary">@_feedbacks.Count</MudChip>
+            @if (_isSuperAdmin)
+            {
+                <MudChip T="string" Color="Color.Warning">SuperAdmin: cross-tenant</MudChip>
+            }
+        </MudStack>
+    </MudStack>
+
+    <MudPaper Class="pa-3 mb-3" Elevation="1">
+        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <MudSelect T="FeedbackType?" @bind-Value="_filterType" Label="Typ" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 160px;" Clearable="true">
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)null)">— wszystkie —</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Bug)">🐛 Błędy</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Suggestion)">💡 Sugestie</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Question)">❓ Pytania</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Praise)">⭐ Pochwały</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.General)">💬 Ogólne</MudSelectItem>
+            </MudSelect>
+
+            <MudSelect T="bool?" @bind-Value="_filterResolved" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 160px;" Clearable="true">
+                <MudSelectItem T="bool?" Value="@((bool?)null)">— wszystkie —</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)false)">📋 Otwarte</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)true)">✅ Rozwiązane</MudSelectItem>
+            </MudSelect>
+
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync">
+                Odśwież
+            </MudButton>
+        </MudStack>
+    </MudPaper>
+
+    @if (_isLoading)
+    {
+        <MudPaper Class="pa-6 text-center"><MudProgressCircular Indeterminate="true" /></MudPaper>
+    }
+    else if (Filtered.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info">Brak zgłoszeń pasujących do filtra.</MudAlert>
+    }
+    else
+    {
+        <MudStack Spacing="2">
+            @foreach (var f in Filtered)
+            {
+                <MudPaper Class="pa-3" Elevation="1" Style="@(f.IsResolved ? "opacity: 0.7;" : "")">
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Wrap="Wrap.Wrap">
+                        <MudStack Spacing="1" Style="flex: 1; min-width: 0;">
+                            <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                                <MudChip T="string" Size="Size.Small" Color="@TypeColor(f.Type)" Variant="Variant.Filled">
+                                    @TypeIcon(f.Type) @TypeLabel(f.Type)
+                                </MudChip>
+                                @if (f.IsResolved)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">✅ Rozwiązane</MudChip>
+                                }
+                                <MudText Typo="Typo.caption" Color="Color.Default">
+                                    @f.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @f.UserEmail (@f.UserRole)
+                                </MudText>
+                                @if (_isSuperAdmin)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Text">tenant: @ShortGuid(f.TenantId)</MudChip>
+                                }
+                            </MudStack>
+
+                            <MudText Typo="Typo.body2" Style="white-space: pre-wrap;">@f.Message</MudText>
+
+                            @if (!string.IsNullOrWhiteSpace(f.CurrentPage))
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Default">
+                                    📍 strona: <code>@f.CurrentPage</code>
+                                </MudText>
+                            }
+
+                            @if (f.IsResolved)
+                            {
+                                <MudText Typo="Typo.caption" Color="Color.Success">
+                                    Zamknięte przez @f.ResolvedBy @f.ResolvedAtUtc?.ToLocalTime().ToString("dd.MM HH:mm")
+                                    @if (!string.IsNullOrWhiteSpace(f.ResolutionNotes)) { <span>· @f.ResolutionNotes</span> }
+                                </MudText>
+                            }
+                        </MudStack>
+
+                        @if (!f.IsResolved)
+                        {
+                            <MudButton Variant="Variant.Outlined" Size="Size.Small" Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.CheckCircle"
+                                       OnClick="() => ResolveAsync(f)">
+                                Oznacz jako rozwiązane
+                            </MudButton>
+                        }
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    private List<UserFeedback> _feedbacks = new();
+    private bool _isLoading = true;
+    private bool _isSuperAdmin;
+    private Guid? _myTenantId;
+    private string? _myEmail;
+    private FeedbackType? _filterType;
+    private bool? _filterResolved;
+
+    private List<UserFeedback> Filtered =>
+        _feedbacks
+            .Where(f => !_filterType.HasValue || f.Type == _filterType.Value)
+            .Where(f => !_filterResolved.HasValue || f.IsResolved == _filterResolved.Value)
+            .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var u = auth.User;
+        _isSuperAdmin = u.IsInRole("SuperAdmin");
+        _myEmail = u.FindFirst(ClaimTypes.Name)?.Value ?? u.FindFirst(ClaimTypes.Email)?.Value;
+        if (Guid.TryParse(u.FindFirst("tenant-id")?.Value, out var tid)) _myTenantId = tid;
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        StateHasChanged();
+        try
+        {
+            // SuperAdmin: tenantId = null → wszystkie cross-tenant.
+            // Owner: tylko swój tenant.
+            var scopeTenantId = _isSuperAdmin ? (Guid?)null : _myTenantId;
+            _feedbacks = await FeedbackService.ListAsync(scopeTenantId, type: null, isResolved: null, limit: 500);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd pobierania zgłoszeń: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ResolveAsync(UserFeedback f)
+    {
+        try
+        {
+            await FeedbackService.ResolveAsync(f.Id, _myEmail ?? "system", null);
+            f.IsResolved = true;
+            f.ResolvedAtUtc = DateTime.UtcNow;
+            f.ResolvedBy = _myEmail;
+            Snackbar.Add("Oznaczono jako rozwiązane", Severity.Success);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Nie udało się: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static Color TypeColor(FeedbackType t) => t switch
+    {
+        FeedbackType.Bug => Color.Error,
+        FeedbackType.Suggestion => Color.Info,
+        FeedbackType.Question => Color.Warning,
+        FeedbackType.Praise => Color.Success,
+        _ => Color.Default
+    };
+
+    private static string TypeLabel(FeedbackType t) => t switch
+    {
+        FeedbackType.Bug => "Błąd",
+        FeedbackType.Suggestion => "Sugestia",
+        FeedbackType.Question => "Pytanie",
+        FeedbackType.Praise => "Pochwała",
+        _ => "Ogólne"
+    };
+
+    private static string TypeIcon(FeedbackType t) => t switch
+    {
+        FeedbackType.Bug => "🐛",
+        FeedbackType.Suggestion => "💡",
+        FeedbackType.Question => "❓",
+        FeedbackType.Praise => "⭐",
+        _ => "💬"
+    };
+
+    private static string ShortGuid(Guid g) => g.ToString("N").Substring(0, 8);
+}

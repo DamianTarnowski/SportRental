@@ -44,6 +44,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<RentalReview> RentalReviews => Set<RentalReview>();
     public DbSet<RentalItemReview> RentalItemReviews => Set<RentalItemReview>();
     public DbSet<CustomerReview> CustomerReviews => Set<CustomerReview>();
+    public DbSet<UserFeedback> UserFeedbacks => Set<UserFeedback>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -219,6 +220,24 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(el => new { el.TenantId, el.Date });
             entity.HasIndex(el => new { el.TenantId, el.Severity });
             entity.HasQueryFilter(el => TenantId == null || el.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<UserFeedback>(entity =>
+        {
+            entity.HasKey(uf => uf.Id);
+            entity.Property(uf => uf.Message).HasMaxLength(8000).IsRequired();
+            entity.Property(uf => uf.UserEmail).HasMaxLength(256);
+            entity.Property(uf => uf.UserRole).HasMaxLength(64);
+            entity.Property(uf => uf.CurrentPage).HasMaxLength(512);
+            entity.Property(uf => uf.ResolvedBy).HasMaxLength(256);
+            entity.Property(uf => uf.ResolutionNotes).HasMaxLength(2000);
+            // ContextJson trzymany jako jsonb w Postgresie — w InMemory ignorowane (string).
+            entity.Property(uf => uf.ContextJson).HasColumnType("jsonb");
+            entity.HasIndex(uf => new { uf.TenantId, uf.CreatedAtUtc });
+            entity.HasIndex(uf => new { uf.TenantId, uf.Type });
+            entity.HasIndex(uf => new { uf.TenantId, uf.IsResolved });
+            // SuperAdmin (TenantId = null) widzi wszystko cross-tenant.
+            entity.HasQueryFilter(uf => TenantId == null || uf.TenantId == TenantId);
         });
 
         modelBuilder.Entity<SmsConfirmation>(entity =>

@@ -165,6 +165,32 @@ builder.Services.AddScoped<SportRental.Admin.Services.IRentalConfirmationService
 builder.Services.AddSingleton<SportRental.Admin.Services.IReviewSurveyTokenService, SportRental.Admin.Services.ReviewSurveyTokenService>();
 builder.Services.AddScoped<SportRental.Admin.Services.ICustomerTrustCalculator, SportRental.Admin.Services.CustomerTrustCalculator>();
 
+// === Floating chat (asystent AI) ===
+// Sekrety idą przez Key Vault (KeyVault:Url w appsettings.json). Lokalnie fallback przez
+// dotnet user-secrets — appsettings.Development.json/repo NIE zawiera sekretów (repo public).
+// Zapisz lokalnie:
+//   dotnet user-secrets set "OpenAI:Endpoint" "https://foundrypolska.cognitiveservices.azure.com/"
+//   dotnet user-secrets set "OpenAI:ApiKey" "..."
+//   dotnet user-secrets set "OpenAI:TextDeployment" "gpt-5.5"
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var endpoint = config["OpenAI:Endpoint"];
+    var apiKey = config["OpenAI:ApiKey"];
+    if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey))
+    {
+        // Returnuj null — DI dla OpenAiChatService rzuci sensownym błędem przy pierwszym użyciu
+        // zamiast crashować startup gdy KV/dev secrets jeszcze nieskonfigurowane.
+        throw new InvalidOperationException(
+            "OpenAI:Endpoint / OpenAI:ApiKey nie skonfigurowane (KV: srental2-kv lub user-secrets).");
+    }
+    return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(endpoint), new Azure.AzureKeyCredential(apiKey));
+});
+builder.Services.AddScoped<SportRental.Admin.Services.Chat.FloatingChatService>();
+builder.Services.AddScoped<SportRental.Admin.Services.Chat.FeedbackService>();
+builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
+builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
+
 // SignalR Hub for real-time rental notifications
 builder.Services.AddSingleton<SportRental.Admin.Hubs.IRentalNotificationService, SportRental.Admin.Hubs.RentalNotificationService>();
 
@@ -510,6 +536,7 @@ app.MapAdditionalIdentityEndpoints();
 app.MapSportRentalApi();
 app.MapSmsApiCallbacks(); // SMSAPI delivery report callbacks
 app.MapConfirmationEndpoints(); // Public rental confirmation page
+app.MapChatEndpoints(); // Floating chat asystent — /api/chat/send, /api/chat/feedback
 app.MapControllers();
 app.MapHub<SportRental.Admin.Hubs.RentalNotificationHub>("/hubs/rentals");
 

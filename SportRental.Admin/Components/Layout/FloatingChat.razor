@@ -1,0 +1,296 @@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using Microsoft.AspNetCore.Components.Authorization
+@using Markdig
+@using SportRental.Admin.Services.Chat
+@using SportRental.Infrastructure.Domain
+@using System.Security.Claims
+@implements IDisposable
+
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject FloatingChatService ChatService
+@inject OpenAiChatService OpenAi
+@inject ChatToolHandler ToolHandler
+@inject FeedbackService Feedback
+@inject IJSRuntime JS
+
+<AuthorizeView>
+    <Authorized>
+        <div class="floating-chat-container">
+            @if (_isOpen)
+            {
+                <div class="chat-window">
+                    <div class="chat-header">
+                        <div class="chat-header-info">
+                            <div class="chat-avatar">
+                                <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Medium" />
+                            </div>
+                            <div class="chat-header-text">
+                                <span class="chat-title">Asystent SportRental</span>
+                                <span class="chat-status">@(_isThinking ? "Myślę..." : "Online")</span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-center gap-1">
+                            <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Size="Size.Small" OnClick="ClearChat" Class="chat-close-btn" Title="Wyczyść rozmowę" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="ToggleChat" Class="chat-close-btn" Title="Zamknij" />
+                        </div>
+                    </div>
+
+                    <div class="chat-messages" @ref="_messagesContainer">
+                        @if (ChatService.Messages.Count == 0 && !_isThinking)
+                        {
+                            <div class="chat-welcome">
+                                <div class="welcome-icon">
+                                    <MudIcon Icon="@Icons.Material.Filled.Chat" Size="Size.Large" Color="Color.Primary" />
+                                </div>
+                                <h3>Cześć! 👋</h3>
+                                <p>Jestem asystentem SportRental. Mogę wyjaśnić jak działa ta strona, przyjąć zgłoszenie błędu albo Twoją sugestię.</p>
+
+                                <div class="quick-actions">
+                                    <button class="quick-action-btn" @onclick='() => SendQuickMessage("Jak działa ta strona?")'>
+                                        💡 Jak działa ta strona?
+                                    </button>
+                                    <button class="quick-action-btn" @onclick='() => SendQuickMessage("Chcę zgłosić błąd")'>
+                                        🐛 Zgłoś błąd
+                                    </button>
+                                    <button class="quick-action-btn" @onclick='() => SendQuickMessage("Mam sugestię")'>
+                                        💭 Mam sugestię
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            @foreach (var msg in ChatService.Messages)
+                            {
+                                <div class="chat-message @(msg.IsUser ? "user-message" : "assistant-message")">
+                                    @if (!msg.IsUser)
+                                    {
+                                        <div class="message-avatar">
+                                            <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+                                        </div>
+                                    }
+                                    <div class="message-content">
+                                        @if (msg.IsUser)
+                                        {
+                                            @msg.Content
+                                        }
+                                        else
+                                        {
+                                            @((MarkupString)RenderMarkdown(msg.Content))
+                                            <div class="floating-feedback-row">
+                                                <button class="floating-feedback-btn @(msg.Feedback == "positive" ? "active-positive" : "")"
+                                                        title="Dobra odpowiedź"
+                                                        @onclick="() => Rate(msg, true)">👍</button>
+                                                <button class="floating-feedback-btn @(msg.Feedback == "negative" ? "active-negative" : "")"
+                                                        title="Zła odpowiedź"
+                                                        @onclick="() => Rate(msg, false)">👎</button>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+
+                            @if (_isThinking)
+                            {
+                                <div class="chat-message assistant-message">
+                                    <div class="message-avatar">
+                                        <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Small" />
+                                    </div>
+                                    <div class="message-content">
+                                        <div class="typing-indicator">
+                                            <span></span><span></span><span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="chat-input-area">
+                        <textarea class="chat-input"
+                                  placeholder="Napisz wiadomość..."
+                                  @bind="_userInput"
+                                  @bind:event="oninput"
+                                  @onkeydown="HandleKeyDown"
+                                  rows="2"
+                                  disabled="@_isThinking"></textarea>
+                        <button class="chat-send-btn"
+                                @onclick="SendMessage"
+                                disabled="@(_isThinking || string.IsNullOrWhiteSpace(_userInput))">
+                            <MudIcon Icon="@Icons.Material.Filled.Send" Size="Size.Small" />
+                        </button>
+                    </div>
+                </div>
+            }
+
+            <button class="chat-toggle-btn @(_isOpen ? "open" : "")" @onclick="ToggleChat" title="Asystent SportRental">
+                @if (_isOpen)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Medium" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Medium" />
+                }
+            </button>
+        </div>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    private bool _isOpen;
+    private bool _isThinking;
+    private string _userInput = string.Empty;
+    private ElementReference _messagesContainer;
+    private string? _currentUserEmail;
+    private static readonly MarkdownPipeline _markdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
+
+    private Guid _tenantId;
+    private string? _userId;
+    private string? _userRole;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isOpen = ChatService.IsOpen;
+        Nav.LocationChanged += OnLocationChanged;
+
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var u = auth.User;
+        _currentUserEmail = u.FindFirst(ClaimTypes.Name)?.Value ?? u.FindFirst(ClaimTypes.Email)?.Value;
+        _userId = u.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        _userRole = u.FindFirst(ClaimTypes.Role)?.Value;
+        if (Guid.TryParse(u.FindFirst("tenant-id")?.Value, out var tid)) _tenantId = tid;
+    }
+
+    public void Dispose() => Nav.LocationChanged -= OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+        => InvokeAsync(StateHasChanged);
+
+    private void ToggleChat()
+    {
+        _isOpen = !_isOpen;
+        ChatService.IsOpen = _isOpen;
+    }
+
+    private void ClearChat() => ChatService.Clear();
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.ShiftKey && !string.IsNullOrWhiteSpace(_userInput) && !_isThinking)
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendQuickMessage(string text)
+    {
+        _userInput = text;
+        await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_userInput) || _isThinking || _tenantId == Guid.Empty) return;
+
+        var text = _userInput.Trim();
+        _userInput = string.Empty;
+        _isThinking = true;
+        ChatService.AddUserMessage(text);
+        StateHasChanged();
+        await ScrollToBottom();
+
+        try
+        {
+            var currentPage = new Uri(Nav.Uri).PathAndQuery;
+            var systemPrompt = SystemPromptBuilder.Build(
+                userEmail: _currentUserEmail,
+                userRole: _userRole,
+                currentPage: currentPage,
+                chatHistory: ChatService.BuildHistoryForPrompt(10));
+
+            // Historia dla modelu — bez ostatniej wiadomości użytkownika (jest już w systemPrompt+input)
+            var turns = ChatService.Messages
+                .Take(ChatService.Messages.Count - 1)
+                .TakeLast(8)
+                .Select(m => new ChatTurn(m.Content, m.IsUser))
+                .Append(new ChatTurn(text, true))
+                .ToList();
+
+            var ctx = new ChatToolContext
+            {
+                TenantId = _tenantId,
+                UserId = _userId,
+                UserEmail = _currentUserEmail,
+                UserRole = _userRole,
+                CurrentPage = currentPage
+            };
+
+            var result = await OpenAi.ChatAsync(
+                systemPrompt: systemPrompt,
+                history: turns,
+                tools: ChatToolDefinitions.Phase1Tools,
+                toolHandler: (name, args) => ToolHandler.HandleAsync(name, args, ctx));
+
+            ChatService.AddAssistantMessage(result.Content);
+        }
+        catch (Exception ex)
+        {
+            ChatService.AddAssistantMessage($"⚠️ Wyjątek: {ex.Message}");
+        }
+        finally
+        {
+            _isThinking = false;
+            StateHasChanged();
+            await ScrollToBottom();
+        }
+    }
+
+    private async Task Rate(FloatingChatMessage msg, bool positive)
+    {
+        msg.Feedback = positive ? "positive" : "negative";
+        StateHasChanged();
+        // Zapisujemy NEGATYWNY feedback do tabeli — pozytywny tylko UI.
+        if (!positive && _tenantId != Guid.Empty)
+        {
+            try
+            {
+                await Feedback.SaveAsync(new UserFeedback
+                {
+                    TenantId = _tenantId,
+                    UserId = _userId,
+                    UserEmail = _currentUserEmail,
+                    UserRole = _userRole,
+                    CurrentPage = new Uri(Nav.Uri).PathAndQuery,
+                    Type = FeedbackType.Bug,
+                    Message = $"👎 Niepoprawna odpowiedź asystenta:\n\n{msg.Content}",
+                    ContextJson = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        flagged_message_index = msg.Index,
+                        flagged_at = DateTimeOffset.UtcNow
+                    })
+                });
+            }
+            catch { /* best-effort */ }
+        }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("eval",
+                "(() => { const c = document.querySelector('.chat-messages'); if (c) c.scrollTop = c.scrollHeight; })()");
+        }
+        catch { }
+    }
+
+    private string RenderMarkdown(string content)
+    {
+        try { return Markdown.ToHtml(content ?? string.Empty, _markdownPipeline); }
+        catch { return System.Web.HttpUtility.HtmlEncode(content ?? string.Empty); }
+    }
+}
