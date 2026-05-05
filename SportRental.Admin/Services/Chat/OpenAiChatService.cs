@@ -29,6 +29,12 @@ public sealed class OpenAiChatService
         Func<string, string, Task<string>> toolHandler,
         CancellationToken ct = default)
     {
+        // Hard cap całego flow chat (3 rundy + tool dispatch). Po 60s dla całego ChatAsync
+        // zwracamy błąd zamiast utrzymywać blokujące _isThinking w UI w nieskończoność.
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(TimeSpan.FromSeconds(60));
+        ct = timeoutCts.Token;
+
         var chat = _client.GetChatClient(_deployment);
 
         // Buildujemy listę wiadomości — DeveloperChatMessage (nowy odpowiednik System dla
