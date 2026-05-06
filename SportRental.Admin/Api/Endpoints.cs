@@ -24,6 +24,19 @@ namespace SportRental.Admin.Api
         // Accepts both JWT Bearer (WASM) and Identity cookie (Blazor Server).
         private const string ApiAuthSchemes = JwtBearerDefaults.AuthenticationScheme + ",Identity.Application";
 
+        /// <summary>
+        /// Wyciąga (TenantId, IsSuperAdmin) z claims. Dla SuperAdmin TenantId może być
+        /// pustym (Guid.Empty) — zwracamy IsSuperAdmin=true i caller ma prawo do cross-tenant.
+        /// Dla zwykłego usera bez tenant claim zwracamy (Guid.Empty, false) — endpoint powinien
+        /// zwrócić Forbid.
+        /// </summary>
+        private static (Guid TenantId, bool IsSuperAdmin) ResolveTenantContext(ClaimsPrincipal user)
+        {
+            var isSuper = user.IsInRole("SuperAdmin");
+            var tid = user.FindFirst("tenant-id")?.Value;
+            return (Guid.TryParse(tid, out var t) ? t : Guid.Empty, isSuper);
+        }
+
         private static string GenerateSessionId()
         {
             Span<byte> buffer = stackalloc byte[32];
@@ -745,22 +758,37 @@ namespace SportRental.Admin.Api
                 }
             });
 
-            api.MapGet("/contracts/{id:guid}", [Authorize] async (Guid id, IDbContextFactory<ApplicationDbContext> dbFactory, IFileStorage storage) =>
+            api.MapGet("/contracts/{id:guid}", [Authorize] async (Guid id, IDbContextFactory<ApplicationDbContext> dbFactory, IFileStorage storage, ClaimsPrincipal user) =>
             {
+                // SEC: ownership check. Bez tego query filter `TenantId == null || ...`
+                // pozwalał komuś z tenanta A pobrać kontrakt B podając jego rental Id.
+                var (callerTenant, callerIsSuperAdmin) = ResolveTenantContext(user);
+                if (callerTenant == Guid.Empty && !callerIsSuperAdmin) return Results.Forbid();
+
                 await using var db = await dbFactory.CreateDbContextAsync();
-                var rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == id);
+                var rental = await db.Rentals.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.Id == id);
                 if (rental == null || string.IsNullOrWhiteSpace(rental.ContractUrl))
                     return Results.NotFound();
+                if (!callerIsSuperAdmin && rental.TenantId != callerTenant)
+                    return Results.NotFound(); // 404 zamiast 403 — nie ujawniamy istnienia rekordu cross-tenant
+
                 var sasUrl = await storage.GetPrivateReadUrlAsync(rental.ContractUrl, TimeSpan.FromMinutes(10));
                 return Results.Redirect(sasUrl);
             });
 
             // Upload zdjęcia produktu
-            api.MapPost("/products/{id:guid}/image", [Authorize(Roles = "Owner")] async (Guid id, HttpRequest request, IDbContextFactory<ApplicationDbContext> dbFactory, ImageVariantService images, IConfiguration config) =>
+            api.MapPost("/products/{id:guid}/image", [Authorize(Roles = "Owner,SuperAdmin")] async (Guid id, HttpRequest request, IDbContextFactory<ApplicationDbContext> dbFactory, ImageVariantService images, IConfiguration config, ClaimsPrincipal user) =>
             {
+                // SEC: ownership check — Owner może zmieniać zdjęcia tylko swojego tenanta;
+                // SuperAdmin cross-tenant. Bez checka Owner z tenanta A mógł nadpisać zdjęcie produktu B.
+                var (callerTenant, callerIsSuperAdmin) = ResolveTenantContext(user);
+                if (callerTenant == Guid.Empty && !callerIsSuperAdmin) return Results.Forbid();
+
                 await using var db = await dbFactory.CreateDbContextAsync();
-                var product = await db.Products.FirstOrDefaultAsync(p => p.Id == id);
+                var product = await db.Products.IgnoreQueryFilters().FirstOrDefaultAsync(p => p.Id == id);
                 if (product == null) return Results.NotFound();
+                if (!callerIsSuperAdmin && product.TenantId != callerTenant)
+                    return Results.NotFound();
                 if (!request.HasFormContentType) return Results.BadRequest("Brak form-data");
                 var form = await request.ReadFormAsync();
                 var file = form.Files.FirstOrDefault();
@@ -780,8 +808,14 @@ namespace SportRental.Admin.Api
             });
 
             // Upload logo tenanta
-            api.MapPost("/tenants/{id:guid}/logo", [Authorize(Roles = "Owner")] async (Guid id, HttpRequest request, IDbContextFactory<ApplicationDbContext> dbFactory, IFileStorage storage, IConfiguration config) =>
+            api.MapPost("/tenants/{id:guid}/logo", [Authorize(Roles = "Owner,SuperAdmin")] async (Guid id, HttpRequest request, IDbContextFactory<ApplicationDbContext> dbFactory, IFileStorage storage, IConfiguration config, ClaimsPrincipal user) =>
             {
+                // SEC: ownership check — Owner może zmieniać logo TYLKO swojego tenanta.
+                // Bez tego Owner z tenanta A mógł nadpisać logo tenanta B podając jego id.
+                var (callerTenant, callerIsSuperAdmin) = ResolveTenantContext(user);
+                if (callerTenant == Guid.Empty && !callerIsSuperAdmin) return Results.Forbid();
+                if (!callerIsSuperAdmin && id != callerTenant) return Results.NotFound();
+
                 await using var db = await dbFactory.CreateDbContextAsync();
                 db.SetTenant(Guid.Empty);
                 var tenant = await db.Tenants.FirstOrDefaultAsync(t => t.Id == id);
@@ -2300,186 +2334,72 @@ namespace SportRental.Admin.Api
             });
 
             // POST /api/checkout/finalize-session/{sessionId}
+            // FALLBACK ścieżka — gdy klient wraca z Stripe redirectu. Logika identyczna jak
+            // w webhook handlerze (`/api/payments/webhook`). Pierwsza ścieżka która zdąży
+            // (zazwyczaj webhook bo Stripe wysyła go natychmiast) tworzy rental; druga widzi
+            // existing przez idempotency key i wraca success bez duplikacji.
             checkout.MapPost("/finalize-session/{sessionId}", [AllowAnonymous] async (
                 string sessionId,
-                IDbContextFactory<ApplicationDbContext> dbFactory,
-                IContractGenerator contracts,
-                ISmsSender sms,
-                IFileStorage storage,
+                Payments.CheckoutFinalizationService finalizer,
+                CancellationToken ct) =>
+            {
+                var result = await finalizer.FinalizeAsync(sessionId, ct);
+                return Results.Ok(result);
+            });
+
+            // POST /api/payments/webhook — primary source of truth. Stripe wysyła event po
+            // pomyślnej płatności (checkout.session.completed). Weryfikujemy podpis HMAC żeby
+            // tylko Stripe mógł trigger-ować finalizację. Bez tego endpointu klient zamykający
+            // kartę przed redirectem powodował: payment OK, ale rental nigdy nie był utworzony.
+            api.MapPost("/payments/webhook", [AllowAnonymous] async (
+                HttpRequest request,
+                Payments.CheckoutFinalizationService finalizer,
                 Microsoft.Extensions.Options.IOptions<Payments.StripeOptions> stripeOptions,
+                ILoggerFactory loggerFactory,
                 CancellationToken ct) =>
             {
                 var stripe = stripeOptions.Value;
-                if (string.IsNullOrWhiteSpace(stripe.SecretKey))
+                var logger = loggerFactory.CreateLogger("StripeWebhook");
+                if (string.IsNullOrWhiteSpace(stripe.WebhookSecret))
                 {
-                    return Results.BadRequest(new { error = "Stripe is not configured." });
+                    logger.LogWarning("Stripe webhook hit ale WebhookSecret nieskonfigurowany");
+                    return Results.BadRequest(new { error = "Stripe webhook not configured" });
                 }
 
-                Stripe.StripeConfiguration.ApiKey = stripe.SecretKey;
+                using var reader = new StreamReader(request.Body);
+                var json = await reader.ReadToEndAsync(ct);
+                var sigHeader = request.Headers["Stripe-Signature"].ToString();
 
+                Stripe.Event evt;
                 try
                 {
-                    var sessionService = new Stripe.Checkout.SessionService();
-                    var session = await sessionService.GetAsync(sessionId, cancellationToken: ct);
-
-                    if (session.PaymentStatus != "paid")
-                    {
-                        return Results.Ok(new SharedModels.FinalizeSessionResponse(
-                            false,
-                            $"Payment not completed. Status: {session.PaymentStatus}",
-                            null));
-                    }
-
-                    // Check if rental already created (idempotency)
-                    if (session.Metadata.TryGetValue("idempotency_key", out var idempotencyKey))
-                    {
-                        await using var checkDb = await dbFactory.CreateDbContextAsync(ct);
-                        var existingRental = await checkDb.Rentals
-                            .IgnoreQueryFilters()
-                            .FirstOrDefaultAsync(r => r.IdempotencyKey == idempotencyKey, ct);
-
-                        if (existingRental != null)
-                        {
-                            return Results.Ok(new SharedModels.FinalizeSessionResponse(
-                                true,
-                                "Rental already created.",
-                                existingRental.Id));
-                        }
-                    }
-
-                    // Get checkout payload from database
-                    if (!session.Metadata.TryGetValue("checkout_session_id", out var checkoutSessionIdStr) 
-                        || !Guid.TryParse(checkoutSessionIdStr, out var checkoutSessionId))
-                    {
-                        return Results.BadRequest(new { error = "Missing checkout session ID in session metadata." });
-                    }
-
-                    await using var payloadDb = await dbFactory.CreateDbContextAsync(ct);
-                    var checkoutSession = await payloadDb.CheckoutSessions
-                        .FirstOrDefaultAsync(cs => cs.Id == checkoutSessionId, ct);
-
-                    if (checkoutSession == null)
-                    {
-                        return Results.BadRequest(new { error = "Checkout session not found." });
-                    }
-
-                    var payload = System.Text.Json.JsonSerializer.Deserialize<Payments.CheckoutRentalPayload>(checkoutSession.PayloadJson);
-
-                    if (payload == null)
-                    {
-                        return Results.BadRequest(new { error = "Invalid checkout payload." });
-                    }
-                    
-                    // Mark checkout session as processed
-                    checkoutSession.IsProcessed = true;
-                    checkoutSession.StripeSessionId = sessionId;
-                    await payloadDb.SaveChangesAsync(ct);
-
-                    // Create rental for each tenant
-                    Guid? firstRentalId = null;
-                    await using var db = await dbFactory.CreateDbContextAsync(ct);
-
-                    foreach (var tenantPayload in payload.Tenants)
-                    {
-                        db.SetTenant(tenantPayload.TenantId);
-
-                        var rental = new Rental
-                        {
-                            Id = Guid.NewGuid(),
-                            TenantId = tenantPayload.TenantId,
-                            CustomerId = payload.Customer.CustomerId,
-                            StartDateUtc = payload.StartDateUtc,
-                            EndDateUtc = payload.EndDateUtc,
-                            TotalAmount = tenantPayload.TotalAmount,
-                            DepositAmount = tenantPayload.DepositAmount,
-                            Status = RentalStatus.Confirmed,
-                            PaymentStatus = "DepositPaid",
-                            PaymentIntentId = session.PaymentIntentId,
-                            IdempotencyKey = payload.IdempotencyKey,
-                            Notes = payload.Notes,
-                            Source = RentalSource.Online, // Wypożyczenie online z WASM
-                            CreatedAtUtc = DateTime.UtcNow
-                        };
-
-                        foreach (var item in tenantPayload.Items)
-                        {
-                            var product = await db.Products
-                                .IgnoreQueryFilters()
-                                .FirstOrDefaultAsync(p => p.Id == item.ProductId, ct);
-
-                            if (product != null)
-                            {
-                                rental.Items.Add(new RentalItem
-                                {
-                                    Id = Guid.NewGuid(),
-                                    ProductId = item.ProductId,
-                                    Quantity = item.Quantity,
-                                    PricePerDay = product.DailyPrice
-                                });
-                            }
-                        }
-
-                        db.Rentals.Add(rental);
-                        await db.SaveChangesAsync(ct);
-
-                        firstRentalId ??= rental.Id;
-                        
-                        // Automatyczne generowanie umowy i wysyłanie emaila
-                        try
-                        {
-                            var customer = await db.Customers
-                                .IgnoreQueryFilters()
-                                .FirstOrDefaultAsync(c => c.Id == rental.CustomerId, ct);
-                            
-                            var productIds = rental.Items.Select(i => i.ProductId).ToList();
-                            var products = await db.Products
-                                .IgnoreQueryFilters()
-                                .Where(p => productIds.Contains(p.Id))
-                                .ToListAsync(ct);
-                            
-                            var companyInfo = await db.CompanyInfos
-                                .IgnoreQueryFilters()
-                                .FirstOrDefaultAsync(ci => ci.TenantId == tenantPayload.TenantId, ct);
-                            
-                            if (customer != null)
-                            {
-                                // Generuj umowę i zapisz URL
-                                var contractUrl = await contracts.GenerateAndSaveRentalContractAsync(
-                                    rental, rental.Items, customer, products, companyInfo, ct);
-                                
-                                rental.ContractUrl = contractUrl;
-                                await db.SaveChangesAsync(ct);
-                                
-                                // Wyślij email z umową jeśli klient ma email
-                                if (!string.IsNullOrWhiteSpace(customer.Email))
-                                {
-                                    await contracts.SendRentalConfirmationEmailAsync(
-                                        rental, rental.Items, customer, products, companyInfo, ct);
-                                    
-                                    rental.IsEmailSent = true;
-                                    await db.SaveChangesAsync(ct);
-                                    
-                                    Console.WriteLine($"✅ Email z umową wysłany do {customer.Email} dla wynajmu {rental.Id}");
-                                }
-                            }
-                        }
-                        catch (Exception contractEx)
-                        {
-                            // Nie przerywaj procesu jeśli generowanie umowy/email się nie powiedzie
-                            Console.WriteLine($"⚠️ Błąd generowania umowy/emaila: {contractEx.Message}");
-                        }
-                    }
-
-                    return Results.Ok(new SharedModels.FinalizeSessionResponse(
-                        true,
-                        "Rental created successfully.",
-                        firstRentalId));
+                    evt = Stripe.EventUtility.ConstructEvent(json, sigHeader, stripe.WebhookSecret);
                 }
                 catch (Stripe.StripeException ex)
                 {
-                    return Results.BadRequest(new { error = $"Stripe error: {ex.Message}" });
+                    logger.LogWarning(ex, "Stripe webhook signature verification failed");
+                    return Results.BadRequest(new { error = "Signature verification failed" });
                 }
+
+                if (evt.Type == "checkout.session.completed" || evt.Type == Stripe.EventTypes.CheckoutSessionCompleted)
+                {
+                    var session = evt.Data.Object as Stripe.Checkout.Session;
+                    if (session != null)
+                    {
+                        logger.LogInformation("Stripe webhook: checkout.session.completed {SessionId}", session.Id);
+                        var result = await finalizer.FinalizeAsync(session.Id, ct);
+                        if (!result.Success)
+                            logger.LogWarning("Webhook finalize NIE udało się dla {SessionId}: {Reason}", session.Id, result.Message);
+                    }
+                }
+                else
+                {
+                    logger.LogDebug("Stripe webhook: ignoruję event type {Type}", evt.Type);
+                }
+
+                return Results.Ok();
             });
+
         }
         
         // SMS webhook endpoints for SerwerSMS.pl

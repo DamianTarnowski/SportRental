@@ -192,6 +192,7 @@ builder.Services.AddScoped<SportRental.Admin.Services.Chat.ReadToolService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.WriteToolService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatPersistenceService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatSettingsService>();
+builder.Services.AddScoped<SportRental.Admin.Payments.CheckoutFinalizationService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
 
@@ -285,8 +286,11 @@ builder.Services.AddHostedService<ExpiredHoldsCleaner>();
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 builder.Services.Configure<JwtOptions>(jwtSection);
 var jwtSigningKey = jwtSection["SigningKey"];
-if (string.IsNullOrWhiteSpace(jwtSigningKey) && builder.Environment.IsDevelopment())
+if (string.IsNullOrWhiteSpace(jwtSigningKey) &&
+    (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing")))
 {
+    // Testing też dostaje fake key — WebApplicationFactory<Program> w testach integracyjnych
+    // bootstrapuje Program.cs i bez tego pada InvalidOperationException przed CreateClient.
     jwtSigningKey = "dev-only-signing-key-do-not-use-in-production-change-in-keyvault-aaaaaaaa";
     jwtSection["SigningKey"] = jwtSigningKey;
 }
@@ -335,7 +339,14 @@ builder.Services.AddAuthentication()
         };
     });
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+// W testach (WebApplicationFactory<Program> bez Configuration provider) DefaultConnection jest
+// pusty — ApiTests overriduje DbContextOptions na InMemory później. Daj fake-string żeby
+// AddDbContextFactory<>().UseNpgsql(...) nie crashował na DI registration; runtime test będzie
+// używał zoverridowanego provider'a InMemory i nigdy nie zadzwoni do tego connection.
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? (builder.Environment.IsEnvironment("Testing")
+        ? "Host=localhost;Database=__test_placeholder__;Username=na;Password=na"
+        : throw new InvalidOperationException("Connection string 'DefaultConnection' not found."));
 // Pooled factory dla Blazor Server - tworzy instancje DbContext na żądanie
 builder.Services.AddPooledDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString, npg => npg.MigrationsAssembly("SportRental.Infrastructure")));
