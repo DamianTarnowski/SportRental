@@ -28,7 +28,7 @@
                                 <MudIcon Icon="@Icons.Material.Filled.SmartToy" Size="Size.Medium" />
                             </div>
                             <div class="chat-header-text">
-                                <span class="chat-title">Asystent SportRental</span>
+                                <span class="chat-title">Asystent RentSpot</span>
                                 <span class="chat-status">@VoiceStatusText()</span>
                             </div>
                         </div>
@@ -57,7 +57,7 @@
                                     <MudIcon Icon="@Icons.Material.Filled.Chat" Size="Size.Large" Color="Color.Primary" />
                                 </div>
                                 <h3>Cześć! 👋</h3>
-                                <p>Jestem asystentem SportRental. Mogę wyjaśnić jak działa ta strona, przyjąć zgłoszenie błędu albo Twoją sugestię.</p>
+                                <p>Jestem asystentem RentSpot. Mogę wyjaśnić jak działa ta strona, przyjąć zgłoszenie błędu albo Twoją sugestię.</p>
 
                                 <div class="quick-actions">
                                     <button class="quick-action-btn" @onclick='() => SendQuickMessage("Jak działa ta strona?")'>
@@ -137,7 +137,7 @@
                 </div>
             }
 
-            <button class="chat-toggle-btn @(_isOpen ? "open" : "")" @onclick="ToggleChat" title="Asystent SportRental">
+            <button class="chat-toggle-btn @(_isOpen ? "open" : "")" @onclick="ToggleChat" title="Asystent RentSpot">
                 @if (_isOpen)
                 {
                     <MudIcon Icon="@Icons.Material.Filled.Close" Size="Size.Medium" />

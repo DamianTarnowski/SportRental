@@ -36,23 +36,37 @@ namespace SportRental.Admin.Services.Contracts
                     page.Margin(1.5f, Unit.Centimetre);
                     page.DefaultTextStyle(x => x.FontSize(10));
                     
-                    // Header z danymi firmy
+                    // Header z danymi firmy + branding RentSpot
                     page.Header().Column(col =>
                     {
-                        col.Item().Row(row =>
+                        // Top brand band — RentSpot (platforma) + slogan
+                        col.Item().PaddingBottom(4).Row(brandRow =>
+                        {
+                            brandRow.RelativeItem().Text(text =>
+                            {
+                                text.Span("RentSpot").FontSize(13).Bold().FontColor("#2F3C7E");
+                                text.Span(".").FontSize(13).Bold().FontColor("#F96167");
+                                text.Span("  — partner Maciej Czaronek").FontSize(8).FontColor("#5B6B82");
+                            });
+                            brandRow.ConstantItem(160).AlignRight().Text("rentspot.eu  |  kontakt@rentspot.eu").FontSize(8).FontColor("#5B6B82");
+                        });
+                        col.Item().LineHorizontal(0.4f).LineColor("#F96167");
+
+                        // Główny header umowy
+                        col.Item().PaddingTop(8).Row(row =>
                         {
                             row.RelativeItem().Column(left =>
                             {
-                                left.Item().Text("UMOWA WYPOŻYCZENIA").Bold().FontSize(18);
+                                left.Item().Text("UMOWA WYPOŻYCZENIA").Bold().FontSize(18).FontColor("#2F3C7E");
                                 left.Item().Text($"Nr: {rental.Id.ToString()[..8].ToUpper()}").FontSize(12);
                                 left.Item().Text($"Data: {DateTime.Now:dd.MM.yyyy}").FontSize(10);
                             });
-                            
+
                             if (companyInfo != null)
                             {
                                 row.RelativeItem().AlignRight().Column(right =>
                                 {
-                                    right.Item().Text(companyInfo.Name ?? "SportRental").Bold().FontSize(12);
+                                    right.Item().Text(companyInfo.Name ?? "RentSpot").Bold().FontSize(12);
                                     if (!string.IsNullOrWhiteSpace(companyInfo.Address))
                                         right.Item().Text(companyInfo.Address);
                                     if (!string.IsNullOrWhiteSpace(companyInfo.NIP))
@@ -86,7 +100,7 @@ namespace SportRental.Admin.Services.Contracts
                             }
                             else
                             {
-                                parties.Item().Text("   SportRental");
+                                parties.Item().Text("   RentSpot");
                             }
                             
                             parties.Item().PaddingTop(8).Text("NAJEMCA (Klient):").SemiBold();
@@ -203,7 +217,11 @@ namespace SportRental.Admin.Services.Contracts
                         footer.Item().LineHorizontal(0.5f);
                         footer.Item().PaddingTop(5).Row(row =>
                         {
-                            row.RelativeItem().Text(companyInfo?.Name ?? "SportRental").FontSize(8);
+                            row.RelativeItem().Text(text =>
+                            {
+                                text.Span(companyInfo?.Name ?? "RentSpot").FontSize(8);
+                                text.Span("  ·  via RentSpot").FontSize(7).FontColor("#5B6B82");
+                            });
                             row.RelativeItem().AlignCenter().Text(text =>
                             {
                                 text.Span("Strona ").FontSize(8);
@@ -211,7 +229,11 @@ namespace SportRental.Admin.Services.Contracts
                                 text.Span(" z ").FontSize(8);
                                 text.TotalPages().FontSize(8);
                             });
-                            row.RelativeItem().AlignRight().Text($"Wygenerowano: {DateTime.Now:dd.MM.yyyy HH:mm}").FontSize(8);
+                            row.RelativeItem().AlignRight().Text(text =>
+                            {
+                                text.Span("rentspot.eu  ·  kontakt@rentspot.eu").FontSize(7).FontColor("#5B6B82");
+                                text.Span($"\nWygenerowano: {DateTime.Now:dd.MM.yyyy HH:mm}").FontSize(7).FontColor("#5B6B82");
+                            });
                         });
                     });
                 });
@@ -240,7 +262,7 @@ namespace SportRental.Admin.Services.Contracts
                 .Replace("{{ItemsTable}}", itemsLines)
                 .Replace("{{Total}}", rental.TotalAmount.ToString("0.00"))
                 .Replace("{{Deposit}}", rental.DepositAmount.ToString("0.00"))
-                .Replace("{{CompanyName}}", companyInfo?.Name ?? "SportRental")
+                .Replace("{{CompanyName}}", companyInfo?.Name ?? "RentSpot")
                 .Replace("{{CompanyAddress}}", companyInfo?.Address ?? "")
                 .Replace("{{CompanyNIP}}", companyInfo?.NIP ?? "")
                 .Replace("{{CompanyPhone}}", companyInfo?.PhoneNumber ?? "")
@@ -253,7 +275,7 @@ namespace SportRental.Admin.Services.Contracts
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
                     page.Content().Text(filled).FontSize(11);
-                    page.Footer().AlignCenter().Text($"{companyInfo?.Name ?? "SportRental"} - {DateTime.Now:dd.MM.yyyy}").FontSize(9);
+                    page.Footer().AlignCenter().Text($"{companyInfo?.Name ?? "RentSpot"} · via RentSpot · rentspot.eu — {DateTime.Now:dd.MM.yyyy}").FontSize(8);
                 });
             });
             var bytes = doc.GeneratePdf();
@@ -318,10 +340,10 @@ namespace SportRental.Admin.Services.Contracts
             // Generuj HTML emaila
             var productMap = products.ToDictionary(p => p.Id, p => p);
             var rentalDays = Math.Max(1, (rental.EndDateUtc - rental.StartDateUtc).Days);
-            var companyName = companyInfo?.Name ?? "SportRental";
-            var companyEmail = companyInfo?.Email ?? "sportrental.kontakt@gmail.com";
+            var companyName = companyInfo?.Name ?? "RentSpot";
+            var companyEmail = companyInfo?.Email ?? "kontakt@rentspot.eu";
             var companyPhone = companyInfo?.PhoneNumber ?? "";
-            
+
             var htmlBody = GenerateConfirmationEmailHtml(rental, items.ToList(), customer, productMap, companyInfo, rentalDays);
             
             // Zapisz PDF do pliku tymczasowego

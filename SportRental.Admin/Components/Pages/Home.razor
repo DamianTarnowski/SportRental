@@ -1,7 +1,7 @@
 @page "/"
 @rendermode InteractiveServer
 
-<PageTitle>SportRental - Panel Administracyjny</PageTitle>
+<PageTitle>RentSpot — panel partnera</PageTitle>
 
 <div class="admin-home">
     <AuthorizeView>
@@ -93,9 +93,14 @@
             <!-- Login Hero -->
             <div class="login-hero">
                 <div class="login-hero-content">
-                    <div class="login-hero-icon">🏂</div>
-                    <h1>SportRental</h1>
-                    <p>Panel administracyjny wypożyczalni sprzętu sportowego</p>
+                    <div class="login-hero-icon">
+                        <svg viewBox="0 0 100 100" width="80" height="80" aria-hidden="true">
+                            <circle cx="50" cy="50" r="48" fill="#F96167" />
+                            <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+                        </svg>
+                    </div>
+                    <h1>RentSpot<span style="color:#F96167">.</span></h1>
+                    <p>Panel partnera — wypożyczalnie sprzętu sportowego</p>
                     <div class="login-hero-features">
                         <div class="feature-item">📦 Zarządzaj produktami</div>
                         <div class="feature-item">👥 Obsługuj klientów</div>
@@ -126,7 +131,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4f46e5 100%);
+        background: linear-gradient(135deg, #1F2A5C 0%, #2F3C7E 50%, #F96167 100%);
         border-radius: 24px;
         margin: -1.5rem;
         padding: 3rem;
@@ -179,7 +184,7 @@
     
     .login-hero-btn {
         background: white !important;
-        color: #4f46e5 !important;
+        color: #2F3C7E !important;
         font-weight: 600 !important;
         padding: 0.75rem 2rem !important;
         font-size: 1rem !important;

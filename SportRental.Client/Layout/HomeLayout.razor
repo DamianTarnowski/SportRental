@@ -21,7 +21,13 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 5.25h16.5M3.75 12h16.5m-16.5 6.75h16.5" />
                 </svg>
             </button>
-            <a class="text-2xl font-semibold @(_scrolled ? "text-gray-900" : "text-white")" href="/">🏂 SportRental</a>
+            <a class="text-2xl font-semibold flex items-center gap-2 @(_scrolled ? "text-gray-900" : "text-white")" href="/">
+                <svg viewBox="0 0 100 100" width="28" height="28" aria-hidden="true">
+                    <circle cx="50" cy="50" r="48" fill="#F96167" />
+                    <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+                </svg>
+                <span>RentSpot<span style="color:#F96167">.</span></span>
+            </a>
             <div class="ml-auto flex items-center gap-2">
                 <!-- Navigation links (desktop) -->
                 <nav class="hidden md:flex items-center gap-1">
@@ -78,7 +84,13 @@
             <div class="absolute inset-y-0 left-0 w-80 bg-white shadow-2xl">
                 <div class="p-6">
                     <div class="flex items-center justify-between mb-8">
-                        <span class="text-xl font-bold text-gray-900">🏂 SportRental</span>
+                        <span class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                            <svg viewBox="0 0 100 100" width="22" height="22" aria-hidden="true">
+                                <circle cx="50" cy="50" r="48" fill="#F96167" />
+                                <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+                            </svg>
+                            RentSpot<span style="color:#F96167">.</span>
+                        </span>
                         <button @onclick="ToggleDrawer" class="p-2 rounded-full hover:bg-gray-100">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />

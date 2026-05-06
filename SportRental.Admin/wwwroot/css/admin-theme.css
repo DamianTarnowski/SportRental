@@ -1,31 +1,44 @@
 /* ============================================
-   SPORTRENTAL ADMIN PANEL - MODERN THEME
+   RENTSPOT ADMIN PANEL — CORAL ENERGY THEME
+   Brand: Coral #F96167, Navy #2F3C7E, Gold #F9E795
    ============================================ */
 
 /* Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@500;600;700&display=swap');
 
 /* Root variables */
 :root {
-    --admin-primary: #6366f1;
-    --admin-primary-dark: #4f46e5;
-    --admin-primary-light: #818cf8;
-    --admin-secondary: #10b981;
-    --admin-accent: #f59e0b;
+    /* Brand */
+    --rs-coral: #F96167;
+    --rs-coral-dark: #E04A50;
+    --rs-coral-light: #FCA0A4;
+    --rs-navy: #2F3C7E;
+    --rs-navy-dark: #1F2A5C;
+    --rs-navy-light: #4D5BA0;
+    --rs-gold: #F9E795;
+    --rs-text-helper: #5B6B82;
+    --rs-surface-bg: #F4F6FA;
+
+    /* Legacy admin-* aliases — now point at brand tokens. Keep names for back-compat with existing CSS. */
+    --admin-primary: var(--rs-navy);
+    --admin-primary-dark: var(--rs-navy-dark);
+    --admin-primary-light: var(--rs-navy-light);
+    --admin-secondary: var(--rs-coral);
+    --admin-accent: var(--rs-coral);
     --admin-danger: #ef4444;
     --admin-warning: #f59e0b;
     --admin-success: #10b981;
-    --admin-info: #3b82f6;
-    
-    --admin-bg: #f8fafc;
+    --admin-info: var(--rs-navy);
+
+    --admin-bg: var(--rs-surface-bg);
     --admin-surface: #ffffff;
-    --admin-sidebar: linear-gradient(180deg, #1e1b4b 0%, #312e81 100%);
-    --admin-header: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
-    
-    --admin-text: #1e293b;
-    --admin-text-secondary: #64748b;
+    --admin-sidebar: linear-gradient(180deg, var(--rs-navy-dark) 0%, var(--rs-navy) 100%);
+    --admin-header: linear-gradient(90deg, var(--rs-navy) 0%, var(--rs-navy-light) 100%);
+
+    --admin-text: #1F2937;
+    --admin-text-secondary: var(--rs-text-helper);
     --admin-text-light: #94a3b8;
-    
+
     --admin-border: #e2e8f0;
     --admin-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     --admin-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -113,7 +126,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .sidebar .navbar-brand::before {
-    content: '🏂';
+    content: '';
     font-size: 1.5rem;
 }
 
@@ -146,7 +159,7 @@ h1, h2, h3, h4, h5, h6 {
 .sidebar .nav-link.active {
     color: white !important;
     background: linear-gradient(90deg, var(--admin-primary) 0%, var(--admin-primary-light) 100%);
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 15px rgba(47, 60, 126, 0.35);
 }
 
 .sidebar .nav-link span[class^="bi"] {
@@ -164,7 +177,7 @@ h1, h2, h3, h4, h5, h6 {
    ============================================ */
 .mud-appbar {
     background: var(--admin-header) !important;
-    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3) !important;
+    box-shadow: 0 4px 20px rgba(47, 60, 126, 0.30) !important;
 }
 
 .mud-appbar .mud-typography {
@@ -289,11 +302,11 @@ article.content {
 
 .mud-button-filled.mud-button-primary {
     background: linear-gradient(135deg, var(--admin-primary) 0%, var(--admin-primary-dark) 100%) !important;
-    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3) !important;
+    box-shadow: 0 4px 15px rgba(47, 60, 126, 0.25) !important;
 }
 
 .mud-button-filled.mud-button-primary:hover {
-    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4) !important;
+    box-shadow: 0 6px 20px rgba(47, 60, 126, 0.35) !important;
 }
 
 /* ============================================
@@ -421,7 +434,7 @@ article.content {
    ADMIN DASHBOARD HERO
    ============================================ */
 .admin-hero {
-    background: linear-gradient(135deg, var(--admin-primary) 0%, #7c3aed 50%, #a855f7 100%);
+    background: linear-gradient(135deg, var(--rs-navy) 0%, var(--rs-coral) 100%);
     border-radius: var(--admin-radius-xl);
     padding: 2.5rem;
     color: white;
@@ -586,12 +599,12 @@ article.content {
     width: 56px;
     height: 56px;
     border-radius: 16px;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--rs-navy) 0%, var(--rs-coral) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto 12px;
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 20px rgba(47, 60, 126, 0.35);
 }
 
 .drawer-logo .mud-icon-root {
@@ -626,7 +639,7 @@ article.content {
 }
 
 .sidebar-drawer .mud-nav-link.active {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+    background: linear-gradient(135deg, var(--rs-navy) 0%, var(--rs-coral) 100%) !important;
     color: white !important;
     font-weight: 600 !important;
 }

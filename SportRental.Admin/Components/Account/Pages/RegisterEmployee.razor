@@ -18,13 +18,18 @@
 @inject ILogger<RegisterEmployee> Logger
 @inject NavigationManager NavigationManager
 
-<PageTitle>Rejestracja pracownika - SportRental</PageTitle>
+<PageTitle>Rejestracja pracownika — RentSpot</PageTitle>
 
 <div class="register-employee-container">
     <div class="register-card">
         <div class="register-header">
-            <div class="logo-icon">👔</div>
-            <h1>SportRental</h1>
+            <div class="logo-icon">
+                <svg viewBox="0 0 100 100" width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="48" fill="#F96167" />
+                    <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+                </svg>
+            </div>
+            <h1>RentSpot<span style="color:#F96167">.</span></h1>
             <p>Rejestracja pracownika</p>
         </div>
 
@@ -126,7 +131,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #064e3b 0%, #047857 50%, #10b981 100%);
+        background: linear-gradient(135deg, #1F2A5C 0%, #2F3C7E 50%, #F96167 100%);
         padding: 20px;
     }
 

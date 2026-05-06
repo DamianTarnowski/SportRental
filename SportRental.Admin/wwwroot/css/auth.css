@@ -4,8 +4,8 @@
 
 /* === Variables === */
 :root {
-    --auth-primary: #6366f1;
-    --auth-primary-hover: #4f46e5;
+    --auth-primary: var(--rs-navy);
+    --auth-primary-hover: var(--rs-navy-dark);
     --auth-primary-light: rgba(99, 102, 241, 0.15);
     --auth-bg-dark: #0f0f23;
     --auth-bg-card: #1a1a2e;
@@ -16,7 +16,7 @@
     --auth-error: #ef4444;
     --auth-success: #22c55e;
     --auth-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    --auth-glow: 0 0 40px rgba(99, 102, 241, 0.3);
+    --auth-glow: 0 0 40px rgba(47, 60, 126, 0.25);
 }
 
 /* === Auth Page Container === */
@@ -80,7 +80,7 @@
     inset: -1px;
     border-radius: 24px;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), transparent, rgba(139, 92, 246, 0.2));
+    background: linear-gradient(135deg, rgba(47, 60, 126, 0.25), transparent, rgba(139, 92, 246, 0.2));
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
@@ -108,7 +108,7 @@
 .auth-logo-icon {
     width: 64px;
     height: 64px;
-    background: linear-gradient(135deg, var(--auth-primary), #8b5cf6);
+    background: linear-gradient(135deg, var(--auth-primary), var(--rs-coral-light));
     border-radius: 16px;
     display: inline-flex;
     align-items: center;
@@ -191,7 +191,7 @@
 }
 
 .auth-input:hover {
-    border-color: rgba(99, 102, 241, 0.3);
+    border-color: rgba(47, 60, 126, 0.25);
 }
 
 .auth-input:focus {
@@ -231,7 +231,7 @@
 .auth-submit {
     width: 100%;
     padding: 1rem 1.5rem;
-    background: linear-gradient(135deg, var(--auth-primary), #8b5cf6);
+    background: linear-gradient(135deg, var(--auth-primary), var(--rs-coral-light));
     border: none;
     border-radius: 12px;
     color: white;
@@ -255,7 +255,7 @@
 
 .auth-submit:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 10px 30px rgba(47, 60, 126, 0.35);
 }
 
 .auth-submit:hover::before {
@@ -349,7 +349,7 @@
 
 .auth-alert-info {
     background: rgba(99, 102, 241, 0.1);
-    border: 1px solid rgba(99, 102, 241, 0.3);
+    border: 1px solid rgba(47, 60, 126, 0.25);
     color: var(--auth-primary);
 }
 
@@ -528,7 +528,7 @@
 /* === Brand colors accent line === */
 .auth-brand-accent {
     height: 4px;
-    background: linear-gradient(90deg, var(--auth-primary), #8b5cf6, #ec4899);
+    background: linear-gradient(90deg, var(--auth-primary), var(--rs-coral-light), #ec4899);
     border-radius: 2px 2px 0 0;
     position: absolute;
     top: 0;

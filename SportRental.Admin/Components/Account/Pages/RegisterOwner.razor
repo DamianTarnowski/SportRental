@@ -21,13 +21,18 @@
 @inject NavigationManager NavigationManager
 @inject RegistrationFeatureFlags RegistrationFlags
 
-<PageTitle>Rejestracja właściciela - SportRental</PageTitle>
+<PageTitle>Rejestracja właściciela — RentSpot</PageTitle>
 
 <div class="register-owner-container">
     <div class="register-card">
         <div class="register-header">
-            <div class="logo-icon">🎿</div>
-            <h1>SportRental</h1>
+            <div class="logo-icon">
+                <svg viewBox="0 0 100 100" width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="48" fill="#F96167" />
+                    <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+                </svg>
+            </div>
+            <h1>RentSpot<span style="color:#F96167">.</span></h1>
             <p>Rejestracja właściciela wypożyczalni</p>
         </div>
 
@@ -129,7 +134,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4c1d95 100%);
+        background: linear-gradient(135deg, #1F2A5C 0%, #2F3C7E 50%, #F96167 100%);
         padding: 20px;
     }
 
@@ -235,7 +240,7 @@
 
     .form-input:focus {
         outline: none;
-        border-color: #6366f1;
+        border-color: #F96167;
         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
 
@@ -263,7 +268,7 @@
     .btn-submit {
         width: 100%;
         padding: 14px 24px;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%);
         color: white;
         border: none;
         border-radius: 10px;
@@ -308,7 +313,7 @@
     }
 
     .form-footer a {
-        color: #6366f1;
+        color: #F96167;
         font-weight: 600;
         text-decoration: none;
     }
@@ -348,7 +353,7 @@
     }
 
     .btn-primary {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%);
         color: white;
     }
 </style>

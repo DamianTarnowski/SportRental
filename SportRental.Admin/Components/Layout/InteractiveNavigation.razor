@@ -10,7 +10,13 @@
                        Edge="Edge.Start" 
                        OnClick="ToggleDrawer" />
     }
-    <MudText Class="ms-2" Typo="Typo.h6">🎿 SportRental</MudText>
+    <div class="rs-brand">
+        <svg class="rs-brand-mark" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="48" fill="#F96167" />
+            <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+        </svg>
+        <span class="rs-brand-word">RentSpot<span class="rs-brand-dot">.</span></span>
+    </div>
     <MudSpacer />
     <ThemeSwitcher />
 </MudAppBar>
@@ -25,6 +31,13 @@
 </MudDrawer>
 
 <MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<style>
+    .rs-brand { display: inline-flex; align-items: center; gap: 10px; margin-left: 8px; }
+    .rs-brand-mark { width: 28px; height: 28px; flex: 0 0 28px; }
+    .rs-brand-word { font-family: 'Inter', system-ui, -apple-system, sans-serif; font-weight: 800; font-size: 1.25rem; letter-spacing: -0.01em; color: #fff; line-height: 1; }
+    .rs-brand-dot { color: #F96167; margin-left: 1px; font-weight: 900; }
+</style>
 
 @code {
     private bool _drawerOpen = true;
