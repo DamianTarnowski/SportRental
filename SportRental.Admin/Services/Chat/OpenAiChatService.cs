@@ -62,13 +62,12 @@ public sealed class OpenAiChatService
             messages.Add(turn.IsUser ? new UserChatMessage(turn.Content) : new AssistantChatMessage(turn.Content));
         }
 
-        var options = new ChatCompletionOptions
-        {
-            // Niski reasoning effort = szybsze odpowiedzi. Dla chat-asystenta UI nie potrzebuje
-            // głębokiego "thinking" (jak w długich kodach/analizach) — chcemy interaktywności.
-            // Action: zauważalnie skraca czas pierwszego tokenu z ~5-8s do ~1-2s na gpt-5.x.
-            ReasoningEffortLevel = ChatReasoningEffortLevel.Low
-        };
+        // ReasoningEffortLevel = Low byłoby super (czas pierwszego tokenu ~1-2s zamiast 5-8s)
+        // ale Azure.AI.OpenAI 2.2.0-beta.4 wysyła `reasoning_effort` w body jako parametr który
+        // używana api-version Azure jeszcze nie akceptuje → HTTP 400 'invalid_request_error
+        // Parameter: reasoning_effort'. Direct curl z `api-version=2024-12-01-preview` działa,
+        // SDK używa innej. Wracamy na 2.1 stable, default reasoning. Re-enable gdy SDK fix wyjdzie.
+        var options = new ChatCompletionOptions();
         foreach (var t in tools) options.Tools.Add(t);
 
         var toolCallsExecuted = new List<ExecutedToolCall>();
