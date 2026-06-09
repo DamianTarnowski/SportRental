@@ -17,6 +17,7 @@
     <PackageReference Include="Markdig" Version="0.42.0" />
     <PackageReference Include="BarcodeLib" Version="3.0.2" />
     <PackageReference Include="MailKit" Version="4.14.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.9" />
@@ -80,7 +81,7 @@
       bo SDK rozwija `_PublishBuildAlternative` który dependOn'uje od Publish globalnie
       w tym samym grafie MSBuild.
     -->
-    <Exec Command='dotnet publish "$(MSBuildProjectDirectory)\..\SportRental.Client\SportRental.Client.csproj" -c $(Configuration) -o "$(ClientWasmTempDir)" -p:SkipSwaDeploy=true --nologo' />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\..\SportRental.Client\SportRental.Client.csproj&quot; -c $(Configuration) -o &quot;$(ClientWasmTempDir)&quot; -p:SkipSwaDeploy=true --nologo" />
 
     <!-- Kopiujemy WSZYSTKIE pliki (łącznie z .br i .gz). Manifest Admin
          `SportRental.staticwebassets.endpoints.json` zawiera endpoint entries wskazujące na
@@ -93,11 +94,9 @@
     </ItemGroup>
 
     <RemoveDir Directories="$(PublishDir)wwwroot\_client" Condition=" '$(PublishDir)' != '' " />
-    <Copy SourceFiles="@(ClientWasmFiles)"
-          DestinationFiles="@(ClientWasmFiles->'$(PublishDir)wwwroot\_client\%(RecursiveDir)%(Filename)%(Extension)')"
-          Condition=" '$(PublishDir)' != '' " />
+    <Copy SourceFiles="@(ClientWasmFiles)" DestinationFiles="@(ClientWasmFiles->'$(PublishDir)wwwroot\_client\%(RecursiveDir)%(Filename)%(Extension)')" Condition=" '$(PublishDir)' != '' " />
 
-    <Message Importance="high" Text="[admin publish] Skopiowano Client WASM (@(ClientWasmFiles->Count()) plików) do $(PublishDir)wwwroot\_client\" />
+    <Message Importance="high" Text="[admin publish] Skopiowano Client WASM (@(ClientWasmFiles-&gt;Count()) plików) do $(PublishDir)wwwroot\_client\" />
 
     <!--
       Fix <base href="/"> na <base href="/_client/"> w index.html hostowanym przez Admin.
@@ -106,10 +105,7 @@
       ekran). Oryginalny index.html z Client zostaje nieruszony dla srclient-blazor + SWA
       (one hostują na root, więc base="/" jest poprawne).
     -->
-    <ReplaceFileText Condition=" '$(PublishDir)' != '' "
-                     InputFile="$(PublishDir)wwwroot\_client\index.html"
-                     Find='&lt;base href="/" /&gt;'
-                     Replace='&lt;base href="/_client/" /&gt;' />
+    <ReplaceFileText Condition=" '$(PublishDir)' != '' " InputFile="$(PublishDir)wwwroot\_client\index.html" Find="&lt;base href=&quot;/&quot; /&gt;" Replace="&lt;base href=&quot;/_client/&quot; /&gt;" />
     <Message Importance="high" Text="[admin publish] Poprawiono base href w $(PublishDir)wwwroot\_client\index.html na /_client/" />
 
     <!--
@@ -121,14 +117,12 @@
     -->
     <!-- PowerShell (Newtonsoft.Json nie jest dostępny w tym MSBuild; System.Text.Json też nie
          w RoslynCodeTaskFactory bez explicit ref). PowerShell ConvertFrom-Json działa stabilnie. -->
-    <Exec Condition=" '$(PublishDir)' != '' "
-          Command='powershell -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\strip-client-endpoints.ps1" -ManifestFile "$(PublishDir)SportRental.staticwebassets.endpoints.json"' />
+    <Exec Condition=" '$(PublishDir)' != '' " Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\strip-client-endpoints.ps1&quot; -ManifestFile &quot;$(PublishDir)SportRental.staticwebassets.endpoints.json&quot;" />
     <Message Importance="high" Text="[admin publish] Wyczyszczono _client/* entries z manifestu" />
   </Target>
 
   <!-- Inline task do podmiany tekstu w pliku (cross-platform, bez zewnętrznego shell). -->
-  <UsingTask TaskName="ReplaceFileText" TaskFactory="RoslynCodeTaskFactory"
-             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+  <UsingTask TaskName="ReplaceFileText" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
     <ParameterGroup>
       <InputFile ParameterType="System.String" Required="true" />
       <Find ParameterType="System.String" Required="true" />

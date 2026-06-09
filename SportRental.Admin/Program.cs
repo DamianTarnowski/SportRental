@@ -300,12 +300,33 @@ if (string.IsNullOrWhiteSpace(jwtSigningKey))
 }
 builder.Services.AddScoped<JwtTokenService>();
 
-builder.Services.AddAuthentication(options =>
+var authBuilder = builder.Services.AddAuthentication(options =>
     {
         options.DefaultScheme = IdentityConstants.ApplicationScheme;
         options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-    })
-    .AddIdentityCookies();
+    });
+
+// Google OAuth — sekrety z Key Vault (Google--ClientId / Google--ClientSecret) albo
+// appsettings.Local.json w dev. Jeśli brak — przycisk "Zaloguj przez Google" się nie pokaże
+// (ExternalLoginPicker filtruje providery zarejestrowane w SignInManager).
+var googleClientId = builder.Configuration["Google:ClientId"];
+var googleClientSecret = builder.Configuration["Google:ClientSecret"];
+if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
+{
+    authBuilder.AddGoogle(options =>
+    {
+        options.ClientId = googleClientId;
+        options.ClientSecret = googleClientSecret;
+        options.SignInScheme = IdentityConstants.ExternalScheme;
+        // Default callback path = /signin-google. Pamiętaj wpisać w Authorized redirect URIs:
+        //   https://srental2.azurewebsites.net/signin-google
+        //   https://app.rentspot.eu/signin-google (po podpięciu custom domain)
+        //   http://localhost:<port>/signin-google (dev)
+        options.SaveTokens = true;
+    });
+}
+
+authBuilder.AddIdentityCookies();
 
 builder.Services.AddAuthentication()
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>

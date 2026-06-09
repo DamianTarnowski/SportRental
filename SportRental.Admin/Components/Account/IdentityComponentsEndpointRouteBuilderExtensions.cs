@@ -40,6 +40,28 @@ namespace Microsoft.AspNetCore.Routing
                 return TypedResults.Challenge(properties, [provider]);
             });
 
+            // GET wariant dla Client WASM (brak server-rendered AntiforgeryToken). State CSRF jest
+            // zabezpieczony przez OAuth `state` param ustawiany przez ASP.NET (DataProtection).
+            accountGroup.MapGet("/StartExternalLogin", (
+                HttpContext context,
+                [FromServices] SignInManager<ApplicationUser> signInManager,
+                [FromQuery] string provider,
+                [FromQuery] string? returnUrl) =>
+            {
+                returnUrl ??= "/";
+                IEnumerable<KeyValuePair<string, StringValues>> query = [
+                    new("ReturnUrl", returnUrl),
+                    new("Action", ExternalLogin.LoginCallbackAction)];
+
+                var redirectUrl = UriHelper.BuildRelative(
+                    context.Request.PathBase,
+                    "/Account/ExternalLogin",
+                    QueryString.Create(query));
+
+                var properties = signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
+                return TypedResults.Challenge(properties, [provider]);
+            });
+
             accountGroup.MapPost("/Logout", async (
                 ClaimsPrincipal user,
                 [FromServices] SignInManager<ApplicationUser> signInManager,

@@ -5,29 +5,41 @@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityRedirectManager RedirectManager
 
-@if (externalLogins.Length == 0)
+@if (externalLogins.Length > 0)
 {
-    <div>
-        <p>
-            There are no external authentication services configured. See this <a href="https://go.microsoft.com/fwlink/?LinkID=532715">article
-            about setting up this ASP.NET application to support logging in via external services</a>.
-        </p>
-    </div>
-}
-else
-{
-    <form class="form-horizontal" action="Account/PerformExternalLogin" method="post">
-        <div>
-            <AntiforgeryToken />
-            <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
-            <p>
-                @foreach (var provider in externalLogins)
+    <div class="external-login-divider"><span>lub</span></div>
+    <form class="external-login-form" action="Account/PerformExternalLogin" method="post">
+        <AntiforgeryToken />
+        <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+        @foreach (var provider in externalLogins)
+        {
+            <button type="submit" class="external-login-btn" name="provider" value="@provider.Name" title="Zaloguj się przez @provider.DisplayName">
+                @if (provider.Name.Equals("Google", StringComparison.OrdinalIgnoreCase))
                 {
-                    <button type="submit" class="btn btn-primary" name="provider" value="@provider.Name" title="Log in using your @provider.DisplayName account">@provider.DisplayName</button>
+                    <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
+                        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
+                        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.6 39.5 16.2 44 24 44z"/>
+                        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C41 35.5 44 30.2 44 24c0-1.3-.1-2.4-.4-3.5z"/>
+                    </svg>
+                    <span>Kontynuuj z Google</span>
                 }
-            </p>
-        </div>
+                else
+                {
+                    <span>Zaloguj się przez @provider.DisplayName</span>
+                }
+            </button>
+        }
     </form>
+
+    <style>
+        .external-login-divider { display: flex; align-items: center; text-align: center; color: #5B6B82; font-size: 13px; margin: 18px 0; }
+        .external-login-divider::before, .external-login-divider::after { content: ""; flex: 1; border-bottom: 1px solid #E5E7EB; }
+        .external-login-divider span { padding: 0 12px; }
+        .external-login-form { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+        .external-login-btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 11px 16px; border: 1px solid #D1D5DB; background: #FFFFFF; color: #1F2937; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.15s ease; font-family: inherit; font-size: 15px; width: 100%; }
+        .external-login-btn:hover { background: #F4F6FA; border-color: #2F3C7E; box-shadow: 0 2px 6px rgba(47, 60, 126, 0.1); }
+    </style>
 }
 
 @code {
