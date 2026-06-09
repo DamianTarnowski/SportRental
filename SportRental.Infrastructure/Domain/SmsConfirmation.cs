@@ -11,8 +11,11 @@ namespace SportRental.Infrastructure.Domain
         [Required]
         public Guid RentalId { get; set; }
 
+        // SEC-012: trzymamy SHA-256(Id + plaintextCode) w base64 (~44 znaki) zamiast plaintext 6-cyfr.
+        // Stara MaxLength=10 (plaintext) zostala podniesiona do 128 dla hash + ewentualne legacy.
+        // Walidacja przez FixedTimeEquals — patrz SmsConfirmationService.
         [Required]
-        [MaxLength(10)]
+        [MaxLength(128)]
         public string Code { get; set; } = string.Empty;
 
         [Required]

@@ -44,7 +44,10 @@ namespace SportRental.Admin.Services.Sms
 
             // SEC-011: kryptograficzny RNG zamiast Random.Shared (przewidywalny PRNG).
             // 6-cyfrowy kod (100000-999999), CSPRNG zgodny z ASVS L2 6.3.1.
-            var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            var plaintextCode = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            // Hash z Id jako salt (Id wygenerowany ponizej; dla atomic flow generujemy najpierw Id).
+            var confirmationId = Guid.NewGuid();
+            var codeHash = HashCode(confirmationId, plaintextCode);
 
             // Get rental to get phone number
             var rental = await context.Rentals
@@ -64,13 +67,13 @@ namespace SportRental.Admin.Services.Sms
                 context.SmsConfirmations.RemoveRange(existing);
             }
 
-            // Create new confirmation
+            // SEC-012: zapisujemy HASH z Id-jako-salt, nigdy plaintext.
             var confirmation = new SmsConfirmation
             {
-                Id = Guid.NewGuid(),
+                Id = confirmationId,
                 TenantId = tenantId.Value,
                 RentalId = rentalId,
-                Code = code,
+                Code = codeHash,
                 PhoneNumber = NormalizePhoneNumber(rental.Customer.PhoneNumber),
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddHours(24)
@@ -81,7 +84,8 @@ namespace SportRental.Admin.Services.Sms
 
             _logger.LogInformation("Generated SMS confirmation code for rental {RentalId}", rentalId);
 
-            return code;
+            // SMS wysyła sie z plaintext kodem do klienta — tylko DB ma hash.
+            return plaintextCode;
         }
 
         public async Task<bool> ValidateConfirmationCodeAsync(Guid rentalId, string code, CancellationToken ct = default)
@@ -93,12 +97,29 @@ namespace SportRental.Admin.Services.Sms
             using var context = _contextFactory.CreateDbContext();
             context.SetTenant(tenantId);
 
+            // SEC-012: szukamy po RentalId, porównujemy hash w pamięci constant-time
+            // (zamiast WHERE Code = @code które ujawnia timing).
             var confirmation = await context.SmsConfirmations
-                .FirstOrDefaultAsync(sc => sc.RentalId == rentalId && sc.Code == code, ct);
+                .Where(sc => sc.RentalId == rentalId)
+                .OrderByDescending(sc => sc.CreatedAt)
+                .FirstOrDefaultAsync(ct);
 
             if (confirmation == null)
             {
+                _logger.LogWarning("No confirmation row for rental {RentalId}", rentalId);
+                return false;
+            }
+
+            var expectedHash = HashCode(confirmation.Id, code);
+            if (!CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.ASCII.GetBytes(expectedHash),
+                System.Text.Encoding.ASCII.GetBytes(confirmation.Code)))
+            {
                 _logger.LogWarning("Invalid confirmation code for rental {RentalId}", rentalId);
+                // Update attempts tracking even na zlym kodzie zeby zabezpieczyc brute-force
+                confirmation.AttemptsCount++;
+                confirmation.LastAttemptAt = DateTime.UtcNow;
+                await context.SaveChangesAsync(ct);
                 return false;
             }
 
@@ -292,6 +313,17 @@ namespace SportRental.Admin.Services.Sms
                 return "+48" + cleaned[1..];
 
             return "+48" + cleaned;
+        }
+
+        /// <summary>
+        /// SEC-012: SHA-256(salt || code), gdzie salt to GUID confirmation rekordu.
+        /// Zwraca base64. Hash deterministyczny per-rekord (różne SmsConfirmation = różne hash dla tego samego kodu).
+        /// </summary>
+        private static string HashCode(Guid salt, string plaintextCode)
+        {
+            var bytes = System.Text.Encoding.UTF8.GetBytes(salt.ToString("N") + ":" + plaintextCode);
+            var hash = SHA256.HashData(bytes);
+            return Convert.ToBase64String(hash);
         }
     }
 }

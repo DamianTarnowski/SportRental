@@ -56,10 +56,20 @@
 | SEC-021 | PII Logging Risk | ❌ Open. ILogger może logować dane klienta. Warto przejrzeć `_logger.LogInformation` z customer/email |
 | SEC-022 | No Alert System | ❌ Open. Brak Application Insights alerts na suspicious login patterns |
 
-## Co naprawiono 2026-05-24 (ten commit)
+## Co naprawiono 2026-05-24 → 2026-06-10
 
-1. **SEC-002 (CRITICAL)** — Password policy podniesiona do ASVS L2 standard
-2. **SEC-011 (MEDIUM)** — Crypto RNG dla SMS confirmation codes
+1. **SEC-002 (CRITICAL)** — Password policy podniesiona do ASVS L2 standard (commit `8bf18b8`)
+2. **SEC-011 (MEDIUM)** — Crypto RNG dla SMS confirmation codes (commit `8bf18b8`)
+3. **SEC-020 (LOW)** — Cookie `__Host-` prefix dla `sr_access_token` (commit `e026966`)
+4. **SEC-012 (MEDIUM)** — SmsConfirmation.Code zhashowany (SHA-256 + Id-as-salt + FixedTimeEquals)
+   + migracja EF `20260609223057_SmsConfirmation_CodeHash` zwiększa MaxLength 10→128
+
+**SEC-010 (MEDIUM)** — RefreshToken jest scaffolded w DB (entity + migracja `AddRefreshToken`)
+ale **nie używany w kodzie** (zero referencji do `RefreshTokens.Add/Find` w aktywnym kodzie).
+Realne ryzyko = 0, dopisałem komentarz w `RefreshToken.cs` że dla przyszłej implementacji
+należy hashować Token (analogicznie do SmsConfirmation w `SmsConfirmationService.HashCode`).
+
+**Compliance teraz: 20/22 = 91%**
 
 ## Rekomendacje na następne sprinty
 
