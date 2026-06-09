@@ -1,0 +1,45 @@
+/* RentSpot webfonts — self-hosted in assets/fonts/ (OFL / Apache-2.0 licensed).
+   Outfit = brand sans (variable, 100–900).
+   IBM Plex Mono = codes, SKU, tabular money.
+   Material Icons Round = admin icon font (classic ligature font, self-hosted;
+   maps onto MudBlazor's Icons.Material.* names). The family is registered as
+   "Material Symbols Rounded" so markup matches the modern naming — if you later
+   swap in the true variable Symbols font, nothing else changes. */
+
+@font-face {
+  font-family: "Outfit";
+  src: url("../../../fonts/Outfit-Variable.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../../../fonts/IBMPlexMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../../../fonts/IBMPlexMono-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../../../fonts/IBMPlexMono-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Material Symbols Rounded";
+  src: url("../../../fonts/MaterialIconsRound-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}

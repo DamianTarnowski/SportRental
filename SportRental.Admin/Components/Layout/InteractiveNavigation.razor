@@ -2,18 +2,18 @@
 
 @inject SportRental.Admin.Services.UI.ThemeService Theme
 
-<MudAppBar Elevation="1" Color="Color.Primary" Fixed="true">
+<MudAppBar Elevation="0" Color="Color.Surface" Fixed="true" Class="rs-appbar">
     @if (_breakpoint < Breakpoint.Md)
     {
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" 
-                       Color="Color.Inherit" 
-                       Edge="Edge.Start" 
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Default"
+                       Edge="Edge.Start"
                        OnClick="ToggleDrawer" />
     }
     <div class="rs-brand">
         <svg class="rs-brand-mark" viewBox="0 0 100 100" aria-hidden="true">
             <circle cx="50" cy="50" r="48" fill="#F96167" />
-            <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+            <text x="50" y="72" font-family="Outfit, Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
         </svg>
         <span class="rs-brand-word">RentSpot<span class="rs-brand-dot">.</span></span>
     </div>
@@ -21,21 +21,33 @@
     <ThemeSwitcher />
 </MudAppBar>
 
-<MudDrawer @bind-Open="_drawerOpen" 
-           ClipMode="DrawerClipMode.Always" 
-           Elevation="2"
+<MudDrawer @bind-Open="_drawerOpen"
+           ClipMode="DrawerClipMode.Always"
+           Elevation="0"
            Variant="@(_breakpoint >= Breakpoint.Md ? DrawerVariant.Responsive : DrawerVariant.Temporary)"
            Breakpoint="Breakpoint.Md"
-           Class="pt-14">
+           Class="pt-14 rs-drawer"
+           Width="248px">
     <NavMenu />
 </MudDrawer>
 
 <MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
 <style>
+    /* DS v2: AppBar = surface biały, navy sidebar */
+    .rs-appbar { border-bottom: 1px solid var(--line, #DDE2EC); }
+    .rs-drawer .mud-drawer-content { background: var(--navy-900, #1B2350) !important; }
+
     .rs-brand { display: inline-flex; align-items: center; gap: 10px; margin-left: 8px; }
     .rs-brand-mark { width: 28px; height: 28px; flex: 0 0 28px; }
-    .rs-brand-word { font-family: 'Inter', system-ui, -apple-system, sans-serif; font-weight: 800; font-size: 1.25rem; letter-spacing: -0.01em; color: #fff; line-height: 1; }
+    .rs-brand-word {
+        font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+        font-weight: 700;
+        font-size: 1.25rem;
+        letter-spacing: -0.01em;
+        color: var(--navy-900, #1B2350);
+        line-height: 1;
+    }
     .rs-brand-dot { color: #F96167; margin-left: 1px; font-weight: 900; }
 </style>
 

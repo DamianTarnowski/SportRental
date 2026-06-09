@@ -9,10 +9,13 @@
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["SportRental.styles.css"]" />
     <link rel="stylesheet" href="_content/MudBlazor/MudBlazor.min.css" />
+    <!-- RentSpot Design System v2 — Coral Energy. Tokens (kolory, type, spacing, fonts) ładujemy
+         przed legacy CSS żeby custom properties --rs-* były dostępne wszędzie. fonts.css ma @font-face
+         z self-hosted Outfit Variable + IBM Plex Mono + Material Icons Round. -->
+    <link rel="stylesheet" href="@Assets["css/ds/styles.css"]" />
     <link rel="stylesheet" href="@Assets["css/modern-ui.css"]" />
     <link rel="stylesheet" href="@Assets["css/auth.css"]" />
     <link rel="stylesheet" href="@Assets["css/admin-theme.css"]" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <ImportMap />

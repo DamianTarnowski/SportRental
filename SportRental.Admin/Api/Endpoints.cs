@@ -54,7 +54,9 @@ namespace SportRental.Admin.Api
         }
 
         // SEC-009: nazwa HttpOnly cookie z tokenem dostępu dla WASM.
-        public const string AccessTokenCookieName = "sr_access_token";
+        // SEC-020: prefix __Host- gwarantuje że cookie jest tylko z Secure + Path=/ + bez Domain
+        // (browser odrzuci cookie z tym prefixem jeśli serwer próbuje obejść te wymagania).
+        public const string AccessTokenCookieName = "__Host-sr_access_token";
 
         // SEC-009: zapisuje JWT w HttpOnly cookie (zamiast oddawać go klientowi do localStorage).
         //

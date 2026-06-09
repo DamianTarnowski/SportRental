@@ -1,0 +1,154 @@
+/* RentSpot color tokens — "Coral Energy v2".
+   Derived from the original brand constants in
+   SportRental.Admin/Services/UI/ThemeService.cs:
+     Coral #F96167 · Navy #2F3C7E · Gold #F9E795 · Surface #F4F6FA · Helper #5B6B82
+   Modernized: full scales, navy-cast neutrals, AA-safe text steps,
+   gradients retired in favour of flat surfaces + tinted fills. */
+
+:root {
+  /* ---------- Brand: Coral (primary action color) ---------- */
+  --coral-50:  #FEF2F2;
+  --coral-100: #FDE3E4;
+  --coral-200: #FBC8CA;
+  --coral-300: #FAA3A7;
+  --coral-400: #FA8186;
+  --coral-500: #F96167;   /* brand anchor */
+  --coral-600: #E0454C;   /* hover */
+  --coral-700: #BC3138;   /* pressed / AA text on light */
+  --coral-800: #8F2429;
+  --coral-900: #671A1E;
+
+  /* ---------- Brand: Navy (structure, ink, chrome) ---------- */
+  --navy-50:  #F1F3F9;
+  --navy-100: #E3E7F3;
+  --navy-200: #C6CEE6;
+  --navy-300: #9DAAD2;
+  --navy-400: #7080B9;
+  --navy-500: #4D5E9F;
+  --navy-600: #3B4A8D;
+  --navy-700: #2F3C7E;   /* brand anchor */
+  --navy-800: #242E61;
+  --navy-900: #1B2350;
+  --navy-950: #0F1530;
+
+  /* ---------- Brand: Gold (highlight, never large fills) ---------- */
+  --gold-100: #FDF8DF;
+  --gold-200: #FBF1BE;
+  --gold-300: #F9E795;   /* brand anchor */
+  --gold-500: #E3C53F;
+  --gold-700: #9C7F14;
+
+  /* ---------- Neutrals (navy-cast) ---------- */
+  --gray-0:   #FFFFFF;
+  --gray-25:  #FBFCFE;
+  --gray-50:  #F4F6FA;   /* app background (kept from v1) */
+  --gray-100: #EBEEF5;
+  --gray-200: #DDE2EC;
+  --gray-300: #C3CAD9;
+  --gray-400: #9AA4B8;
+  --gray-500: #76829B;
+  --gray-600: #5B6B82;   /* helper text (kept from v1) */
+  --gray-700: #41506A;
+  --gray-800: #2B3650;
+  --gray-900: #1C2438;
+
+  /* ---------- Semantic status ---------- */
+  --green-100: #DDF3E6;
+  --green-500: #1F9D61;
+  --green-700: #16744A;
+  --amber-100: #FCEFD8;
+  --amber-500: #DD8413;
+  --amber-700: #9D5C0B;
+  --red-100:   #FBE2DF;
+  --red-500:   #C8362B;  /* destructive — deeper than brand coral on purpose */
+  --red-700:   #9A281F;
+  --blue-100:  #DFEAFB;
+  --blue-500:  #2E66C8;
+  --blue-700:  #214B95;
+
+  /* ---------- Semantic aliases: surfaces ---------- */
+  --surface-app:     var(--gray-50);
+  --surface-card:    var(--gray-0);
+  --surface-raised:  var(--gray-0);
+  --surface-sunken:  var(--gray-100);
+  --surface-inverse: var(--navy-900);
+  --surface-brand-tint: var(--coral-50);
+  --surface-gold-tint:  var(--gold-100);
+
+  /* ---------- Semantic aliases: text ---------- */
+  --text-display:   var(--navy-900);
+  --text-body:      var(--gray-900);
+  --text-secondary: var(--gray-600);
+  --text-muted:     var(--gray-400);
+  --text-brand:     var(--coral-700);
+  --text-on-fill:   #FFFFFF;
+  --text-link:      var(--navy-600);
+
+  /* ---------- Semantic aliases: interactive ---------- */
+  --action-primary:        var(--coral-500);
+  --action-primary-hover:  var(--coral-600);
+  --action-primary-active: var(--coral-700);
+  --action-secondary:      var(--navy-700);
+  --action-secondary-hover: var(--navy-800);
+  --focus-ring: 0 0 0 2px var(--gray-0), 0 0 0 4px var(--coral-400);
+
+  /* ---------- Semantic aliases: lines ---------- */
+  --line-soft:   var(--gray-100);
+  --line:        var(--gray-200);
+  --line-strong: var(--gray-300);
+  --line-input:  var(--gray-300);
+
+  /* ---------- Status aliases ---------- */
+  --status-success-bg: var(--green-100);
+  --status-success-fg: var(--green-700);
+  --status-warning-bg: var(--amber-100);
+  --status-warning-fg: var(--amber-700);
+  --status-danger-bg:  var(--red-100);
+  --status-danger-fg:  var(--red-700);
+  --status-info-bg:    var(--blue-100);
+  --status-info-fg:    var(--blue-700);
+  --status-neutral-bg: var(--gray-100);
+  --status-neutral-fg: var(--gray-700);
+}
+
+/* ---------- Dark theme (admin "tryb ciemny") ----------
+   Scope: set data-theme="dark" on <html> or any container. */
+[data-theme="dark"] {
+  --surface-app:     var(--navy-950);
+  --surface-card:    var(--navy-900);
+  --surface-raised:  #222B5C;
+  --surface-sunken:  #0B102A;
+  --surface-inverse: var(--gray-0);
+  --surface-brand-tint: rgba(249, 97, 103, 0.12);
+  --surface-gold-tint:  rgba(249, 231, 149, 0.10);
+
+  --text-display:   #FFFFFF;
+  --text-body:      #E8EBF5;
+  --text-secondary: #A7B0CC;
+  --text-muted:     #6B76A0;
+  --text-brand:     var(--coral-400);
+  --text-link:      var(--navy-300);
+
+  --action-primary:        var(--coral-500);
+  --action-primary-hover:  var(--coral-400);
+  --action-primary-active: var(--coral-600);
+  --action-secondary:      var(--navy-300);
+  --action-secondary-hover: var(--navy-200);
+  --focus-ring: 0 0 0 2px var(--navy-950), 0 0 0 4px var(--coral-400);
+
+  --line-soft:   rgba(255, 255, 255, 0.06);
+  --line:        rgba(255, 255, 255, 0.10);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --line-input:  rgba(255, 255, 255, 0.22);
+
+  --status-success-bg: rgba(31, 157, 97, 0.18);
+  --status-success-fg: #5BD79D;
+  --status-warning-bg: rgba(221, 132, 19, 0.18);
+  --status-warning-fg: #F0B05E;
+  --status-danger-bg:  rgba(200, 54, 43, 0.20);
+  --status-danger-fg:  #F2918A;
+  --status-info-bg:    rgba(46, 102, 200, 0.20);
+  --status-info-fg:    #8AB2F2;
+  --status-neutral-bg: rgba(255, 255, 255, 0.08);
+  --status-neutral-fg: #C3CAD9;
+}

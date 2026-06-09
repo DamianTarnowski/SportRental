@@ -1,0 +1,34 @@
+/* RentSpot spacing, sizing & radius tokens. 4px base grid. */
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* Radii — v1 mixed 16/20px + pills everywhere; v2 keeps pills only for
+     client-facing CTAs and chips. Admin chrome uses md/lg. */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+
+  /* Control heights */
+  --control-sm: 32px;
+  --control-md: 40px;
+  --control-lg: 48px;
+
+  /* Layout */
+  --sidebar-width: 248px;
+  --content-max: 1280px;
+  --page-pad: var(--space-6);
+}

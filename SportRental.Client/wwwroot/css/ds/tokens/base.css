@@ -1,0 +1,29 @@
+/* RentSpot base element styles. Minimal — components do the heavy lifting. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: var(--text-body);
+  color: var(--text-body);
+  background: var(--surface-app);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--coral-200);
+  color: var(--coral-900);
+}
+
+a {
+  color: var(--text-link);
+  text-decoration: none;
+}
+a:hover { text-decoration: underline; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-xs);
+}
