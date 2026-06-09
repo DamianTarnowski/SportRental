@@ -71,6 +71,13 @@ należy hashować Token (analogicznie do SmsConfirmation w `SmsConfirmationServi
 
 **Compliance teraz: 20/22 = 91%**
 
+5. **SEC-019** — cleanup test users + customers w prod DB (2026-06-10):
+   - 15 unconfirmed test accounts usuniętych (`*@sportrental.pl`, `*test.local`, `mczartonek@*`)
+   - 21 test customers bez powiązanych wynajmów (Test EmailSms, WASM Test Customer)
+   - Zostało 11 użytkowników (8 confirmed real + 3 oczekujących na potwierdzenie email,
+     w tym Piotr `piotrekze@hotmail.com` i nowy partner `bikebrothers.jastarnia@gmail.com`)
+   - Zostało 39 customers (39 realnych, było 60)
+
 ## Rekomendacje na następne sprinty
 
 **Sprint 1 (must-have przed launchem partnerskim):**
