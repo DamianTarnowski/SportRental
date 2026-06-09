@@ -377,12 +377,15 @@ builder.Services.AddScoped<ApplicationDbContext>(sp =>
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => {
-        options.SignIn.RequireConfirmedAccount = false; // WyĹ‚Ä…czamy wymaganie potwierdzenia konta
-        options.Password.RequireDigit = false;
-        options.Password.RequireLowercase = false;
-        options.Password.RequireUppercase = false;
-        options.Password.RequireNonAlphanumeric = false;
-        options.Password.RequiredLength = 6;
+        options.SignIn.RequireConfirmedAccount = false; // wymaganie email confirm wyłączone (UX); MFA dla SuperAdmin osobno
+        // SEC-002: policy zgodna z ASVS L2 — min 12 znaków + 3 z 4 klas znaków.
+        // Wcześniej było 6 znaków bez wymagań (DoS na słownik).
+        options.Password.RequiredLength = 12;
+        options.Password.RequireDigit = true;
+        options.Password.RequireLowercase = true;
+        options.Password.RequireUppercase = true;
+        options.Password.RequireNonAlphanumeric = false; // zostawiamy opcjonalne (3 z 4 klas wystarczy)
+        options.Password.RequiredUniqueChars = 4;
     })
     .AddRoles<IdentityRole<Guid>>()
     .AddEntityFrameworkStores<ApplicationDbContext>()

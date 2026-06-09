@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Tenancy;
@@ -41,8 +42,9 @@ namespace SportRental.Admin.Services.Sms
             using var context = _contextFactory.CreateDbContext();
             context.SetTenant(tenantId);
 
-            // Generate a 6-digit code
-            var code = Random.Shared.Next(100000, 999999).ToString();
+            // SEC-011: kryptograficzny RNG zamiast Random.Shared (przewidywalny PRNG).
+            // 6-cyfrowy kod (100000-999999), CSPRNG zgodny z ASVS L2 6.3.1.
+            var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
             // Get rental to get phone number
             var rental = await context.Rentals
