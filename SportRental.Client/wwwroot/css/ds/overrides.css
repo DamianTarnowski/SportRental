@@ -1,0 +1,234 @@
+/* RentSpot Client DS v2 overrides — wpięte PO home.css/products.css/layout.css w index.html.
+   Cel: flat surfaces, brak aurora/glow/floating effects/pink gradients, no-emoji-clean. */
+
+/* ============================================
+   HERO — flat navy zamiast aurora gradient
+   ============================================ */
+.sr-hero {
+    background: var(--navy-900, #1B2350) !important;
+    color: #E8EBF5 !important;
+}
+.sr-hero::before,
+.sr-hero::after,
+.sr-hero-aurora,
+.sr-floating-icons,
+.sr-scroll-indicator {
+    display: none !important;
+}
+
+.sr-hero-tagline {
+    background: rgba(249, 97, 103, 0.15) !important;
+    color: var(--coral-400, #FA8186) !important;
+    border: 1px solid rgba(249, 97, 103, 0.3) !important;
+}
+
+.sr-hero-title {
+    font-family: 'Outfit', system-ui, sans-serif !important;
+    color: #FFFFFF !important;
+    letter-spacing: -0.02em !important;
+}
+.sr-hero-title span {
+    color: var(--coral-500, #F96167) !important;
+    background: none !important;
+    -webkit-text-fill-color: var(--coral-500, #F96167) !important;
+}
+.sr-hero-description { color: rgba(232, 235, 245, 0.8) !important; }
+
+/* Hero right column — flat surface cards, no glow */
+.sr-hero-visual {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
+}
+.sr-preview-card {
+    background: rgba(255, 255, 255, 0.06) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 16px !important;
+    padding: 1.25rem 1.5rem !important;
+    color: #E8EBF5 !important;
+    text-decoration: none !important;
+    transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1), background 200ms, border-color 200ms;
+}
+.sr-preview-card:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: var(--coral-500, #F96167) !important;
+    text-decoration: none !important;
+}
+.sr-preview-card svg { color: var(--coral-400, #FA8186); margin-bottom: 0.5rem; }
+.sr-preview-card-title { font-size: 1.1rem; font-weight: 600; margin: 0; color: #FFFFFF; }
+.sr-preview-card-price { font-size: 0.875rem; color: rgba(232, 235, 245, 0.7); margin-top: 0.25rem; }
+
+/* Buttons w hero — Coral primary, transparent secondary */
+.sr-btn-primary {
+    background: var(--coral-500, #F96167) !important;
+    color: #FFFFFF !important;
+    box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
+}
+.sr-btn-primary:hover {
+    background: var(--coral-600, #E0454C) !important;
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md) !important;
+}
+.sr-btn-secondary {
+    background: transparent !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+.sr-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.5) !important;
+    transform: translateY(-2px);
+}
+
+/* ============================================
+   STATS — outlined cards, flat surface
+   ============================================ */
+.sr-stats { background: var(--surface-app, #F4F6FA) !important; }
+.sr-stat-item {
+    background: var(--surface-card, #FFFFFF) !important;
+    border: 1px solid var(--line, #DDE2EC) !important;
+    border-radius: 16px !important;
+    padding: 2rem 1.5rem !important;
+    text-align: center;
+    box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
+}
+.sr-stat-icon {
+    color: var(--coral-500, #F96167) !important;
+    margin: 0 auto 0.75rem !important;
+    display: block !important;
+}
+.sr-stat-value {
+    font-family: 'Outfit', system-ui, sans-serif;
+    font-size: 2.25rem !important;
+    font-weight: 700 !important;
+    color: var(--navy-900, #1C2438) !important;
+    background: none !important;
+    -webkit-text-fill-color: var(--navy-900, #1C2438) !important;
+    letter-spacing: -0.01em;
+}
+.sr-stat-label { color: var(--text-secondary, #5B6B82) !important; }
+
+/* ============================================
+   FEATURES — outlined cards, no glow, no gradient icons
+   ============================================ */
+.sr-features { background: var(--surface-card, #FFFFFF) !important; }
+.sr-section-label {
+    color: var(--coral-700, #BC3138) !important;
+    background: var(--surface-brand-tint, #FEF2F2) !important;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    font-weight: 600;
+}
+.sr-section-title {
+    font-family: 'Outfit', system-ui, sans-serif !important;
+    color: var(--navy-900, #1C2438) !important;
+    letter-spacing: -0.01em !important;
+}
+.sr-section-subtitle { color: var(--text-secondary, #5B6B82) !important; }
+.sr-feature-card {
+    background: var(--surface-card, #FFFFFF) !important;
+    border: 1px solid var(--line, #DDE2EC) !important;
+    border-radius: 16px !important;
+    padding: 2rem 1.5rem !important;
+    box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
+}
+.sr-feature-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md) !important;
+    border-color: var(--line-strong, #C3CAD9) !important;
+}
+.sr-feature-icon {
+    background: var(--surface-brand-tint, #FEF2F2) !important;
+    color: var(--coral-700, #BC3138) !important;
+    border-radius: 12px;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+}
+.sr-feature-title { color: var(--navy-900, #1C2438) !important; }
+.sr-feature-description { color: var(--text-secondary, #5B6B82) !important; }
+
+/* ============================================
+   CATEGORIES — flat outlined cards, no animated bg/pattern
+   ============================================ */
+.sr-categories { background: var(--surface-app, #F4F6FA) !important; }
+.sr-category-card {
+    background: var(--surface-card, #FFFFFF) !important;
+    border: 1px solid var(--line, #DDE2EC) !important;
+    border-radius: 16px !important;
+    padding: 2rem 1.5rem !important;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
+    color: var(--text-body, #1C2438) !important;
+    text-decoration: none !important;
+    display: block;
+}
+.sr-category-card::before,
+.sr-category-card::after,
+.sr-category-bg,
+.sr-category-pattern {
+    display: none !important;
+}
+.sr-category-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md) !important;
+    border-color: var(--coral-500, #F96167) !important;
+    text-decoration: none !important;
+}
+.sr-category-icon {
+    color: var(--coral-500, #F96167) !important;
+    margin-bottom: 0.75rem;
+    display: block;
+}
+.sr-category-title {
+    color: var(--navy-900, #1C2438) !important;
+    font-family: 'Outfit', system-ui, sans-serif !important;
+    margin: 0 0 0.25rem !important;
+}
+.sr-category-count { color: var(--text-secondary, #5B6B82) !important; margin: 0 !important; }
+.sr-category-arrow {
+    position: absolute !important;
+    top: 1.5rem !important;
+    right: 1.5rem !important;
+    color: var(--coral-500, #F96167) !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    opacity: 0.6 !important;
+    background: none !important;
+}
+.sr-category-card:hover .sr-category-arrow { opacity: 1 !important; transform: translateX(4px) !important; }
+
+/* ============================================
+   CTA — flat coral tint, no animated shapes
+   ============================================ */
+.sr-cta {
+    background: var(--surface-brand-tint, #FEF2F2) !important;
+    color: var(--navy-900, #1C2438) !important;
+}
+.sr-cta::before,
+.sr-cta::after,
+.sr-cta-shapes,
+.sr-cta-shape { display: none !important; }
+.sr-cta-title {
+    font-family: 'Outfit', system-ui, sans-serif !important;
+    color: var(--navy-900, #1C2438) !important;
+    background: none !important;
+    -webkit-text-fill-color: var(--navy-900, #1C2438) !important;
+}
+.sr-cta-description { color: var(--text-secondary, #5B6B82) !important; }
+
+/* ============================================
+   FOOTER — navy900 flat, czysty
+   ============================================ */
+.sr-footer { background: var(--navy-950, #0F1530) !important; color: rgba(232, 235, 245, 0.7) !important; }
+.sr-footer h4 { color: #FFFFFF !important; }
+.sr-footer-links a { color: rgba(232, 235, 245, 0.7) !important; }
+.sr-footer-links a:hover { color: var(--coral-400, #FA8186) !important; }
+.sr-footer-tagline { color: rgba(232, 235, 245, 0.6) !important; }
+.sr-footer-bottom { border-top: 1px solid rgba(255, 255, 255, 0.08) !important; }

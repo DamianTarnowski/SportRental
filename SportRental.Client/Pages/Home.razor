@@ -3,128 +3,108 @@
 
 <PageTitle>RentSpot — wypożyczalnia sprzętu sportowego</PageTitle>
 
-<!-- =============================================
-     HERO SECTION - Full Screen Immersive
-     ============================================= -->
-<section class="sr-hero">
-    <!-- Aurora background effect -->
-    <div class="sr-hero-aurora"></div>
-    
-    <!-- Floating sport icons -->
-    <div class="sr-floating-icons">
-        <span class="sr-floating-icon">⛷️</span>
-        <span class="sr-floating-icon">🏂</span>
-        <span class="sr-floating-icon">🚴</span>
-        <span class="sr-floating-icon">🏄</span>
-        <span class="sr-floating-icon">🎿</span>
-        <span class="sr-floating-icon">🚵</span>
-        <span class="sr-floating-icon">🏊</span>
-        <span class="sr-floating-icon">⛷️</span>
-    </div>
+@* DS v2: flat navy hero (no aurora, no floating emoji), SVG icons only, no emoji *@
 
+<section class="sr-hero">
     <div class="sr-hero-content">
-        <!-- Left: Text Content -->
         <div class="sr-hero-text">
-            <div class="sr-hero-tagline">
-                ✨ Premium Sport Rental
-            </div>
+            <div class="sr-hero-tagline">Wypożyczalnia sportowa</div>
             <h1 class="sr-hero-title">
                 Odkryj <span>przygodę</span> na każdą porę roku
             </h1>
             <p class="sr-hero-description">
-                Wypożycz profesjonalny sprzęt sportowy i przeżyj niezapomniane chwile. 
+                Wypożycz profesjonalny sprzęt sportowy i przeżyj niezapomniane chwile.
                 Narty, snowboardy, rowery i sprzęt wodny czekają na Ciebie.
             </p>
             <div class="sr-hero-buttons">
                 <a href="/products" class="sr-btn-primary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="m21 21-4.3-4.3"></path>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.3-4.3"/>
                     </svg>
                     Przeglądaj sprzęt
                 </a>
                 <a href="/contact" class="sr-btn-secondary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
                     </svg>
                     Kontakt
                 </a>
             </div>
         </div>
 
-        <!-- Right: 3D Card Stack -->
+        @* Right column: flat surface cards with category preview, no glow/gradient/emoji *@
         <div class="sr-hero-visual">
-            <div class="sr-sport-card sr-sport-card--ski">
-                <div class="sr-sport-card-glow"></div>
-                <div class="sr-sport-card-content">
-                    <span class="sr-sport-card-emoji">⛷️</span>
-                    <div class="sr-sport-card-title">Narty zjazdowe</div>
-                    <div class="sr-sport-card-price">od 49 zł / dzień</div>
-                </div>
-            </div>
-            <div class="sr-sport-card sr-sport-card--snow">
-                <div class="sr-sport-card-glow"></div>
-                <div class="sr-sport-card-content">
-                    <span class="sr-sport-card-emoji">🏂</span>
-                    <div class="sr-sport-card-title">Snowboardy</div>
-                    <div class="sr-sport-card-price">od 59 zł / dzień</div>
-                </div>
-            </div>
-            <div class="sr-sport-card sr-sport-card--bike">
-                <div class="sr-sport-card-glow"></div>
-                <div class="sr-sport-card-content">
-                    <span class="sr-sport-card-emoji">🚴</span>
-                    <div class="sr-sport-card-title">Rowery górskie</div>
-                    <div class="sr-sport-card-price">od 39 zł / dzień</div>
-                </div>
-            </div>
+            <a href="/products?category=ski" class="sr-preview-card">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 21l18-18M7 17l3-3M11 13l3-3M15 9l3-3"/>
+                </svg>
+                <div class="sr-preview-card-title">Narty zjazdowe</div>
+                <div class="sr-preview-card-price">od 49 zł / dzień</div>
+            </a>
+            <a href="/products?category=snowboard" class="sr-preview-card">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 20l16-16M8 16h.01M16 8h.01"/>
+                </svg>
+                <div class="sr-preview-card-title">Snowboardy</div>
+                <div class="sr-preview-card-price">od 59 zł / dzień</div>
+            </a>
+            <a href="/products?category=bike" class="sr-preview-card">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="5.5" cy="17.5" r="3.5"/>
+                    <circle cx="18.5" cy="17.5" r="3.5"/>
+                    <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>
+                </svg>
+                <div class="sr-preview-card-title">Rowery górskie</div>
+                <div class="sr-preview-card-price">od 39 zł / dzień</div>
+            </a>
         </div>
-    </div>
-
-    <!-- Scroll Indicator -->
-    <div class="sr-scroll-indicator">
-        <span>Przewiń w dół</span>
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m6 9 6 6 6-6"/>
-        </svg>
     </div>
 </section>
 
-<!-- =============================================
-     STATS SECTION - Social Proof
-     ============================================= -->
+@* STATS — bez emoji, monochromatyczne SVG ikony *@
 <section class="sr-stats">
     <div class="sr-stats-grid">
-        <div class="sr-stat-item sr-reveal">
-            <span class="sr-stat-icon">📦</span>
+        <div class="sr-stat-item">
+            <svg class="sr-stat-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M16.5 9.4 7.55 4.24M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
             <div class="sr-stat-value">500+</div>
             <div class="sr-stat-label">Produktów w ofercie</div>
         </div>
-        <div class="sr-stat-item sr-reveal sr-reveal-delay-1">
-            <span class="sr-stat-icon">😊</span>
+        <div class="sr-stat-item">
+            <svg class="sr-stat-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
             <div class="sr-stat-value">10k+</div>
             <div class="sr-stat-label">Zadowolonych klientów</div>
         </div>
-        <div class="sr-stat-item sr-reveal sr-reveal-delay-2">
-            <span class="sr-stat-icon">⭐</span>
+        <div class="sr-stat-item">
+            <svg class="sr-stat-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
             <div class="sr-stat-value">4.9</div>
             <div class="sr-stat-label">Ocena klientów</div>
         </div>
-        <div class="sr-stat-item sr-reveal sr-reveal-delay-3">
-            <span class="sr-stat-icon">🛡️</span>
+        <div class="sr-stat-item">
+            <svg class="sr-stat-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
             <div class="sr-stat-value">24/7</div>
-            <div class="sr-stat-label">Wsparcie techniczne</div>
+            <div class="sr-stat-label">Wsparcie</div>
         </div>
     </div>
 </section>
 
-<!-- =============================================
-     FEATURES SECTION
-     ============================================= -->
+@* FEATURES — outlined cards, monochrome SVG icons, no emoji *@
 <section class="sr-features">
     <div class="sr-section-header">
-        <div class="sr-section-label">Dlaczego my?</div>
-        <h2 class="sr-section-title">Wszystko czego potrzebujesz do swojej przygody</h2>
+        <div class="sr-section-label">Dlaczego my</div>
+        <h2 class="sr-section-title">Wszystko, czego potrzebujesz do swojej przygody</h2>
         <p class="sr-section-subtitle">
             Oferujemy najwyższej jakości sprzęt sportowy, profesjonalną obsługę i konkurencyjne ceny.
         </p>
@@ -132,7 +112,11 @@
 
     <div class="sr-features-grid">
         <div class="sr-feature-card">
-            <div class="sr-feature-icon">🏆</div>
+            <div class="sr-feature-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+                </svg>
+            </div>
             <h3 class="sr-feature-title">Premium sprzęt</h3>
             <p class="sr-feature-description">
                 Tylko sprawdzony i serwisowany sprzęt od najlepszych światowych marek.
@@ -140,7 +124,11 @@
         </div>
 
         <div class="sr-feature-card">
-            <div class="sr-feature-icon">⚡</div>
+            <div class="sr-feature-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+            </div>
             <h3 class="sr-feature-title">Błyskawiczna realizacja</h3>
             <p class="sr-feature-description">
                 Zarezerwuj online i odbierz w kilka minut. Bez kolejek i czekania.
@@ -148,7 +136,12 @@
         </div>
 
         <div class="sr-feature-card">
-            <div class="sr-feature-icon">💰</div>
+            <div class="sr-feature-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="12" y1="1" x2="12" y2="23"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+            </div>
             <h3 class="sr-feature-title">Uczciwe ceny</h3>
             <p class="sr-feature-description">
                 Konkurencyjne stawki i specjalne rabaty dla stałych klientów.
@@ -156,7 +149,11 @@
         </div>
 
         <div class="sr-feature-card">
-            <div class="sr-feature-icon">🛡️</div>
+            <div class="sr-feature-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+            </div>
             <h3 class="sr-feature-title">Pełne ubezpieczenie</h3>
             <p class="sr-feature-description">
                 Każdy wynajem objęty jest kompleksowym ubezpieczeniem.
@@ -164,7 +161,13 @@
         </div>
 
         <div class="sr-feature-card">
-            <div class="sr-feature-icon">🎯</div>
+            <div class="sr-feature-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"/>
+                    <circle cx="12" cy="12" r="6"/>
+                    <circle cx="12" cy="12" r="2"/>
+                </svg>
+            </div>
             <h3 class="sr-feature-title">Doradztwo ekspertów</h3>
             <p class="sr-feature-description">
                 Nasi specjaliści pomogą dobrać sprzęt idealnie dopasowany do Twoich potrzeb.
@@ -172,7 +175,13 @@
         </div>
 
         <div class="sr-feature-card">
-            <div class="sr-feature-icon">🔄</div>
+            <div class="sr-feature-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="23 4 23 10 17 10"/>
+                    <polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+            </div>
             <h3 class="sr-feature-title">Elastyczna wymiana</h3>
             <p class="sr-feature-description">
                 Nie pasuje? Wymień na inny rozmiar bez dodatkowych opłat.
@@ -181,100 +190,67 @@
     </div>
 </section>
 
-<!-- =============================================
-     CATEGORIES SECTION
-     ============================================= -->
+@* CATEGORIES — flat cards, no emoji, no patterns *@
 <section class="sr-categories">
     <div class="sr-section-header">
         <div class="sr-section-label">Kategorie</div>
         <h2 class="sr-section-title">Wybierz swoją dyscyplinę</h2>
         <p class="sr-section-subtitle">
-            Od zimowych szaleństw po letnie przygody - mamy wszystko.
+            Od zimowych szaleństw po letnie przygody — mamy wszystko.
         </p>
     </div>
 
     <div class="sr-categories-grid">
-        <a href="/products?category=ski" class="sr-category-card sr-category-card--ski sr-reveal">
-            <div class="sr-category-bg"></div>
-            <div class="sr-category-pattern"></div>
-            <div class="sr-category-arrow">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-            </div>
-            <div class="sr-category-content">
-                <span class="sr-category-emoji">⛷️</span>
-                <h3 class="sr-category-title">Narty</h3>
-                <p class="sr-category-count">42 produkty</p>
-            </div>
+        <a href="/products?category=ski" class="sr-category-card">
+            <svg class="sr-category-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 21l18-18M7 17l3-3M11 13l3-3M15 9l3-3"/>
+            </svg>
+            <h3 class="sr-category-title">Narty</h3>
+            <p class="sr-category-count">42 produkty</p>
+            <span class="sr-category-arrow" aria-hidden="true">→</span>
         </a>
 
-        <a href="/products?category=snowboard" class="sr-category-card sr-category-card--snow sr-reveal sr-reveal-delay-1">
-            <div class="sr-category-bg"></div>
-            <div class="sr-category-pattern"></div>
-            <div class="sr-category-arrow">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-            </div>
-            <div class="sr-category-content">
-                <span class="sr-category-emoji">🏂</span>
-                <h3 class="sr-category-title">Snowboard</h3>
-                <p class="sr-category-count">28 produktów</p>
-            </div>
+        <a href="/products?category=snowboard" class="sr-category-card">
+            <svg class="sr-category-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 20l16-16M8 16h.01M16 8h.01"/>
+            </svg>
+            <h3 class="sr-category-title">Snowboard</h3>
+            <p class="sr-category-count">28 produktów</p>
+            <span class="sr-category-arrow" aria-hidden="true">→</span>
         </a>
 
-        <a href="/products?category=bike" class="sr-category-card sr-category-card--bike sr-reveal sr-reveal-delay-2">
-            <div class="sr-category-bg"></div>
-            <div class="sr-category-pattern"></div>
-            <div class="sr-category-arrow">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-            </div>
-            <div class="sr-category-content">
-                <span class="sr-category-emoji">🚴</span>
-                <h3 class="sr-category-title">Rowery</h3>
-                <p class="sr-category-count">35 produktów</p>
-            </div>
+        <a href="/products?category=bike" class="sr-category-card">
+            <svg class="sr-category-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="5.5" cy="17.5" r="3.5"/>
+                <circle cx="18.5" cy="17.5" r="3.5"/>
+                <path d="M15 6a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm-3 11.5V14l-3-3 4-3 2 3h2"/>
+            </svg>
+            <h3 class="sr-category-title">Rowery</h3>
+            <p class="sr-category-count">35 produktów</p>
+            <span class="sr-category-arrow" aria-hidden="true">→</span>
         </a>
 
-        <a href="/products?category=water" class="sr-category-card sr-category-card--water sr-reveal sr-reveal-delay-3">
-            <div class="sr-category-bg"></div>
-            <div class="sr-category-pattern"></div>
-            <div class="sr-category-arrow">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-            </div>
-            <div class="sr-category-content">
-                <span class="sr-category-emoji">🏄</span>
-                <h3 class="sr-category-title">Sporty wodne</h3>
-                <p class="sr-category-count">18 produktów</p>
-            </div>
+        <a href="/products?category=water" class="sr-category-card">
+            <svg class="sr-category-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12c2-2 4-2 6 0s4 2 6 0 4-2 6 0M2 18c2-2 4-2 6 0s4 2 6 0 4-2 6 0M2 6c2-2 4-2 6 0s4 2 6 0 4-2 6 0"/>
+            </svg>
+            <h3 class="sr-category-title">Sporty wodne</h3>
+            <p class="sr-category-count">18 produktów</p>
+            <span class="sr-category-arrow" aria-hidden="true">→</span>
         </a>
     </div>
 </section>
 
-<!-- =============================================
-     CTA SECTION
-     ============================================= -->
+@* CTA — flat coral tint, no animated shapes, no emoji *@
 <section class="sr-cta">
-    <!-- Animated background shapes -->
-    <div class="sr-cta-shapes">
-        <div class="sr-cta-shape"></div>
-        <div class="sr-cta-shape"></div>
-        <div class="sr-cta-shape"></div>
-    </div>
-    
     <div class="sr-cta-content">
-        <h2 class="sr-cta-title">🚀 Gotowy na przygodę?</h2>
+        <h2 class="sr-cta-title">Gotowy na przygodę?</h2>
         <p class="sr-cta-description">
             Dołącz do tysięcy zadowolonych klientów i odkryj radość ze sportu z profesjonalnym sprzętem.
-            Rezerwacja online trwa tylko minutę!
+            Rezerwacja online trwa tylko minutę.
         </p>
         <a href="/products" class="sr-btn-primary">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M5 12h14"/>
                 <path d="m12 5 7 7-7 7"/>
             </svg>
@@ -283,16 +259,14 @@
     </div>
 </section>
 
-<!-- =============================================
-     FOOTER
-     ============================================= -->
+@* FOOTER — bez emoji, aktualny rok i brand RentSpot *@
 <footer class="sr-footer">
     <div class="sr-footer-content">
         <div class="sr-footer-brand">
             <div class="sr-footer-logo" style="display:inline-flex;align-items:center;gap:8px;">
                 <svg viewBox="0 0 100 100" width="22" height="22" aria-hidden="true">
                     <circle cx="50" cy="50" r="48" fill="#F96167" />
-                    <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+                    <text x="50" y="72" font-family="Outfit, Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
                 </svg>
                 RentSpot<span style="color:#F96167">.</span>
             </div>
@@ -333,38 +307,6 @@
     </div>
 
     <div class="sr-footer-bottom">
-        <p>© 2024 SportRental. Wszystkie prawa zastrzeżone. Crafted with ❤️</p>
+        <p>© @DateTime.Now.Year RentSpot. Wszelkie prawa zastrzeżone.</p>
     </div>
 </footer>
-
-@code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            // Initialize scroll reveal animations
-            await JS.InvokeVoidAsync("eval", @"
-                const revealElements = document.querySelectorAll('.sr-reveal');
-                
-                const revealOnScroll = () => {
-                    revealElements.forEach(el => {
-                        const elementTop = el.getBoundingClientRect().top;
-                        const windowHeight = window.innerHeight;
-                        
-                        if (elementTop < windowHeight - 100) {
-                            el.classList.add('revealed');
-                        }
-                    });
-                };
-                
-                // Initial check
-                revealOnScroll();
-                
-                // Check on scroll
-                window.addEventListener('scroll', revealOnScroll);
-            ");
-        }
-    }
-
-    [Inject] private IJSRuntime JS { get; set; } = default!;
-}
