@@ -778,6 +778,50 @@ namespace SportRental.Admin.Api
                 return Results.Redirect(sasUrl);
             });
 
+            // Faza 8c — faktury VAT
+            // POST /api/rentals/{id}/invoice — wystawia fakturę dla wynajmu (idempotent przez Number unique)
+            api.MapPost("/rentals/{id:guid}/invoice", [Authorize(Roles = "Owner,SuperAdmin")] async (
+                Guid id,
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                SportRental.Admin.Services.IInvoiceService invoices,
+                ClaimsPrincipal user) =>
+            {
+                var (callerTenant, callerIsSuperAdmin) = ResolveTenantContext(user);
+                if (callerTenant == Guid.Empty && !callerIsSuperAdmin) return Results.Forbid();
+
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var rental = await db.Rentals.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.Id == id);
+                if (rental == null) return Results.NotFound();
+                if (!callerIsSuperAdmin && rental.TenantId != callerTenant) return Results.NotFound();
+
+                // Idempotency: jeśli już istnieje invoice dla tego rentala, zwróć go (nie generuj ponownie)
+                var existing = await db.Invoices.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.RentalId == id);
+                if (existing != null)
+                    return Results.Ok(new { id = existing.Id, number = existing.Number, status = existing.Status.ToString() });
+
+                var inv = await invoices.CreateForRentalAsync(id);
+                return Results.Created($"/api/invoices/{inv.Id}", new { id = inv.Id, number = inv.Number, status = inv.Status.ToString() });
+            });
+
+            // GET /api/invoices/{id}/pdf — pobierz PDF
+            api.MapGet("/invoices/{id:guid}/pdf", [Authorize] async (
+                Guid id,
+                IDbContextFactory<ApplicationDbContext> dbFactory,
+                SportRental.Admin.Services.IInvoiceService invoices,
+                ClaimsPrincipal user) =>
+            {
+                var (callerTenant, callerIsSuperAdmin) = ResolveTenantContext(user);
+                if (callerTenant == Guid.Empty && !callerIsSuperAdmin) return Results.Forbid();
+
+                await using var db = await dbFactory.CreateDbContextAsync();
+                var inv = await db.Invoices.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.Id == id);
+                if (inv == null) return Results.NotFound();
+                if (!callerIsSuperAdmin && inv.TenantId != callerTenant) return Results.NotFound();
+
+                var pdf = await invoices.GeneratePdfAsync(id);
+                return Results.File(pdf, "application/pdf", fileDownloadName: $"{inv.Number.Replace('/', '_')}.pdf");
+            });
+
             // Upload zdjęcia produktu
             api.MapPost("/products/{id:guid}/image", [Authorize(Roles = "Owner,SuperAdmin")] async (Guid id, HttpRequest request, IDbContextFactory<ApplicationDbContext> dbFactory, ImageVariantService images, IConfiguration config, ClaimsPrincipal user) =>
             {

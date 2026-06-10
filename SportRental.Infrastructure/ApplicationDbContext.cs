@@ -57,6 +57,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     // Faza 8b — ceny sezonowe per produkt
     public DbSet<PriceRule> PriceRules => Set<PriceRule>();
 
+    // Faza 8c — faktury VAT
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceCounter> InvoiceCounters => Set<InvoiceCounter>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -466,6 +470,29 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                   .HasForeignKey(pr => pr.ProductId)
                   .OnDelete(DeleteBehavior.Cascade);
             entity.HasQueryFilter(pr => TenantId == null || pr.TenantId == TenantId);
+        });
+
+        // Faza 8c — faktury VAT
+        modelBuilder.Entity<Invoice>(entity =>
+        {
+            entity.ToTable("Invoices");
+            entity.HasKey(i => i.Id);
+            entity.HasIndex(i => new { i.TenantId, i.Number }).IsUnique();
+            entity.HasIndex(i => i.RentalId);
+            entity.Property(i => i.Number).HasMaxLength(40).IsRequired();
+            entity.Property(i => i.VatRate).HasMaxLength(10).IsRequired();
+            entity.Property(i => i.NetAmount).HasPrecision(18, 2);
+            entity.Property(i => i.VatAmount).HasPrecision(18, 2);
+            entity.Property(i => i.GrossAmount).HasPrecision(18, 2);
+            entity.Property(i => i.PdfUrl).HasMaxLength(512);
+            entity.HasQueryFilter(i => TenantId == null || i.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<InvoiceCounter>(entity =>
+        {
+            entity.ToTable("InvoiceCounters");
+            entity.HasKey(c => c.Id);
+            entity.HasIndex(c => new { c.TenantId, c.Year }).IsUnique();
         });
     }
 }
