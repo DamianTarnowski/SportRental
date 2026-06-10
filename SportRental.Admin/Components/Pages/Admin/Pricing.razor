@@ -1,0 +1,199 @@
+@page "/admin/pricing"
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@rendermode InteractiveServer
+
+@using Microsoft.EntityFrameworkCore
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<Pricing> Logger
+
+<PageTitle>Ceny sezonowe · RentSpot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+        <div>
+            <MudText Typo="Typo.h4" Class="mb-1">Ceny sezonowe</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Reguły zmieniają cenę bazową produktu w wybranych okresach (sezon wysoki, ferie, święta).
+                Wygrywa najwyższy priorytet z aktywnych reguł na dany dzień.
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add"
+                   OnClick="OpenAddDialog">
+            Nowa reguła
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_rules.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+            Brak reguł cenowych. Bazowa cena produktu z katalogu jest używana cały rok.
+        </MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="mt-3" Style="border-radius: 16px;">
+            <MudTable Items="@_rules" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Nazwa</MudTh>
+                    <MudTh>Produkt</MudTh>
+                    <MudTh>Okres</MudTh>
+                    <MudTh>Typ</MudTh>
+                    <MudTh>Wartość</MudTh>
+                    <MudTh>Priorytet</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate Context="r">
+                    <MudTd>@r.Name</MudTd>
+                    <MudTd>@(_productNames.TryGetValue(r.ProductId, out var n) ? n : r.ProductId.ToString()[..8])</MudTd>
+                    <MudTd>@r.FromDate.ToString("dd.MM") – @r.ToDate.ToString("dd.MM.yyyy")</MudTd>
+                    <MudTd>@TypeLabel(r.Type)</MudTd>
+                    <MudTd>@FormatValue(r.Type, r.Value)</MudTd>
+                    <MudTd>@r.Priority</MudTd>
+                    <MudTd>
+                        @if (r.IsActive)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">aktywna</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Filled">wyłączona</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="() => OpenEditDialog(r)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => Delete(r)" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private List<PriceRule> _rules = new();
+    private Dictionary<Guid, string> _productNames = new();
+    private List<Product> _products = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var tenantId = TenantProvider.GetCurrentTenantId();
+            if (tenantId == null)
+            {
+                Snackbar.Add("Brak kontekstu tenanta.", Severity.Warning);
+                return;
+            }
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(tenantId.Value);
+
+            _products = await db.Products.OrderBy(p => p.Name).ToListAsync();
+            _productNames = _products.ToDictionary(p => p.Id, p => p.Name);
+            _rules = await db.PriceRules
+                .OrderByDescending(r => r.IsActive)
+                .ThenBy(r => r.FromDate)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load price rules");
+            Snackbar.Add($"Błąd ładowania: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var parameters = new DialogParameters
+        {
+            ["Rule"] = new PriceRule
+            {
+                FromDate = DateOnly.FromDateTime(DateTime.Today),
+                ToDate = DateOnly.FromDateTime(DateTime.Today.AddMonths(1)),
+                Type = PriceRuleType.Multiplier,
+                Value = 1.5m,
+                IsActive = true,
+                Priority = 10
+            },
+            ["Products"] = _products,
+            ["IsNew"] = true
+        };
+        var dialog = await DialogService.ShowAsync<PriceRuleDialog>("Nowa reguła cenowa", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false }) await ReloadAsync();
+    }
+
+    private async Task OpenEditDialog(PriceRule rule)
+    {
+        var parameters = new DialogParameters
+        {
+            ["Rule"] = rule,
+            ["Products"] = _products,
+            ["IsNew"] = false
+        };
+        var dialog = await DialogService.ShowAsync<PriceRuleDialog>("Edycja reguły", parameters);
+        var result = await dialog.Result;
+        if (result is { Canceled: false }) await ReloadAsync();
+    }
+
+    private async Task Delete(PriceRule rule)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Usuń regułę",
+            $"Czy na pewno usunąć regułę \"{rule.Name}\"?",
+            yesText: "Usuń", cancelText: "Anuluj");
+        if (confirm != true) return;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.PriceRules.Remove(rule);
+            await db.SaveChangesAsync();
+            Snackbar.Add("Reguła usunięta.", Severity.Success);
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to delete price rule {Id}", rule.Id);
+            Snackbar.Add($"Błąd usuwania: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static string TypeLabel(PriceRuleType t) => t switch
+    {
+        PriceRuleType.Multiplier => "Mnożnik",
+        PriceRuleType.FixedAdd => "Dopłata",
+        PriceRuleType.FixedReplace => "Cena stała",
+        _ => t.ToString()
+    };
+
+    private static string FormatValue(PriceRuleType t, decimal v) => t switch
+    {
+        PriceRuleType.Multiplier => $"×{v:0.00}",
+        PriceRuleType.FixedAdd => $"+{v:0.00} zł",
+        PriceRuleType.FixedReplace => $"{v:0.00} zł/dzień",
+        _ => v.ToString("0.00")
+    };
+}

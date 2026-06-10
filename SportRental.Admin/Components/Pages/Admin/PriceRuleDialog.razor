@@ -1,0 +1,131 @@
+@using Microsoft.EntityFrameworkCore
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject ILogger<PriceRuleDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="Rule.Name" Label="Nazwa (np. Wysoki sezon, Ferie)" Required="true" />
+
+            <MudSelect T="Guid" Value="Rule.ProductId" ValueChanged="@(v => Rule.ProductId = v)" Label="Produkt" Required="true">
+                @foreach (var p in Products)
+                {
+                    <MudSelectItem T="Guid" Value="@p.Id">@p.Name (bazowa @p.DailyPrice.ToString("0.00") zł/dzień)</MudSelectItem>
+                }
+            </MudSelect>
+
+            <MudStack Row="true" Spacing="2">
+                <MudDatePicker @bind-Date="_fromDate" Label="Od" Required="true" />
+                <MudDatePicker @bind-Date="_toDate" Label="Do" Required="true" />
+            </MudStack>
+
+            <MudSelect T="PriceRuleType" Value="Rule.Type" ValueChanged="@(v => Rule.Type = v)" Label="Typ modyfikatora">
+                <MudSelectItem T="PriceRuleType" Value="@PriceRuleType.Multiplier">Mnożnik (np. ×1.5 = +50%)</MudSelectItem>
+                <MudSelectItem T="PriceRuleType" Value="@PriceRuleType.FixedAdd">Dopłata kwotowa (np. +50 zł/dzień)</MudSelectItem>
+                <MudSelectItem T="PriceRuleType" Value="@PriceRuleType.FixedReplace">Cena stała (zastępuje bazową)</MudSelectItem>
+            </MudSelect>
+
+            <MudNumericField @bind-Value="Rule.Value" Label="@ValueLabel(Rule.Type)" Min="0.01m" Step="0.1m" Format="N2" />
+
+            <MudStack Row="true" Spacing="2">
+                <MudNumericField @bind-Value="Rule.Priority" Label="Priorytet (wyższy = wygrywa)" Min="0" Step="1" />
+                <MudSwitch @bind-Value="Rule.IsActive" Label="Aktywna" Color="Color.Primary" />
+            </MudStack>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Anuluj</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@_saving">
+            @(_saving ? "Zapisywanie…" : (IsNew ? "Utwórz" : "Zapisz"))
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public PriceRule Rule { get; set; } = default!;
+    [Parameter] public List<Product> Products { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+
+    private bool _saving;
+    private DateTime? _fromDate;
+    private DateTime? _toDate;
+
+    protected override void OnInitialized()
+    {
+        _fromDate = Rule.FromDate.ToDateTime(TimeOnly.MinValue);
+        _toDate = Rule.ToDate.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private static string ValueLabel(PriceRuleType t) => t switch
+    {
+        PriceRuleType.Multiplier => "Mnożnik (1.5 = +50%)",
+        PriceRuleType.FixedAdd => "Kwota dodawana (PLN)",
+        PriceRuleType.FixedReplace => "Nowa cena dzienna (PLN)",
+        _ => "Wartość"
+    };
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Rule.Name))
+        {
+            Snackbar.Add("Nazwa jest wymagana.", Severity.Warning);
+            return;
+        }
+        if (Rule.ProductId == Guid.Empty)
+        {
+            Snackbar.Add("Wybierz produkt.", Severity.Warning);
+            return;
+        }
+        if (!_fromDate.HasValue || !_toDate.HasValue || _fromDate > _toDate)
+        {
+            Snackbar.Add("Niepoprawny zakres dat (od ≤ do).", Severity.Warning);
+            return;
+        }
+        Rule.FromDate = DateOnly.FromDateTime(_fromDate.Value);
+        Rule.ToDate = DateOnly.FromDateTime(_toDate.Value);
+
+        var tenantId = TenantProvider.GetCurrentTenantId();
+        if (tenantId == null) return;
+
+        _saving = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(tenantId.Value);
+
+            if (IsNew)
+            {
+                Rule.Id = Guid.NewGuid();
+                Rule.TenantId = tenantId.Value;
+                Rule.CreatedAtUtc = DateTime.UtcNow;
+                db.PriceRules.Add(Rule);
+            }
+            else
+            {
+                db.PriceRules.Attach(Rule);
+                db.Entry(Rule).State = EntityState.Modified;
+            }
+
+            await db.SaveChangesAsync();
+            Snackbar.Add(IsNew ? "Reguła utworzona." : "Reguła zapisana.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(Rule));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save price rule");
+            Snackbar.Add($"Błąd zapisu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

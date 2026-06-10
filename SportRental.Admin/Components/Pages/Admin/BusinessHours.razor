@@ -1,0 +1,197 @@
+@page "/admin/business-hours"
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@rendermode InteractiveServer
+
+@inject SportRental.Admin.Services.IBusinessHoursService HoursService
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject ILogger<BusinessHours> Logger
+
+<PageTitle>Godziny pracy · RentSpot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-1">Godziny pracy wypożyczalni</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        Klient nie wybierze rezerwacji poza godzinami otwarcia. Brak ustawień = domyślnie 8:00–20:00 codziennie.
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else
+    {
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true" Style="border-radius: 16px;">
+            <MudTable Items="@_days" Hover="true" Dense="true" Bordered="false" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Dzień tygodnia</MudTh>
+                    <MudTh Style="width: 100px">Zamknięte</MudTh>
+                    <MudTh>Od</MudTh>
+                    <MudTh>Do</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="row">
+                    <MudTd DataLabel="Dzień">@DayLabel(row.DayOfWeek)</MudTd>
+                    <MudTd DataLabel="Zamknięte">
+                        <MudCheckBox T="bool" Value="row.IsClosed"
+                                     ValueChanged="@(v => OnClosedChanged(row, v))"
+                                     Color="Color.Primary" />
+                    </MudTd>
+                    <MudTd DataLabel="Od">
+                        @if (!row.IsClosed)
+                        {
+                            <MudTimePicker Time="@TimeSpanFrom(row.OpenFrom)"
+                                           TimeChanged="@(t => row.OpenFrom = TimeOnlyFrom(t))"
+                                           AmPm="false" Editable="true" />
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Do">
+                        @if (!row.IsClosed)
+                        {
+                            <MudTimePicker Time="@TimeSpanFrom(row.OpenTo)"
+                                           TimeChanged="@(t => row.OpenTo = TimeOnlyFrom(t))"
+                                           AmPm="false" Editable="true" />
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">—</MudText>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+
+            <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-4">
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Strefa czasowa: Europe/Warsaw. Wyjątki na konkretne daty (święta) — wkrótce.
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Save"
+                           OnClick="SaveAsync" Disabled="@_saving">
+                    @(_saving ? "Zapisywanie…" : "Zapisz")
+                </MudButton>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private bool _saving;
+    private List<DayRow> _days = new();
+
+    private static readonly DayOfWeek[] WeekOrder = new[]
+    {
+        DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday,
+        DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday
+    };
+
+    public sealed class DayRow
+    {
+        public DayOfWeek DayOfWeek { get; set; }
+        public bool IsClosed { get; set; }
+        public TimeOnly? OpenFrom { get; set; }
+        public TimeOnly? OpenTo { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var tenantId = TenantProvider.GetCurrentTenantId();
+            if (tenantId == null)
+            {
+                Snackbar.Add("Brak kontekstu tenanta. Wybierz wypożyczalnię.", Severity.Warning);
+                _loading = false;
+                return;
+            }
+
+            var schedule = await HoursService.GetOrCreateScheduleAsync(tenantId.Value);
+            _days = WeekOrder.Select(dow =>
+            {
+                var d = schedule.Days.FirstOrDefault(x => x.DayOfWeek == dow);
+                return new DayRow
+                {
+                    DayOfWeek = dow,
+                    IsClosed = d?.IsClosed ?? false,
+                    OpenFrom = d?.OpenFrom ?? new TimeOnly(8, 0),
+                    OpenTo = d?.OpenTo ?? new TimeOnly(20, 0)
+                };
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load business hours");
+            Snackbar.Add($"Błąd ładowania: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        var tenantId = TenantProvider.GetCurrentTenantId();
+        if (tenantId == null) return;
+
+        _saving = true;
+        try
+        {
+            // Walidacja: from < to dla otwartych
+            foreach (var d in _days.Where(x => !x.IsClosed))
+            {
+                if (!d.OpenFrom.HasValue || !d.OpenTo.HasValue || d.OpenFrom >= d.OpenTo)
+                {
+                    Snackbar.Add($"Niepoprawne godziny dla {DayLabel(d.DayOfWeek)} — Od musi być przed Do.", Severity.Error);
+                    _saving = false;
+                    return;
+                }
+            }
+
+            var days = _days.Select(d => new SportRental.Infrastructure.Domain.BusinessHoursDay
+            {
+                DayOfWeek = d.DayOfWeek,
+                IsClosed = d.IsClosed,
+                OpenFrom = d.OpenFrom,
+                OpenTo = d.OpenTo
+            });
+
+            await HoursService.SaveScheduleAsync(tenantId.Value, days);
+            Snackbar.Add("Godziny pracy zapisane.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to save business hours");
+            Snackbar.Add($"Błąd zapisu: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void OnClosedChanged(DayRow row, bool isClosed)
+    {
+        row.IsClosed = isClosed;
+        if (!isClosed && row.OpenFrom == null) row.OpenFrom = new TimeOnly(8, 0);
+        if (!isClosed && row.OpenTo == null) row.OpenTo = new TimeOnly(20, 0);
+    }
+
+    private static string DayLabel(DayOfWeek dow) => dow switch
+    {
+        DayOfWeek.Monday => "Poniedziałek",
+        DayOfWeek.Tuesday => "Wtorek",
+        DayOfWeek.Wednesday => "Środa",
+        DayOfWeek.Thursday => "Czwartek",
+        DayOfWeek.Friday => "Piątek",
+        DayOfWeek.Saturday => "Sobota",
+        DayOfWeek.Sunday => "Niedziela",
+        _ => dow.ToString()
+    };
+
+    private static TimeSpan? TimeSpanFrom(TimeOnly? t) => t.HasValue ? t.Value.ToTimeSpan() : null;
+    private static TimeOnly? TimeOnlyFrom(TimeSpan? ts) => ts.HasValue ? TimeOnly.FromTimeSpan(ts.Value) : null;
+}

@@ -9,6 +9,7 @@
 @inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
 @inject SportRental.Admin.Services.Sms.ISmsConfirmationService SmsConfirmationService
 @inject SportRental.Admin.Services.IRentalConfirmationService RentalConfirmationService
+@inject SportRental.Admin.Services.IInvoiceService InvoiceService
 @inject ILogger<Rentals> Logger
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
@@ -105,6 +106,7 @@
                                     {
                                         <MudMenuItem Icon="@Icons.Material.Filled.Description" Href="@rental.ContractUrl" Target="_blank">Umowa</MudMenuItem>
                                     }
+                                    <MudMenuItem Icon="@Icons.Material.Filled.ReceiptLong" OnClick="() => IssueInvoice(rental)">Wystaw fakturę VAT</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Email" OnClick="() => SendContractByEmail(rental)">Email</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Sms" OnClick="() => OpenCustomSmsDialog(rental)">SMS</MudMenuItem>
                                     @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
@@ -2276,6 +2278,36 @@ else
         {
             sendingCustomSms = false;
             StateHasChanged();
+        }
+    }
+
+    private async Task IssueInvoice(Rental rental)
+    {
+        try
+        {
+            // Idempotent: jeśli faktura już istnieje, otwiera istniejącą zamiast tworzyć duplikat
+            await using var db = await DbFactory.CreateDbContextAsync();
+            var existing = await db.Invoices.FirstOrDefaultAsync(i => i.RentalId == rental.Id);
+
+            SportRental.Infrastructure.Domain.Invoice invoice;
+            if (existing != null)
+            {
+                invoice = existing;
+                Snackbar.Add($"Faktura {invoice.Number} już istnieje — otwieram PDF.", MudBlazor.Severity.Info);
+            }
+            else
+            {
+                invoice = await InvoiceService.CreateForRentalAsync(rental.Id);
+                Snackbar.Add($"Wystawiono fakturę {invoice.Number} ({invoice.GrossAmount:N2} zł brutto).", MudBlazor.Severity.Success);
+            }
+
+            // Otwórz PDF w nowej karcie (endpoint /api/invoices/{id}/pdf wymaga auth — cookie sesji Blazor)
+            await JS.InvokeVoidAsync("open", $"/api/invoices/{invoice.Id}/pdf", "_blank");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to issue invoice for rental {RentalId}", rental.Id);
+            Snackbar.Add($"Błąd wystawiania faktury: {ex.Message}", MudBlazor.Severity.Error);
         }
     }
 }
