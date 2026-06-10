@@ -49,6 +49,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<ChatSettings> ChatSettings => Set<ChatSettings>();
 
+    // Faza 8a — godziny pracy per tenant
+    public DbSet<BusinessHoursSchedule> BusinessHoursSchedules => Set<BusinessHoursSchedule>();
+    public DbSet<BusinessHoursDay> BusinessHoursDays => Set<BusinessHoursDay>();
+    public DbSet<BusinessHoursException> BusinessHoursExceptions => Set<BusinessHoursException>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -413,6 +418,35 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(cs => cs.ExpiresAtUtc);
             entity.Property(cs => cs.IdempotencyKey).HasMaxLength(100).IsRequired();
             entity.Property(cs => cs.StripeSessionId).HasMaxLength(200);
+        });
+
+        // Faza 8a — BusinessHours per tenant
+        modelBuilder.Entity<BusinessHoursSchedule>(entity =>
+        {
+            entity.ToTable("BusinessHoursSchedules");
+            entity.HasKey(bh => bh.Id);
+            entity.HasIndex(bh => bh.TenantId).IsUnique(); // jeden schedule per tenant
+            entity.HasMany(bh => bh.Days)
+                  .WithOne(d => d.Schedule!)
+                  .HasForeignKey(d => d.ScheduleId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(bh => TenantId == null || bh.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<BusinessHoursDay>(entity =>
+        {
+            entity.ToTable("BusinessHoursDays");
+            entity.HasKey(d => d.Id);
+            entity.HasIndex(d => new { d.ScheduleId, d.DayOfWeek }).IsUnique();
+        });
+
+        modelBuilder.Entity<BusinessHoursException>(entity =>
+        {
+            entity.ToTable("BusinessHoursExceptions");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.Date }).IsUnique();
+            entity.Property(e => e.Reason).HasMaxLength(256);
+            entity.HasQueryFilter(e => TenantId == null || e.TenantId == TenantId);
         });
     }
 }

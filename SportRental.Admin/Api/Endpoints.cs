@@ -2143,6 +2143,7 @@ namespace SportRental.Admin.Api
                 ITenantProvider tenantProvider,
                 IConfiguration configuration,
                 Microsoft.Extensions.Options.IOptions<Payments.StripeOptions> stripeOptions,
+                SportRental.Admin.Services.IBusinessHoursService businessHours,
                 SharedModels.CreateCheckoutSessionRequest request,
                 CancellationToken ct) =>
             {
@@ -2159,6 +2160,28 @@ namespace SportRental.Admin.Api
                 if (!request.CustomerId.HasValue)
                 {
                     return Results.BadRequest(new { error = "CustomerId is required for checkout." });
+                }
+
+                // Faza 8a: walidacja godzin pracy PRZED Stripe (po płatności już nie cofniemy).
+                // Pobieramy tenanty per ProductId (CheckoutItem nie ma TenantId), walidujemy
+                // dla każdego distinct tenant w koszyku.
+                {
+                    await using var preDb = await dbFactory.CreateDbContextAsync(ct);
+                    var productIds = request.Items.Select(i => i.ProductId).ToList();
+                    var tenants = await preDb.Products
+                        .IgnoreQueryFilters()
+                        .Where(p => productIds.Contains(p.Id))
+                        .Select(p => p.TenantId)
+                        .Distinct()
+                        .ToListAsync(ct);
+                    foreach (var tId in tenants)
+                    {
+                        var window = await businessHours.ValidateRentalWindowAsync(tId, request.StartDateUtc, request.EndDateUtc, ct);
+                        if (!window.IsValid)
+                        {
+                            return Results.BadRequest(new { error = window.Reason ?? "Wypożyczalnia jest zamknięta w wybranym terminie." });
+                        }
+                    }
                 }
 
                 await using var db = await dbFactory.CreateDbContextAsync(ct);
