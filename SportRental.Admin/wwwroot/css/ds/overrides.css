@@ -86,9 +86,64 @@ aside.mud-drawer .mud-nav-link.mud-nav-link-active .mud-icon-root {
 
 /* ============================================
    PAGE HEADERS / BANNERS — flat coral tint (light) lub navy-inverse (dark)
-   Cel: usunąć WSZYSTKIE inline gradient z .mud-paper (10+ kolorów w stronach
-   Admin: #4fc3f7, #f093fb, #11998e, #4ecdc4, #ab47bc, #a8edea, #f3e5f5, etc.)
+   Czyste: .rs-page-banner (desktop big) + .rs-page-banner-sm (mobile small) —
+   z refactor 10 stron Admin (Products, Customers, etc.), inline gradient zostały
+   zamienione na te klasy. Legacy: .mud-paper[style*="linear-gradient"] dla
+   placeholderów (image wells, avatars) ktore moga jeszcze gdziekolwiek zostać.
    ============================================ */
+.rs-page-banner,
+.rs-page-banner-sm {
+    background: var(--surface-brand-tint, #FEF2F2) !important;
+    color: var(--coral-900, #671A1E) !important;
+    border: 1px solid var(--coral-200, #FBC8CA) !important;
+    box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
+    border-radius: 16px !important;
+}
+.rs-page-banner-sm { border-radius: 12px !important; }
+
+.rs-page-banner .mud-typography,
+.rs-page-banner-sm .mud-typography,
+.rs-page-banner h1, .rs-page-banner h2, .rs-page-banner h3, .rs-page-banner h4 {
+    color: var(--coral-900, #671A1E) !important;
+    text-shadow: none !important;
+}
+.rs-page-banner .mud-icon-root,
+.rs-page-banner-sm .mud-icon-root {
+    color: var(--coral-700, #BC3138) !important;
+}
+.rs-page-banner .mud-button {
+    background: rgba(255, 255, 255, 0.7) !important;
+    color: var(--coral-900, #671A1E) !important;
+    border: 1px solid var(--coral-300, #FAA3A7) !important;
+}
+
+[data-theme="dark"] .rs-page-banner,
+[data-theme="dark"] .rs-page-banner-sm,
+.mud-theme-dark .rs-page-banner,
+.mud-theme-dark .rs-page-banner-sm {
+    background: var(--navy-900, #1B2350) !important;
+    color: #E8EBF5 !important;
+    border: 1px solid var(--navy-800, #242E61) !important;
+}
+[data-theme="dark"] .rs-page-banner .mud-typography,
+[data-theme="dark"] .rs-page-banner-sm .mud-typography,
+[data-theme="dark"] .rs-page-banner h1, [data-theme="dark"] .rs-page-banner h2,
+[data-theme="dark"] .rs-page-banner h3, [data-theme="dark"] .rs-page-banner h4,
+.mud-theme-dark .rs-page-banner .mud-typography {
+    color: #FFFFFF !important;
+}
+[data-theme="dark"] .rs-page-banner .mud-icon-root,
+[data-theme="dark"] .rs-page-banner-sm .mud-icon-root,
+.mud-theme-dark .rs-page-banner .mud-icon-root {
+    color: rgba(232, 235, 245, 0.85) !important;
+}
+[data-theme="dark"] .rs-page-banner .mud-button,
+.mud-theme-dark .rs-page-banner .mud-button {
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
 .admin-page-header,
 .mud-paper[style*="linear-gradient"] {
     background: var(--surface-brand-tint, #FEF2F2) !important;
