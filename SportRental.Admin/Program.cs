@@ -599,6 +599,15 @@ app.MapHealthChecks("/health/ready");
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
 
+// User-friendly redirects — żeby srental2.azurewebsites.net/login działało (route `/login`
+// istnieje tylko w Client WASM pod `/_client/login`, a Admin używa `/Account/Login`).
+app.MapGet("/login", () => Results.Redirect("/Account/Login", permanent: false))
+   .AllowAnonymous();
+app.MapGet("/register", () => Results.Redirect("/Account/Register", permanent: false))
+   .AllowAnonymous();
+app.MapGet("/logout", () => Results.Redirect("/Account/Logout", permanent: false))
+   .AllowAnonymous();
+
 // REST API
 app.MapSportRentalApi();
 app.MapSmsApiCallbacks(); // SMSAPI delivery report callbacks

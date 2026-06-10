@@ -29,10 +29,19 @@
 /* ============================================
    SIDEBAR — flat navy zawsze (DS v2: sidebar = navy element chrome)
    ============================================ */
+.rs-drawer,
+aside.mud-drawer {
+    background: var(--navy-900, #1B2350) !important;
+}
 .rs-drawer .mud-drawer-content,
 aside.mud-drawer .mud-drawer-content {
     background: var(--navy-900, #1B2350) !important;
-    overflow-y: auto !important;  /* fix: lista pozycji nie zmieści się — scroll */
+    /* Drawer ma fixed pozycję od top:appbar (60px) do bottom viewport.
+       Wewnętrzny content musi mieć fixed height + scroll żeby długa lista
+       pozycji (~14 linków) zmieściła się także na Home gdzie body jest krótkie. */
+    height: 100% !important;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto !important;
     overflow-x: hidden;
 }
 
