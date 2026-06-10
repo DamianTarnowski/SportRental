@@ -1,0 +1,87 @@
+@using SportRental.Infrastructure.Domain
+@inject SportRental.Admin.Services.IVoucherService VoucherSvc
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject ILogger<VoucherCreateDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        @if (_created == null)
+        {
+            <MudStack Spacing="3">
+                <MudNumericField @bind-Value="_balance" Label="Wartość vouchera (PLN)" Required="true" Min="1" Step="50" Format="N2" />
+                <MudTextField @bind-Value="_toName" Label="Dla kogo (opcjonalnie)" />
+                <MudTextField @bind-Value="_toEmail" Label="Email odbiorcy (opcjonalnie)" InputType="InputType.Email" />
+                <MudDatePicker @bind-Date="_expires" Label="Data wygaśnięcia (opcjonalnie)" />
+            </MudStack>
+        }
+        else
+        {
+            <MudStack Spacing="3">
+                <MudAlert Severity="Severity.Success" Variant="Variant.Outlined">
+                    Voucher wygenerowany. Skopiuj kod i przekaż odbiorcy.
+                </MudAlert>
+                <MudPaper Class="pa-4 text-center" Outlined="true" Style="border-radius: 16px; background: var(--surface-brand-tint);">
+                    <MudText Typo="Typo.h5" Style="font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.05em;">
+                        @_created.Code
+                    </MudText>
+                    <MudText Typo="Typo.body1" Class="mt-2" Style="font-weight: 600;">
+                        Saldo: @_created.InitialBalance.ToString("N2") zł
+                    </MudText>
+                </MudPaper>
+            </MudStack>
+        }
+    </DialogContent>
+    <DialogActions>
+        @if (_created == null)
+        {
+            <MudButton OnClick="Cancel">Anuluj</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateAsync" Disabled="@_saving">
+                @(_saving ? "Generowanie…" : "Wygeneruj")
+            </MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">OK</MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private bool _saving;
+    private decimal _balance = 100m;
+    private string? _toName;
+    private string? _toEmail;
+    private DateTime? _expires = DateTime.Today.AddYears(1);
+    private Voucher? _created;
+
+    private async Task CreateAsync()
+    {
+        if (_balance <= 0)
+        {
+            Snackbar.Add("Wartość musi być dodatnia.", Severity.Warning);
+            return;
+        }
+        var tenantId = TenantProvider.GetCurrentTenantId();
+        if (tenantId == null) return;
+
+        _saving = true;
+        try
+        {
+            DateOnly? expires = _expires.HasValue ? DateOnly.FromDateTime(_expires.Value) : null;
+            _created = await VoucherSvc.CreateAsync(tenantId.Value, _balance, _toName, _toEmail, expires, null);
+            Snackbar.Add("Voucher utworzony.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Create voucher failed");
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally { _saving = false; }
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(_created));
+    private void Cancel() => MudDialog.Cancel();
+}

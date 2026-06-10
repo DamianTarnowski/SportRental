@@ -1,0 +1,115 @@
+@page "/admin/vouchers"
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@rendermode InteractiveServer
+
+@using SportRental.Infrastructure.Domain
+@inject SportRental.Admin.Services.IVoucherService VoucherSvc
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<Vouchers> Logger
+
+<PageTitle>Vouchery · RentSpot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+        <div>
+            <MudText Typo="Typo.h4">Vouchery</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                Karty podarunkowe z saldem do wykorzystania na wynajmy. Kod 16-znakowy globalnie unikalny.
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">
+            Nowy voucher
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_vouchers.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+            Brak voucherów. Dodaj pierwszy — np. prezent dla stałego klienta.
+        </MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="mt-3" Style="border-radius: 16px;">
+            <MudTable Items="@_vouchers" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Kod</MudTh>
+                    <MudTh>Dla kogo</MudTh>
+                    <MudTh>Saldo początkowe</MudTh>
+                    <MudTh>Saldo pozostałe</MudTh>
+                    <MudTh>Wygasa</MudTh>
+                    <MudTh>Status</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="v">
+                    <MudTd>
+                        <MudText Style="font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem;">@v.Code</MudText>
+                    </MudTd>
+                    <MudTd>
+                        @(v.IssuedToName ?? "—")
+                        @if (!string.IsNullOrWhiteSpace(v.IssuedToEmail))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@v.IssuedToEmail</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>@v.InitialBalance.ToString("N2") zł</MudTd>
+                    <MudTd>
+                        <MudText Style="@(v.RemainingBalance > 0 ? "font-weight: 600; color: var(--coral-700);" : "color: var(--text-secondary);")">
+                            @v.RemainingBalance.ToString("N2") zł
+                        </MudText>
+                    </MudTd>
+                    <MudTd>@(v.ExpiresAt?.ToString("dd.MM.yyyy") ?? "bezterminowo")</MudTd>
+                    <MudTd>
+                        @{
+                            (string label, Color color) = v.Status switch
+                            {
+                                VoucherStatus.Active => ("aktywny", Color.Success),
+                                VoucherStatus.FullyRedeemed => ("wykorzystany", Color.Default),
+                                VoucherStatus.Expired => ("wygasł", Color.Warning),
+                                VoucherStatus.Cancelled => ("anulowany", Color.Error),
+                                _ => (v.Status.ToString(), Color.Default)
+                            };
+                        }
+                        <MudChip T="string" Size="Size.Small" Color="@color" Variant="Variant.Filled">@label</MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private List<Voucher> _vouchers = new();
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var tenantId = TenantProvider.GetCurrentTenantId();
+            if (tenantId == null) { Snackbar.Add("Brak tenanta.", Severity.Warning); return; }
+            _vouchers = (await VoucherSvc.ListAsync(tenantId.Value)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Load vouchers failed");
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var dlg = await DialogService.ShowAsync<VoucherCreateDialog>("Nowy voucher", new DialogParameters());
+        if ((await dlg.Result) is { Canceled: false }) await ReloadAsync();
+    }
+}

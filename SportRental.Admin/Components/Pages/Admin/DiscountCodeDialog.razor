@@ -1,0 +1,138 @@
+@using Microsoft.EntityFrameworkCore
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject ILogger<DiscountCodeDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudTextField @bind-Value="Code.Code" Label="Kod (UPPERCASE)" Required="true"
+                          HelperText="Np. LATO2026, PARTNER20, BLACKFRIDAY" />
+
+            <MudTextField @bind-Value="Code.Description" Label="Opis (opcjonalnie)" />
+
+            <MudSelect T="DiscountType" Value="Code.Type" ValueChanged="@(v => Code.Type = v)" Label="Typ">
+                <MudSelectItem T="DiscountType" Value="@DiscountType.Percentage">Procentowy (10 = -10%)</MudSelectItem>
+                <MudSelectItem T="DiscountType" Value="@DiscountType.FixedAmount">Kwotowy (50 = -50 zł)</MudSelectItem>
+            </MudSelect>
+
+            <MudNumericField @bind-Value="Code.Value" Label="@ValueLabel(Code.Type)" Min="0" Step="1" Format="N2" />
+
+            <MudStack Row="true" Spacing="2">
+                <MudDatePicker @bind-Date="_validFrom" Label="Ważny od (opcjonalnie)" />
+                <MudDatePicker @bind-Date="_validTo" Label="Ważny do (opcjonalnie)" />
+            </MudStack>
+
+            <MudStack Row="true" Spacing="2">
+                <MudNumericField @bind-Value="Code.MaxUses" Label="Max użyć (puste = ∞)" Min="1" Step="1" />
+                <MudNumericField @bind-Value="Code.MinOrderAmount" Label="Min. kwota zamówienia (PLN)" Min="0" Step="10" Format="N2" />
+            </MudStack>
+
+            <MudSwitch @bind-Value="Code.IsActive" Label="Aktywny" Color="Color.Primary" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Anuluj</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveAsync" Disabled="@_saving">
+            @(_saving ? "Zapisywanie…" : (IsNew ? "Utwórz" : "Zapisz"))
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public DiscountCode Code { get; set; } = default!;
+    [Parameter] public bool IsNew { get; set; }
+
+    private bool _saving;
+    private DateTime? _validFrom;
+    private DateTime? _validTo;
+
+    protected override void OnInitialized()
+    {
+        _validFrom = Code.ValidFrom?.ToDateTime(TimeOnly.MinValue);
+        _validTo = Code.ValidTo?.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private static string ValueLabel(DiscountType t) => t switch
+    {
+        DiscountType.Percentage => "Procent zniżki (1-100)",
+        DiscountType.FixedAmount => "Kwota zniżki w PLN",
+        _ => "Wartość"
+    };
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Code.Code))
+        {
+            Snackbar.Add("Kod jest wymagany.", Severity.Warning);
+            return;
+        }
+        Code.Code = Code.Code.Trim().ToUpperInvariant();
+
+        if (Code.Type == DiscountType.Percentage && (Code.Value <= 0 || Code.Value > 100))
+        {
+            Snackbar.Add("Procent musi być w zakresie 1-100.", Severity.Warning);
+            return;
+        }
+        if (Code.Type == DiscountType.FixedAmount && Code.Value <= 0)
+        {
+            Snackbar.Add("Kwota musi być dodatnia.", Severity.Warning);
+            return;
+        }
+
+        Code.ValidFrom = _validFrom.HasValue ? DateOnly.FromDateTime(_validFrom.Value) : null;
+        Code.ValidTo = _validTo.HasValue ? DateOnly.FromDateTime(_validTo.Value) : null;
+        if (Code.ValidFrom.HasValue && Code.ValidTo.HasValue && Code.ValidFrom > Code.ValidTo)
+        {
+            Snackbar.Add("Data 'od' musi być wcześniejsza niż 'do'.", Severity.Warning);
+            return;
+        }
+
+        var tenantId = TenantProvider.GetCurrentTenantId();
+        if (tenantId == null) return;
+
+        _saving = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(tenantId.Value);
+
+            if (IsNew)
+            {
+                Code.Id = Guid.NewGuid();
+                Code.TenantId = tenantId.Value;
+                Code.CreatedAtUtc = DateTime.UtcNow;
+
+                var exists = await db.DiscountCodes.AnyAsync(c => c.Code == Code.Code);
+                if (exists)
+                {
+                    Snackbar.Add($"Kod '{Code.Code}' już istnieje dla tej wypożyczalni.", Severity.Warning);
+                    _saving = false;
+                    return;
+                }
+                db.DiscountCodes.Add(Code);
+            }
+            else
+            {
+                db.DiscountCodes.Attach(Code);
+                db.Entry(Code).State = EntityState.Modified;
+            }
+
+            await db.SaveChangesAsync();
+            Snackbar.Add(IsNew ? "Kod utworzony." : "Zapisano.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(Code));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Save failed");
+            Snackbar.Add($"Błąd zapisu: {ex.Message}", Severity.Error);
+        }
+        finally { _saving = false; }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

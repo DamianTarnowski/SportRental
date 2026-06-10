@@ -1,0 +1,141 @@
+@page "/admin/google-calendar"
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@rendermode InteractiveServer
+
+@using SportRental.Infrastructure.Domain
+@inject SportRental.Admin.Services.IGoogleCalendarService GCal
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject ILogger<GoogleCalendarPage> Logger
+
+<PageTitle>Google Calendar · RentSpot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <MudText Typo="Typo.h4" Class="mb-1">Integracja z Google Calendar</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-4">
+        Każdy wynajem automatycznie pojawi się jako wydarzenie w Twoim Google Calendar.
+        Synchronizujemy datę odbioru, zwrotu, klienta i sprzęt.
+    </MudText>
+
+    @if (!string.IsNullOrEmpty(_message))
+    {
+        <MudAlert Severity="@_messageSev" Variant="Variant.Outlined" Class="mb-4">@_message</MudAlert>
+    }
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_config == null)
+    {
+        <MudPaper Class="pa-6" Elevation="0" Outlined="true" Style="border-radius: 16px;">
+            <MudStack Spacing="3" AlignItems="AlignItems.Center">
+                <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Large" Color="Color.Primary" />
+                <MudText Typo="Typo.h6">Nie połączono z Google Calendar</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Align="Align.Center">
+                    Kliknij poniżej, aby zalogować się przez Google i wybrać kalendarz dla synchronizacji wynajmów.
+                </MudText>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                           Href="/api/google-calendar/connect"
+                           StartIcon="@Icons.Material.Filled.Link">
+                    Połącz z Google Calendar
+                </MudButton>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Wymagany zakres: <code>calendar.events</code> — zapis/edycja wydarzeń.
+                </MudText>
+            </MudStack>
+        </MudPaper>
+    }
+    else
+    {
+        <MudPaper Class="pa-6" Elevation="0" Outlined="true" Style="border-radius: 16px;">
+            <MudStack Spacing="3">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" />
+                    <MudText Typo="Typo.h6">Połączono</MudText>
+                </MudStack>
+                <MudDivider />
+                <MudStack Spacing="1">
+                    <MudText><strong>Konto Google:</strong> @(_config.ConnectedEmail ?? "—")</MudText>
+                    <MudText><strong>Kalendarz:</strong> @_config.CalendarId</MudText>
+                    <MudText><strong>Ostatnia synchronizacja:</strong>
+                        @(_config.LastSyncAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
+                    </MudText>
+                    <MudText><strong>Liczba wynajmów zsynchronizowanych:</strong> @_config.SyncedCount</MudText>
+                </MudStack>
+                <MudDivider />
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Error"
+                               StartIcon="@Icons.Material.Filled.LinkOff"
+                               OnClick="DisconnectAsync">
+                        Rozłącz
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private GoogleCalendarConfig? _config;
+    private string? _message;
+    private Severity _messageSev = Severity.Info;
+
+    [SupplyParameterFromQuery] public string? Connected { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(Connected))
+        {
+            _message = "Połączono z Google Calendar.";
+            _messageSev = Severity.Success;
+        }
+        else if (!string.IsNullOrEmpty(Error))
+        {
+            _message = $"Błąd połączenia: {Error}";
+            _messageSev = Severity.Error;
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var tenantId = TenantProvider.GetCurrentTenantId();
+            if (tenantId == null)
+            {
+                Snackbar.Add("Brak tenanta.", Severity.Warning);
+                return;
+            }
+            _config = await GCal.GetConfigAsync(tenantId.Value);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Load gcal config failed");
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task DisconnectAsync()
+    {
+        var tenantId = TenantProvider.GetCurrentTenantId();
+        if (tenantId == null) return;
+        try
+        {
+            await GCal.DisconnectTenantAsync(tenantId.Value);
+            Snackbar.Add("Rozłączono.", Severity.Success);
+            _config = null;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Disconnect failed");
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+    }
+}

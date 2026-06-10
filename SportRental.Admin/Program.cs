@@ -218,6 +218,9 @@ builder.Services.AddScoped<SportRental.Admin.Payments.CheckoutFinalizationServic
 builder.Services.AddScoped<SportRental.Admin.Services.IBusinessHoursService, SportRental.Admin.Services.BusinessHoursService>();
 builder.Services.AddScoped<SportRental.Admin.Services.IPriceCalculator, SportRental.Admin.Services.PriceCalculator>();
 builder.Services.AddScoped<SportRental.Admin.Services.IInvoiceService, SportRental.Admin.Services.InvoiceService>();
+builder.Services.AddScoped<SportRental.Admin.Services.IDiscountService, SportRental.Admin.Services.DiscountService>();
+builder.Services.AddScoped<SportRental.Admin.Services.IVoucherService, SportRental.Admin.Services.VoucherService>();
+builder.Services.AddScoped<SportRental.Admin.Services.IGoogleCalendarService, SportRental.Admin.Services.GoogleCalendarService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
 

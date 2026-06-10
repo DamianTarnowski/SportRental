@@ -778,6 +778,69 @@ namespace SportRental.Admin.Api
                 return Results.Redirect(sasUrl);
             });
 
+            // Faza 9a — walidacja kodu rabatowego (publiczny endpoint do checkout client)
+            api.MapPost("/discount-codes/validate", [AllowAnonymous] async (
+                SportRental.Shared.Models.DiscountValidateRequest req,
+                SportRental.Admin.Services.IDiscountService discounts,
+                CancellationToken ct) =>
+            {
+                if (req == null || string.IsNullOrWhiteSpace(req.Code) || req.TenantId == Guid.Empty)
+                    return Results.BadRequest(new { error = "Niepełne dane." });
+                var r = await discounts.ValidateAsync(req.TenantId, req.Code, req.OrderAmount, ct);
+                return Results.Ok(new { isValid = r.IsValid, discountAmount = r.DiscountAmount, reason = r.Reason });
+            }).RequireRateLimiting("api");
+
+            // Faza 9b — walidacja vouchera
+            api.MapPost("/vouchers/validate", [AllowAnonymous] async (
+                SportRental.Shared.Models.VoucherValidateRequest req,
+                SportRental.Admin.Services.IVoucherService vouchers,
+                CancellationToken ct) =>
+            {
+                if (req == null || string.IsNullOrWhiteSpace(req.Code))
+                    return Results.BadRequest(new { error = "Pusty kod." });
+                var r = await vouchers.ValidateAsync(req.Code, ct);
+                return Results.Ok(new { isValid = r.IsValid, remainingBalance = r.RemainingBalance, reason = r.Reason });
+            }).RequireRateLimiting("api");
+
+            // Faza 9c — Google Calendar OAuth flow (admin redirect → Google → callback)
+            api.MapGet("/google-calendar/connect", [Authorize(Roles = "Owner,SuperAdmin")] (
+                HttpRequest request,
+                SportRental.Admin.Services.IGoogleCalendarService gcal,
+                ITenantProvider tenantProvider) =>
+            {
+                var tenantId = tenantProvider.GetCurrentTenantId();
+                if (tenantId == null) return Results.BadRequest(new { error = "Brak tenanta." });
+                var redirectUri = $"{request.Scheme}://{request.Host}/api/google-calendar/callback";
+                return Results.Redirect(gcal.BuildAuthorizationUrl(redirectUri, tenantId.Value));
+            });
+
+            api.MapGet("/google-calendar/callback", [AllowAnonymous] async (
+                HttpRequest request,
+                string? code,
+                string? state,
+                string? error,
+                SportRental.Admin.Services.IGoogleCalendarService gcal,
+                CancellationToken ct) =>
+            {
+                if (!string.IsNullOrWhiteSpace(error))
+                    return Results.Redirect("/admin/google-calendar?error=" + Uri.EscapeDataString(error));
+                if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(state))
+                    return Results.BadRequest(new { error = "Brak code lub state." });
+                if (!Guid.TryParseExact(state, "N", out var tenantId))
+                    return Results.BadRequest(new { error = "Niepoprawny state." });
+
+                var redirectUri = $"{request.Scheme}://{request.Host}/api/google-calendar/callback";
+                try
+                {
+                    await gcal.ConnectTenantAsync(tenantId, code, redirectUri, ct);
+                    return Results.Redirect("/admin/google-calendar?connected=1");
+                }
+                catch (Exception ex)
+                {
+                    return Results.Redirect("/admin/google-calendar?error=" + Uri.EscapeDataString(ex.Message));
+                }
+            });
+
             // Faza 8c — faktury VAT
             // POST /api/rentals/{id}/invoice — wystawia fakturę dla wynajmu (idempotent przez Number unique)
             api.MapPost("/rentals/{id:guid}/invoice", [Authorize(Roles = "Owner,SuperAdmin")] async (

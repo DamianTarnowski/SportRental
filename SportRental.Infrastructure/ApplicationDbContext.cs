@@ -61,6 +61,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceCounter> InvoiceCounters => Set<InvoiceCounter>();
 
+    // Faza 9a — kody rabatowe
+    public DbSet<DiscountCode> DiscountCodes => Set<DiscountCode>();
+    public DbSet<DiscountRedemption> DiscountRedemptions => Set<DiscountRedemption>();
+
+    // Faza 9b — vouchery
+    public DbSet<Voucher> Vouchers => Set<Voucher>();
+    public DbSet<VoucherRedemption> VoucherRedemptions => Set<VoucherRedemption>();
+
+    // Faza 9c — Google Calendar
+    public DbSet<GoogleCalendarConfig> GoogleCalendarConfigs => Set<GoogleCalendarConfig>();
+    public DbSet<GoogleCalendarEvent> GoogleCalendarEvents => Set<GoogleCalendarEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -493,6 +505,83 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.ToTable("InvoiceCounters");
             entity.HasKey(c => c.Id);
             entity.HasIndex(c => new { c.TenantId, c.Year }).IsUnique();
+        });
+
+        // Faza 9a — kody rabatowe
+        modelBuilder.Entity<DiscountCode>(entity =>
+        {
+            entity.ToTable("DiscountCodes");
+            entity.HasKey(d => d.Id);
+            entity.HasIndex(d => new { d.TenantId, d.Code }).IsUnique();
+            entity.HasIndex(d => new { d.TenantId, d.IsActive });
+            entity.Property(d => d.Code).HasMaxLength(40).IsRequired();
+            entity.Property(d => d.Value).HasPrecision(10, 2);
+            entity.Property(d => d.MinOrderAmount).HasPrecision(10, 2);
+            entity.Property(d => d.Description).HasMaxLength(256);
+            entity.HasQueryFilter(d => TenantId == null || d.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<DiscountRedemption>(entity =>
+        {
+            entity.ToTable("DiscountRedemptions");
+            entity.HasKey(r => r.Id);
+            entity.HasIndex(r => new { r.DiscountCodeId, r.RentalId }).IsUnique();
+            entity.HasIndex(r => r.RentalId);
+            entity.Property(r => r.AppliedAmount).HasPrecision(18, 2);
+            entity.HasOne(r => r.DiscountCode)
+                  .WithMany()
+                  .HasForeignKey(r => r.DiscountCodeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(r => TenantId == null || r.TenantId == TenantId);
+        });
+
+        // Faza 9b — vouchery
+        modelBuilder.Entity<Voucher>(entity =>
+        {
+            entity.ToTable("Vouchers");
+            entity.HasKey(v => v.Id);
+            entity.HasIndex(v => v.Code).IsUnique(); // globally unique (cross-tenant)
+            entity.HasIndex(v => new { v.TenantId, v.Status });
+            entity.Property(v => v.Code).HasMaxLength(24).IsRequired();
+            entity.Property(v => v.IssuedToName).HasMaxLength(128);
+            entity.Property(v => v.IssuedToEmail).HasMaxLength(256);
+            entity.Property(v => v.InitialBalance).HasPrecision(18, 2);
+            entity.Property(v => v.RemainingBalance).HasPrecision(18, 2);
+            entity.Property(v => v.Notes).HasMaxLength(512);
+            entity.HasQueryFilter(v => TenantId == null || v.TenantId == TenantId);
+        });
+
+        modelBuilder.Entity<VoucherRedemption>(entity =>
+        {
+            entity.ToTable("VoucherRedemptions");
+            entity.HasKey(r => r.Id);
+            entity.HasIndex(r => r.VoucherId);
+            entity.HasIndex(r => r.RentalId);
+            entity.Property(r => r.Amount).HasPrecision(18, 2);
+            entity.HasOne(r => r.Voucher)
+                  .WithMany()
+                  .HasForeignKey(r => r.VoucherId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(r => TenantId == null || r.TenantId == TenantId);
+        });
+
+        // Faza 9c — Google Calendar
+        modelBuilder.Entity<GoogleCalendarConfig>(entity =>
+        {
+            entity.ToTable("GoogleCalendarConfigs");
+            entity.HasKey(c => c.Id);
+            entity.HasIndex(c => c.TenantId).IsUnique();
+            entity.Property(c => c.RefreshToken).HasMaxLength(512).IsRequired();
+            entity.Property(c => c.CalendarId).HasMaxLength(256).IsRequired();
+            entity.Property(c => c.ConnectedEmail).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<GoogleCalendarEvent>(entity =>
+        {
+            entity.ToTable("GoogleCalendarEvents");
+            entity.HasKey(e => e.Id);
+            entity.HasIndex(e => new { e.TenantId, e.RentalId }).IsUnique();
+            entity.Property(e => e.EventId).HasMaxLength(256).IsRequired();
         });
     }
 }

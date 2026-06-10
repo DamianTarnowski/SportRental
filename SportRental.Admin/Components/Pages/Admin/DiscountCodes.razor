@@ -1,0 +1,179 @@
+@page "/admin/discount-codes"
+@attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@rendermode InteractiveServer
+
+@using Microsoft.EntityFrameworkCore
+@using SportRental.Infrastructure.Data
+@using SportRental.Infrastructure.Domain
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject ILogger<DiscountCodes> Logger
+
+<PageTitle>Kody rabatowe · RentSpot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+        <div>
+            <MudText Typo="Typo.h4">Kody rabatowe</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">
+                % zniżki albo kwotowa od totalu, z limitem użyć i okresem ważności.
+            </MudText>
+        </div>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Add" OnClick="OpenAddDialog">
+            Nowy kod
+        </MudButton>
+    </MudStack>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_codes.Count == 0)
+    {
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+            Brak kodów rabatowych. Dodaj pierwszy, np. "LATO2026 -15%".
+        </MudAlert>
+    }
+    else
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="mt-3" Style="border-radius: 16px;">
+            <MudTable Items="@_codes" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Kod</MudTh>
+                    <MudTh>Wartość</MudTh>
+                    <MudTh>Okres</MudTh>
+                    <MudTh>Użycia</MudTh>
+                    <MudTh>Min. kwota</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate Context="c">
+                    <MudTd>
+                        <MudText Style="font-family: 'IBM Plex Mono', monospace; font-weight: 600;">@c.Code</MudText>
+                        @if (!string.IsNullOrWhiteSpace(c.Description))
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@c.Description</MudText>
+                        }
+                    </MudTd>
+                    <MudTd>@FormatValue(c)</MudTd>
+                    <MudTd>@FormatPeriod(c)</MudTd>
+                    <MudTd>
+                        @c.UsedCount @(c.MaxUses.HasValue ? $"/ {c.MaxUses.Value}" : "/ ∞")
+                    </MudTd>
+                    <MudTd>@(c.MinOrderAmount.HasValue ? $"{c.MinOrderAmount.Value:N2} zł" : "—")</MudTd>
+                    <MudTd>
+                        @if (c.IsActive)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">aktywny</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Filled">wyłączony</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" OnClick="() => OpenEditDialog(c)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error" OnClick="() => Delete(c)" />
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private List<DiscountCode> _codes = new();
+
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _loading = true;
+        try
+        {
+            var tenantId = TenantProvider.GetCurrentTenantId();
+            if (tenantId == null)
+            {
+                Snackbar.Add("Brak kontekstu tenanta.", Severity.Warning);
+                return;
+            }
+
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(tenantId.Value);
+            _codes = await db.DiscountCodes
+                .OrderByDescending(c => c.IsActive)
+                .ThenByDescending(c => c.CreatedAtUtc)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load discount codes");
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task OpenAddDialog()
+    {
+        var p = new DialogParameters
+        {
+            ["Code"] = new DiscountCode
+            {
+                IsActive = true,
+                Type = DiscountType.Percentage,
+                Value = 10m,
+                ValidFrom = DateOnly.FromDateTime(DateTime.Today),
+                ValidTo = DateOnly.FromDateTime(DateTime.Today.AddMonths(3))
+            },
+            ["IsNew"] = true
+        };
+        var dlg = await DialogService.ShowAsync<DiscountCodeDialog>("Nowy kod rabatowy", p);
+        if ((await dlg.Result) is { Canceled: false }) await ReloadAsync();
+    }
+
+    private async Task OpenEditDialog(DiscountCode code)
+    {
+        var p = new DialogParameters { ["Code"] = code, ["IsNew"] = false };
+        var dlg = await DialogService.ShowAsync<DiscountCodeDialog>("Edycja kodu", p);
+        if ((await dlg.Result) is { Canceled: false }) await ReloadAsync();
+    }
+
+    private async Task Delete(DiscountCode code)
+    {
+        var ok = await DialogService.ShowMessageBox("Usuń kod",
+            $"Usunąć kod \"{code.Code}\"? Historia użyć zostanie również usunięta.",
+            yesText: "Usuń", cancelText: "Anuluj");
+        if (ok != true) return;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.DiscountCodes.Remove(code);
+            await db.SaveChangesAsync();
+            Snackbar.Add("Kod usunięty.", Severity.Success);
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Delete failed");
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private static string FormatValue(DiscountCode c) => c.Type switch
+    {
+        DiscountType.Percentage => $"-{c.Value:0}%",
+        DiscountType.FixedAmount => $"-{c.Value:N2} zł",
+        _ => c.Value.ToString()
+    };
+
+    private static string FormatPeriod(DiscountCode c)
+    {
+        var from = c.ValidFrom?.ToString("dd.MM.yyyy") ?? "—";
+        var to = c.ValidTo?.ToString("dd.MM.yyyy") ?? "bezterminowo";
+        return $"{from} → {to}";
+    }
+}
