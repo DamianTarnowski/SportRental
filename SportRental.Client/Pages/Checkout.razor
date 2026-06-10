@@ -38,25 +38,25 @@
         <!-- Mobile Header -->
         <div class="checkout-mobile-header">
             <div class="checkout-mobile-title">
-                <span>💳</span>
+                <span></span>
                 <h1>Zamówienie</h1>
             </div>
             <div class="checkout-mobile-steps">
-                <span class="step done">🛒</span>
+                <span class="step done"></span>
                 <span class="step-line"></span>
-                <span class="step active">📝</span>
+                <span class="step active"></span>
                 <span class="step-line"></span>
-                <span class="step">💳</span>
+                <span class="step"></span>
             </div>
         </div>
 
         @if (_cart.Items.Count == 0)
         {
             <div class="checkout-mobile-empty">
-                <span class="empty-icon">🛒</span>
+                <span class="empty-icon"></span>
                 <h3>Pusty koszyk</h3>
                 <p>Dodaj produkty do koszyka</p>
-                <a href="/products" class="checkout-mobile-cta">📦 Przeglądaj katalog</a>
+                <a href="/products" class="checkout-mobile-cta">Przeglądaj katalog</a>
             </div>
         }
         else
@@ -64,7 +64,7 @@
             <!-- Cart Summary - Collapsible -->
             <div class="checkout-mobile-section">
                 <button class="checkout-mobile-section-header" @onclick="() => _showMobileItems = !_showMobileItems">
-                    <span>📦 Produkty (@_cart.TotalItems)</span>
+                    <span>Produkty (@_cart.TotalItems)</span>
                     <span class="section-toggle">@(_showMobileItems ? "▲" : "▼")</span>
                 </button>
                 @if (_showMobileItems)
@@ -83,14 +83,14 @@
                 @if (_hasMixedDates)
                 {
                     <div class="checkout-mobile-warning">
-                        ⚠️ Różne daty w produktach
+                        Różne daty w produktach
                     </div>
                 }
             </div>
 
             <!-- Customer Form -->
             <div class="checkout-mobile-section">
-                <div class="checkout-mobile-section-title">👤 Twoje dane</div>
+                <div class="checkout-mobile-section-title">Twoje dane</div>
                 <EditForm Model="_customer">
                     <DataAnnotationsValidator />
                     <div class="checkout-mobile-form">
@@ -107,7 +107,7 @@
                             <button type="button" class="lookup-btn" 
                                     disabled="@(!CanSearchExisting || _isLookupInProgress)"
                                     @onclick="LookupCustomerButtonAsync">
-                                @(_isLookupInProgress ? "🔄" : "🔍")
+                                @(_isLookupInProgress ? "" : "")
                             </button>
                         </div>
                         <div class="form-group">
@@ -132,7 +132,7 @@
                 @if (_quoteError is not null)
                 {
                     <div class="checkout-mobile-error">
-                        ⚠️ @_quoteError
+                        @_quoteError
                         <button @onclick="RefreshPaymentSummaryAsync">Odśwież</button>
                     </div>
                 }
@@ -159,10 +159,10 @@
                     }
                     else
                     {
-                        <span>✅ Zapłać @_quote?.TotalAmount.ToString("C")</span>
+                        <span>Zapłać @_quote?.TotalAmount.ToString("C")</span>
                     }
                 </button>
-                <p class="checkout-mobile-secure">🔒 Bezpieczna płatność Stripe</p>
+                <p class="checkout-mobile-secure">Bezpieczna płatność Stripe</p>
             </div>
         }
     </div>
@@ -176,11 +176,11 @@ else
     <div class="max-w-6xl mx-auto">
         <!-- Header -->
         <div class="checkout-header">
-            <h1>💳 Finalizacja zamówienia</h1>
+            <h1>Finalizacja zamówienia</h1>
             <p>Ostatni krok - sprawdź szczegóły i dokonaj płatności</p>
             <div class="checkout-steps">
                 <div class="checkout-step">
-                    <span class="checkout-step-number">✓</span>
+                    <span class="checkout-step-number"></span>
                     <span>Koszyk</span>
                 </div>
                 <div class="checkout-step active">
@@ -197,11 +197,11 @@ else
         @if (_cart.Items.Count == 0)
         {
             <div class="text-center py-20 bg-white rounded-3xl shadow-sm">
-                <div class="text-8xl mb-6">🛒</div>
+                <div class="text-8xl mb-6"></div>
                 <h2 class="text-2xl font-bold text-gray-800 mb-3">Koszyk jest pusty</h2>
                 <p class="text-gray-600 mb-8">Dodaj produkty do koszyka aby kontynuować</p>
                 <a href="/products" class="checkout-submit-btn" style="max-width: 280px; margin: 0 auto; text-decoration: none;">
-                    📦 Przeglądaj katalog
+                    Przeglądaj katalog
                 </a>
             </div>
         }
@@ -210,7 +210,7 @@ else
             <div class="checkout-grid">
                 <!-- Items List -->
                 <div class="checkout-items-card">
-                    <h2>📦 Produkty do wypożyczenia</h2>
+                    <h2>Produkty do wypożyczenia</h2>
                     
                     @foreach (var item in _cart.Items)
                     {
@@ -231,28 +231,27 @@ else
                                 @if (item.HoldId is not null)
                                 {
                                     <span class="inline-block mt-1 px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-lg">
-                                        ✅ Zarezerwowany do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm:ss")
+                                        Zarezerwowany do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm:ss")
                                     </span>
                                 }
                             </div>
                             <div class="checkout-item-price">@item.TotalPrice.ToString("C")</div>
                             <button class="checkout-remove-btn" @onclick="@(() => RemoveFromCart(item.ProductId))" title="Usuń z zamówienia">
-                                🗑️
-                            </button>
+                                </button>
                         </div>
                     }
 
                     @if (_hasMixedDates)
                     {
                         <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800">
-                            ⚠️ Pozycje mają różne daty. Ujednolić daty przed finalizacją.
+                            Pozycje mają różne daty. Ujednolić daty przed finalizacją.
                         </div>
                     }
                 </div>
 
                 <!-- Form & Summary -->
                 <div class="checkout-form-card">
-                    <h2>👤 Dane do rezerwacji</h2>
+                    <h2>Dane do rezerwacji</h2>
 
                     <EditForm Model="_customer">
                         <DataAnnotationsValidator />
@@ -279,11 +278,11 @@ else
                                         @onclick="LookupCustomerButtonAsync">
                                     @if (_isLookupInProgress)
                                     {
-                                        <span>🔄</span>
+                                        <span></span>
                                     }
                                     else
                                     {
-                                        <span>🔍</span>
+                                        <span></span>
                                     }
                                 </button>
                             </div>
@@ -314,12 +313,12 @@ else
 
                     <!-- Payment Summary -->
                     <div class="checkout-summary">
-                        <h3 class="font-semibold text-gray-800 mb-3">💰 Podsumowanie płatności</h3>
+                        <h3 class="font-semibold text-gray-800 mb-3">Podsumowanie płatności</h3>
                         
                         @if (_quoteError is not null)
                         {
                             <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800 text-sm mb-3">
-                                ⚠️ @_quoteError
+                                @_quoteError
                                 <button @onclick="RefreshPaymentSummaryAsync" class="ml-2 underline">Odśwież</button>
                             </div>
                         }
@@ -352,12 +351,12 @@ else
                         }
                         else
                         {
-                            <span>✅ Potwierdź i zapłać</span>
+                            <span>Potwierdź i zapłać</span>
                         }
                     </button>
 
                     <p class="text-center text-sm text-gray-500 mt-4">
-                        🔒 Płatność obsługiwana przez Stripe
+                        Płatność obsługiwana przez Stripe
                     </p>
                 </div>
             </div>

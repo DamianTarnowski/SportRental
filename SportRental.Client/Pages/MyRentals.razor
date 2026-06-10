@@ -22,7 +22,7 @@
         <!-- Mobile Header -->
         <div class="rentals-mobile-header">
             <div class="rentals-mobile-title">
-                <span>📋</span>
+                <span></span>
                 <h1>Wypożyczenia</h1>
                 @if (_rentals?.Count > 0)
                 {
@@ -41,10 +41,10 @@
         else if (_rentals == null || !_rentals.Any())
         {
             <div class="rentals-mobile-empty">
-                <span class="empty-icon">📭</span>
+                <span class="empty-icon"></span>
                 <h3>Brak wypożyczeń</h3>
                 <p>Zacznij swoją przygodę ze sportem!</p>
-                <a href="/products" class="rentals-mobile-cta">🎿 Przeglądaj sprzęt</a>
+                <a href="/products" class="rentals-mobile-cta">Przeglądaj sprzęt</a>
             </div>
         }
         else
@@ -66,7 +66,7 @@
                         @if (rental.IsOverdue)
                         {
                             <div class="rental-mobile-overdue">
-                                ⚠️ Termin minął!
+                                Termin minął!
                             </div>
                         }
 
@@ -87,7 +87,7 @@
                         <div class="rental-mobile-products">
                             @foreach (var item in rental.Items.Take(2))
                             {
-                                <span class="rental-mobile-product">📦 @item.ProductName x@(item.Quantity)</span>
+                                <span class="rental-mobile-product">@item.ProductName x@(item.Quantity)</span>
                             }
                             @if (rental.Items.Count > 2)
                             {
@@ -107,13 +107,13 @@
                         @if (CanReview(rental))
                         {
                             <button class="rental-mobile-review-cta" @onclick="@(() => OpenReviewDialog(rental))">
-                                ⭐ Oceń wypożyczenie
+                                Oceń wypożyczenie
                             </button>
                         }
                         else if (rental.HasReview)
                         {
                             <div class="rental-mobile-review-done">
-                                ✅ Dziękujemy za opinię
+                                Dziękujemy za opinię
                             </div>
                         }
                     </div>
@@ -131,7 +131,7 @@ else
     <div class="max-w-5xl mx-auto">
         <!-- Header -->
         <div class="rentals-header">
-            <h1>📋 Moje wypożyczenia</h1>
+            <h1>Moje wypożyczenia</h1>
             <p>Przeglądaj historię swoich wypożyczeń i aktywne rezerwacje</p>
         </div>
 
@@ -147,11 +147,11 @@ else
         else if (_rentals == null || !_rentals.Any())
         {
             <div class="rentals-empty">
-                <div class="rentals-empty-icon">📭</div>
+                <div class="rentals-empty-icon"></div>
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">Brak wypożyczeń</h2>
                 <p class="text-gray-600 mb-6">Nie masz jeszcze żadnych wypożyczeń. Zacznij swoją przygodę ze sportem!</p>
                 <a href="/products" class="cart-checkout-btn" style="max-width: 300px; margin: 0 auto; text-decoration: none; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
-                    🎿 Przeglądaj sprzęt
+                    Przeglądaj sprzęt
                 </a>
             </div>
         }
@@ -186,7 +186,7 @@ else
                         @if (rental.IsOverdue)
                         {
                             <div class="rental-overdue-warning">
-                                ⚠️ Termin zwrotu minął! Prosimy o pilny kontakt z wypożyczalnią.
+                                Termin zwrotu minął! Prosimy o pilny kontakt z wypożyczalnią.
                             </div>
                         }
 
@@ -194,7 +194,7 @@ else
                             @foreach (var item in rental.Items.Take(3))
                             {
                                 <div class="rental-product-item">
-                                    <span>📦 @item.ProductName</span>
+                                    <span>@item.ProductName</span>
                                     <span class="font-medium">x@(item.Quantity)</span>
                                 </div>
                             }
@@ -214,20 +214,20 @@ else
                                 @if (CanReview(rental))
                                 {
                                     <button class="rental-btn rental-btn-review" @onclick="@(() => OpenReviewDialog(rental))">
-                                        ⭐ Oceń
+                                        Oceń
                                     </button>
                                 }
                                 else if (rental.HasReview)
                                 {
-                                    <span class="rental-review-done-badge">✅ Oceniono</span>
+                                    <span class="rental-review-done-badge">Oceniono</span>
                                 }
                                 <button class="rental-btn rental-btn-primary" @onclick="@(() => ViewDetails(rental.Id))">
-                                    👁️ Szczegóły
+                                    Szczegóły
                                 </button>
                                 @if (rental.ContractUrl != null)
                                 {
                                     <a href="@rental.ContractUrl" target="_blank" class="rental-btn rental-btn-secondary">
-                                        📄 Umowa
+                                        Umowa
                                     </a>
                                 }
                             </div>
@@ -320,12 +320,12 @@ else
         return status.ToLower() switch
         {
             "draft" or "pending" => "⏳",
-            "reserved" or "confirmed" => "📅",
-            "active" or "onrent" => "✅",
-            "returned" or "completed" => "🏁",
-            "cancelled" => "❌",
-            "overdue" => "⚠️",
-            _ => "📋"
+            "reserved" or "confirmed" => "",
+            "active" or "onrent" => "",
+            "returned" or "completed" => "",
+            "cancelled" => "",
+            "overdue" => "",
+            _ => ""
         };
     }
 
@@ -356,9 +356,9 @@ else
     private string GetEquipmentStatusEmoji(MyRentalDto rental)
     {
         if (rental.ReturnedAtUtc.HasValue)
-            return "✅";
+            return "";
         if (rental.IssuedAtUtc.HasValue)
-            return rental.IsOverdue ? "⚠️" : "📦";
+            return rental.IsOverdue ? "" : "";
         return "⏳";
     }
 

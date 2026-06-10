@@ -18,7 +18,7 @@
         <!-- Mobile Header -->
         <div class="cart-mobile-header">
             <div class="cart-mobile-title">
-                <span>🛒</span>
+                <span></span>
                 <h1>Koszyk</h1>
                 @if (_cart.TotalItems > 0)
                 {
@@ -30,10 +30,10 @@
         @if (_cart.Items.Count == 0)
         {
             <div class="cart-mobile-empty">
-                <span class="empty-icon">🛒</span>
+                <span class="empty-icon"></span>
                 <h3>Pusty koszyk</h3>
                 <p>Dodaj sprzęt sportowy do koszyka</p>
-                <a href="/products" class="cart-mobile-cta">📦 Przeglądaj katalog</a>
+                <a href="/products" class="cart-mobile-cta">Przeglądaj katalog</a>
             </div>
         }
         else
@@ -50,25 +50,25 @@
                             }
                             else
                             {
-                                <div class="cart-mobile-item-placeholder">📦</div>
+                                <div class="cart-mobile-item-placeholder"></div>
                             }
                             <div class="cart-mobile-item-info">
                                 <h4>@item.ProductName</h4>
                                 <span class="cart-mobile-item-price">@item.DailyPrice.ToString("C")/dzień</span>
                             </div>
-                            <button class="cart-mobile-remove" @onclick="@(() => RemoveFromCart(item.ProductId))">✕</button>
+                            <button class="cart-mobile-remove" @onclick="@(() => RemoveFromCart(item.ProductId))"></button>
                         </div>
                         
                         <div class="cart-mobile-item-dates">
                             <div class="cart-mobile-date">
-                                <label>📅 Od</label>
+                                <label>Od</label>
                                 <input type="date" 
                                        value="@item.StartDate.ToString("yyyy-MM-dd")" 
                                        min="@DateTime.Today.ToString("yyyy-MM-dd")"
                                        @onchange="@((e) => OnStartDateChanged(item, e))" />
                             </div>
                             <div class="cart-mobile-date">
-                                <label>📅 Do</label>
+                                <label>Do</label>
                                 <input type="date" 
                                        value="@item.EndDate.ToString("yyyy-MM-dd")" 
                                        min="@item.StartDate.AddDays(1).ToString("yyyy-MM-dd")"
@@ -80,7 +80,7 @@
                             <select value="@((int)item.RentalType)"
                                     @onchange="@((e) => OnRentalTypeChanged(item, e))"
                                     class="cart-mobile-select">
-                                <option value="0">📅 Dzienny</option>
+                                <option value="0">Dzienny</option>
                                 @if (item.HourlyPrice.HasValue && item.HourlyPrice.Value > 0)
                                 {
                                     <option value="1">⏰ Godzinowy</option>
@@ -109,7 +109,7 @@
                         @if (item.HoldId is not null)
                         {
                             <div class="cart-mobile-hold">
-                                ✅ Rezerwacja do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm")
+                                Rezerwacja do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm")
                             </div>
                         }
                     </div>
@@ -123,9 +123,9 @@
                     <span class="cart-mobile-summary-total">@_cart.TotalAmount.ToString("C")</span>
                 </div>
                 <button class="cart-mobile-checkout" @onclick="ProceedToCheckout">
-                    💳 Zamów • @_cart.TotalAmount.ToString("C")
+                    Zamów • @_cart.TotalAmount.ToString("C")
                 </button>
-                <a href="/products" class="cart-mobile-continue">🛒 Kontynuuj zakupy</a>
+                <a href="/products" class="cart-mobile-continue">Kontynuuj zakupy</a>
             </div>
         }
     </div>
@@ -139,7 +139,7 @@ else
     <div class="max-w-6xl mx-auto">
         <!-- Header -->
         <div class="cart-header">
-            <h1>🛒 Twój Koszyk</h1>
+            <h1>Twój Koszyk</h1>
             <p>Sprawdź wybrane produkty przed wypożyczeniem</p>
         </div>
 
@@ -147,11 +147,11 @@ else
         {
             <!-- Empty Cart -->
             <div class="cart-empty">
-                <div class="cart-empty-icon">🛒</div>
+                <div class="cart-empty-icon"></div>
                 <h2>Twój koszyk jest pusty</h2>
                 <p>Dodaj sprzęt sportowy, aby rozpocząć wypożyczenie</p>
                 <a href="/products" class="cart-checkout-btn" style="max-width: 300px; margin: 0 auto; text-decoration: none;">
-                    📦 Przeglądaj katalog
+                    Przeglądaj katalog
                 </a>
             </div>
         }
@@ -170,7 +170,7 @@ else
                             }
                             else
                             {
-                                <div class="cart-item-placeholder">📦</div>
+                                <div class="cart-item-placeholder"></div>
                             }
 
                             <!-- Details -->
@@ -180,7 +180,7 @@ else
                                 
                                 <div class="cart-item-dates">
                                     <div class="flex flex-col">
-                                        <label class="text-xs text-gray-500 mb-1">📅 Od</label>
+                                        <label class="text-xs text-gray-500 mb-1">Od</label>
                                         <input type="date" 
                                                value="@item.StartDate.ToString("yyyy-MM-dd")" 
                                                min="@DateTime.Today.ToString("yyyy-MM-dd")"
@@ -188,7 +188,7 @@ else
                                                class="px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                     <div class="flex flex-col">
-                                        <label class="text-xs text-gray-500 mb-1">📅 Do</label>
+                                        <label class="text-xs text-gray-500 mb-1">Do</label>
                                         <input type="date" 
                                                value="@item.EndDate.ToString("yyyy-MM-dd")" 
                                                min="@item.StartDate.AddDays(1).ToString("yyyy-MM-dd")"
@@ -200,11 +200,11 @@ else
                                 @* Typ wynajmu *@
                                 <div class="flex items-center gap-3 mt-3">
                                     <div class="flex flex-col">
-                                        <label class="text-xs text-gray-500 mb-1">🕐 Typ wynajmu</label>
+                                        <label class="text-xs text-gray-500 mb-1">Typ wynajmu</label>
                                         <select value="@((int)item.RentalType)"
                                                 @onchange="@((e) => OnRentalTypeChanged(item, e))"
                                                 class="px-3 py-2 border rounded-lg text-sm">
-                                            <option value="0">📅 Dzienny</option>
+                                            <option value="0">Dzienny</option>
                                             @if (item.HourlyPrice.HasValue && item.HourlyPrice.Value > 0)
                                             {
                                                 <option value="1">⏰ Godzinowy</option>
@@ -238,7 +238,7 @@ else
                                 @if (item.HoldId is not null)
                                 {
                                     <div class="mt-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm inline-flex items-center gap-1">
-                                        ✅ Rezerwacja do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm:ss")
+                                        Rezerwacja do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm:ss")
                                     </div>
                                 }
                             </div>
@@ -254,7 +254,7 @@ else
                                 <div class="cart-item-total">@item.TotalPrice.ToString("C")</div>
                                 
                                 <button class="cart-remove-btn" @onclick="@(() => RemoveFromCart(item.ProductId))">
-                                    🗑️ Usuń
+                                    Usuń
                                 </button>
                             </div>
                         </div>
@@ -264,7 +264,7 @@ else
                 <!-- Summary -->
                 <div class="lg:col-span-1">
                     <div class="cart-summary">
-                        <h2>📋 Podsumowanie</h2>
+                        <h2>Podsumowanie</h2>
                         
                         <div class="cart-summary-row">
                             <span>Produkty (@_cart.TotalItems)</span>
@@ -282,11 +282,11 @@ else
                         </div>
 
                         <button class="cart-checkout-btn" @onclick="ProceedToCheckout">
-                            💳 Przejdź do płatności
+                            Przejdź do płatności
                         </button>
                         
                         <button class="cart-continue-btn" @onclick="@(() => Navigation.NavigateTo("/products"))">
-                            🛒 Kontynuuj zakupy
+                            Kontynuuj zakupy
                         </button>
                     </div>
                 </div>

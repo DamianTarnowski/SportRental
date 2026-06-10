@@ -15,13 +15,13 @@
         <div class="profile-header">
             <div class="flex items-center justify-between flex-wrap gap-4">
                 <div>
-                    <h1>👤 Moje dane</h1>
+                    <h1>Moje dane</h1>
                     <p>Aktualizuj informacje kontaktowe wykorzystywane przy rezerwacjach</p>
                 </div>
                 @if (!_loading && _customerId.HasValue)
                 {
                     <button class="profile-logout-btn" @onclick="LogoutAsync">
-                        🚪 Wyloguj się
+                        Wyloguj się
                     </button>
                 }
             </div>
@@ -39,15 +39,15 @@
         else if (!_customerId.HasValue)
         {
             <div class="profile-card text-center py-12">
-                <div class="text-6xl mb-4">🔒</div>
+                <div class="text-6xl mb-4"></div>
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">Brak zalogowanego użytkownika</h2>
                 <p class="text-gray-600 mb-6">Zaloguj się lub załóż konto, aby zarządzać swoimi danymi.</p>
                 <div class="flex justify-center gap-4 flex-wrap">
                     <a href="/login" class="profile-save-btn" style="text-decoration: none;">
-                        🔑 Zaloguj się
+                        Zaloguj się
                     </a>
                     <a href="/register" class="profile-logout-btn" style="text-decoration: none; color: #11998e; border-color: #11998e;">
-                        ✨ Zarejestruj się
+                        Zarejestruj się
                     </a>
                 </div>
             </div>
@@ -61,36 +61,36 @@
                     @if (_saveSuccess)
                     {
                         <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-xl flex items-center gap-3">
-                            ✅ Dane zostały zapisane pomyślnie!
+                            Dane zostały zapisane pomyślnie!
                         </div>
                     }
 
                     <div class="profile-form-group">
-                        <label for="fullName">👤 Imię i nazwisko *</label>
+                        <label for="fullName">Imię i nazwisko *</label>
                         <InputText id="fullName" @bind-Value="_model.FullName" class="profile-input" placeholder="Jan Kowalski" />
                         <ValidationMessage For="() => _model.FullName" class="text-red-500 text-sm mt-1" />
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="profile-form-group">
-                            <label for="email">📧 Email *</label>
+                            <label for="email">Email *</label>
                             <InputText id="email" @bind-Value="_model.Email" type="email" class="profile-input" placeholder="jan@example.com" />
                             <ValidationMessage For="() => _model.Email" class="text-red-500 text-sm mt-1" />
                         </div>
                         <div class="profile-form-group">
-                            <label for="phone">📱 Telefon *</label>
+                            <label for="phone">Telefon *</label>
                             <InputText id="phone" @bind-Value="_model.PhoneNumber" type="tel" class="profile-input" placeholder="+48 123 456 789" />
                             <ValidationMessage For="() => _model.PhoneNumber" class="text-red-500 text-sm mt-1" />
                         </div>
                     </div>
 
                     <div class="profile-form-group">
-                        <label for="address">🏠 Adres (opcjonalnie)</label>
+                        <label for="address">Adres (opcjonalnie)</label>
                         <InputTextArea id="address" @bind-Value="_model.Address" rows="2" class="profile-input" placeholder="ul. Sportowa 123, 00-001 Warszawa" />
                     </div>
 
                     <div class="profile-form-group">
-                        <label for="document">🪪 Dokument tożsamości (opcjonalnie)</label>
+                        <label for="document">Dokument tożsamości (opcjonalnie)</label>
                         <InputText id="document" @bind-Value="_model.DocumentNumber" class="profile-input" placeholder="ABC123456" />
                         <p class="text-sm text-gray-500 mt-1">Numer dokumentu przyspieszy proces weryfikacji przy odbiorze sprzętu</p>
                     </div>
@@ -99,11 +99,11 @@
                         <button type="submit" class="profile-save-btn" disabled="@_isSaving">
                             @if (_isSaving)
                             {
-                                <span>💾 Zapisywanie...</span>
+                                <span>Zapisywanie...</span>
                             }
                             else
                             {
-                                <span>💾 Zapisz zmiany</span>
+                                <span>Zapisz zmiany</span>
                             }
                         </button>
                     </div>
@@ -113,12 +113,12 @@
             <!-- Quick Links -->
             <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <a href="/my-rentals" class="block p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow text-center">
-                    <div class="text-4xl mb-3">📋</div>
+                    <div class="text-4xl mb-3"></div>
                     <h3 class="font-semibold text-gray-800">Moje wypożyczenia</h3>
                     <p class="text-sm text-gray-500">Zobacz historię wypożyczeń</p>
                 </a>
                 <a href="/products" class="block p-6 bg-white rounded-2xl shadow-sm hover:shadow-md transition-shadow text-center">
-                    <div class="text-4xl mb-3">🎿</div>
+                    <div class="text-4xl mb-3"></div>
                     <h3 class="font-semibold text-gray-800">Katalog produktów</h3>
                     <p class="text-sm text-gray-500">Przeglądaj dostępny sprzęt</p>
                 </a>

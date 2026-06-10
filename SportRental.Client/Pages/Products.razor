@@ -23,12 +23,12 @@
         <!-- Mobile Header - Sticky -->
         <div class="products-mobile-header">
             <div class="products-mobile-title">
-                <span>🎿</span>
+                <span></span>
                 <h1>Katalog</h1>
                 <span class="products-mobile-count">@totalProductCount</span>
             </div>
             <button class="products-mobile-filter-btn" @onclick="ToggleMobileFilters">
-                <span>🔍</span>
+                <span></span>
                 @if (HasActiveFilters())
                 {
                     <span class="filter-badge">!</span>
@@ -39,11 +39,11 @@
         <!-- Mobile Quick Stats -->
         <div class="products-mobile-stats">
             <div class="mobile-stat">
-                <span>✅</span>
+                <span></span>
                 <span>@availableProductCount dostępnych</span>
             </div>
             <div class="mobile-stat">
-                <span>💰</span>
+                <span></span>
                 <span>od @minPrice.ToString("N0") zł</span>
             </div>
         </div>
@@ -66,7 +66,7 @@
                 <div class="mobile-filter-chips">
                     <div class="filter-chip-mobile @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")" 
                          @onclick="@(() => SelectCategory(string.Empty))">
-                        🎯 Wszystkie
+                        Wszystkie
                     </div>
                     @foreach (var cat in GetCategoryChips())
                     {
@@ -100,13 +100,13 @@
                     <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="Dostępne" />
                     <MudSelect T="string" Label="Sortuj" @bind-Value="SelectedSort" 
                                Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense">
-                        <MudSelectItem Value="@("featured")">⭐ Polecane</MudSelectItem>
+                        <MudSelectItem Value="@("featured")">Polecane</MudSelectItem>
                         @if (userLat.HasValue && userLon.HasValue)
                         {
-                            <MudSelectItem Value="@("distance")">📍 Najbliżej</MudSelectItem>
+                            <MudSelectItem Value="@("distance")">Najbliżej</MudSelectItem>
                         }
-                        <MudSelectItem Value="@("price-asc")">💵 Najtańsze</MudSelectItem>
-                        <MudSelectItem Value="@("price-desc")">💎 Najdroższe</MudSelectItem>
+                        <MudSelectItem Value="@("price-asc")">Najtańsze</MudSelectItem>
+                        <MudSelectItem Value="@("price-desc")">Najdroższe</MudSelectItem>
                     </MudSelect>
                 </div>
 
@@ -129,7 +129,7 @@
         else if (!filteredProducts.Any())
         {
             <div class="products-mobile-empty">
-                <span class="empty-icon">🔍</span>
+                <span class="empty-icon"></span>
                 <h3>Brak produktów</h3>
                 <p>Zmień kryteria wyszukiwania</p>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ClearFilters">
@@ -153,15 +153,15 @@
                             }
                             else
                             {
-                                <div class="product-mobile-placeholder">📷</div>
+                                <div class="product-mobile-placeholder"></div>
                             }
                             @if (product.IsAvailable && product.AvailableQuantity > 0)
                             {
-                                <span class="product-mobile-badge available">✓</span>
+                                <span class="product-mobile-badge available"></span>
                             }
                             else
                             {
-                                <span class="product-mobile-badge unavailable">✗</span>
+                                <span class="product-mobile-badge unavailable"></span>
                             }
                         </div>
                         <div class="product-mobile-info">
@@ -176,8 +176,7 @@
                                 disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
                                 @onclick="@(async () => await AddToCart(product))"
                                 @onclick:stopPropagation="true">
-                            🛒
-                        </button>
+                            </button>
                     </div>
                 }
             </div>
@@ -208,23 +207,23 @@ else
          ============================================= -->
     <div class="products-hero">
         <div class="products-hero-content">
-            <h1 class="products-hero-title">🎿 Znajdź swoją przygodę</h1>
+            <h1 class="products-hero-title">Znajdź swoją przygodę</h1>
             <p class="products-hero-subtitle">
                 Przeglądaj nasz katalog profesjonalnego sprzętu sportowego
             </p>
             <div class="products-stats">
                 <div class="products-stat">
-                    <span class="products-stat-icon">📦</span>
+                    <span class="products-stat-icon"></span>
                     <span class="products-stat-value">@totalProductCount</span>
                     <span class="products-stat-label">produktów</span>
                 </div>
                 <div class="products-stat">
-                    <span class="products-stat-icon">✅</span>
+                    <span class="products-stat-icon"></span>
                     <span class="products-stat-value">@availableProductCount</span>
                     <span class="products-stat-label">dostępnych</span>
                 </div>
                 <div class="products-stat">
-                    <span class="products-stat-icon">💰</span>
+                    <span class="products-stat-icon"></span>
                     <span class="products-stat-value">@avgPrice.ToString("C")</span>
                     <span class="products-stat-label">śr. cena</span>
                 </div>
@@ -239,7 +238,7 @@ else
         <MudGrid Spacing="3">
             <!-- Location filters FIRST (user request: lokalizacja najpierw) -->
             <MudItem xs="12" md="3">
-                <MudSelect T="string" Label="📍 Województwo" @bind-Value="SelectedVoivodeship" Variant="Variant.Outlined" Clearable="true">
+                <MudSelect T="string" Label="Województwo" @bind-Value="SelectedVoivodeship" Variant="Variant.Outlined" Clearable="true">
                     @foreach (var v in voivodeships)
                     {
                         <MudSelectItem Value="@v">@v</MudSelectItem>
@@ -248,7 +247,7 @@ else
             </MudItem>
             
             <MudItem xs="12" md="3">
-                <MudSelect T="string" Label="🏙️ Miasto" @bind-Value="SelectedCity" Variant="Variant.Outlined" Clearable="true">
+                <MudSelect T="string" Label="Miasto" @bind-Value="SelectedCity" Variant="Variant.Outlined" Clearable="true">
                     @foreach (var c in filteredCities)
                     {
                         <MudSelectItem Value="@c">@c</MudSelectItem>
@@ -259,7 +258,7 @@ else
             <!-- Search SECOND -->
             <MudItem xs="12" md="4">
                 <MudTextField @bind-Value="searchText"
-                              Label="🔍 Szukaj produktów"
+                              Label="Szukaj produktów"
                               Placeholder="Wpisz nazwę..."
                               Variant="Variant.Outlined"
                               Adornment="Adornment.End"
@@ -285,7 +284,7 @@ else
                 <div class="filter-chips">
                     <div class="filter-chip @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")" 
                          @onclick="@(() => SelectCategory(string.Empty))">
-                        <span>🎯</span> Wszystkie
+                        <span></span> Wszystkie
                     </div>
                     @foreach (var cat in GetCategoryChips())
                     {
@@ -299,7 +298,7 @@ else
             
             <!-- Additional filters row -->
             <MudItem xs="12" md="3">
-                <MudSelect T="string" Label="🏪 Wypożyczalnia" @bind-Value="SelectedTenant" Variant="Variant.Outlined" Clearable="true">
+                <MudSelect T="string" Label="Wypożyczalnia" @bind-Value="SelectedTenant" Variant="Variant.Outlined" Clearable="true">
                     @foreach (var t in filteredTenants)
                     {
                         <MudSelectItem Value="@t">@t</MudSelectItem>
@@ -309,14 +308,14 @@ else
             
             <MudItem xs="12" md="3">
                 <MudSelect T="string" Label="Sortuj" @bind-Value="SelectedSort" Variant="Variant.Outlined">
-                    <MudSelectItem Value="@("featured")">⭐ Polecane</MudSelectItem>
+                    <MudSelectItem Value="@("featured")">Polecane</MudSelectItem>
                     @if (userLat.HasValue && userLon.HasValue)
                     {
-                        <MudSelectItem Value="@("distance")">📍 Najbliżej mnie</MudSelectItem>
+                        <MudSelectItem Value="@("distance")">Najbliżej mnie</MudSelectItem>
                     }
-                    <MudSelectItem Value="@("price-asc")">💵 Najtańsze</MudSelectItem>
-                    <MudSelectItem Value="@("price-desc")">💎 Najdroższe</MudSelectItem>
-                    <MudSelectItem Value="@("name")">🔤 Nazwa A-Z</MudSelectItem>
+                    <MudSelectItem Value="@("price-asc")">Najtańsze</MudSelectItem>
+                    <MudSelectItem Value="@("price-desc")">Najdroższe</MudSelectItem>
+                    <MudSelectItem Value="@("name")">Nazwa A-Z</MudSelectItem>
                 </MudSelect>
             </MudItem>
             
@@ -345,7 +344,7 @@ else
             </MudItem>
             
             <MudItem xs="12" md="3">
-                <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="✅ Tylko dostępne" />
+                <MudSwitch @bind-Value="ShowOnlyAvailable" Color="Color.Success" Label="Tylko dostępne" />
             </MudItem>
         </MudGrid>
     </div>
@@ -372,7 +371,7 @@ else
     else if (!filteredProducts.Any())
     {
         <div class="products-empty">
-            <div class="products-empty-icon">🔍</div>
+            <div class="products-empty-icon"></div>
             <h3 class="products-empty-title">Brak produktów</h3>
             <p class="products-empty-text">Nie znaleźliśmy produktów spełniających Twoje kryteria.</p>
             <button class="products-reset-btn" @onclick="ClearFilters">
@@ -398,7 +397,7 @@ else
                         else
                         {
                             <div class="product-card-placeholder">
-                                <span class="product-card-placeholder-icon">📷</span>
+                                <span class="product-card-placeholder-icon"></span>
                             </div>
                         }
                         
@@ -427,13 +426,12 @@ else
                                     disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
                                     @onclick="@(async () => await AddToCart(product))"
                                     @onclick:stopPropagation="true">
-                                🛒 Do koszyka
+                                Do koszyka
                             </button>
                             <button class="product-quick-btn product-quick-btn-secondary"
                                     @onclick="@(() => NavigateToProduct(product.Id))"
                                     @onclick:stopPropagation="true">
-                                👁️
-                            </button>
+                                </button>
                         </div>
                     </div>
                     
@@ -455,7 +453,7 @@ else
                         
                         <div class="product-card-meta">
                             <div class="product-meta-item">
-                                <span class="product-meta-icon">📦</span>
+                                <span class="product-meta-icon"></span>
                                 <span>@product.AvailableQuantity szt.</span>
                             </div>
                         </div>
@@ -467,7 +465,7 @@ else
                                 disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
                                 @onclick="@(async () => await AddToCart(product))"
                                 @onclick:stopPropagation="true">
-                            <span>🛒</span> Dodaj do koszyka
+                            <span></span> Dodaj do koszyka
                         </button>
                     </div>
                 </div>
@@ -551,14 +549,14 @@ else
 
     private string GetCategoryIcon(string? category) => category?.ToLower() switch
     {
-        "narty" or "ski" => "⛷️",
-        "snowboard" => "🏂",
-        "rowery" or "bike" or "rower" => "🚴",
-        "sporty wodne" or "water" or "sup" or "kajak" => "🏄",
-        "buty" or "buty narciarskie" => "👢",
-        "kaski" or "kask" => "⛑️",
-        "akcesoria" => "🎒",
-        _ => "🎿"
+        "narty" or "ski" => "",
+        "snowboard" => "",
+        "rowery" or "bike" or "rower" => "",
+        "sporty wodne" or "water" or "sup" or "kajak" => "",
+        "buty" or "buty narciarskie" => "",
+        "kaski" or "kask" => "",
+        "akcesoria" => "",
+        _ => ""
     };
 
     private void SelectCategory(string category)
@@ -902,7 +900,7 @@ else
     private async Task AddToCart(ProductDto product)
     {
         await CartService.AddToCartAsync(product);
-        Snackbar.Add($"✅ {product.Name} dodany do koszyka!", Severity.Success);
+        Snackbar.Add($"{product.Name} dodany do koszyka!", Severity.Success);
     }
 
     private Task AddToCartFromDialog(ProductDto product) => AddToCart(product);

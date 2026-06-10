@@ -232,3 +232,32 @@
 .sr-footer-links a:hover { color: var(--coral-400, #FA8186) !important; }
 .sr-footer-tagline { color: rgba(232, 235, 245, 0.6) !important; }
 .sr-footer-bottom { border-top: 1px solid rgba(255, 255, 255, 0.08) !important; }
+
+/* ============================================
+   UNIVERSAL: pobij WSZYSTKIE inline linear-gradient w stronach klienta
+   (Account, Cart, Checkout, CheckoutSuccess, Map, MyRentals, Register, SelectTenant,
+   RentalDetails) — flat coral tint zamiast pink/teal/etc. gradient
+   ============================================ */
+[style*="linear-gradient"]:not(.sr-hero):not(.sr-cta):not(.sr-footer) {
+    background: var(--surface-card, #FFFFFF) !important;
+    border: 1px solid var(--line, #DDE2EC) !important;
+    border-radius: 16px !important;
+    box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
+}
+
+/* Bannery hero typu: <div style="background: linear-gradient(...); color: white"> */
+.mud-paper[style*="linear-gradient"] {
+    color: var(--coral-900, #671A1E) !important;
+}
+.mud-paper[style*="linear-gradient"] .mud-typography,
+.mud-paper[style*="linear-gradient"] h1,
+.mud-paper[style*="linear-gradient"] h2,
+.mud-paper[style*="linear-gradient"] h3 {
+    color: var(--coral-900, #671A1E) !important;
+    text-shadow: none !important;
+}
+.mud-paper[style*="linear-gradient"] .mud-icon-root {
+    color: var(--coral-700, #BC3138) !important;
+}
+
+

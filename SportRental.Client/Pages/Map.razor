@@ -12,7 +12,7 @@
     <MudPaper Elevation="0" Class="pa-4 mb-4" Style="background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%); border-radius: 16px;">
         <MudGrid>
             <MudItem xs="12" md="8">
-                <MudText Typo="Typo.h4" Style="color: white; font-weight: 700;">🗺️ Mapa wypożyczalni</MudText>
+                <MudText Typo="Typo.h4" Style="color: white; font-weight: 700;">Mapa wypożyczalni</MudText>
                 <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.85);" Class="mt-1">
                     Kliknij na mapie aby ustawić swoją lokalizację, a następnie wybierz promień wyszukiwania
                 </MudText>
@@ -35,7 +35,7 @@
             <MudStack Spacing="3">
                 @* Location controls *@
                 <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
-                    <MudText Typo="Typo.h6" Class="mb-3">📍 Twoja lokalizacja</MudText>
+                    <MudText Typo="Typo.h6" Class="mb-3">Twoja lokalizacja</MudText>
                     
                     @if (userLat.HasValue && userLon.HasValue)
                     {
@@ -94,7 +94,7 @@
                 @* Rental shops list *@
                 <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-                        <MudText Typo="Typo.h6">🏪 Wypożyczalnie</MudText>
+                        <MudText Typo="Typo.h6">Wypożyczalnie</MudText>
                         <MudChip T="string" Size="Size.Small" Color="Color.Primary">@filteredLocations.Count</MudChip>
                     </MudStack>
                     
@@ -135,13 +135,13 @@
                                         @if (!string.IsNullOrEmpty(loc.Address))
                                         {
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                📍 @TruncateAddress(loc.Address, 50)
+                                                @TruncateAddress(loc.Address, 50)
                                             </MudText>
                                         }
                                         @if (!string.IsNullOrEmpty(loc.City) || !string.IsNullOrEmpty(loc.Voivodeship))
                                         {
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                                🏙️ @loc.City@((!string.IsNullOrEmpty(loc.City) && !string.IsNullOrEmpty(loc.Voivodeship)) ? ", " : "")@loc.Voivodeship
+                                                @loc.City@((!string.IsNullOrEmpty(loc.City) && !string.IsNullOrEmpty(loc.Voivodeship)) ? ", " : "")@loc.Voivodeship
                                             </MudText>
                                         }
                                     </MudStack>
@@ -163,7 +163,7 @@
                     <MudText Typo="Typo.caption" Style="font-weight: 600; margin-bottom: 8px;">Legenda</MudText>
                     <MudStack Spacing="1">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <div style="width: 20px; height: 20px; background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%); border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center;">🏪</div>
+                            <div style="width: 20px; height: 20px; background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%); border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center;"></div>
                             <MudText Typo="Typo.caption">Wypożyczalnia</MudText>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
