@@ -16,45 +16,30 @@
 @inject IdentityRedirectManager RedirectManager
 @inject ILogger<ExternalLogin> Logger
 
-<PageTitle>Register</PageTitle>
+<PageTitle>Łączenie konta · RentSpot</PageTitle>
 
-<StatusMessage Message="@message" />
-<h1>Register</h1>
-<h2>Associate your @ProviderDisplayName account.</h2>
-<hr />
-
-<div  class="alert alert-info">
-    You've successfully authenticated with <strong>@ProviderDisplayName</strong>.
-    Please enter an email address for this site below and click the Register button to finish
-    logging in.
-</div>
-
-<div class="row">
-    <div class="col-md-4">
-        <EditForm Model="Input" OnValidSubmit="OnValidSubmitAsync" FormName="confirmation" method="post">
-            <DataAnnotationsValidator />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="email" placeholder="Please enter your email." />
-                <label for="Input.Email" class="form-label">Email</label>
-                <ValidationMessage For="() => Input.Email" />
+@if (!string.IsNullOrWhiteSpace(_message))
+{
+    <div class="auth-page">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <div class="auth-logo-icon">R<span class="auth-logo-dot">.</span></div>
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
-        </EditForm>
+            <h1 class="auth-title">Logowanie przez @ProviderDisplayName</h1>
+            <p class="auth-subtitle">@_message</p>
+            <a class="btn btn-primary w-100" href="Account/Login">Wróć do logowania</a>
+        </div>
     </div>
-</div>
+}
 
 @code {
     public const string LoginCallbackAction = "LoginCallback";
 
-    private string? message;
-    private ExternalLoginInfo? externalLoginInfo;
+    private string? _message;
+    private ExternalLoginInfo? _externalLoginInfo;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
-
-    [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = new();
 
     [SupplyParameterFromQuery]
     private string? RemoteError { get; set; }
@@ -65,22 +50,24 @@
     [SupplyParameterFromQuery]
     private string? Action { get; set; }
 
-    private string? ProviderDisplayName => externalLoginInfo?.ProviderDisplayName;
+    private string ProviderDisplayName => _externalLoginInfo?.ProviderDisplayName ?? "Google";
 
     protected override async Task OnInitializedAsync()
     {
         if (RemoteError is not null)
         {
-            RedirectManager.RedirectToWithStatus("Account/Login", $"Error from external provider: {RemoteError}", HttpContext);
+            RedirectManager.RedirectToWithStatus("Account/Login",
+                $"Błąd dostawcy zewnętrznego: {RemoteError}", HttpContext);
         }
 
         var info = await SignInManager.GetExternalLoginInfoAsync();
         if (info is null)
         {
-            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
+            RedirectManager.RedirectToWithStatus("Account/Login",
+                "Nie udało się odczytać danych logowania zewnętrznego.", HttpContext);
         }
 
-        externalLoginInfo = info;
+        _externalLoginInfo = info;
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
@@ -90,88 +77,90 @@
                 return;
             }
 
-            // We should only reach this page via the login callback, so redirect back to
-            // the login page if we get here some other way.
             RedirectManager.RedirectTo("Account/Login");
         }
     }
 
     private async Task OnLoginCallbackAsync()
     {
-        if (externalLoginInfo is null)
-        {
-            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information.", HttpContext);
-        }
+        if (_externalLoginInfo is null) return;
 
-        // Sign in the user with this external login provider if the user already has a login.
-        var result = await SignInManager.ExternalLoginSignInAsync(
-            externalLoginInfo.LoginProvider,
-            externalLoginInfo.ProviderKey,
+        // Krok 1: jeśli Google login jest już powiązany — zaloguj od razu.
+        var signInResult = await SignInManager.ExternalLoginSignInAsync(
+            _externalLoginInfo.LoginProvider,
+            _externalLoginInfo.ProviderKey,
             isPersistent: false,
             bypassTwoFactor: true);
 
-        if (result.Succeeded)
+        if (signInResult.Succeeded)
         {
-            Logger.LogInformation(
-                "{Name} logged in with {LoginProvider} provider.",
-                externalLoginInfo.Principal.Identity?.Name,
-                externalLoginInfo.LoginProvider);
+            Logger.LogInformation("{Name} zalogowany przez {Provider}.",
+                _externalLoginInfo.Principal.Identity?.Name, _externalLoginInfo.LoginProvider);
             RedirectManager.RedirectTo(ReturnUrl);
         }
-        else if (result.IsLockedOut)
+
+        if (signInResult.IsLockedOut)
         {
             RedirectManager.RedirectTo("Account/Lockout");
         }
 
-        // If the user does not have an account, then ask the user to create an account.
-        if (externalLoginInfo.Principal.HasClaim(c => c.Type == ClaimTypes.Email))
+        // Krok 2: brak powiązania — sprawdź czy konto z tym emailem już istnieje (auto-link merge).
+        var email = _externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email);
+        if (string.IsNullOrWhiteSpace(email))
         {
-            Input.Email = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email) ?? "";
-        }
-    }
-
-    private async Task OnValidSubmitAsync()
-    {
-        if (externalLoginInfo is null)
-        {
-            RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information during confirmation.", HttpContext);
+            _message = "Konto Google nie udostępnia adresu email. Skontaktuj się z administratorem.";
+            return;
         }
 
-        var emailStore = GetEmailStore();
-        var user = CreateUser();
-
-        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
-        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-
-        var result = await UserManager.CreateAsync(user);
-        if (result.Succeeded)
+        var existingUser = await UserManager.FindByEmailAsync(email);
+        if (existingUser is not null)
         {
-            result = await UserManager.AddLoginAsync(user, externalLoginInfo);
-            if (result.Succeeded)
+            // Auto-merge: dołóż Google login do istniejącego konta i zaloguj.
+            // Email z Google jest zweryfikowany (claim email_verified=true), więc to bezpieczne.
+            var addLoginResult = await UserManager.AddLoginAsync(existingUser, _externalLoginInfo);
+            if (addLoginResult.Succeeded)
             {
-                Logger.LogInformation("User created an account using {Name} provider.", externalLoginInfo.LoginProvider);
-
-                var userId = await UserManager.GetUserIdAsync(user);
-                var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-                code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-
-                var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-                    NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-                    new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
-                await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
-
-                // If account confirmation is required, we need to show the link if we don't have a real email sender
-                if (UserManager.Options.SignIn.RequireConfirmedAccount)
-                {
-                    RedirectManager.RedirectTo("Account/RegisterConfirmation", new() { ["email"] = Input.Email });
-                }
-
-                await SignInManager.SignInAsync(user, isPersistent: false, externalLoginInfo.LoginProvider);
+                Logger.LogInformation(
+                    "Połączono konto Google z istniejącym kontem {Email}.", email);
+                await SignInManager.SignInAsync(existingUser, isPersistent: false, _externalLoginInfo.LoginProvider);
                 RedirectManager.RedirectTo(ReturnUrl);
             }
+            else
+            {
+                _message = "Nie udało się połączyć konta Google z istniejącym kontem: "
+                          + string.Join(", ", addLoginResult.Errors.Select(e => e.Description));
+            }
+            return;
         }
 
-        message = $"Error: {string.Join(",", result.Errors.Select(error => error.Description))}";
+        // Krok 3: brak konta — utwórz nowe automatycznie z emaila Google.
+        var user = CreateUser();
+        var emailStore = GetEmailStore();
+        await UserStore.SetUserNameAsync(user, email, CancellationToken.None);
+        await emailStore.SetEmailAsync(user, email, CancellationToken.None);
+        user.EmailConfirmed = true; // email zweryfikowany przez Google
+
+        var createResult = await UserManager.CreateAsync(user);
+        if (!createResult.Succeeded)
+        {
+            _message = "Nie udało się utworzyć konta: "
+                      + string.Join(", ", createResult.Errors.Select(e => e.Description));
+            return;
+        }
+
+        var addLog = await UserManager.AddLoginAsync(user, _externalLoginInfo);
+        if (!addLog.Succeeded)
+        {
+            _message = "Nie udało się dodać logowania zewnętrznego: "
+                      + string.Join(", ", addLog.Errors.Select(e => e.Description));
+            return;
+        }
+
+        Logger.LogInformation("Utworzono nowe konto z {Provider} (email {Email}).",
+            _externalLoginInfo.LoginProvider, email);
+
+        await SignInManager.SignInAsync(user, isPersistent: false, _externalLoginInfo.LoginProvider);
+        RedirectManager.RedirectTo(ReturnUrl);
     }
 
     private ApplicationUser CreateUser()
@@ -182,8 +171,9 @@
         }
         catch
         {
-            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor");
+            throw new InvalidOperationException(
+                $"Nie można utworzyć instancji '{nameof(ApplicationUser)}'. " +
+                "Sprawdź czy klasa nie jest abstract i ma bezparametrowy konstruktor.");
         }
     }
 
@@ -191,15 +181,8 @@
     {
         if (!UserManager.SupportsUserEmail)
         {
-            throw new NotSupportedException("The default UI requires a user store with email support.");
+            throw new NotSupportedException("UserStore musi wspierać email.");
         }
         return (IUserEmailStore<ApplicationUser>)UserStore;
-    }
-
-    private sealed class InputModel
-    {
-        [Required]
-        [EmailAddress]
-        public string Email { get; set; } = "";
     }
 }

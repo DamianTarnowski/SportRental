@@ -4,6 +4,7 @@ using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MudBlazor.Services;
@@ -138,6 +139,27 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             }));
 });
+
+// Persist DataProtection keys, żeby antiforgery cookies + Identity cookies przeżywały restart.
+// Bez tego każdy deploy/restart unieważnia wszystkie aktywne sesje (HTTP 400 na login).
+// Na Azure App Service /home/data/* jest shared między instancjami i przeżywa redeploy.
+{
+    var keysPath = builder.Environment.IsDevelopment()
+        ? Path.Combine(builder.Environment.ContentRootPath, "App_Data", "dpkeys")
+        : "/home/data/dpkeys";
+    try
+    {
+        Directory.CreateDirectory(keysPath);
+        builder.Services.AddDataProtection()
+            .PersistKeysToFileSystem(new DirectoryInfo(keysPath))
+            .SetApplicationName("RentSpot.Admin");
+    }
+    catch (Exception ex)
+    {
+        var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
+        logger.LogWarning(ex, "Nie udało się skonfigurować persistent DataProtection keys w {Path}. Używam default in-memory.", keysPath);
+    }
+}
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
