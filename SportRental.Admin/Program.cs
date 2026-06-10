@@ -309,11 +309,14 @@ var authBuilder = builder.Services.AddAuthentication(options =>
         options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
     });
 
-// Google OAuth — sekrety z Key Vault (Google--ClientId / Google--ClientSecret) albo
-// appsettings.Local.json w dev. Jeśli brak — przycisk "Zaloguj przez Google" się nie pokaże
+// Google OAuth — sekrety z Key Vault (GoogleOAuth--ClientId / GoogleOAuth--ClientSecret) albo
+// appsettings.Local.json w dev. Fallback: stara nazwa Google:* gdyby ktoś przywrócił.
+// Jeśli brak — przycisk "Zaloguj przez Google" się nie pokaże
 // (ExternalLoginPicker filtruje providery zarejestrowane w SignInManager).
-var googleClientId = builder.Configuration["Google:ClientId"];
-var googleClientSecret = builder.Configuration["Google:ClientSecret"];
+var googleClientId = builder.Configuration["GoogleOAuth:ClientId"]
+                     ?? builder.Configuration["Google:ClientId"];
+var googleClientSecret = builder.Configuration["GoogleOAuth:ClientSecret"]
+                         ?? builder.Configuration["Google:ClientSecret"];
 if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(googleClientSecret))
 {
     authBuilder.AddGoogle(options =>
