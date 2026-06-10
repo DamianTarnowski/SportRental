@@ -194,6 +194,7 @@ builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatPersistenceServic
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatSettingsService>();
 builder.Services.AddScoped<SportRental.Admin.Payments.CheckoutFinalizationService>();
 builder.Services.AddScoped<SportRental.Admin.Services.IBusinessHoursService, SportRental.Admin.Services.BusinessHoursService>();
+builder.Services.AddScoped<SportRental.Admin.Services.IPriceCalculator, SportRental.Admin.Services.PriceCalculator>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
 

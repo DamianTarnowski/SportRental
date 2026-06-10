@@ -54,6 +54,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<BusinessHoursDay> BusinessHoursDays => Set<BusinessHoursDay>();
     public DbSet<BusinessHoursException> BusinessHoursExceptions => Set<BusinessHoursException>();
 
+    // Faza 8b — ceny sezonowe per produkt
+    public DbSet<PriceRule> PriceRules => Set<PriceRule>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -447,6 +450,22 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(e => new { e.TenantId, e.Date }).IsUnique();
             entity.Property(e => e.Reason).HasMaxLength(256);
             entity.HasQueryFilter(e => TenantId == null || e.TenantId == TenantId);
+        });
+
+        // Faza 8b — ceny sezonowe
+        modelBuilder.Entity<PriceRule>(entity =>
+        {
+            entity.ToTable("PriceRules");
+            entity.HasKey(pr => pr.Id);
+            entity.HasIndex(pr => new { pr.TenantId, pr.ProductId, pr.FromDate, pr.ToDate });
+            entity.HasIndex(pr => new { pr.ProductId, pr.IsActive });
+            entity.Property(pr => pr.Name).HasMaxLength(128).IsRequired();
+            entity.Property(pr => pr.Value).HasPrecision(10, 4);
+            entity.HasOne(pr => pr.Product)
+                  .WithMany()
+                  .HasForeignKey(pr => pr.ProductId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasQueryFilter(pr => TenantId == null || pr.TenantId == TenantId);
         });
     }
 }
