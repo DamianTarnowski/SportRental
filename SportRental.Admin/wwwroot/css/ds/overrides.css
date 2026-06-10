@@ -1,0 +1,154 @@
+/* RentSpot DS v2 — overrides na legacy CSS (modern-ui.css, admin-theme.css).
+   Wpięte PO legacy w App.razor, więc deklaracje stąd wygrywają.
+   Cel: zachowanie spójnego look between light/dark zgodnie z Coral Energy v2. */
+
+/* ============================================
+   APP BAR — biały w light, navy w dark, BEZ gradientu
+   ============================================ */
+.mud-appbar.rs-appbar,
+.mud-appbar {
+    background: var(--surface-card, #FFFFFF) !important;
+    color: var(--text-body, #1C2438) !important;
+    box-shadow: none !important;
+    border-bottom: 1px solid var(--line, #DDE2EC) !important;
+}
+
+[data-theme="dark"] .mud-appbar,
+.mud-theme-dark .mud-appbar {
+    background: var(--navy-900, #1B2350) !important;
+    color: var(--text-body, #E8EBF5) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Logo brand-word — czytelny na obu trybach */
+.rs-brand-word { color: var(--navy-900, #1C2438) !important; }
+[data-theme="dark"] .rs-brand-word,
+.mud-theme-dark .rs-brand-word { color: #FFFFFF !important; }
+.rs-brand-dot { color: var(--coral-500, #F96167) !important; }
+
+/* ============================================
+   SIDEBAR — flat navy zawsze (DS v2: sidebar = navy element chrome)
+   ============================================ */
+.rs-drawer .mud-drawer-content,
+aside.mud-drawer .mud-drawer-content {
+    background: var(--navy-900, #1B2350) !important;
+    overflow-y: auto !important;  /* fix: lista pozycji nie zmieści się — scroll */
+    overflow-x: hidden;
+}
+
+/* Custom scrollbar w drawer żeby pasował do navy */
+.rs-drawer .mud-drawer-content::-webkit-scrollbar,
+aside.mud-drawer .mud-drawer-content::-webkit-scrollbar { width: 6px; }
+.rs-drawer .mud-drawer-content::-webkit-scrollbar-track,
+aside.mud-drawer .mud-drawer-content::-webkit-scrollbar-track { background: transparent; }
+.rs-drawer .mud-drawer-content::-webkit-scrollbar-thumb,
+aside.mud-drawer .mud-drawer-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+.rs-drawer .mud-drawer-content::-webkit-scrollbar-thumb:hover,
+aside.mud-drawer .mud-drawer-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+/* Sidebar nav items — text i ikony żeby były czytelne na navy */
+aside.mud-drawer .mud-nav-link,
+.mud-drawer .mud-nav-link {
+    color: rgba(232, 235, 245, 0.85) !important;
+}
+aside.mud-drawer .mud-nav-link .mud-nav-link-icon,
+.mud-drawer .mud-nav-link .mud-icon-root {
+    color: rgba(232, 235, 245, 0.7) !important;
+}
+aside.mud-drawer .mud-nav-link:hover {
+    background: rgba(255, 255, 255, 0.06) !important;
+    color: #FFFFFF !important;
+}
+aside.mud-drawer .mud-nav-link.mud-nav-link-active,
+aside.mud-drawer .mud-nav-link.active-item {
+    background: rgba(249, 97, 103, 0.15) !important;
+    color: var(--coral-500, #F96167) !important;
+    box-shadow: none !important;
+}
+aside.mud-drawer .mud-nav-link.mud-nav-link-active .mud-nav-link-icon,
+aside.mud-drawer .mud-nav-link.mud-nav-link-active .mud-icon-root {
+    color: var(--coral-500, #F96167) !important;
+}
+
+/* ============================================
+   PAGE HEADERS / BANNERS — flat coral tint (light) lub navy-inverse (dark)
+   Cel: usunąć inline gradient #4fc3f7→#29b6f6 i podobne z poszczególnych stron
+   ============================================ */
+.admin-page-header,
+.mud-paper[style*="linear-gradient(135deg, #4fc3f7"],
+.mud-paper[style*="linear-gradient(135deg, #2F3C7E"],
+.mud-paper[style*="linear-gradient(135deg, #1F2A5C"] {
+    background: var(--surface-brand-tint, #FEF2F2) !important;
+    color: var(--coral-900, #671A1E) !important;
+    border: 1px solid var(--coral-200, #FBC8CA) !important;
+    box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
+    border-radius: 16px !important;
+}
+
+[data-theme="dark"] .admin-page-header,
+.mud-theme-dark .admin-page-header,
+[data-theme="dark"] .mud-paper[style*="linear-gradient(135deg, #4fc3f7"],
+.mud-theme-dark .mud-paper[style*="linear-gradient(135deg, #4fc3f7"] {
+    background: var(--navy-900, #1B2350) !important;
+    color: #E8EBF5 !important;
+    border: 1px solid var(--navy-800, #242E61) !important;
+}
+
+/* Tytuły w bannerach — biały tekst za bardzo na coral tint, zmień */
+.admin-page-header h1,
+.admin-page-header .mud-typography-h4 {
+    color: var(--coral-900, #671A1E) !important;
+    text-shadow: none !important;
+}
+.admin-page-header p,
+.admin-page-header .mud-typography-subtitle1 {
+    color: var(--coral-700, #BC3138) !important;
+    opacity: 0.9 !important;
+}
+
+[data-theme="dark"] .admin-page-header h1,
+[data-theme="dark"] .admin-page-header .mud-typography-h4,
+.mud-theme-dark .admin-page-header h1 {
+    color: #FFFFFF !important;
+}
+[data-theme="dark"] .admin-page-header p,
+[data-theme="dark"] .admin-page-header .mud-typography-subtitle1,
+.mud-theme-dark .admin-page-header p {
+    color: rgba(232, 235, 245, 0.8) !important;
+}
+
+/* ============================================
+   APP BACKGROUND — żeby nie było zlewania z navy AppBar w light
+   ============================================ */
+body, .mud-layout {
+    background: var(--surface-app, #F4F6FA) !important;
+}
+[data-theme="dark"] body,
+[data-theme="dark"] .mud-layout,
+.mud-theme-dark body,
+.mud-theme-dark .mud-layout {
+    background: var(--navy-950, #0F1530) !important;
+}
+
+/* ============================================
+   QUICK ACTION CARDS na Home — usuń legacy gradient ikony
+   ============================================ */
+.admin-quick-action-icon[style*="linear-gradient"] {
+    background: var(--surface-brand-tint, #FEF2F2) !important;
+    color: var(--coral-700, #BC3138) !important;
+}
+
+/* ============================================
+   LOGIN — ikonki email/lock były pokrzywione (top: 50% liczone z całości
+   label + input, więc lądowały w okolicach labela). Pinujemy do dołu pola.
+   ============================================ */
+.auth-field-icon {
+    top: auto !important;
+    bottom: 18px !important;  /* (input-height ~56px - icon 20px) / 2 ≈ 18 */
+    transform: none !important;
+}

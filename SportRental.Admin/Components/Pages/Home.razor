@@ -6,52 +6,53 @@
 <div class="admin-home">
     <AuthorizeView>
         <Authorized>
-            <!-- Welcome Hero -->
-            <div class="admin-hero">
-                <h1>👋 Witaj, @context.User.Identity?.Name!</h1>
-                <p>Panel administracyjny wypożyczalni sprzętu sportowego</p>
-            </div>
+            @* DS v2: flat navy-inverse hero, bez gradientu, bez emoji *@
+            <MudPaper Elevation="0" Class="rs-hero pa-6 mb-5">
+                <MudText Typo="Typo.h4" Class="rs-hero-title">Witaj, @context.User.Identity?.Name</MudText>
+                <MudText Typo="Typo.body1" Class="rs-hero-subtitle">Panel partnera wypożyczalni sprzętu sportowego</MudText>
+            </MudPaper>
 
-            <!-- Quick Actions -->
-            <MudText Typo="Typo.h6" Class="mb-3">⚡ Szybkie akcje</MudText>
+            <MudText Typo="Typo.subtitle1" Class="mb-3 d-flex align-center" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.Bolt" Color="Color.Primary" Class="mr-2" />
+                Szybkie akcje
+            </MudText>
             <MudGrid Spacing="3" Class="mb-6">
                 <MudItem xs="12" sm="6" md="3">
-                    <a href="/dashboard" class="admin-quick-action">
-                        <div class="admin-quick-action-icon">📊</div>
+                    <a href="/dashboard" class="rs-quick-action">
+                        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="rs-quick-action-icon" />
                         <h3>Dashboard</h3>
                         <p>Przegląd statystyk</p>
                     </a>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <a href="/admin/rentals" class="admin-quick-action">
-                        <div class="admin-quick-action-icon" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%);">🛒</div>
+                    <a href="/admin/rentals" class="rs-quick-action">
+                        <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Class="rs-quick-action-icon" />
                         <h3>Nowy wynajem</h3>
                         <p>Utwórz rezerwację</p>
                     </a>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <a href="/admin/products" class="admin-quick-action">
-                        <div class="admin-quick-action-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">📦</div>
+                    <a href="/admin/products" class="rs-quick-action">
+                        <MudIcon Icon="@Icons.Material.Filled.Inventory2" Class="rs-quick-action-icon" />
                         <h3>Produkty</h3>
                         <p>Zarządzaj sprzętem</p>
                     </a>
                 </MudItem>
                 <MudItem xs="12" sm="6" md="3">
-                    <a href="/admin/customers" class="admin-quick-action">
-                        <div class="admin-quick-action-icon" style="background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);">👥</div>
+                    <a href="/admin/customers" class="rs-quick-action">
+                        <MudIcon Icon="@Icons.Material.Filled.Groups" Class="rs-quick-action-icon" />
                         <h3>Klienci</h3>
                         <p>Baza klientów</p>
                     </a>
                 </MudItem>
             </MudGrid>
 
-            <!-- Info Cards -->
             <MudGrid Spacing="3">
                 <MudItem xs="12" md="6">
-                    <MudCard Elevation="2">
+                    <MudCard Outlined="true" Elevation="0" Class="rs-info-card">
                         <MudCardContent>
-                            <div class="d-flex align-items-center gap-3 mb-3">
-                                <MudAvatar Color="Color.Primary" Size="Size.Large">📋</MudAvatar>
+                            <div class="d-flex align-center gap-3 mb-3">
+                                <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Primary" Size="Size.Large" />
                                 <div>
                                     <MudText Typo="Typo.h6">Funkcje panelu</MudText>
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">Dostępne narzędzia</MudText>
@@ -68,10 +69,10 @@
                     </MudCard>
                 </MudItem>
                 <MudItem xs="12" md="6">
-                    <MudCard Elevation="2">
+                    <MudCard Outlined="true" Elevation="0" Class="rs-info-card">
                         <MudCardContent>
-                            <div class="d-flex align-items-center gap-3 mb-3">
-                                <MudAvatar Color="Color.Success" Size="Size.Large">💡</MudAvatar>
+                            <div class="d-flex align-center gap-3 mb-3">
+                                <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Color="Color.Tertiary" Size="Size.Large" />
                                 <div>
                                     <MudText Typo="Typo.h6">Wskazówki</MudText>
                                     <MudText Typo="Typo.body2" Color="Color.Secondary">Porady dla admina</MudText>
@@ -90,31 +91,45 @@
             </MudGrid>
         </Authorized>
         <NotAuthorized>
-            <!-- Login Hero -->
-            <div class="login-hero">
-                <div class="login-hero-content">
-                    <div class="login-hero-icon">
-                        <svg viewBox="0 0 100 100" width="80" height="80" aria-hidden="true">
+            @* DS v2: flat navy-inverse hero, bez gradient, bez emoji, jeden CTA *@
+            <div class="rs-welcome">
+                <div class="rs-welcome-content">
+                    <div class="rs-welcome-logo">
+                        <svg viewBox="0 0 100 100" width="72" height="72" aria-hidden="true">
                             <circle cx="50" cy="50" r="48" fill="#F96167" />
-                            <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+                            <text x="50" y="72" font-family="Outfit, Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
                         </svg>
                     </div>
-                    <h1>RentSpot<span style="color:#F96167">.</span></h1>
-                    <p>Panel partnera — wypożyczalnie sprzętu sportowego</p>
-                    <div class="login-hero-features">
-                        <div class="feature-item">📦 Zarządzaj produktami</div>
-                        <div class="feature-item">👥 Obsługuj klientów</div>
-                        <div class="feature-item">📊 Analizuj raporty</div>
+                    <h1 class="rs-welcome-title">RentSpot<span class="rs-welcome-dot">.</span></h1>
+                    <p class="rs-welcome-subtitle">Panel partnera — wypożyczalnie sprzętu sportowego</p>
+
+                    <div class="rs-welcome-features">
+                        <div class="rs-feature">
+                            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" />
+                            <span>Zarządzaj produktami</span>
+                        </div>
+                        <div class="rs-feature">
+                            <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" />
+                            <span>Obsługuj klientów</span>
+                        </div>
+                        <div class="rs-feature">
+                            <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" />
+                            <span>Analizuj raporty</span>
+                        </div>
                     </div>
-                    <MudButton Href="/Account/Login" 
-                               Variant="Variant.Filled" 
-                               Size="Size.Large"
-                               Class="login-hero-btn">
-                        🔑 Zaloguj się
-                    </MudButton>
-                    <MudText Typo="Typo.caption" Class="mt-3" Style="opacity: 0.7;">
-                        Nie masz konta? <MudLink Href="/Account/Register" Color="Color.Inherit" Underline="Underline.Always">Zarejestruj się</MudLink>
-                    </MudText>
+
+                    <div class="rs-welcome-cta">
+                        <MudButton Href="/Account/Login"
+                                   Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   Size="Size.Large"
+                                   Class="rs-welcome-btn">
+                            Zaloguj się
+                        </MudButton>
+                        <MudText Typo="Typo.caption" Class="rs-welcome-register">
+                            Nie masz konta? <MudLink Href="/Account/Register" Color="Color.Inherit" Underline="Underline.Always">Zarejestruj się</MudLink>
+                        </MudText>
+                    </div>
                 </div>
             </div>
         </NotAuthorized>
@@ -122,76 +137,122 @@
 </div>
 
 <style>
-    .admin-home {
-        animation: fadeInUp 0.4s ease-out;
+    .admin-home { animation: fadeInUp 0.4s ease-out; }
+
+    /* DS v2: flat navy-inverse hero, no gradient */
+    .rs-hero {
+        background: var(--navy-900, #1B2350) !important;
+        color: #E8EBF5 !important;
+        border-radius: 16px !important;
+        border: 1px solid var(--navy-800, #242E61) !important;
     }
-    
-    .login-hero {
-        min-height: calc(100vh - 150px);
+    .rs-hero-title { color: #FFFFFF !important; font-weight: 700; letter-spacing: -0.01em; }
+    .rs-hero-subtitle { color: rgba(232, 235, 245, 0.75) !important; }
+
+    /* Quick action card — outlined + flat */
+    .rs-quick-action {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 1.25rem 1.5rem;
+        background: var(--surface-card, #FFFFFF);
+        border: 1px solid var(--line, #DDE2EC);
+        border-radius: 16px;
+        color: var(--text-body, #1C2438);
+        text-decoration: none;
+        box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06));
+        transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 200ms, border-color 200ms;
+    }
+    .rs-quick-action:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md, 0 2px 4px rgba(24,31,69,0.05), 0 12px 28px -8px rgba(24,31,69,0.14));
+        border-color: var(--line-strong, #C3CAD9);
+        text-decoration: none;
+        color: var(--text-body, #1C2438);
+    }
+    .rs-quick-action-icon {
+        font-size: 2rem !important;
+        color: var(--coral-500, #F96167) !important;
+        margin-bottom: 0.25rem;
+    }
+    .rs-quick-action h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0;
+        color: var(--text-body, #1C2438);
+    }
+    .rs-quick-action p {
+        font-size: 0.875rem;
+        color: var(--text-secondary, #5B6B82);
+        margin: 0;
+    }
+
+    /* Info cards (Funkcje panelu / Wskazówki) */
+    .rs-info-card { border-radius: 16px !important; }
+
+    /* Welcome hero (NotAuthorized) — flat navy, bez gradientu coral */
+    .rs-welcome {
+        min-height: calc(100vh - 200px);
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #1F2A5C 0%, #2F3C7E 50%, #F96167 100%);
-        border-radius: 24px;
-        margin: -1.5rem;
-        padding: 3rem;
+        background: var(--navy-900, #1B2350);
+        border-radius: 16px;
+        margin: -1rem -0.5rem;
+        padding: 3rem 2rem;
+        color: #E8EBF5;
     }
-    
-    .login-hero-content {
-        text-align: center;
-        color: white;
-        max-width: 500px;
+    .rs-welcome-content { text-align: center; max-width: 520px; }
+    .rs-welcome-logo { margin-bottom: 1.25rem; }
+    .rs-welcome-title {
+        font-family: 'Outfit', system-ui, sans-serif;
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        color: #FFFFFF;
+        margin: 0 0 0.5rem 0;
     }
-    
-    .login-hero-icon {
-        font-size: 5rem;
-        margin-bottom: 1.5rem;
-        animation: adminFloat 3s ease-in-out infinite;
-    }
-    
-    .login-hero h1 {
-        font-family: 'Poppins', sans-serif;
-        font-size: 3rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        background: linear-gradient(90deg, #fff 0%, #c7d2fe 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-    
-    .login-hero p {
-        font-size: 1.1rem;
-        opacity: 0.9;
+    .rs-welcome-dot { color: #F96167; }
+    .rs-welcome-subtitle {
+        font-size: 1rem;
+        color: rgba(232, 235, 245, 0.8);
         margin-bottom: 2rem;
     }
-    
-    .login-hero-features {
+    .rs-welcome-features {
         display: flex;
         justify-content: center;
-        gap: 1rem;
+        gap: 0.75rem;
         flex-wrap: wrap;
-        margin-bottom: 2rem;
+        margin-bottom: 2.5rem;
     }
-    
-    .feature-item {
-        background: rgba(255, 255, 255, 0.1);
-        padding: 0.75rem 1.25rem;
-        border-radius: 30px;
-        font-size: 0.9rem;
-        backdrop-filter: blur(10px);
+    .rs-feature {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        font-size: 0.875rem;
+        color: rgba(232, 235, 245, 0.9);
     }
-    
-    .login-hero-btn {
-        background: white !important;
-        color: #2F3C7E !important;
+    .rs-welcome-cta {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+    }
+    .rs-welcome-btn {
         font-weight: 600 !important;
         padding: 0.75rem 2rem !important;
         font-size: 1rem !important;
     }
-    
-    .login-hero-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    .rs-welcome-register { color: rgba(232, 235, 245, 0.7); }
+    .rs-welcome-register a { color: #F96167; }
+
+    @@keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
     }
 </style>
