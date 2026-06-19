@@ -45,25 +45,21 @@ public static class RentalGuards
     {
         if (endUtc <= startUtc) return "Data końca musi być po dacie początku.";
 
-        // Aktywne wynajmy = wszystko poza Cancelled/Completed. Draft też liczymy bo
-        // ktoś może utworzyć dwa draftowe z konfliktem.
-        var blockingStatuses = new[]
-        {
-            RentalStatus.Draft,
-            RentalStatus.Pending,
-            RentalStatus.Confirmed,
-            RentalStatus.Active
-        };
-
-        // EF Core 9 nie radzi sobie z null-coalescing operator (??) na Guid? w Where —
-        // wyodrębniamy do lokalnej zmiennej, używamy stałej.
+        // Aktywne wynajmy = wszystko poza Cancelled/Completed.
+        // UWAGA: NIE używamy `new[]{...}.Contains(x)` — w .NET 9/10 rezolwuje to do
+        // `MemoryExtensions.Contains(ReadOnlySpan<T>, T)`, a EF interpreter próbuje
+        // skompilować ReadOnlySpan<T> jako generic argument (ref struct) → runtime
+        // TypeLoadException. Rzutujemy więc na konkretne sprawdzenie OR per status.
         var excludeId = excludeRentalId ?? Guid.Empty;
 
         var query = db.Rentals
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(r => r.TenantId == tenantId
-                && blockingStatuses.Contains(r.Status)
+                && (r.Status == RentalStatus.Draft
+                    || r.Status == RentalStatus.Pending
+                    || r.Status == RentalStatus.Confirmed
+                    || r.Status == RentalStatus.Active)
                 && r.Items.Any(i => i.ProductId == productId)
                 && r.StartDateUtc < endUtc
                 && r.EndDateUtc > startUtc);
