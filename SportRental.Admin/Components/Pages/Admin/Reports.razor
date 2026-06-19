@@ -123,9 +123,105 @@
             <MudItem xs="12" md="6">
                 <MudPaper Class="p-4">
                     <MudText Typo="Typo.h6" Class="mb-3">Statusy wynajmów</MudText>
-                    <MudChart ChartType="MudBlazor.ChartType.Pie" 
-                              ChartSeries="@statusData" 
+                    <MudChart ChartType="MudBlazor.ChartType.Pie"
+                              ChartSeries="@statusData"
                               Width="100%" Height="300px" />
+                </MudPaper>
+            </MudItem>
+
+            <!-- KPI tile: Avg rental duration + Avg rating -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 16px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">Średnie wskaźniki</MudText>
+                    <MudGrid>
+                        <MudItem xs="6">
+                            <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.Schedule" Color="Color.Info" Size="Size.Large" />
+                                <MudText Typo="Typo.h4" Color="Color.Info">@reportData.AvgRentalDays.ToString("0.0")</MudText>
+                                <MudText Typo="Typo.caption">średnia długość (dni)</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="6">
+                            <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                <MudIcon Icon="@Icons.Material.Filled.Star" Color="Color.Warning" Size="Size.Large" />
+                                <MudText Typo="Typo.h4" Color="Color.Warning">@(reportData.RatingCount > 0 ? reportData.AvgRating.ToString("0.0") : "—")</MudText>
+                                <MudText Typo="Typo.caption">średnia ocena (@reportData.RatingCount opinii)</MudText>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Conversion & Cancellation -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 16px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">Efektywność lejka</MudText>
+                    <MudStack Spacing="3">
+                        <div>
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.body2"><MudIcon Icon="@Icons.Material.Filled.CheckCircle" Size="Size.Small" Color="Color.Success" Class="mr-1" />Conversion rate (Completed)</MudText>
+                                <MudText Typo="Typo.body1" Style="font-weight: 700;">@reportData.ConversionRate.ToString("0.0")%</MudText>
+                            </MudStack>
+                            <MudProgressLinear Value="@reportData.ConversionRate" Color="Color.Success" Size="Size.Small" Class="mt-1" />
+                        </div>
+                        <div>
+                            <MudStack Row="true" Justify="Justify.SpaceBetween">
+                                <MudText Typo="Typo.body2"><MudIcon Icon="@Icons.Material.Filled.Cancel" Size="Size.Small" Color="Color.Error" Class="mr-1" />Cancellation rate</MudText>
+                                <MudText Typo="Typo.body1" Style="font-weight: 700;">@reportData.CancellationRate.ToString("0.0")%</MudText>
+                            </MudStack>
+                            <MudProgressLinear Value="@reportData.CancellationRate" Color="Color.Error" Size="Size.Small" Class="mt-1" />
+                        </div>
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Top kategoria + Peak day -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 16px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">Najlepsze segmenty</MudText>
+                    <MudGrid>
+                        <MudItem xs="12" sm="6">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Default">Najmocniejsza kategoria</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Primary">@reportData.TopCategory</MudText>
+                                <MudText Typo="Typo.body2">@reportData.TopCategoryRevenue.Pln() (@reportData.TopCategoryShare.ToString("0")%)</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudStack Spacing="1">
+                                <MudText Typo="Typo.caption" Color="Color.Default">Najlepszy dzień tygodnia</MudText>
+                                <MudText Typo="Typo.h6" Color="Color.Info">@reportData.PeakDayOfWeek</MudText>
+                                <MudText Typo="Typo.body2">@reportData.PeakDayRevenue.Pln()</MudText>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            </MudItem>
+
+            <!-- Klienci nowi vs powracający + martwe sprzęty -->
+            <MudItem xs="12" md="6">
+                <MudPaper Class="pa-4" Elevation="2" Style="border-radius: 16px;">
+                    <MudText Typo="Typo.h6" Class="mb-3">Klienci i sprzęt</MudText>
+                    <MudGrid>
+                        <MudItem xs="4">
+                            <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText Typo="Typo.h4" Color="Color.Success">@reportData.NewCustomers</MudText>
+                                <MudText Typo="Typo.caption" Align="Align.Center">nowych klientów</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="4">
+                            <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText Typo="Typo.h4" Color="Color.Info">@reportData.ReturningCustomers</MudText>
+                                <MudText Typo="Typo.caption" Align="Align.Center">powracających</MudText>
+                            </MudStack>
+                        </MudItem>
+                        <MudItem xs="4">
+                            <MudStack AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText Typo="Typo.h4" Color="@(reportData.IdleProductsCount > 0 ? Color.Warning : Color.Success)">@reportData.IdleProductsCount</MudText>
+                                <MudText Typo="Typo.caption" Align="Align.Center">sprzętów bez wynajmu</MudText>
+                            </MudStack>
+                        </MudItem>
+                    </MudGrid>
                 </MudPaper>
             </MudItem>
 
@@ -318,12 +414,96 @@
                 })
                 .ToList();
 
+            // === Nowe metryki ===
+            // Średni czas wynajmu (z Completed wynajmów)
+            var completedRentals = allRentals.Where(r => r.Status == RentalStatus.Completed).ToList();
+            var avgRentalDays = completedRentals.Count > 0
+                ? completedRentals.Average(r => (r.EndDateUtc - r.StartDateUtc).TotalDays)
+                : 0;
+
+            // Top kategoria — group by Product.Category przez RentalItems
+            var allItemsInPeriod = await Db.RentalItems
+                .Where(ri => Db.Rentals.Any(r => r.Id == ri.RentalId && r.CreatedAtUtc >= startDate && r.CreatedAtUtc <= endDate))
+                .Join(Db.Products, ri => ri.ProductId, p => p.Id, (ri, p) => new { p.Category, ri.Subtotal })
+                .ToListAsync();
+            var categoryTotals = allItemsInPeriod
+                .GroupBy(x => x.Category ?? "Inne")
+                .Select(g => new { Cat = g.Key, Rev = g.Sum(x => x.Subtotal) })
+                .OrderByDescending(x => x.Rev)
+                .FirstOrDefault();
+
+            // Conversion / Cancellation rate
+            var completedCount = allRentals.Count(r => r.Status == RentalStatus.Completed);
+            var cancelledCount = allRentals.Count(r => r.Status == RentalStatus.Cancelled);
+            var conversionRate = totalRentals > 0 ? (double)completedCount / totalRentals * 100 : 0;
+            var cancellationRate = totalRentals > 0 ? (double)cancelledCount / totalRentals * 100 : 0;
+
+            // Sprzęty bez wynajmu w okresie (produkty z 0 rentalitemami)
+            var rentedProductIds = allItemsInPeriod.Select(_ => (Guid?)null).ToList(); // need product ids
+            var rentedIdsSet = (await Db.RentalItems
+                .Where(ri => Db.Rentals.Any(r => r.Id == ri.RentalId && r.CreatedAtUtc >= startDate && r.CreatedAtUtc <= endDate))
+                .Select(ri => ri.ProductId)
+                .Distinct()
+                .ToListAsync()).ToHashSet();
+            var totalActiveProducts = await Db.Products.Where(p => p.IsActive).CountAsync();
+            var idleProductsCount = totalActiveProducts - rentedIdsSet.Count;
+
+            // Średnia ocena z RentalReview w okresie
+            var reviewsInPeriod = await Db.Set<RentalReview>()
+                .Where(rev => rev.CreatedAtUtc >= startDate && rev.CreatedAtUtc <= endDate)
+                .Select(rev => new { rev.QualityScore, rev.PriceScore, rev.ServiceScore })
+                .ToListAsync();
+            var avgRating = reviewsInPeriod.Count > 0
+                ? reviewsInPeriod.Average(r => (r.QualityScore + r.PriceScore + r.ServiceScore) / 3.0)
+                : 0;
+            var ratingCount = reviewsInPeriod.Count;
+
+            // Dzień tygodnia z największymi przychodami
+            var revenueByDayOfWeek = allRentals
+                .GroupBy(r => r.CreatedAtUtc.ToLocalTime().DayOfWeek)
+                .Select(g => new { Day = g.Key, Rev = g.Sum(x => x.TotalAmount) })
+                .OrderByDescending(x => x.Rev)
+                .FirstOrDefault();
+            var peakDayName = revenueByDayOfWeek == null ? "—" : revenueByDayOfWeek.Day switch
+            {
+                DayOfWeek.Monday => "Poniedziałek",
+                DayOfWeek.Tuesday => "Wtorek",
+                DayOfWeek.Wednesday => "Środa",
+                DayOfWeek.Thursday => "Czwartek",
+                DayOfWeek.Friday => "Piątek",
+                DayOfWeek.Saturday => "Sobota",
+                DayOfWeek.Sunday => "Niedziela",
+                _ => "—"
+            };
+
+            // Nowi vs powracający klienci w okresie
+            var customerFirstRentalDates = await Db.Rentals
+                .Where(r => allRentals.Select(ar => ar.CustomerId).Contains(r.CustomerId))
+                .GroupBy(r => r.CustomerId)
+                .Select(g => new { CustomerId = g.Key, FirstRental = g.Min(r => r.CreatedAtUtc) })
+                .ToListAsync();
+            var newCustomers = customerFirstRentalDates.Count(c => c.FirstRental >= startDate);
+            var returningCustomers = uniqueCustomers - newCustomers;
+
             reportData = new ReportData
             {
                 TotalRentals = totalRentals,
                 TotalRevenue = totalRevenue,
                 UniqueCustomers = uniqueCustomers,
                 AverageRentalValue = averageRentalValue,
+                AvgRentalDays = avgRentalDays,
+                TopCategory = categoryTotals?.Cat ?? "—",
+                TopCategoryRevenue = categoryTotals?.Rev ?? 0,
+                TopCategoryShare = (totalRevenue > 0 && categoryTotals != null) ? (double)(categoryTotals.Rev / totalRevenue) * 100 : 0,
+                ConversionRate = conversionRate,
+                CancellationRate = cancellationRate,
+                IdleProductsCount = idleProductsCount,
+                AvgRating = avgRating,
+                RatingCount = ratingCount,
+                PeakDayOfWeek = peakDayName,
+                PeakDayRevenue = revenueByDayOfWeek?.Rev ?? 0,
+                NewCustomers = newCustomers,
+                ReturningCustomers = returningCustomers,
                 TopProducts = topProductsReport,
                 TopCustomers = topCustomersReport,
                 ProductUtilization = productUtilizationReport
@@ -366,6 +546,20 @@
         public decimal TotalRevenue { get; set; }
         public int UniqueCustomers { get; set; }
         public decimal AverageRentalValue { get; set; }
+        // Nowe metryki:
+        public double AvgRentalDays { get; set; }
+        public string TopCategory { get; set; } = "—";
+        public decimal TopCategoryRevenue { get; set; }
+        public double TopCategoryShare { get; set; } // % całości
+        public double ConversionRate { get; set; } // % Completed
+        public double CancellationRate { get; set; } // % Cancelled
+        public int IdleProductsCount { get; set; }
+        public double AvgRating { get; set; }
+        public int RatingCount { get; set; }
+        public string PeakDayOfWeek { get; set; } = "—";
+        public decimal PeakDayRevenue { get; set; }
+        public int NewCustomers { get; set; }
+        public int ReturningCustomers { get; set; }
         public List<TopProductReport> TopProducts { get; set; } = new();
         public List<TopCustomerReport> TopCustomers { get; set; } = new();
         public List<ProductUtilizationReport> ProductUtilization { get; set; } = new();

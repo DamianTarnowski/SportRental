@@ -6,6 +6,11 @@
     <MudNavLink Href="dashboard" Icon="@Icons.Material.Filled.Dashboard">
         Dashboard
     </MudNavLink>
+    <AuthorizeView Roles="Owner,SuperAdmin" Context="reportsCtx">
+        <MudNavLink Href="admin/reports" Icon="@Icons.Material.Filled.Analytics">
+            Raporty
+        </MudNavLink>
+    </AuthorizeView>
 
     <AuthorizeView>
         <Authorized>
@@ -71,9 +76,6 @@
                     </MudNavLink>
                     <MudNavLink Href="admin/employees" Icon="@Icons.Material.Filled.Badge">
                         Pracownicy
-                    </MudNavLink>
-                    <MudNavLink Href="admin/reports" Icon="@Icons.Material.Filled.Analytics">
-                        Raporty
                     </MudNavLink>
                     <MudNavLink Href="admin/company-settings" Icon="@Icons.Material.Filled.Store">
                         Ustawienia firmy
