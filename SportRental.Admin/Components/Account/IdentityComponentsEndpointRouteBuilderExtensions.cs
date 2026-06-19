@@ -85,7 +85,8 @@ namespace Microsoft.AspNetCore.Routing
                 try
                 {
                     await signInManager.SignOutAsync();
-                    var demoUser = await seeder.EnsureAsync(ct);
+                    // Per-session demo: zawsze nowy tenant + user (8h TTL, cleanup w background).
+                    var demoUser = await seeder.CreateFreshAsync(ct);
                     await signInManager.SignInAsync(demoUser, isPersistent: false);
                     log.LogInformation("Demo sign-in OK for {Email}", demoUser.Email);
                     return TypedResults.LocalRedirect("~/");

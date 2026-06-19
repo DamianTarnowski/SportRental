@@ -20,6 +20,13 @@ namespace SportRental.Infrastructure.Domain
 
         [MaxLength(16)]
         public string? SecondaryColorHex { get; set; }
+
+        /// Tryb demo — tenant utworzony przez kliknięcie "Wypróbuj demo".
+        /// Cleanup background service usuwa demo tenants po DemoExpiresAtUtc.
+        public bool IsDemo { get; set; }
+
+        /// Czas wygaśnięcia trybu demo (null dla zwykłych tenantów).
+        public DateTime? DemoExpiresAtUtc { get; set; }
     }
 }
 

@@ -181,7 +181,12 @@ builder.Services.AddHttpClient("SerwerSms");
 builder.Services.AddSingleton<SmsApiSender>();
 builder.Services.AddSingleton<SerwerSmsSender>();
 builder.Services.AddSingleton<ConsoleSmsSender>();
-builder.Services.AddSingleton<ISmsSender, SmsSenderRouter>();
+builder.Services.AddSingleton<SmsSenderRouter>();
+// Decorator: w demo loguje "DEMO SANDBOX" zamiast słać realny SMS. Scoped bo IDemoGuard jest scoped.
+builder.Services.AddScoped<ISmsSender>(sp => new SportRental.Admin.Services.Demo.DemoAwareSmsSender(
+    sp.GetRequiredService<SmsSenderRouter>(),
+    sp.GetRequiredService<SportRental.Admin.Services.Demo.IDemoGuard>(),
+    sp.GetRequiredService<ILogger<SportRental.Admin.Services.Demo.DemoAwareSmsSender>>()));
 builder.Services.AddScoped<ISmsConfirmationService, SmsConfirmationService>();
 builder.Services.AddScoped<SportRental.Admin.Services.IRentalConfirmationService, SportRental.Admin.Services.RentalConfirmationService>();
 builder.Services.AddSingleton<SportRental.Admin.Services.IReviewSurveyTokenService, SportRental.Admin.Services.ReviewSurveyTokenService>();
@@ -225,6 +230,8 @@ builder.Services.AddScoped<SportRental.Admin.Data.DemoTenantSeeder>();
 builder.Services.AddScoped<SportRental.Admin.Services.Dashboard.DashboardMetricsService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Search.SearchService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Ai.IProductAiAssistant, SportRental.Admin.Services.Ai.ProductAiAssistant>();
+builder.Services.AddHostedService<SportRental.Admin.Services.Demo.DemoTenantCleanupService>();
+builder.Services.AddScoped<SportRental.Admin.Services.Demo.IDemoGuard, SportRental.Admin.Services.Demo.DemoGuard>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
 
@@ -429,21 +436,20 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => {
     .AddClaimsPrincipalFactory<SportRental.Admin.Services.Identity.CustomUserClaimsPrincipalFactory>()
     .AddDefaultTokenProviders();
 
-// Email configuration: default to NoOp (tests), enable SMTP only when explicitly configured
+// Email configuration: default to NoOp (tests), enable SMTP only when explicitly configured.
+// W demo: DemoAwareEmailSender wrap loguje zamiast wysyłać.
 builder.Services.AddScoped<SportRental.Admin.Services.Email.IEmailSender>(sp =>
 {
     var cfg = sp.GetRequiredService<IConfiguration>();
     var useSmtp = cfg.GetValue<bool?>("Email:Smtp:Enabled") ?? false;
-    if (useSmtp)
-    {
-        var logger = sp.GetRequiredService<ILogger<SportRental.Admin.Services.Email.SmtpEmailSender>>();
-        return new SportRental.Admin.Services.Email.SmtpEmailSender(cfg, logger);
-    }
-    else
-    {
-        var logger = sp.GetRequiredService<ILogger<SportRental.Admin.Services.Email.NoOpEmailSender>>();
-        return new SportRental.Admin.Services.Email.NoOpEmailSender(logger);
-    }
+    SportRental.Admin.Services.Email.IEmailSender inner = useSmtp
+        ? new SportRental.Admin.Services.Email.SmtpEmailSender(cfg, sp.GetRequiredService<ILogger<SportRental.Admin.Services.Email.SmtpEmailSender>>())
+        : new SportRental.Admin.Services.Email.NoOpEmailSender(sp.GetRequiredService<ILogger<SportRental.Admin.Services.Email.NoOpEmailSender>>());
+
+    return new SportRental.Admin.Services.Demo.DemoAwareEmailSender(
+        inner,
+        sp.GetRequiredService<SportRental.Admin.Services.Demo.IDemoGuard>(),
+        sp.GetRequiredService<ILogger<SportRental.Admin.Services.Demo.DemoAwareEmailSender>>());
 });
 builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp =>
     sp.GetRequiredService<SportRental.Admin.Services.Email.IEmailSender>());
