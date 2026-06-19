@@ -32,7 +32,7 @@
         </MudPaper>
 
         @* Taby mobilne *@
-        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Style="border-radius: 12px;">
+        <MudTabs Elevation="2" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-2" Style="border-radius: 12px;" Class="rs-handling-tabs">
             <MudTabPanel Text="Wydanie" Icon="@Icons.Material.Filled.Output" BadgeData="@_toIssueCount" BadgeColor="Color.Warning">
                 @if (_toIssueRentals == null)
                 {
@@ -184,7 +184,7 @@ else
             </MudStack>
         </MudPaper>
 
-        <MudTabs Elevation="4" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Style="border-radius: 16px;">
+        <MudTabs Elevation="4" Rounded="true" ApplyEffectsToContainer="true" PanelClass="pa-6" Style="border-radius: 16px;" Class="rs-handling-tabs">
             <MudTabPanel Text="Do wydania" Icon="@Icons.Material.Filled.Output" BadgeData="@_toIssueCount" BadgeColor="Color.Warning">
                 <MudText Typo="Typo.h6" Class="mb-4">
                     <MudIcon Icon="@Icons.Material.Filled.Output" Class="mr-2" />
@@ -670,3 +670,24 @@ else
         _ => "Nieznany"
     };
 }
+
+<style>
+    /* MudTabs BadgeData chip — domyślnie pozycjonowany absolutnie w prawym górnym
+       rogu tab itemu, nachodzi na border i wygląda jakby "wystawał". Pinujemy go
+       w tekście tab + dodajemy padding-right żeby się mieścił. */
+    .rs-handling-tabs .mud-tab {
+        padding-right: 1.75rem !important;
+        position: relative;
+    }
+    .rs-handling-tabs .mud-tab .mud-badge.mud-badge-overlap,
+    .rs-handling-tabs .mud-tab .mud-badge {
+        top: 50% !important;
+        right: 0.5rem !important;
+        transform: translateY(-50%) !important;
+        position: absolute !important;
+    }
+    /* Mobile — tabs mogą być scrollowane; ścieśnij padding */
+    @@media (max-width: 600px) {
+        .rs-handling-tabs .mud-tab { padding-right: 1.5rem !important; }
+    }
+</style>
