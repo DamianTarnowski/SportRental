@@ -2,7 +2,7 @@
 
 @inject NavigationManager NavigationManager
 
-<MudNavMenu Class="mud-width-full py-2">
+<MudNavMenu Class="mud-width-full rs-nav-menu">
     <MudNavLink Href="dashboard" Icon="@Icons.Material.Filled.Dashboard">
         Dashboard
     </MudNavLink>
@@ -113,9 +113,9 @@
             </AuthorizeView>
             
             <MudDivider Class="my-2" />
-            
-            <MudNavLink Href="Account/Manage" Icon="@Icons.Material.Filled.Person">
-                @context.User.Identity?.Name
+
+            <MudNavLink Href="Account/Manage" Icon="@Icons.Material.Filled.Person" Class="rs-user-link">
+                <span class="rs-user-name" title="@context.User.Identity?.Name">@DisplayName(context.User.Identity?.Name)</span>
             </MudNavLink>
             <MudNavLink Href="Account/Logout" Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error">
                 Wyloguj
@@ -154,4 +154,30 @@
     {
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
+
+    /// Demo userzy mają email `demo+<8znaków>@rentspot.eu` — w UI pokazujemy "Demo Owner"
+    /// zamiast brzydkiego maila. Reszta userów: skróć email do @local part jeśli długi.
+    private static string DisplayName(string? identityName)
+    {
+        if (string.IsNullOrWhiteSpace(identityName)) return "Użytkownik";
+        if (identityName.StartsWith("demo+", StringComparison.OrdinalIgnoreCase) ||
+            identityName.Contains("@rentspot.eu", StringComparison.OrdinalIgnoreCase) && identityName.StartsWith("demo", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Demo Owner";
+        }
+        return identityName;
+    }
 }
+
+<style>
+    /* NavMenu — usunięta przerwa nad Dashboard, ellipsis dla długich emaili */
+    .rs-nav-menu { padding-top: 0 !important; }
+    .rs-user-link .mud-nav-link-text,
+    .rs-user-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: inline-block;
+        max-width: 180px;
+    }
+</style>
