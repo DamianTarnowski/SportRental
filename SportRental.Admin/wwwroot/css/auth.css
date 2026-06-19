@@ -130,6 +130,31 @@
     margin: 0 0 0.5rem 0;
     letter-spacing: -0.025em;
 }
+/* NXRE QA #1: FocusOnNavigate kładzie outline na H1 z tabindex=-1 — niepotrzebne wizualnie. */
+.auth-title:focus,
+.auth-title:focus-visible {
+    outline: none;
+    box-shadow: none;
+}
+
+/* NXRE QA #2: Password reveal toggle */
+.auth-input-password { padding-right: 2.75rem; }
+.auth-password-toggle {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    color: var(--auth-text-muted);
+    border-radius: 6px;
+    line-height: 0;
+}
+.auth-password-toggle:hover { color: var(--auth-text); background: rgba(255,255,255,0.05); }
+.auth-password-toggle svg { width: 20px; height: 20px; }
+.auth-password-toggle.shown { color: var(--rs-coral, #F96167); }
 
 .auth-subtitle {
     font-size: 0.95rem;

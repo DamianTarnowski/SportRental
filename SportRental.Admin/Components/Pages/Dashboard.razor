@@ -5,259 +5,195 @@
 <PageTitle>RentSpot — Panel</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
-    @* DS v2: flat navy-inverse hero zamiast gradient. --surface-inverse + --text-on-fill *@
-    <MudPaper Class="pa-6 ma-2 rs-hero" Elevation="0" Style="background: #1B2350; color: #E8EBF5; border-radius: 16px;">
-        <MudGrid Class="mud-align-center" Spacing="3">
-            <MudItem xs="12" md="8" lg="9">
-                <MudStack Spacing="3">
-                    <div>
-                        <MudText Typo="Typo.h3" Class="mb-2" Style="font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <MudIcon Icon="@Icons.Material.Filled.WbSunny" Class="mr-3" />
-                            Witaj w RentSpot
-                        </MudText>
-                        <MudText Typo="Typo.h6" Style="opacity: 0.9; font-weight: 300;">
-                            Zarządzaj wypożyczalnią sportową w nowoczesny sposób
-                        </MudText>
-                    </div>
-                    <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
-                        <MudButton Href="/admin/rentals" 
-                                   Color="Color.Surface" 
-                                   Variant="Variant.Filled" 
-                                   StartIcon="@Icons.Material.Filled.Add"
-                                   Size="Size.Large"
-                                   Class="rounded-pill px-6 py-3">
-                            Nowy wynajem
-                        </MudButton>
-                        <MudButton Href="/admin/products" 
-                                   Variant="Variant.Outlined" 
-                                   StartIcon="@Icons.Material.Filled.Inventory2"
-                                   Style="border-color: white; color: white; border-width: 2px;"
-                                   Class="rounded-pill px-4">
-                            Produkty
-                        </MudButton>
-                        <MudButton Href="/admin/customers" 
-                                   Variant="Variant.Outlined" 
-                                   StartIcon="@Icons.Material.Filled.Groups"
-                                   Style="border-color: white; color: white; border-width: 2px;"
-                                   Class="rounded-pill px-4">
-                            Klienci
-                        </MudButton>
-                    </MudStack>
-                </MudStack>
-            </MudItem>
-            <MudItem xs="12" md="4" lg="3" Class="text-center">
-                <MudIcon Icon="@Icons.Material.Filled.SportsTennis" 
-                         Style="font-size: 120px; opacity: 0.8; transform: rotate(-15deg);" />
-            </MudItem>
-        </MudGrid>
+    @* DS v2: compact navy hero — krótko o połowę względem v1, tenant name zamiast generic *@
+    <MudPaper Class="pa-4 ma-2 rs-dash-hero" Elevation="0" Style="background: #1B2350; color: #E8EBF5; border-radius: 16px;">
+        <MudStack Row="true" Class="mud-space-between mud-align-center" Spacing="3">
+            <div>
+                <MudText Typo="Typo.h5" Style="font-weight: 700; color: #FFFFFF; margin: 0;">@tenantName</MudText>
+                <MudText Typo="Typo.body2" Style="color: rgba(232, 235, 245, 0.75); margin-top: 4px;">
+                    Panel właściciela wypożyczalni
+                </MudText>
+            </div>
+            <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                <MudButton Href="/admin/rentals"
+                           Color="Color.Primary"
+                           Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           Size="Size.Medium">
+                    Nowy wynajem
+                </MudButton>
+                <MudButton Href="/admin/products"
+                           Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Filled.Inventory2"
+                           Style="border-color: rgba(255,255,255,0.35); color: white;"
+                           Size="Size.Medium">
+                    Produkty
+                </MudButton>
+                <MudButton Href="/admin/customers"
+                           Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Filled.Groups"
+                           Style="border-color: rgba(255,255,255,0.35); color: white;"
+                           Size="Size.Medium">
+                    Klienci
+                </MudButton>
+            </MudStack>
+        </MudStack>
     </MudPaper>
 
+    @* 4 KPI flat cards — Maciej: Aktywne wynajmy / Zwroty dziś / Wolne produkty / Przychód dziś *@
     <MudGrid Class="mt-4" Spacing="3">
-        <MudItem xs="12" md="8">
-            <MudStack Row="true" Spacing="2" Class="mud-align-center">
-                <MudText Typo="Typo.subtitle2">Placówka:</MudText>
-                <MudSelect T="string" @bind-Value="selectedBranch" Style="max-width:260px">
-                    @foreach (var b in branches)
+        <MudItem xs="12" sm="6" md="3">
+            <a href="/admin/equipment-handling" class="rs-kpi-card">
+                <div class="rs-kpi-icon rs-kpi-icon-active"><MudIcon Icon="@Icons.Material.Filled.PlayCircle" /></div>
+                <div class="rs-kpi-text">
+                    <div class="rs-kpi-value">@(metrics?.ActiveRentals ?? 0)</div>
+                    <div class="rs-kpi-label">Aktywne wynajmy</div>
+                </div>
+            </a>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <a href="/admin/equipment-handling" class="rs-kpi-card">
+                <div class="rs-kpi-icon rs-kpi-icon-return"><MudIcon Icon="@Icons.Material.Filled.AssignmentReturn" /></div>
+                <div class="rs-kpi-text">
+                    <div class="rs-kpi-value">@(metrics?.PendingReturns ?? 0)</div>
+                    <div class="rs-kpi-label">Do zwrotu</div>
+                </div>
+            </a>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <a href="/admin/products" class="rs-kpi-card">
+                <div class="rs-kpi-icon rs-kpi-icon-stock"><MudIcon Icon="@Icons.Material.Filled.Inventory2" /></div>
+                <div class="rs-kpi-text">
+                    <div class="rs-kpi-value">@(metrics?.AvailableProducts ?? 0)</div>
+                    <div class="rs-kpi-label">Wolne produkty</div>
+                </div>
+            </a>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <div class="rs-kpi-card">
+                <div class="rs-kpi-icon rs-kpi-icon-revenue"><MudIcon Icon="@Icons.Material.Filled.TrendingUp" /></div>
+                <div class="rs-kpi-text">
+                    <div class="rs-kpi-value">@((metrics?.TodayRevenue ?? 0m).Pln())</div>
+                    <div class="rs-kpi-label">Przychód dziś</div>
+                </div>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+    @* Dzisiaj do zrobienia + Alerty (Maciej) *@
+    <MudGrid Class="mt-4" Spacing="3">
+        <MudItem xs="12" md="6">
+            <div class="rs-todo-card">
+                <div class="rs-section-head">
+                    <MudIcon Icon="@Icons.Material.Filled.Today" />
+                    <h3>Dzisiaj do zrobienia</h3>
+                </div>
+                <div class="rs-todo-list">
+                    <a href="/admin/equipment-handling" class="rs-todo-item">
+                        <span class="rs-todo-count">@(metrics?.TodayPickups ?? 0)</span>
+                        <span class="rs-todo-label">wydań</span>
+                    </a>
+                    <a href="/admin/equipment-handling" class="rs-todo-item">
+                        <span class="rs-todo-count">@(metrics?.TodayReturns ?? 0)</span>
+                        <span class="rs-todo-label">zwrotów</span>
+                    </a>
+                    <a href="/admin/rentals" class="rs-todo-item">
+                        <span class="rs-todo-count">@(metrics?.UnsignedContracts ?? 0)</span>
+                        <span class="rs-todo-label">umów do podpisu</span>
+                    </a>
+                </div>
+            </div>
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <div class="rs-alerts-card">
+                <div class="rs-section-head">
+                    <MudIcon Icon="@Icons.Material.Filled.NotificationsActive" />
+                    <h3>Alerty</h3>
+                </div>
+                <div class="rs-alerts-list">
+                    <a href="/admin/equipment-handling" class="rs-alert-row @(metrics?.OverdueReturns > 0 ? "rs-alert-row-active rs-alert-red" : "")">
+                        <span class="rs-alert-dot rs-alert-dot-red"></span>
+                        <span class="rs-alert-label">Spóźnione zwroty</span>
+                        <span class="rs-alert-count">@(metrics?.OverdueReturns ?? 0)</span>
+                    </a>
+                    <a href="/admin/rentals" class="rs-alert-row @(metrics?.UnpaidRentals > 0 ? "rs-alert-row-active rs-alert-orange" : "")">
+                        <span class="rs-alert-dot rs-alert-dot-orange"></span>
+                        <span class="rs-alert-label">Brak płatności</span>
+                        <span class="rs-alert-count">@(metrics?.UnpaidRentals ?? 0)</span>
+                    </a>
+                    <a href="/admin/rentals" class="rs-alert-row @(metrics?.UnsignedContracts > 0 ? "rs-alert-row-active rs-alert-orange" : "")">
+                        <span class="rs-alert-dot rs-alert-dot-orange"></span>
+                        <span class="rs-alert-label">Brak podpisu</span>
+                        <span class="rs-alert-count">@(metrics?.UnsignedContracts ?? 0)</span>
+                    </a>
+                </div>
+            </div>
+        </MudItem>
+    </MudGrid>
+
+    @* Oś dnia (Maciej): timeline 06:00-22:00 z pinami dzisiejszych wydań/zwrotów *@
+    @if (timelineEvents.Count > 0)
+    {
+        <MudPaper Elevation="0" Outlined="true" Class="pa-4 mt-4" Style="border-radius: 16px;">
+            <div class="rs-section-head">
+                <MudIcon Icon="@Icons.Material.Filled.Timeline" />
+                <h3>Oś dnia</h3>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Text" Color="Color.Default">@timelineEvents.Count zdarzeń</MudChip>
+            </div>
+            <div class="rs-timeline">
+                <div class="rs-timeline-hours">
+                    @for (int h = TimelineStartHour; h <= TimelineEndHour; h++)
                     {
-                        <MudSelectItem Value="@b">@b</MudSelectItem>
+                        <span style="@($"left: {((h - TimelineStartHour) / (double)(TimelineEndHour - TimelineStartHour)) * 100:0.##}%")">@(h.ToString("00")):00</span>
                     }
-                </MudSelect>
-                <MudText Typo="Typo.caption">(na razie tylko „Wszystkie” – multi-placówki wkrótce)</MudText>
-            </MudStack>
-        </MudItem>
-    </MudGrid>
+                </div>
+                <div class="rs-timeline-track">
+                    @{ var nowPct = NowPctOfDay(); }
+                    @if (nowPct is { } p)
+                    {
+                        <div class="rs-timeline-now" style="@($"left: {p:0.##}%")" title="Teraz"></div>
+                    }
+                    @foreach (var evt in timelineEvents.OrderBy(e => e.LocalTime))
+                    {
+                        var pct = EventPct(evt.LocalTime);
+                        var color = evt.Type switch
+                        {
+                            SportRental.Admin.Services.Dashboard.TimelineEventType.Pickup => "rs-timeline-pin-green",
+                            SportRental.Admin.Services.Dashboard.TimelineEventType.Return => "rs-timeline-pin-orange",
+                            _ => "rs-timeline-pin-red"
+                        };
+                        <a class="rs-timeline-pin @color" style="@($"left: {pct:0.##}%")"
+                           href="@($"/admin/rentals?highlight={evt.RentalId}")"
+                           title="@($"{evt.LocalTime:HH:mm} {evt.CustomerName} — {evt.Summary}")">
+                            <span class="rs-timeline-pin-time">@evt.LocalTime.ToString("HH:mm")</span>
+                            <span class="rs-timeline-pin-label">@evt.CustomerName</span>
+                        </a>
+                    }
+                </div>
+                <div class="rs-timeline-legend">
+                    <span class="rs-legend-item"><span class="rs-legend-dot rs-timeline-pin-green"></span>Wydanie</span>
+                    <span class="rs-legend-item"><span class="rs-legend-dot rs-timeline-pin-orange"></span>Zwrot</span>
+                    <span class="rs-legend-item"><span class="rs-legend-dot rs-timeline-pin-red"></span>Spóźniony</span>
+                </div>
+            </div>
+        </MudPaper>
+    }
 
-    <MudGrid Class="mt-4" Spacing="3">
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="4" Class="rounded-lg hover-card" Style="border-radius: 16px; transition: all 0.3s ease;">
-                <MudCardContent Class="pa-4">
-                    <MudStack Row="true" Spacing="3" Class="mud-align-center">
-                        <MudAvatar Color="Color.Primary" Size="Size.Large">
-                            <MudIcon Icon="@Icons.Material.Filled.PlayArrow" />
-                        </MudAvatar>
-                        <MudStack Spacing="0">
-                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@todayIssues</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Default">Dziś do wydania</MudText>
-                        </MudStack>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="4" Class="rounded-lg hover-card" Style="border-radius: 16px; transition: all 0.3s ease;">
-                <MudCardContent Class="pa-4">
-                    <MudStack Row="true" Spacing="3" Class="mud-align-center">
-                        <MudAvatar Color="Color.Warning" Size="Size.Large">
-                            <MudIcon Icon="@Icons.Material.Filled.AssignmentReturn" />
-                        </MudAvatar>
-                        <MudStack Spacing="0">
-                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@todayReturns</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Default">Dziś do zwrotu</MudText>
-                        </MudStack>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="4" Class="rounded-lg hover-card" Style="border-radius: 16px; transition: all 0.3s ease;">
-                <MudCardContent Class="pa-4">
-                    <MudStack Row="true" Spacing="3" Class="mud-align-center">
-                        <MudAvatar Color="Color.Success" Size="Size.Large">
-                            <MudIcon Icon="@Icons.Material.Filled.TrendingUp" />
-                        </MudAvatar>
-                        <MudStack Spacing="0">
-                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@activeRentals</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Default">Aktywne wynajmy</MudText>
-                        </MudStack>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" sm="6" md="3">
-            <MudCard Elevation="4" Class="rounded-lg hover-card" Style="border-radius: 16px; transition: all 0.3s ease;">
-                <MudCardContent Class="pa-4">
-                    <MudStack Row="true" Spacing="3" Class="mud-align-center">
-                        <MudAvatar Color="Color.Info" Size="Size.Large">
-                            <MudIcon Icon="@Icons.Material.Filled.People" />
-                        </MudAvatar>
-                        <MudStack Spacing="0">
-                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@customersCount</MudText>
-                            <MudText Typo="Typo.body2" Color="Color.Default">Klientów</MudText>
-                        </MudStack>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
-
-    <MudGrid Class="mt-4" Spacing="3">
-        <MudItem xs="12" lg="4">
-            @* DS v2: tinted coral surface zamiast pink gradient *@
-            <MudCard Elevation="0" Outlined="true" Class="h-100" Style="border-radius: 16px; background: var(--surface-brand-tint, #FEF2F2); border-color: var(--coral-200, #FBC8CA); color: var(--coral-900, #671A1E);">
-                <MudCardContent Class="pa-5">
-                    <MudStack Spacing="3">
-                        <div Class="d-flex align-center">
-                            <MudIcon Icon="@Icons.Material.Filled.Bolt" Size="Size.Large" Class="mr-3" />
-                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Szybkie akcje</MudText>
-                        </div>
-                        <MudStack Spacing="2">
-                            <MudButton Href="/admin/rentals" 
-                                       Variant="Variant.Filled" 
-                                       StartIcon="@Icons.Material.Filled.RocketLaunch"
-                                       Style="background: rgba(255,255,255,0.2); color: white; border: none;"
-                                       FullWidth="true"
-                                       Class="rounded-pill py-3">
-                                Utwórz wynajem
-                            </MudButton>
-                            <MudButton Href="/admin/products" 
-                                       Variant="Variant.Outlined" 
-                                       StartIcon="@Icons.Material.Filled.Add"
-                                       Style="border-color: white; color: white; border-width: 2px;"
-                                       FullWidth="true"
-                                       Class="rounded-pill">
-                                Dodaj produkt
-                            </MudButton>
-                            <MudButton Href="/admin/customers" 
-                                       Variant="Variant.Outlined" 
-                                       StartIcon="@Icons.Material.Filled.PersonAddAlt"
-                                       Style="border-color: white; color: white; border-width: 2px;"
-                                       FullWidth="true"
-                                       Class="rounded-pill">
-                                Dodaj klienta
-                            </MudButton>
-                        </MudStack>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" lg="4">
-            @* DS v2: navy inverse surface dla cards z navy theme *@
-            <MudCard Elevation="0" Class="h-100" Style="border-radius: 16px; background: #1B2350; color: #E8EBF5;">
-                <MudCardContent Class="pa-5">
-                    <MudStack Spacing="3">
-                        <div Class="d-flex align-center">
-                            <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" Class="mr-3" />
-                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Zarządzanie</MudText>
-                        </div>
-                        <MudText Typo="Typo.body1" Style="opacity: 0.9;">
-                            Konfiguruj ustawienia wypożyczalni
-                        </MudText>
-                        <MudStack Spacing="2">
-                            <MudButton Href="/admin/contract-template" 
-                                       Variant="Variant.Filled" 
-                                       StartIcon="@Icons.Material.Filled.Article"
-                                       Style="background: rgba(255,255,255,0.2); color: white;"
-                                       FullWidth="true"
-                                       Class="rounded-pill">
-                                Szablon umowy
-                            </MudButton>
-                            <MudButton Href="/admin/company-settings" 
-                                       Variant="Variant.Outlined" 
-                                       StartIcon="@Icons.Material.Filled.Settings"
-                                       Style="border-color: white; color: white; border-width: 2px;"
-                                       FullWidth="true"
-                                       Class="rounded-pill">
-                                Ustawienia
-                            </MudButton>
-                        </MudStack>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-        <MudItem xs="12" lg="4">
-            <MudCard Elevation="6" Class="h-100 dashboard-card-peach" Style="border-radius: 16px;">
-                <MudCardContent Class="pa-5">
-                    <MudStack Spacing="3">
-                        <div Class="d-flex align-center">
-                            <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Large" Class="mr-3" Color="Color.Primary" />
-                            <MudText Typo="Typo.h6" Class="dashboard-card-title" Style="font-weight: 600;">Przegląd danych</MudText>
-                        </div>
-                        <MudGrid Spacing="2">
-                            <MudItem xs="6">
-                                <MudStack Class="mud-align-center" Spacing="1">
-                                    <MudText Typo="Typo.h5" Class="dashboard-card-title" Style="font-weight: 700;">@productsCount</MudText>
-                                    <MudText Typo="Typo.caption" Class="dashboard-card-subtitle">Produkty</MudText>
-                                </MudStack>
-                            </MudItem>
-                            <MudItem xs="6">
-                                <MudStack Class="mud-align-center" Spacing="1">
-                                    <MudText Typo="Typo.h5" Class="dashboard-card-title" Style="font-weight: 700;">@customersCount</MudText>
-                                    <MudText Typo="Typo.caption" Class="dashboard-card-subtitle">Klienci</MudText>
-                                </MudStack>
-                            </MudItem>
-                        </MudGrid>
-                        <MudButton Href="/admin/reports" 
-                                   Variant="Variant.Filled" 
-                                   Color="Color.Primary"
-                                   StartIcon="@Icons.Material.Filled.BarChart"
-                                   FullWidth="true"
-                                   Class="rounded-pill">
-                            Zobacz raporty
-                        </MudButton>
-                    </MudStack>
-                </MudCardContent>
-            </MudCard>
-        </MudItem>
-    </MudGrid>
-
-    <MudCard Elevation="6" Class="mt-4" Style="border-radius: 16px;">
+    @* Wykres ostatnie 7 dni — flat outlined zamiast Elevation 6 *@
+    <MudCard Elevation="0" Outlined="true" Class="mt-4" Style="border-radius: 16px;">
         <MudCardContent Class="pa-5">
             <div Class="d-flex align-center mb-4">
                 <MudIcon Icon="@Icons.Material.Filled.TrendingUp" Color="Color.Primary" Size="Size.Large" Class="mr-3" />
                 <MudText Typo="Typo.h6" Style="font-weight: 600;">Wynajmy w ostatnich 7 dniach</MudText>
             </div>
-            <MudChart ChartType="MudBlazor.ChartType.Line" 
-                      XAxisLabels="@weekLabels" 
-                      ChartSeries="@weekData" 
-                      Width="100%" 
+            <MudChart ChartType="MudBlazor.ChartType.Line"
+                      XAxisLabels="@weekLabels"
+                      ChartSeries="@weekData"
+                      Width="100%"
                       Height="280px"
                       ChartOptions="chartOptions" />
         </MudCardContent>
     </MudCard>
-
-    <AuthorizeView Roles="SuperAdmin">
-        <MudAlert Severity="Severity.Info" Class="mt-4">Widok SuperAdmina: zarządzanie wypożyczalniami i placówkami – do wdrożenia.</MudAlert>
-    </AuthorizeView>
 
     <MudGrid Class="mt-4" Spacing="3">
         <MudItem xs="12" lg="6">
@@ -300,7 +236,7 @@
                             <MudTd>@context.ItemsSummary</MudTd>
                             <MudTd>
                                 <MudText Typo="Typo.body2" Style="font-weight: 600; color: var(--mud-palette-success);">
-                                    @context.TotalAmount.ToString("0.00") zł
+                                    @context.TotalAmount.Pln()
                                 </MudText>
                             </MudTd>
                         </RowTemplate>
@@ -345,7 +281,7 @@
                             <MudTd>@context.EndDateLocal.ToString("MM-dd")</MudTd>
                             <MudTd>
                                 <MudText Typo="Typo.body2" Style="font-weight: 600; color: var(--mud-palette-success);">
-                                    @context.TotalAmount.ToString("0.00") zł
+                                    @context.TotalAmount.Pln()
                                 </MudText>
                             </MudTd>
                         </RowTemplate>
@@ -356,20 +292,306 @@
     </MudGrid>
 </MudContainer>
 
+<style>
+    /* KPI cards — flat outlined zamiast Elevation 4 z pink */
+    .rs-kpi-card {
+        display: flex;
+        align-items: center;
+        gap: 0.875rem;
+        padding: 1.1rem 1.25rem;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 16px;
+        color: #1B2350;
+        text-decoration: none;
+        transition: transform 180ms cubic-bezier(0.2,0.7,0.3,1), box-shadow 180ms, border-color 180ms;
+    }
+    a.rs-kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px -6px rgba(24,31,69,0.18);
+        border-color: #F96167;
+        color: #1B2350;
+        text-decoration: none;
+    }
+    .rs-kpi-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 48px;
+    }
+    .rs-kpi-icon .mud-icon-root { font-size: 1.5rem !important; color: #FFFFFF !important; }
+    .rs-kpi-icon-active { background: #1F9D61; }
+    .rs-kpi-icon-return { background: #DD8413; }
+    .rs-kpi-icon-stock { background: #2E66C8; }
+    .rs-kpi-icon-revenue { background: #F96167; }
+    .rs-kpi-value { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+    .rs-kpi-label { font-size: 0.85rem; color: #5B6B82; margin-top: 2px; }
+
+    /* Section heading (Dzisiaj/Alerty) */
+    .rs-section-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.85rem;
+    }
+    .rs-section-head h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin: 0;
+        color: #1B2350;
+    }
+    .rs-section-head .mud-icon-root { color: #F96167 !important; }
+
+    /* Dzisiaj do zrobienia */
+    .rs-todo-card,
+    .rs-alerts-card {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 16px;
+        padding: 1.25rem;
+        height: 100%;
+    }
+    .rs-todo-list { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    .rs-todo-item {
+        flex: 1 1 0;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.15rem;
+        padding: 0.85rem 0.5rem;
+        background: linear-gradient(180deg, #FFFBF5 0%, #FFFFFF 100%);
+        border: 1px solid #F0E5D5;
+        border-radius: 12px;
+        color: #1B2350;
+        text-decoration: none;
+        text-align: center;
+        transition: border-color 180ms, transform 180ms;
+    }
+    .rs-todo-item:hover {
+        transform: translateY(-1px);
+        border-color: #F96167;
+        text-decoration: none;
+        color: #1B2350;
+    }
+    .rs-todo-count { font-size: 1.4rem; font-weight: 700; color: #F96167; }
+    .rs-todo-label { font-size: 0.8rem; color: #5B6B82; }
+
+    /* Alerty */
+    .rs-alerts-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .rs-alert-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 0.85rem;
+        background: #FAFBFD;
+        border: 1px solid #EBEEF5;
+        border-radius: 10px;
+        color: #1B2350;
+        text-decoration: none;
+        transition: background 180ms, border-color 180ms;
+    }
+    .rs-alert-row:hover { background: #F0F2F8; text-decoration: none; color: #1B2350; }
+    .rs-alert-row-active.rs-alert-red {
+        background: rgba(200, 54, 43, 0.06);
+        border-color: rgba(200, 54, 43, 0.25);
+    }
+    .rs-alert-row-active.rs-alert-orange {
+        background: rgba(221, 132, 19, 0.06);
+        border-color: rgba(221, 132, 19, 0.25);
+    }
+    .rs-alert-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex: 0 0 10px;
+        background: #C3CAD9;
+    }
+    .rs-alert-row-active .rs-alert-dot-red { background: #C8362B; box-shadow: 0 0 0 4px rgba(200,54,43,0.15); }
+    .rs-alert-row-active .rs-alert-dot-orange { background: #DD8413; box-shadow: 0 0 0 4px rgba(221,132,19,0.15); }
+    .rs-alert-label { flex: 1; font-size: 0.9rem; font-weight: 500; }
+    .rs-alert-count {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #1B2350;
+        padding: 0.1rem 0.5rem;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 999px;
+        min-width: 28px;
+        text-align: center;
+    }
+    .rs-alert-row-active.rs-alert-red .rs-alert-count { color: #C8362B; border-color: rgba(200,54,43,0.3); }
+    .rs-alert-row-active.rs-alert-orange .rs-alert-count { color: #DD8413; border-color: rgba(221,132,19,0.3); }
+
+    /* Oś dnia (Maciej) — horizontal timeline 06:00-22:00 */
+    .rs-timeline { position: relative; padding-top: 0.5rem; }
+    .rs-timeline-hours {
+        position: relative;
+        height: 18px;
+        font-size: 0.65rem;
+        color: #5B6B82;
+        font-family: 'IBM Plex Mono', monospace;
+    }
+    .rs-timeline-hours span {
+        position: absolute;
+        transform: translateX(-50%);
+    }
+    .rs-timeline-track {
+        position: relative;
+        height: 56px;
+        margin-top: 0.5rem;
+        background: linear-gradient(180deg, transparent 27px, #DDE2EC 27px, #DDE2EC 29px, transparent 29px);
+    }
+    .rs-timeline-now {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #F96167;
+        z-index: 1;
+        box-shadow: 0 0 8px rgba(249,97,103,0.4);
+    }
+    .rs-timeline-pin {
+        position: absolute;
+        top: 0;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-decoration: none;
+        z-index: 2;
+        cursor: pointer;
+    }
+    .rs-timeline-pin-time {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #1B2350;
+        font-family: 'IBM Plex Mono', monospace;
+    }
+    .rs-timeline-pin-label {
+        font-size: 0.7rem;
+        color: #5B6B82;
+        white-space: nowrap;
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .rs-timeline-pin::after {
+        content: '';
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-top: 4px;
+        border: 2px solid #FFFFFF;
+        box-shadow: 0 1px 3px rgba(24,31,69,0.25);
+    }
+    .rs-timeline-pin.rs-timeline-pin-green::after { background: #1F9D61; }
+    .rs-timeline-pin.rs-timeline-pin-orange::after { background: #DD8413; }
+    .rs-timeline-pin.rs-timeline-pin-red::after { background: #C8362B; box-shadow: 0 0 0 4px rgba(200,54,43,0.15); }
+    .rs-timeline-legend {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.75rem;
+        font-size: 0.75rem;
+        color: #5B6B82;
+    }
+    .rs-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .rs-legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .rs-legend-dot.rs-timeline-pin-green { background: #1F9D61; }
+    .rs-legend-dot.rs-timeline-pin-orange { background: #DD8413; }
+    .rs-legend-dot.rs-timeline-pin-red { background: #C8362B; }
+
+    [data-theme="dark"] .rs-timeline-hours,
+    .mud-theme-dark .rs-timeline-hours,
+    [data-theme="dark"] .rs-timeline-pin-label,
+    .mud-theme-dark .rs-timeline-pin-label,
+    [data-theme="dark"] .rs-timeline-legend,
+    .mud-theme-dark .rs-timeline-legend { color: rgba(232,235,245,0.65); }
+    [data-theme="dark"] .rs-timeline-pin-time,
+    .mud-theme-dark .rs-timeline-pin-time { color: #E8EBF5; }
+    [data-theme="dark"] .rs-timeline-track,
+    .mud-theme-dark .rs-timeline-track {
+        background: linear-gradient(180deg, transparent 27px, rgba(255,255,255,0.12) 27px, rgba(255,255,255,0.12) 29px, transparent 29px);
+    }
+
+    /* Dark mode */
+    [data-theme="dark"] .rs-kpi-card,
+    [data-theme="dark"] .rs-todo-card,
+    [data-theme="dark"] .rs-alerts-card,
+    .mud-theme-dark .rs-kpi-card,
+    .mud-theme-dark .rs-todo-card,
+    .mud-theme-dark .rs-alerts-card {
+        background: rgba(255,255,255,0.04);
+        border-color: rgba(255,255,255,0.1);
+        color: #E8EBF5;
+    }
+    [data-theme="dark"] .rs-section-head h3,
+    .mud-theme-dark .rs-section-head h3,
+    [data-theme="dark"] a.rs-kpi-card,
+    .mud-theme-dark a.rs-kpi-card { color: #E8EBF5; }
+    [data-theme="dark"] .rs-kpi-label,
+    [data-theme="dark"] .rs-todo-label,
+    .mud-theme-dark .rs-kpi-label,
+    .mud-theme-dark .rs-todo-label { color: rgba(232,235,245,0.7); }
+    [data-theme="dark"] .rs-alert-row,
+    .mud-theme-dark .rs-alert-row {
+        background: rgba(255,255,255,0.03);
+        border-color: rgba(255,255,255,0.08);
+        color: #E8EBF5;
+    }
+    [data-theme="dark"] .rs-alert-count,
+    .mud-theme-dark .rs-alert-count {
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(255,255,255,0.15);
+        color: #E8EBF5;
+    }
+</style>
+
 @code {
     [Inject] private IDbContextFactory<ApplicationDbContext> DbFactory { get; set; } = default!;
     [Inject] private SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider { get; set; } = default!;
+    [Inject] private SportRental.Admin.Services.Dashboard.DashboardMetricsService MetricsService { get; set; } = default!;
+    [Inject] private SportRental.Admin.Services.Cache.IAppCache AppCache { get; set; } = default!;
 
     private int productsCount;
     private int customersCount;
     private int activeRentals;
     private int todayReturns;
     private int todayIssues;
+    private SportRental.Admin.Services.Dashboard.DashboardMetrics? metrics;
+    private List<SportRental.Admin.Services.Dashboard.TimelineEvent> timelineEvents = new();
+
+    private const int TimelineStartHour = 6;
+    private const int TimelineEndHour = 22;
+
+    private double EventPct(DateTime localTime)
+    {
+        var minutes = (localTime.TimeOfDay.TotalMinutes - TimelineStartHour * 60.0)
+            / ((TimelineEndHour - TimelineStartHour) * 60.0) * 100.0;
+        return Math.Clamp(minutes, 0, 100);
+    }
+
+    private double? NowPctOfDay()
+    {
+        var n = DateTime.Now;
+        if (n.Hour < TimelineStartHour || n.Hour > TimelineEndHour) return null;
+        return EventPct(n);
+    }
 
     private List<UpcomingReturnVm> upcomingReturns = new();
     private List<ActiveVm> activeNow = new();
     private string selectedBranch = "Wszystkie";
     private List<string> branches = new() { "Wszystkie" };
+    private string tenantName = "RentSpot";
     private string[] weekLabels = Array.Empty<string>();
     private List<MudBlazor.ChartSeries> weekData = new();
     private ChartOptions chartOptions = new()
@@ -381,7 +603,16 @@
     protected override async Task OnInitializedAsync()
     {
         await using var Db = await DbFactory.CreateDbContextAsync();
-        Db.SetTenant(TenantProvider.GetCurrentTenantId());
+        var tid = TenantProvider.GetCurrentTenantId();
+        Db.SetTenant(tid);
+        if (tid.HasValue)
+        {
+            // PERF: nazwa tenanta to read-mostly — cached przez IAppCache na 15min.
+            var t = await AppCache.GetTenantNameAsync(tid.Value);
+            if (!string.IsNullOrWhiteSpace(t)) tenantName = t;
+            metrics = await MetricsService.GetAsync(tid.Value);
+            timelineEvents = await MetricsService.GetTodayTimelineAsync(tid.Value);
+        }
         productsCount = await Db.Products.AsNoTracking().CountAsync();
         customersCount = await Db.Customers.AsNoTracking().CountAsync();
         activeRentals = await Db.Rentals.AsNoTracking().CountAsync(r => r.Status == RentalStatus.Active || r.Status == RentalStatus.Confirmed);

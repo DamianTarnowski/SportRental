@@ -43,7 +43,7 @@
                                        OnClick="Save"
                                        Size="Size.Large"
                                        Class="rounded-pill px-6">
-                                💾 Zapisz szablon
+                                Zapisz szablon
                             </MudButton>
                             <MudButton Variant="Variant.Outlined" 
                                        Color="Color.Warning"
@@ -191,7 +191,7 @@
             Db.ContractTemplates.Update(tpl);
         }
         await Db.SaveChangesAsync();
-        Snackbar.Add("✅ Szablon został zapisany", MudBlazor.Severity.Success);
+        Snackbar.Add("Szablon został zapisany", MudBlazor.Severity.Success);
     }
 
     private void ResetDefault()
@@ -203,7 +203,7 @@
     private async Task CopyVariable(string variable)
     {
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", variable);
-        Snackbar.Add($"📋 Skopiowano: {variable}", MudBlazor.Severity.Success);
+        Snackbar.Add($"Skopiowano: {variable}", MudBlazor.Severity.Success);
     }
 
     private static string DefaultTemplate() => @"

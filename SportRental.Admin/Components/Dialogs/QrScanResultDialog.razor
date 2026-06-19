@@ -57,13 +57,13 @@
                     <tbody>
                         <tr>
                             <td><strong>Cena dzienna</strong></td>
-                            <td>@Product.DailyPrice.ToString("C")</td>
+                            <td>@Product.DailyPrice.Pln()</td>
                         </tr>
                         @if (Product.HourlyPrice.HasValue)
                         {
                             <tr>
                                 <td><strong>Cena godzinowa</strong></td>
-                                <td>@Product.HourlyPrice.Value.ToString("C")</td>
+                                <td>@Product.HourlyPrice.Value.Pln()</td>
                             </tr>
                         }
                         <tr>

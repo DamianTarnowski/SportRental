@@ -12,38 +12,53 @@
 @inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h4">
-            <MudIcon Icon="@Icons.Material.Filled.Feedback" Class="mr-2" />
-            Zgłoszenia od użytkowników
-        </MudText>
-        <MudStack Row="true" Spacing="1">
-            <MudChip T="string" Color="Color.Primary">@_feedbacks.Count</MudChip>
+    @* Banner DS v2 navy *@
+    <MudPaper Class="rs-page-banner pa-6 mb-4" Elevation="0">
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.Feedback" Size="Size.Large" />
+            <div style="flex: 1;">
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">Zgłoszenia od użytkowników</MudText>
+                <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">
+                    @if (_feedbacks.Count == 0)
+                    {
+                        <text>Wszystko czysto — brak zgłoszeń</text>
+                    }
+                    else
+                    {
+                        var open = _feedbacks.Count(f => !f.IsResolved);
+                        <text>@_feedbacks.Count @(_feedbacks.Count == 1 ? "zgłoszenie" : "zgłoszeń") · @open otwartych · @(_feedbacks.Count - open) rozwiązanych</text>
+                    }
+                </MudText>
+            </div>
             @if (_isSuperAdmin)
             {
-                <MudChip T="string" Color="Color.Warning">SuperAdmin: cross-tenant</MudChip>
+                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="color: #FFFFFF; border-color: rgba(255,255,255,0.4);">
+                    SuperAdmin · cross-tenant
+                </MudChip>
             }
         </MudStack>
-    </MudStack>
+    </MudPaper>
 
-    <MudPaper Class="pa-3 mb-3" Elevation="1">
+    <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true" Style="border-radius: 12px;">
         <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
             <MudSelect T="FeedbackType?" @bind-Value="_filterType" Label="Typ" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 160px;" Clearable="true">
                 <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)null)">— wszystkie —</MudSelectItem>
-                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Bug)">🐛 Błędy</MudSelectItem>
-                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Suggestion)">💡 Sugestie</MudSelectItem>
-                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Question)">❓ Pytania</MudSelectItem>
-                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Praise)">⭐ Pochwały</MudSelectItem>
-                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.General)">💬 Ogólne</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Bug)">Błędy</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Suggestion)">Sugestie</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Question)">Pytania</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.Praise)">Pochwały</MudSelectItem>
+                <MudSelectItem T="FeedbackType?" Value="@((FeedbackType?)FeedbackType.General)">Ogólne</MudSelectItem>
             </MudSelect>
 
             <MudSelect T="bool?" @bind-Value="_filterResolved" Label="Status" Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 160px;" Clearable="true">
                 <MudSelectItem T="bool?" Value="@((bool?)null)">— wszystkie —</MudSelectItem>
-                <MudSelectItem T="bool?" Value="@((bool?)false)">📋 Otwarte</MudSelectItem>
-                <MudSelectItem T="bool?" Value="@((bool?)true)">✅ Rozwiązane</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)false)">Otwarte</MudSelectItem>
+                <MudSelectItem T="bool?" Value="@((bool?)true)">Rozwiązane</MudSelectItem>
             </MudSelect>
 
-            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync">
+            <MudSpacer />
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync">
                 Odśwież
             </MudButton>
         </MudStack>
@@ -51,11 +66,25 @@
 
     @if (_isLoading)
     {
-        <MudPaper Class="pa-6 text-center"><MudProgressCircular Indeterminate="true" /></MudPaper>
+        <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" Style="border-radius: 16px;">
+            <MudProgressCircular Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (_feedbacks.Count == 0)
+    {
+        @* Empty state — onboarding hint *@
+        <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" Style="border-radius: 16px;">
+            <MudIcon Icon="@Icons.Material.Filled.MarkChatRead" Size="Size.Large" Color="Color.Default" Class="mb-3" Style="opacity: 0.4;" />
+            <MudText Typo="Typo.h6" Style="font-weight: 600;">Brak zgłoszeń</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                Tutaj będą się pojawiać zgłoszenia, sugestie i pytania od użytkowników.
+                Mogą je dodawać przez przycisk czatu w prawym dolnym rogu (Wsparcie / Zgłoś sugestię).
+            </MudText>
+        </MudPaper>
     }
     else if (Filtered.Count == 0)
     {
-        <MudAlert Severity="Severity.Info">Brak zgłoszeń pasujących do filtra.</MudAlert>
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">Brak zgłoszeń pasujących do filtra.</MudAlert>
     }
     else
     {
@@ -66,12 +95,13 @@
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start" Wrap="Wrap.Wrap">
                         <MudStack Spacing="1" Style="flex: 1; min-width: 0;">
                             <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
-                                <MudChip T="string" Size="Size.Small" Color="@TypeColor(f.Type)" Variant="Variant.Filled">
-                                    @TypeIcon(f.Type) @TypeLabel(f.Type)
+                                <MudChip T="string" Size="Size.Small" Color="@TypeColor(f.Type)" Variant="Variant.Filled"
+                                         Icon="@TypeIcon(f.Type)">
+                                    @TypeLabel(f.Type)
                                 </MudChip>
                                 @if (f.IsResolved)
                                 {
-                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">✅ Rozwiązane</MudChip>
+                                    <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Outlined">Rozwiązane</MudChip>
                                 }
                                 <MudText Typo="Typo.caption" Color="Color.Default">
                                     @f.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm") · @f.UserEmail (@f.UserRole)
@@ -87,7 +117,7 @@
                             @if (!string.IsNullOrWhiteSpace(f.CurrentPage))
                             {
                                 <MudText Typo="Typo.caption" Color="Color.Default">
-                                    📍 strona: <code>@f.CurrentPage</code>
+                                    strona: <code>@f.CurrentPage</code>
                                 </MudText>
                             }
 
@@ -200,11 +230,11 @@
 
     private static string TypeIcon(FeedbackType t) => t switch
     {
-        FeedbackType.Bug => "🐛",
-        FeedbackType.Suggestion => "💡",
-        FeedbackType.Question => "❓",
-        FeedbackType.Praise => "⭐",
-        _ => "💬"
+        FeedbackType.Bug => Icons.Material.Filled.BugReport,
+        FeedbackType.Suggestion => Icons.Material.Filled.Lightbulb,
+        FeedbackType.Question => Icons.Material.Filled.HelpOutline,
+        FeedbackType.Praise => Icons.Material.Filled.Star,
+        _ => Icons.Material.Filled.ChatBubbleOutline
     };
 
     private static string ShortGuid(Guid g) => g.ToString("N").Substring(0, 8);

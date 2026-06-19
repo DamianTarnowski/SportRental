@@ -12,56 +12,68 @@
 @inject ISnackbar Snackbar
 
 <MudContainer MaxWidth="MaxWidth.Small" Class="mt-4">
-    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Spacing="2">
-        <MudIcon Icon="@Icons.Material.Filled.Tune" />
-        <MudText Typo="Typo.h4">Ustawienia floating chatu</MudText>
-        <MudChip T="string" Color="Color.Warning" Size="Size.Small">SuperAdmin only</MudChip>
-    </MudStack>
+    @* Banner DS v2 navy *@
+    <MudPaper Class="rs-page-banner pa-6 mb-4" Elevation="0">
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.Tune" Size="Size.Large" />
+            <div style="flex: 1;">
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">Ustawienia floating chatu</MudText>
+                <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">
+                    Domyślny model AI dla wszystkich userów + przełącznik w UI
+                </MudText>
+            </div>
+            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Style="color: #FFFFFF; border-color: rgba(255,255,255,0.4);">
+                SuperAdmin
+            </MudChip>
+        </MudStack>
+    </MudPaper>
 
     @if (_isLoading)
     {
-        <MudPaper Class="pa-6 text-center"><MudProgressCircular Indeterminate="true" /></MudPaper>
+        <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" Style="border-radius: 16px;">
+            <MudProgressCircular Indeterminate="true" />
+        </MudPaper>
     }
     else
     {
-        <MudPaper Class="pa-4" Elevation="2">
+        <MudPaper Class="pa-4" Elevation="0" Outlined="true" Style="border-radius: 16px;">
             <MudStack Spacing="4">
                 <MudSelect T="string" @bind-Value="_defaultModel" Label="Domyślny model" Variant="Variant.Outlined">
-                    <MudSelectItem Value="@("gpt-5.5")">🧠 gpt-5.5 (mądrzejszy, droższy)</MudSelectItem>
-                    <MudSelectItem Value="@("gpt-5.4-mini")">🚀 gpt-5.4-mini (szybszy, tańszy)</MudSelectItem>
+                    <MudSelectItem Value="@("gpt-5.5")">gpt-5.5 — mądrzejszy, droższy</MudSelectItem>
+                    <MudSelectItem Value="@("gpt-5.4-mini")">gpt-5.4-mini — szybszy, tańszy</MudSelectItem>
                 </MudSelect>
 
                 <MudSwitch T="bool" @bind-Value="_allowUserChoice"
                            Label="Pozwól użytkownikom przełączać model w UI chatu"
                            Color="Color.Primary" />
 
-                <MudAlert Severity="@(_allowUserChoice ? Severity.Info : Severity.Warning)" Dense="true">
+                <MudAlert Severity="@(_allowUserChoice ? Severity.Info : Severity.Warning)" Dense="true" Variant="Variant.Outlined">
                     @if (_allowUserChoice)
                     {
-                        <span>Każdy user widzi 🧠/🚀 toggle w nagłówku chatu i może wybrać. Jego wybór trzymany w localStorage przeglądarki, jeśli pierwszy raz — startuje z domyślnego.</span>
+                        <span>Każdy user widzi przełącznik modelu w nagłówku chatu i może wybrać. Jego wybór trzymany w localStorage przeglądarki — przy pierwszym wejściu startuje z domyślnego.</span>
                     }
                     else
                     {
-                        <span>Toggle ukryty u userów — wszyscy używają <strong>@_defaultModel</strong>. Idealnie gdy chcesz zminimalizować koszty (gpt-5.4-mini) lub odwrotnie wymusić jakość (gpt-5.5).</span>
+                        <span>Przełącznik ukryty u userów — wszyscy używają <strong>@_defaultModel</strong>. Idealnie gdy chcesz zminimalizować koszty (gpt-5.4-mini) lub wymusić jakość (gpt-5.5).</span>
                     }
                 </MudAlert>
 
-                <MudStack Row="true" Spacing="2" Justify="Justify.FlexEnd">
+                <MudStack Row="true" Spacing="2" Justify="Justify.FlexEnd" AlignItems="AlignItems.Center">
+                    @if (_lastUpdated.HasValue)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Style="flex: 1;">
+                            Ostatnio zmienione: @_lastUpdated.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            @if (!string.IsNullOrWhiteSpace(_lastUpdatedBy)) { <span> przez @_lastUpdatedBy</span> }
+                        </MudText>
+                    }
                     <MudButton Variant="Variant.Filled" Color="Color.Primary"
                                StartIcon="@Icons.Material.Filled.Save"
                                OnClick="SaveAsync"
-                               Disabled="@_isSaving">
-                        @(_isSaving ? "Zapisuję..." : "Zapisz")
+                               Disabled="@_isSaving"
+                               Size="Size.Medium">
+                        @(_isSaving ? "Zapisuję…" : "Zapisz")
                     </MudButton>
                 </MudStack>
-
-                @if (_lastUpdated.HasValue)
-                {
-                    <MudText Typo="Typo.caption" Color="Color.Default">
-                        Ostatnio zmienione: @_lastUpdated.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
-                        @if (!string.IsNullOrWhiteSpace(_lastUpdatedBy)) { <span> przez @_lastUpdatedBy</span> }
-                    </MudText>
-                }
             </MudStack>
         </MudPaper>
     }

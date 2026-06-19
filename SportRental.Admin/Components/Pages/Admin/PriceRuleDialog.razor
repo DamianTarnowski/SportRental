@@ -14,7 +14,7 @@
             <MudSelect T="Guid" Value="Rule.ProductId" ValueChanged="@(v => Rule.ProductId = v)" Label="Produkt" Required="true">
                 @foreach (var p in Products)
                 {
-                    <MudSelectItem T="Guid" Value="@p.Id">@p.Name (bazowa @p.DailyPrice.ToString("0.00") zł/dzień)</MudSelectItem>
+                    <MudSelectItem T="Guid" Value="@p.Id">@p.Name (bazowa @p.DailyPrice.Pln()/dzień)</MudSelectItem>
                 }
             </MudSelect>
 

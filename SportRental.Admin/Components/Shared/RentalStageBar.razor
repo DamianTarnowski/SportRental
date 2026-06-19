@@ -1,0 +1,148 @@
+@using SportRental.Infrastructure.Domain
+@using SportRental.Admin.Services.Guards
+
+<div class="rs-stage-bar @(Compact ? "rs-stage-bar-sm" : "")">
+    @{
+        var stages = GetStages();
+    }
+    @for (int i = 0; i < stages.Count; i++)
+    {
+        var s = stages[i];
+        var cls = s.IsDone ? "rs-stage-done"
+                 : s.IsCurrent ? "rs-stage-current"
+                 : "rs-stage-future";
+        <div class="rs-stage @cls">
+            <div class="rs-stage-dot">
+                @if (s.IsDone)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Check" Size="Size.Small" />
+                }
+                else
+                {
+                    <span>@(i + 1)</span>
+                }
+            </div>
+            <div class="rs-stage-label">@s.Label</div>
+        </div>
+        @if (i < stages.Count - 1)
+        {
+            <div class="rs-stage-line @(s.IsDone ? "rs-stage-line-done" : "")"></div>
+        }
+    }
+</div>
+
+<style>
+    .rs-stage-bar {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        width: 100%;
+        font-family: 'Outfit', system-ui, sans-serif;
+    }
+    .rs-stage {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.35rem;
+        flex: 0 0 auto;
+    }
+    .rs-stage-dot {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: 700;
+        flex: 0 0 28px;
+        background: #F0F2F8;
+        color: #5B6B82;
+        border: 2px solid #E2E8F0;
+        transition: all 180ms;
+    }
+    .rs-stage-dot .mud-icon-root { font-size: 0.95rem !important; color: inherit !important; }
+    .rs-stage-label {
+        font-size: 0.72rem;
+        font-weight: 500;
+        color: #5B6B82;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .rs-stage-line {
+        flex: 1 1 auto;
+        height: 2px;
+        background: #E2E8F0;
+        margin: 0 0.25rem;
+        margin-bottom: 1.1rem;
+        min-width: 16px;
+    }
+    .rs-stage-line-done { background: #1F9D61; }
+    .rs-stage-done .rs-stage-dot {
+        background: #1F9D61;
+        color: #FFFFFF;
+        border-color: #1F9D61;
+    }
+    .rs-stage-done .rs-stage-label { color: #1F9D61; }
+    .rs-stage-current .rs-stage-dot {
+        background: #FFFFFF;
+        color: #F96167;
+        border-color: #F96167;
+        box-shadow: 0 0 0 4px rgba(249,97,103,0.15);
+    }
+    .rs-stage-current .rs-stage-label { color: #F96167; font-weight: 700; }
+
+    /* Compact variant — dla list */
+    .rs-stage-bar-sm .rs-stage-dot { width: 20px; height: 20px; font-size: 0.7rem; flex: 0 0 20px; }
+    .rs-stage-bar-sm .rs-stage-dot .mud-icon-root { font-size: 0.75rem !important; }
+    .rs-stage-bar-sm .rs-stage-label { display: none; }
+    .rs-stage-bar-sm .rs-stage-line { margin-bottom: 0; }
+
+    [data-theme="dark"] .rs-stage-dot,
+    .mud-theme-dark .rs-stage-dot {
+        background: rgba(255,255,255,0.06);
+        border-color: rgba(255,255,255,0.15);
+        color: rgba(232,235,245,0.6);
+    }
+    [data-theme="dark"] .rs-stage-line,
+    .mud-theme-dark .rs-stage-line { background: rgba(255,255,255,0.1); }
+    [data-theme="dark"] .rs-stage-label,
+    .mud-theme-dark .rs-stage-label { color: rgba(232,235,245,0.6); }
+    [data-theme="dark"] .rs-stage-current .rs-stage-dot,
+    .mud-theme-dark .rs-stage-current .rs-stage-dot { background: #1B2350; }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public Rental Rental { get; set; } = default!;
+    [Parameter] public bool Compact { get; set; } = false;
+
+    private record Stage(string Label, bool IsDone, bool IsCurrent);
+
+    private List<Stage> GetStages()
+    {
+        var hasContract = !string.IsNullOrEmpty(Rental.ContractUrl);
+        var isPaid = RentalGuards.IsRentalPaid(Rental);
+        var isIssued = Rental.IssuedAtUtc.HasValue;
+        var isReturned = Rental.ReturnedAtUtc.HasValue;
+        var isCancelled = Rental.Status == RentalStatus.Cancelled;
+
+        // Domyślnie wszystkie etapy nie-done. Określamy bieżący jako pierwszy nie-done.
+        var stages = new List<(string Label, bool Done)>
+        {
+            ("Rezerwacja", true), // istnieje rental → krok 1 zawsze done
+            ("Umowa", hasContract),
+            ("Płatność", isPaid),
+            ("Wydanie", isIssued),
+            ("Zwrot", isReturned)
+        };
+
+        // Anulowane: pokaż jako bieżący ostatni done
+        if (isCancelled)
+        {
+            return stages.Select(s => new Stage(s.Label, s.Done, false)).ToList();
+        }
+
+        var firstNotDoneIdx = stages.FindIndex(s => !s.Done);
+        return stages.Select((s, i) => new Stage(s.Label, s.Done, i == firstNotDoneIdx)).ToList();
+    }
+}

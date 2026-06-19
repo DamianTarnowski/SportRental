@@ -1,137 +1,200 @@
 @page "/"
 @rendermode InteractiveServer
+@inject NavigationManager Nav
 
-<PageTitle>RentSpot — panel partnera</PageTitle>
+<PageTitle>RentSpot — wynajem sprzętu sportowego online</PageTitle>
 
 <div class="admin-home">
     <AuthorizeView>
         <Authorized>
-            @* DS v2: flat navy-inverse hero, bez gradientu, bez emoji *@
-            <MudPaper Elevation="0" Class="rs-hero pa-6 mb-5">
-                <MudText Typo="Typo.h4" Class="rs-hero-title">Witaj, @context.User.Identity?.Name</MudText>
-                <MudText Typo="Typo.body1" Class="rs-hero-subtitle">Panel partnera wypożyczalni sprzętu sportowego</MudText>
-            </MudPaper>
-
-            <MudText Typo="Typo.subtitle1" Class="mb-3 d-flex align-center" Style="font-weight: 600;">
-                <MudIcon Icon="@Icons.Material.Filled.Bolt" Color="Color.Primary" Class="mr-2" />
-                Szybkie akcje
-            </MudText>
-            <MudGrid Spacing="3" Class="mb-6">
-                <MudItem xs="12" sm="6" md="3">
-                    <a href="/dashboard" class="rs-quick-action">
-                        <MudIcon Icon="@Icons.Material.Filled.Dashboard" Class="rs-quick-action-icon" />
-                        <h3>Dashboard</h3>
-                        <p>Przegląd statystyk</p>
-                    </a>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <a href="/admin/rentals" class="rs-quick-action">
-                        <MudIcon Icon="@Icons.Material.Filled.AddShoppingCart" Class="rs-quick-action-icon" />
-                        <h3>Nowy wynajem</h3>
-                        <p>Utwórz rezerwację</p>
-                    </a>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <a href="/admin/products" class="rs-quick-action">
-                        <MudIcon Icon="@Icons.Material.Filled.Inventory2" Class="rs-quick-action-icon" />
-                        <h3>Produkty</h3>
-                        <p>Zarządzaj sprzętem</p>
-                    </a>
-                </MudItem>
-                <MudItem xs="12" sm="6" md="3">
-                    <a href="/admin/customers" class="rs-quick-action">
-                        <MudIcon Icon="@Icons.Material.Filled.Groups" Class="rs-quick-action-icon" />
-                        <h3>Klienci</h3>
-                        <p>Baza klientów</p>
-                    </a>
-                </MudItem>
-            </MudGrid>
-
-            <MudGrid Spacing="3">
-                <MudItem xs="12" md="6">
-                    <MudCard Outlined="true" Elevation="0" Class="rs-info-card">
-                        <MudCardContent>
-                            <div class="d-flex align-center gap-3 mb-3">
-                                <MudIcon Icon="@Icons.Material.Filled.Assignment" Color="Color.Primary" Size="Size.Large" />
-                                <div>
-                                    <MudText Typo="Typo.h6">Funkcje panelu</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Dostępne narzędzia</MudText>
-                                </div>
-                            </div>
-                            <MudList T="string" Dense="true">
-                                <MudListItem Icon="@Icons.Material.Filled.Inventory" Text="Zarządzanie produktami i stanami magazynowymi" />
-                                <MudListItem Icon="@Icons.Material.Filled.People" Text="Baza klientów i historia wypożyczeń" />
-                                <MudListItem Icon="@Icons.Material.Filled.CalendarMonth" Text="Kalendarz rezerwacji" />
-                                <MudListItem Icon="@Icons.Material.Filled.Description" Text="Automatyczne generowanie umów PDF" />
-                                <MudListItem Icon="@Icons.Material.Filled.Analytics" Text="Raporty i statystyki" />
-                            </MudList>
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
-                <MudItem xs="12" md="6">
-                    <MudCard Outlined="true" Elevation="0" Class="rs-info-card">
-                        <MudCardContent>
-                            <div class="d-flex align-center gap-3 mb-3">
-                                <MudIcon Icon="@Icons.Material.Filled.Lightbulb" Color="Color.Tertiary" Size="Size.Large" />
-                                <div>
-                                    <MudText Typo="Typo.h6">Wskazówki</MudText>
-                                    <MudText Typo="Typo.body2" Color="Color.Secondary">Porady dla admina</MudText>
-                                </div>
-                            </div>
-                            <MudList T="string" Dense="true">
-                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Regularnie aktualizuj stany magazynowe" />
-                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Sprawdzaj kalendarz na początku dnia" />
-                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Wysyłaj przypomnienia o zwrotach" />
-                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Monitoruj raporty sprzedaży" />
-                                <MudListItem Icon="@Icons.Material.Filled.TipsAndUpdates" Text="Dostosuj szablon umowy do potrzeb" />
-                            </MudList>
-                        </MudCardContent>
-                    </MudCard>
-                </MudItem>
-            </MudGrid>
+            @* Zalogowany → Dashboard (Home jako routing target nieaktywny). *@
+            <div class="rs-redirecting">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
         </Authorized>
         <NotAuthorized>
-            @* DS v2: flat navy-inverse hero, bez gradient, bez emoji, jeden CTA *@
-            <div class="rs-welcome">
-                <div class="rs-welcome-content">
-                    <div class="rs-welcome-logo">
-                        <svg viewBox="0 0 100 100" width="72" height="72" aria-hidden="true">
-                            <circle cx="50" cy="50" r="48" fill="#F96167" />
-                            <text x="50" y="72" font-family="Outfit, Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+            <section class="rs-landing">
+                @* ========== HERO ========== *@
+                <div class="rs-landing-hero">
+                    <div class="rs-landing-hero-text">
+                        <span class="rs-landing-eyebrow">RentSpot.eu</span>
+                        <h1 class="rs-landing-h1">
+                            Wynajem sprzętu sportowego
+                            <span class="rs-landing-h1-accent">w&nbsp;jednym&nbsp;miejscu.</span>
+                        </h1>
+                        <p class="rs-landing-sub">
+                            System online dla wypożyczalni rowerów, kajaków, nart, SUP-ów i sprzętu outdoor.
+                            Rezerwacja, kalendarz, klienci, faktury — bez Excela.
+                        </p>
+                        <div class="rs-landing-cta-row">
+                            <MudButton Href="/Account/Login"
+                                       Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Size="Size.Large"
+                                       Class="rs-landing-cta-primary">
+                                Zaloguj się
+                            </MudButton>
+                            <MudButton Href="/Account/Register"
+                                       Variant="Variant.Outlined"
+                                       Color="Color.Primary"
+                                       Size="Size.Large"
+                                       Class="rs-landing-cta-secondary">
+                                Załóż konto firmowe
+                            </MudButton>
+                        </div>
+                        <a href="/_client/" class="rs-landing-tertiary">
+                            Mam konto klienta — przejdź do rezerwacji →
+                        </a>
+                    </div>
+
+                    @* ========== SVG ART ========== *@
+                    <div class="rs-landing-hero-art">
+                        <svg viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <defs>
+                                <radialGradient id="rsBgRing" cx="50%" cy="50%" r="50%">
+                                    <stop offset="60%" stop-color="#FFE9EA" stop-opacity="0.6"/>
+                                    <stop offset="100%" stop-color="#FFE9EA" stop-opacity="0"/>
+                                </radialGradient>
+                            </defs>
+
+                            @* Background atmospheric ring *@
+                            <circle cx="240" cy="240" r="220" fill="url(#rsBgRing)"/>
+
+                            @* Center coral disk with R mark *@
+                            <circle cx="240" cy="240" r="120" fill="#F96167"/>
+                            <text x="240" y="298" font-family="Outfit, Inter, sans-serif"
+                                  font-size="160" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
+
+                            @* Floating tile — bike (top-left) *@
+                            <g transform="translate(40 60)">
+                                <rect width="96" height="96" rx="20" fill="#FFFFFF" stroke="#DDE2EC" stroke-width="1.5"/>
+                                @* bike icon *@
+                                <g transform="translate(20 22)" stroke="#1B2350" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="38" r="10"/>
+                                    <circle cx="44" cy="38" r="10"/>
+                                    <path d="M12 38 L28 14 L44 38" stroke="#F96167"/>
+                                    <path d="M28 14 L34 14" stroke="#F96167"/>
+                                    <line x1="28" y1="14" x2="20" y2="14" stroke="#1B2350"/>
+                                </g>
+                            </g>
+
+                            @* Floating tile — kayak (top-right) *@
+                            <g transform="translate(344 80)">
+                                <rect width="96" height="96" rx="20" fill="#FFFFFF" stroke="#DDE2EC" stroke-width="1.5"/>
+                                @* kayak icon *@
+                                <g transform="translate(14 36) rotate(-12)">
+                                    <ellipse cx="34" cy="12" rx="32" ry="9" fill="none" stroke="#F96167" stroke-width="3"/>
+                                    <line x1="2" y1="-2" x2="66" y2="26" stroke="#1B2350" stroke-width="3" stroke-linecap="round"/>
+                                    <circle cx="34" cy="12" r="4" fill="#1B2350"/>
+                                </g>
+                            </g>
+
+                            @* Floating tile — skis (bottom-left) *@
+                            <g transform="translate(20 320)">
+                                <rect width="96" height="96" rx="20" fill="#FFFFFF" stroke="#DDE2EC" stroke-width="1.5"/>
+                                @* skis icon *@
+                                <g transform="translate(22 22)" stroke-linecap="round">
+                                    <path d="M6 6 L46 46" stroke="#1B2350" stroke-width="4"/>
+                                    <path d="M6 14 L46 46" stroke="#1B2350" stroke-width="4"/>
+                                    <circle cx="46" cy="46" r="4" fill="#F96167"/>
+                                    <path d="M4 4 Q8 0 12 4" stroke="#1B2350" stroke-width="3" fill="none"/>
+                                    <path d="M4 12 Q8 8 12 12" stroke="#1B2350" stroke-width="3" fill="none"/>
+                                </g>
+                            </g>
+
+                            @* Floating tile — SUP / paddleboard (bottom-right) *@
+                            <g transform="translate(340 332)">
+                                <rect width="96" height="96" rx="20" fill="#FFFFFF" stroke="#DDE2EC" stroke-width="1.5"/>
+                                @* SUP icon *@
+                                <g transform="translate(18 16)">
+                                    <ellipse cx="30" cy="48" rx="28" ry="8" fill="none" stroke="#1B2350" stroke-width="3"/>
+                                    <line x1="30" y1="4" x2="30" y2="60" stroke="#F96167" stroke-width="3" stroke-linecap="round"/>
+                                    <path d="M24 4 L36 4 L30 14 Z" fill="#F96167"/>
+                                </g>
+                            </g>
+
+                            @* Map pin accent (center-bottom outside R disk) *@
+                            <g transform="translate(220 410)">
+                                <circle cx="20" cy="20" r="16" fill="#FFFFFF" stroke="#DDE2EC" stroke-width="1.5"/>
+                                <path d="M20 10 C16 10 13 13 13 17 C13 22 20 30 20 30 C20 30 27 22 27 17 C27 13 24 10 20 10 Z" fill="#F96167"/>
+                                <circle cx="20" cy="17" r="2.5" fill="#FFFFFF"/>
+                            </g>
                         </svg>
                     </div>
-                    <h1 class="rs-welcome-title">RentSpot<span class="rs-welcome-dot">.</span></h1>
-                    <p class="rs-welcome-subtitle">Panel partnera — wypożyczalnie sprzętu sportowego</p>
+                </div>
 
-                    <div class="rs-welcome-features">
-                        <div class="rs-feature">
-                            <MudIcon Icon="@Icons.Material.Filled.Inventory2" Size="Size.Small" />
-                            <span>Zarządzaj produktami</span>
-                        </div>
-                        <div class="rs-feature">
-                            <MudIcon Icon="@Icons.Material.Filled.Groups" Size="Size.Small" />
-                            <span>Obsługuj klientów</span>
-                        </div>
-                        <div class="rs-feature">
-                            <MudIcon Icon="@Icons.Material.Filled.Analytics" Size="Size.Small" />
-                            <span>Analizuj raporty</span>
-                        </div>
-                    </div>
+                @* ========== ROLE CHOOSER ========== *@
+                <div class="rs-landing-roles">
+                    <h2 class="rs-landing-h2">Co chcesz zrobić?</h2>
+                    <div class="rs-landing-roles-grid">
+                        <a href="/Account/Register" class="rs-role-card">
+                            <div class="rs-role-icon-wrap rs-role-icon-coral">
+                                <MudIcon Icon="@Icons.Material.Filled.Storefront" />
+                            </div>
+                            <h3>Prowadzę wypożyczalnię</h3>
+                            <p>Chcę zarządzać sprzętem, rezerwacjami i klientami w jednym systemie.</p>
+                            <span class="rs-role-cta">Załóż konto firmowe →</span>
+                        </a>
 
-                    <div class="rs-welcome-cta">
-                        <MudButton Href="/Account/Login"
-                                   Variant="Variant.Filled"
-                                   Color="Color.Primary"
-                                   Size="Size.Large"
-                                   Class="rs-welcome-btn">
-                            Zaloguj się
-                        </MudButton>
-                        <MudText Typo="Typo.caption" Class="rs-welcome-register">
-                            Nie masz konta? <MudLink Href="/Account/Register" Color="Color.Inherit" Underline="Underline.Always">Zarejestruj się</MudLink>
-                        </MudText>
+                        <a href="/_client/" class="rs-role-card">
+                            <div class="rs-role-icon-wrap rs-role-icon-navy">
+                                <MudIcon Icon="@Icons.Material.Filled.DirectionsBike" />
+                            </div>
+                            <h3>Chcę wynająć sprzęt</h3>
+                            <p>Szukam wypożyczalni — rower, kajak, narty, SUP, sprzęt outdoor.</p>
+                            <span class="rs-role-cta">Przejdź do rezerwacji →</span>
+                        </a>
+
+                        <a href="/Account/Demo" class="rs-role-card rs-role-card-accent">
+                            <div class="rs-role-icon-wrap rs-role-icon-gold">
+                                <MudIcon Icon="@Icons.Material.Filled.PlayCircleOutline" />
+                            </div>
+                            <h3>Wypróbuj demo</h3>
+                            <p>Zobacz panel partnera z przykładowymi danymi — bez rejestracji.</p>
+                            <span class="rs-role-cta">Wejdź na demo →</span>
+                        </a>
                     </div>
                 </div>
-            </div>
+
+                @* ========== FEATURE STRIP ========== *@
+                <div class="rs-landing-features">
+                    <h2 class="rs-landing-h2">Co dostajesz w pakiecie</h2>
+                    <div class="rs-landing-features-grid">
+                        <div class="rs-feature-card">
+                            <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Class="rs-feature-icon" />
+                            <h3>Kalendarz sprzętu</h3>
+                            <p>Wszystkie wynajmy w jednym widoku. Wykrywanie kolizji, drag &amp; drop, multi-sprzęt.</p>
+                        </div>
+                        <div class="rs-feature-card">
+                            <MudIcon Icon="@Icons.Material.Filled.Receipt" Class="rs-feature-icon" />
+                            <h3>Klienci &amp; faktury</h3>
+                            <p>Baza klientów, automatyczne umowy PDF, faktury VAT, eksport do księgowości.</p>
+                        </div>
+                        <div class="rs-feature-card">
+                            <MudIcon Icon="@Icons.Material.Filled.LocalOffer" Class="rs-feature-icon" />
+                            <h3>Vouchery &amp; rabaty</h3>
+                            <p>Karty podarunkowe z saldem, kody promocyjne, sezony cenowe, weekendy.</p>
+                        </div>
+                        <div class="rs-feature-card">
+                            <MudIcon Icon="@Icons.Material.Filled.Public" Class="rs-feature-icon" />
+                            <h3>Booking online 24/7</h3>
+                            <p>Klienci rezerwują przez stronę partnera. Google Calendar sync, SMS przypomnienia.</p>
+                        </div>
+                    </div>
+                </div>
+
+                @* ========== FOOTER STRIP ========== *@
+                <div class="rs-landing-footer">
+                    <div class="rs-landing-footer-text">
+                        <strong>RentSpot.</strong> System dla wypożyczalni sprzętu sportowego.
+                    </div>
+                    <div class="rs-landing-footer-links">
+                        <a href="/Account/Login">Zaloguj się</a>
+                        <a href="/Account/Register">Załóż konto firmowe</a>
+                        <a href="/_client/">Aplikacja klienta</a>
+                    </div>
+                </div>
+            </section>
         </NotAuthorized>
     </AuthorizeView>
 </div>
@@ -139,7 +202,9 @@
 <style>
     .admin-home { animation: fadeInUp 0.4s ease-out; }
 
-    /* DS v2: flat navy-inverse hero, no gradient */
+    /* ============================================
+       AUTHORIZED hero (po loginie) — zostaje navy
+       ============================================ */
     .rs-hero {
         background: var(--navy-900, #1B2350) !important;
         color: #E8EBF5 !important;
@@ -171,88 +236,365 @@
         text-decoration: none;
         color: var(--text-body, #1C2438);
     }
-    .rs-quick-action-icon {
-        font-size: 2rem !important;
-        color: var(--coral-500, #F96167) !important;
-        margin-bottom: 0.25rem;
-    }
-    .rs-quick-action h3 {
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin: 0;
-        color: var(--text-body, #1C2438);
-    }
-    .rs-quick-action p {
-        font-size: 0.875rem;
-        color: var(--text-secondary, #5B6B82);
-        margin: 0;
-    }
+    .rs-quick-action-icon { font-size: 2rem !important; color: var(--coral-500, #F96167) !important; margin-bottom: 0.25rem; }
+    .rs-quick-action h3 { font-size: 1.1rem; font-weight: 600; margin: 0; color: var(--text-body, #1C2438); }
+    .rs-quick-action p { font-size: 0.875rem; color: var(--text-secondary, #5B6B82); margin: 0; }
 
-    /* Info cards (Funkcje panelu / Wskazówki) */
     .rs-info-card { border-radius: 16px !important; }
 
-    /* Welcome hero (NotAuthorized) — flat navy, bez gradientu coral */
-    .rs-welcome {
-        min-height: calc(100vh - 200px);
-        display: flex;
+    /* ============================================
+       LANDING (NotAuthorized) — light cream hero
+       ============================================ */
+    .rs-landing {
+        margin: -1rem -0.5rem 0;
+        padding: 0 0 4rem;
+        background: linear-gradient(180deg, #FFFBF5 0%, #FFFFFF 60%, #FFFFFF 100%);
+        overflow-x: clip;
+        word-wrap: break-word;
+        max-width: 100vw;
+    }
+    /* Block body horizontal scroll when landing renders */
+    html:has(.rs-landing), body:has(.rs-landing) { overflow-x: hidden; }
+    .rs-landing * { box-sizing: border-box; min-width: 0; }
+
+    /* HERO grid */
+    .rs-landing-hero {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        gap: 3rem;
         align-items: center;
-        justify-content: center;
-        background: var(--navy-900, #1B2350);
-        border-radius: 16px;
-        margin: -1rem -0.5rem;
-        padding: 3rem 2rem;
-        color: #E8EBF5;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 3.5rem 1.5rem 2.5rem;
     }
-    .rs-welcome-content { text-align: center; max-width: 520px; }
-    .rs-welcome-logo { margin-bottom: 1.25rem; }
-    .rs-welcome-title {
+    @@media (max-width: 900px) {
+        .rs-landing-hero { grid-template-columns: 1fr; padding: 1.5rem 1rem 1rem; gap: 1.25rem; }
+        .rs-landing-hero-art { order: -1; max-width: min(280px, 70vw); margin: 0 auto; }
+    }
+    @@media (max-width: 480px) {
+        .rs-landing-hero { padding: 1.25rem 0.875rem 0.75rem; }
+        .rs-landing-hero-art { max-width: min(240px, 65vw); }
+    }
+
+    .rs-landing-eyebrow {
+        display: inline-block;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 0.75rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #F96167;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+    .rs-landing-h1 {
         font-family: 'Outfit', system-ui, sans-serif;
-        font-size: 2.5rem;
+        font-size: clamp(1.4rem, 5vw, 3.25rem);
         font-weight: 800;
+        line-height: 1.15;
         letter-spacing: -0.02em;
-        color: #FFFFFF;
-        margin: 0 0 0.5rem 0;
+        color: #1B2350;
+        margin: 0 0 1.25rem 0;
+        overflow-wrap: break-word;
+        text-wrap: balance;
+        max-width: 100%;
     }
-    .rs-welcome-dot { color: #F96167; }
-    .rs-welcome-subtitle {
-        font-size: 1rem;
-        color: rgba(232, 235, 245, 0.8);
-        margin-bottom: 2rem;
+    .rs-landing-h1-accent { color: #F96167; white-space: nowrap; }
+    .rs-landing-sub {
+        font-size: clamp(0.95rem, 2vw, 1.125rem);
+        line-height: 1.5;
+        color: #4A5670;
+        max-width: 540px;
+        margin: 0 0 2rem 0;
+        overflow-wrap: break-word;
     }
-    .rs-welcome-features {
+    .rs-landing-cta-row {
         display: flex;
-        justify-content: center;
         gap: 0.75rem;
         flex-wrap: wrap;
-        margin-bottom: 2.5rem;
+        margin-bottom: 1.25rem;
     }
-    .rs-feature {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        padding: 0.5rem 1rem;
-        border-radius: 999px;
-        font-size: 0.875rem;
-        color: rgba(232, 235, 245, 0.9);
-    }
-    .rs-welcome-cta {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.75rem;
-    }
-    .rs-welcome-btn {
+    .rs-landing-cta-row .mud-button { white-space: nowrap; }
+    .rs-landing-cta-primary {
         font-weight: 600 !important;
-        padding: 0.75rem 2rem !important;
+        padding: 0.75rem 1.75rem !important;
+        font-size: 1rem !important;
+        box-shadow: 0 4px 12px rgba(249, 97, 103, 0.25);
+    }
+    .rs-landing-cta-secondary {
+        font-weight: 600 !important;
+        padding: 0.75rem 1.5rem !important;
         font-size: 1rem !important;
     }
-    .rs-welcome-register { color: rgba(232, 235, 245, 0.7); }
-    .rs-welcome-register a { color: #F96167; }
+    .rs-landing-tertiary {
+        display: inline-block;
+        color: #1B2350;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.95rem;
+        padding: 0.25rem 0;
+        border-bottom: 1px solid transparent;
+        transition: border-color 200ms;
+    }
+    .rs-landing-tertiary:hover {
+        border-bottom-color: #1B2350;
+        color: #1B2350;
+    }
+
+    /* SVG art */
+    .rs-landing-hero-art {
+        width: 100%;
+        max-width: 480px;
+        margin-left: auto;
+    }
+    .rs-landing-hero-art svg { width: 100%; height: auto; display: block; }
+
+    /* ============================================
+       ROLE CHOOSER
+       ============================================ */
+    .rs-landing-roles {
+        max-width: 1100px;
+        margin: 2.5rem auto 1.5rem;
+        padding: 0 1.5rem;
+    }
+    .rs-landing-h2 {
+        font-family: 'Outfit', system-ui, sans-serif;
+        font-size: 1.875rem;
+        font-weight: 700;
+        color: #1B2350;
+        text-align: center;
+        margin: 0 0 2rem 0;
+        letter-spacing: -0.01em;
+    }
+    .rs-landing-roles-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.25rem;
+    }
+    @@media (max-width: 900px) {
+        .rs-landing-roles-grid { grid-template-columns: 1fr; }
+    }
+
+    .rs-role-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 1.75rem 1.5rem;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 18px;
+        color: #1B2350;
+        text-decoration: none;
+        box-shadow: 0 1px 2px rgba(24,31,69,0.06);
+        transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1),
+                    box-shadow 220ms,
+                    border-color 220ms;
+    }
+    .rs-role-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 28px -8px rgba(24,31,69,0.18);
+        border-color: #F96167;
+        color: #1B2350;
+        text-decoration: none;
+    }
+    .rs-role-card.rs-role-card-accent {
+        background: linear-gradient(180deg, #FFFBF5 0%, #FFFFFF 100%);
+    }
+    .rs-role-card h3 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.25rem;
+        font-weight: 700;
+        margin: 0.5rem 0 0.25rem;
+        color: #1B2350;
+    }
+    .rs-role-card p {
+        font-size: 0.95rem;
+        color: #5B6B82;
+        margin: 0 0 1rem 0;
+        line-height: 1.45;
+        flex: 1;
+    }
+    .rs-role-cta {
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: #F96167;
+        margin-top: auto;
+    }
+    .rs-role-icon-wrap {
+        width: 52px;
+        height: 52px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.25rem;
+    }
+    .rs-role-icon-wrap :where(.mud-icon-root) { font-size: 1.75rem !important; color: #FFFFFF !important; }
+    .rs-role-icon-coral { background: #F96167; }
+    .rs-role-icon-navy { background: #1B2350; }
+    .rs-role-icon-gold { background: #F9E795; }
+    .rs-role-icon-gold :where(.mud-icon-root) { color: #1B2350 !important; }
+
+    /* ============================================
+       FEATURE STRIP
+       ============================================ */
+    .rs-landing-features {
+        max-width: 1100px;
+        margin: 3rem auto 0;
+        padding: 2.5rem 1.5rem;
+        background: #1B2350;
+        border-radius: 24px;
+        color: #E8EBF5;
+    }
+    .rs-landing-features .rs-landing-h2 { color: #FFFFFF; }
+    .rs-landing-features-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.25rem;
+    }
+    @@media (max-width: 900px) {
+        .rs-landing-features-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @@media (max-width: 540px) {
+        .rs-landing-features-grid { grid-template-columns: 1fr; }
+    }
+    .rs-feature-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 1.25rem;
+    }
+    .rs-feature-icon {
+        font-size: 1.75rem !important;
+        color: #F96167 !important;
+        margin-bottom: 0.5rem;
+    }
+    .rs-feature-card h3 {
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #FFFFFF;
+        margin: 0.25rem 0 0.5rem;
+    }
+    .rs-feature-card p {
+        font-size: 0.875rem;
+        color: rgba(232, 235, 245, 0.75);
+        line-height: 1.5;
+        margin: 0;
+    }
+
+    /* ============================================
+       FOOTER STRIP
+       ============================================ */
+    .rs-landing-footer {
+        max-width: 1100px;
+        margin: 2.5rem auto 0;
+        padding: 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+        color: #5B6B82;
+        font-size: 0.875rem;
+    }
+    .rs-landing-footer-text strong { color: #1B2350; }
+    .rs-landing-footer-links { display: inline-flex; gap: 1rem; flex-wrap: wrap; }
+    .rs-landing-footer-links a {
+        color: #1B2350;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .rs-landing-footer-links a:hover { color: #F96167; }
+
+    /* ============================================
+       DARK MODE — landing background flips do navy
+       ============================================ */
+    [data-theme="dark"] .rs-landing,
+    .mud-theme-dark .rs-landing {
+        background: linear-gradient(180deg, #0F1530 0%, #1B2350 60%, #1B2350 100%);
+        color: #E8EBF5;
+    }
+    [data-theme="dark"] .rs-landing-h1,
+    .mud-theme-dark .rs-landing-h1 { color: #FFFFFF; }
+    [data-theme="dark"] .rs-landing-sub,
+    .mud-theme-dark .rs-landing-sub { color: rgba(232, 235, 245, 0.75); }
+    [data-theme="dark"] .rs-landing-tertiary,
+    .mud-theme-dark .rs-landing-tertiary { color: #E8EBF5; }
+    [data-theme="dark"] .rs-landing-tertiary:hover,
+    .mud-theme-dark .rs-landing-tertiary:hover { border-bottom-color: #E8EBF5; color: #FFFFFF; }
+    [data-theme="dark"] .rs-landing-h2,
+    .mud-theme-dark .rs-landing-h2 { color: #FFFFFF; }
+    [data-theme="dark"] .rs-role-card,
+    .mud-theme-dark .rs-role-card {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: #E8EBF5;
+    }
+    [data-theme="dark"] .rs-role-card:hover,
+    .mud-theme-dark .rs-role-card:hover {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: #F96167;
+        color: #E8EBF5;
+    }
+    [data-theme="dark"] .rs-role-card.rs-role-card-accent,
+    .mud-theme-dark .rs-role-card.rs-role-card-accent {
+        background: linear-gradient(180deg, rgba(249, 97, 103, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+    }
+    [data-theme="dark"] .rs-role-card h3,
+    .mud-theme-dark .rs-role-card h3 { color: #FFFFFF; }
+    [data-theme="dark"] .rs-role-card p,
+    .mud-theme-dark .rs-role-card p { color: rgba(232, 235, 245, 0.7); }
+    /* Feature strip — w dark mode mocniejszy kontrast (już navy) */
+    [data-theme="dark"] .rs-landing-features,
+    .mud-theme-dark .rs-landing-features {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    /* Floating tile cards w hero art — dark variants */
+    [data-theme="dark"] .rs-landing-hero-art svg rect[fill="#FFFFFF"],
+    .mud-theme-dark .rs-landing-hero-art svg rect[fill="#FFFFFF"] {
+        fill: #1B2350;
+        stroke: rgba(255, 255, 255, 0.15);
+    }
+    [data-theme="dark"] .rs-landing-hero-art svg [stroke="#1B2350"],
+    .mud-theme-dark .rs-landing-hero-art svg [stroke="#1B2350"] {
+        stroke: #E8EBF5;
+    }
+    [data-theme="dark"] .rs-landing-footer-text strong,
+    .mud-theme-dark .rs-landing-footer-text strong { color: #FFFFFF; }
+    [data-theme="dark"] .rs-landing-footer,
+    .mud-theme-dark .rs-landing-footer { color: rgba(232, 235, 245, 0.7); }
+    [data-theme="dark"] .rs-landing-footer-links a,
+    .mud-theme-dark .rs-landing-footer-links a { color: #E8EBF5; }
+
+    /* Redirect spinner (auth users get punted to /dashboard) */
+    .rs-redirecting {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 60vh;
+    }
 
     @@keyframes fadeInUp {
         from { opacity: 0; transform: translateY(8px); }
         to { opacity: 1; transform: translateY(0); }
     }
 </style>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+    private bool _isAuthed;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is null) return;
+        var state = await AuthState;
+        _isAuthed = state.User.Identity?.IsAuthenticated == true;
+        if (_isAuthed)
+        {
+            // Prerender + interactive: NavigateTo wyrzuca NavigationException, którego
+            // serwer obsługuje jako 302. Po hydration działa identycznie.
+            Nav.NavigateTo("/dashboard", forceLoad: false);
+        }
+    }
+}

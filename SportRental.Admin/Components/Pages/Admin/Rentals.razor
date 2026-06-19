@@ -3,6 +3,7 @@
 @attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
 @using Microsoft.AspNetCore.SignalR.Client
 @using SportRental.Admin.Components.Dialogs
+@using SportRental.Admin.Services.Guards
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IDialogService DialogService
@@ -20,7 +21,7 @@
         @* Nagłówek mobilny *@
         <MudPaper Class="rs-page-banner-sm pa-3 mb-2" Elevation="0">
             <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.h6" Style="font-weight: 700;">📋 Wynajmy</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">Wynajmy</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.Add" 
                                Color="Color.Inherit" 
                                OnClick="CreateNew" />
@@ -54,12 +55,20 @@
                      OnClick="() => cbEnded = !cbEnded">
                 Zakończone
             </MudChip>
-            <MudChip T="string" 
-                     Color="@(cbIncoming ? Color.Info : Color.Default)" 
+            <MudChip T="string"
+                     Color="@(cbIncoming ? Color.Info : Color.Default)"
                      Variant="@(cbIncoming ? Variant.Filled : Variant.Outlined)"
                      Size="Size.Small"
                      OnClick="() => cbIncoming = !cbIncoming">
                 Nadchodzące
+            </MudChip>
+            <MudChip T="string"
+                     Color="@(cbActionNeeded ? Color.Error : Color.Default)"
+                     Variant="@(cbActionNeeded ? Variant.Filled : Variant.Outlined)"
+                     Size="Size.Small"
+                     Icon="@Icons.Material.Filled.PriorityHigh"
+                     OnClick="() => cbActionNeeded = !cbActionNeeded">
+                Wymaga działania
             </MudChip>
         </div>
 
@@ -92,7 +101,7 @@
                                     }
                                     <div class="d-flex align-center gap-1 flex-wrap">
                                         <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">
-                                            @rental.TotalAmount.ToString("0") zł
+                                            @rental.TotalAmount.PlnInt()
                                         </MudText>
                                         <MudText Typo="Typo.caption">•</MudText>
                                         <MudText Typo="Typo.caption">
@@ -119,7 +128,7 @@
                             @if (rental.Items?.Any() == true)
                             {
                                 <MudText Typo="Typo.caption" Color="Color.Default" Class="mt-1" Style="opacity: 0.8;">
-                                    📦 @GetItemsSummary(rental, 2)
+                                    @GetItemsSummary(rental, 2)
                                 </MudText>
                             }
                             <div class="d-flex align-center gap-1 flex-wrap mt-1">
@@ -150,7 +159,7 @@
                                 @if (IsOverdue(rental))
                                 {
                                     <MudChip T="string" Color="Color.Error" Size="Size.Small">
-                                        ⚠️ Przeterminowany (@GetOverdueDays(rental) dni)
+                                        Po terminie (@GetOverdueDays(rental) dni)
                                     </MudChip>
                                 }
                             </div>
@@ -342,15 +351,29 @@ else
                                             </MudPaper>
                                         }
 
+                                        @* Pasek postępu 5-etapowy (Maciej): Rezerwacja → Umowa → Płatność → Wydanie → Zwrot *@
+                                        <div class="my-2">
+                                            <SportRental.Admin.Components.Shared.RentalStageBar Rental="rental" />
+                                        </div>
+
                                         <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
-                                            <MudChip T="string" Icon="@Icons.Material.Filled.AttachMoney" 
-                                                     Color="Color.Success" 
+                                            <MudChip T="string" Icon="@Icons.Material.Filled.AttachMoney"
+                                                     Color="@(SportRental.Admin.Services.Guards.RentalGuards.IsRentalPaid(rental) ? Color.Success : Color.Error)"
                                                      Variant="Variant.Filled"
                                                      Size="Size.Small">
-                                                @rental.TotalAmount.ToString("0.00") zł
+                                                @rental.TotalAmount.Pln() @(SportRental.Admin.Services.Guards.RentalGuards.IsRentalPaid(rental) ? "(opłacono)" : "(do zapłaty)")
                                             </MudChip>
-                                            <MudChip T="string" Icon="@GetStatusIcon(rental.Status)" 
-                                                     Color="@GetStatusColor(rental.Status)" 
+                                            @if (rental.Status == RentalStatus.Active && !rental.ReturnedAtUtc.HasValue)
+                                            {
+                                                <MudChip T="string" Icon="@Icons.Material.Filled.Schedule"
+                                                         Color="@(rental.EndDateUtc < DateTime.UtcNow ? Color.Error : Color.Warning)"
+                                                         Variant="Variant.Outlined"
+                                                         Size="Size.Small">
+                                                    @SportRental.Shared.Formatting.TimeRemaining.Format(rental.EndDateUtc)
+                                                </MudChip>
+                                            }
+                                            <MudChip T="string" Icon="@GetStatusIcon(rental.Status)"
+                                                     Color="@GetStatusColor(rental.Status)"
                                                      Variant="Variant.Text"
                                                      Size="Size.Small">
                                                 @GetRentalStatusText(rental)
@@ -359,7 +382,7 @@ else
                                                      Color="@(rental.IsEmailSent ? Color.Success : Color.Default)" 
                                                      Variant="Variant.Text"
                                                      Size="Size.Small">
-                                                Email: @(rental.IsEmailSent ? "✓" : "✗")
+                                                Email: @(rental.IsEmailSent ? "✓" : "—")
                                             </MudChip>
                                             @if (rental.IsSmsConfirmationSent)
                                             {
@@ -406,7 +429,7 @@ else
                                                          Color="Color.Error" 
                                                          Variant="Variant.Filled"
                                                          Size="Size.Small">
-                                                    PRZETERMINOWANE (@GetOverdueDays(rental) dni)
+                                                    Po terminie (@GetOverdueDays(rental) dni)
                                                 </MudChip>
                                             }
                                         </MudStack>
@@ -424,84 +447,97 @@ else
                                 </MudItem>
                                 
                                 <MudItem xs="12" md="4">
-                                    <MudStack Spacing="2">
-                                        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false">
-                                            <MudButton StartIcon="@Icons.Material.Filled.Edit" 
+                                    <div class="rs-rental-actions">
+                                        @* Główna akcja zależna od statusu *@
+                                        @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
+                                        {
+                                            <MudButton StartIcon="@Icons.Material.Filled.CheckCircle"
+                                                       OnClick="() => CompleteRental(rental)"
+                                                       Color="Color.Success"
+                                                       Variant="Variant.Filled"
+                                                       Size="Size.Large"
+                                                       FullWidth="true"
+                                                       Class="rs-rental-action-primary">
+                                                Zakończ wynajem
+                                            </MudButton>
+                                        }
+
+                                        @* Edytuj / Usuń — wyraźne filled outlined *@
+                                        <div class="rs-rental-actions-row">
+                                            <MudButton StartIcon="@Icons.Material.Filled.Edit"
                                                        OnClick="() => Edit(rental)"
-                                                       Size="Size.Small">
+                                                       Variant="Variant.Outlined"
+                                                       Color="Color.Primary"
+                                                       Size="Size.Medium"
+                                                       Class="flex-1">
                                                 Edytuj
                                             </MudButton>
-                                            <MudButton StartIcon="@Icons.Material.Filled.Delete" 
+                                            <MudButton StartIcon="@Icons.Material.Filled.Delete"
                                                        OnClick="() => Delete(rental)"
+                                                       Variant="Variant.Outlined"
                                                        Color="Color.Error"
-                                                       Size="Size.Small">
+                                                       Size="Size.Medium">
                                                 Usuń
                                             </MudButton>
-                                        </MudButtonGroup>
-                                        
-                                        <MudButtonGroup Variant="Variant.Outlined" Color="Color.Secondary" OverrideStyles="false">
+                                        </div>
+
+                                        @* Dokumenty / Komunikacja — icon-buttons z tooltipami, większe touch target *@
+                                        <div class="rs-rental-actions-icons">
                                             @if (!string.IsNullOrWhiteSpace(rental.ContractUrl))
                                             {
-                                                <MudButton StartIcon="@Icons.Material.Filled.Description" 
-                                                           Href="@rental.ContractUrl" 
-                                                           Target="_blank"
-                                                           Size="Size.Small">
-                                                    Umowa
-                                                </MudButton>
+                                                <MudTooltip Text="Otwórz umowę PDF">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.Description"
+                                                                   Color="Color.Primary"
+                                                                   Variant="Variant.Outlined"
+                                                                   Href="@rental.ContractUrl"
+                                                                   Target="_blank"
+                                                                   Size="Size.Medium" />
+                                                </MudTooltip>
                                             }
-                                            <MudButton StartIcon="@Icons.Material.Filled.FileDownload" 
-                                                       OnClick="() => GenerateContract(rental)"
-                                                       Size="Size.Small">
-                                                Generuj
-                                            </MudButton>
-                                            <MudButton StartIcon="@Icons.Material.Filled.Email" 
-                                                       OnClick="() => SendContractByEmail(rental)"
-                                                       Size="Size.Small">
-                                                Email
-                                            </MudButton>
-                                            <MudButton StartIcon="@Icons.Material.Filled.Sms" 
-                                                       OnClick="() => OpenCustomSmsDialog(rental)"
-                                                       Size="Size.Small"
-                                                       Color="Color.Info">
-                                                SMS
-                                            </MudButton>
-                                        </MudButtonGroup>
-                                        
-                                        <MudStack Row="true" Spacing="1">
-                                            @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
-                                            {
-                                                <MudButton StartIcon="@Icons.Material.Filled.CheckCircle" 
-                                                           OnClick="() => CompleteRental(rental)"
-                                                           Color="Color.Success"
-                                                           Variant="Variant.Filled"
-                                                           Size="Size.Small"
-                                                           Class="flex-1">
-                                                    Zakończ
-                                                </MudButton>
-                                            }
+                                            <MudTooltip Text="Wygeneruj umowę">
+                                                <MudIconButton Icon="@Icons.Material.Filled.FileDownload"
+                                                               Color="Color.Default"
+                                                               Variant="Variant.Outlined"
+                                                               OnClick="() => GenerateContract(rental)"
+                                                               Size="Size.Medium" />
+                                            </MudTooltip>
+                                            <MudTooltip Text="Wyślij email z umową">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Email"
+                                                               Color="Color.Default"
+                                                               Variant="Variant.Outlined"
+                                                               OnClick="() => SendContractByEmail(rental)"
+                                                               Size="Size.Medium" />
+                                            </MudTooltip>
+                                            <MudTooltip Text="Wyślij SMS">
+                                                <MudIconButton Icon="@Icons.Material.Filled.Sms"
+                                                               Color="Color.Info"
+                                                               Variant="Variant.Outlined"
+                                                               OnClick="() => OpenCustomSmsDialog(rental)"
+                                                               Size="Size.Medium" />
+                                            </MudTooltip>
                                             @if (rental.Status != RentalStatus.Completed && rental.Status != RentalStatus.Cancelled && !rental.IsReminderSmsSent)
                                             {
-                                                <MudButton StartIcon="@Icons.Material.Filled.NotificationsActive" 
-                                                           OnClick="() => SendReminderSms(rental)"
-                                                           Color="Color.Warning"
-                                                           Variant="Variant.Outlined"
-                                                           Size="Size.Small">
-                                                    Przypomnienie SMS
-                                                </MudButton>
+                                                <MudTooltip Text="Wyślij przypomnienie SMS o zwrocie">
+                                                    <MudIconButton Icon="@Icons.Material.Filled.NotificationsActive"
+                                                                   Color="Color.Warning"
+                                                                   Variant="Variant.Outlined"
+                                                                   OnClick="() => SendReminderSms(rental)"
+                                                                   Size="Size.Medium" />
+                                                </MudTooltip>
                                             }
-                                        </MudStack>
+                                        </div>
                                         @if (IsOverdue(rental))
                                         {
-                                            <MudButton StartIcon="@Icons.Material.Filled.Update" 
+                                            <MudButton StartIcon="@Icons.Material.Filled.Update"
                                                        OnClick="() => ExtendRental(rental)"
                                                        Color="Color.Error"
                                                        Variant="Variant.Filled"
                                                        FullWidth="true"
-                                                       Size="Size.Small">
-                                                ⚠️ Przedłuż wynajem
+                                                       Size="Size.Medium">
+                                                Przedłuż wynajem
                                             </MudButton>
                                         }
-                                    </MudStack>
+                                    </div>
                                 </MudItem>
                             </MudGrid>
                         </MudCardContent>
@@ -527,8 +563,8 @@ else
     </TitleContent>
     <DialogContent>
         <MudStack Spacing="4" Class="pa-2">
-            @* SEKCJA: KLIENT I DATY *@
-            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);">
+            @* SEKCJA: KLIENT I DATY — flat outlined zamiast pink gradient *@
+            <MudPaper Elevation="0" Outlined="true" Class="pa-4" Style="border-radius: 16px;">
                 <MudStack Spacing="3">
                     <MudStack Row="true" Class="mud-align-center" Spacing="2">
                         <MudIcon Icon="@Icons.Material.Filled.Person" Color="Color.Primary" />
@@ -607,7 +643,7 @@ else
                         <MudItem xs="12" md="6">
                             <MudDatePicker Date="@startDate" 
                                            DateChanged="OnStartDateChanged" 
-                                           Label="📅 Data rozpoczęcia"
+                                           Label="Data rozpoczęcia"
                                            Variant="Variant.Outlined"
                                            Editable="true"
                                            DateFormat="dd.MM.yyyy"
@@ -616,7 +652,7 @@ else
                         <MudItem xs="12" md="6">
                             <MudDatePicker Date="@endDate" 
                                            DateChanged="OnEndDateChanged" 
-                                           Label="📅 Data zakończenia"
+                                           Label="Data zakończenia"
                                            Variant="Variant.Outlined"
                                            Editable="true"
                                            DateFormat="dd.MM.yyyy"
@@ -634,8 +670,8 @@ else
                                        Adornment="Adornment.Start"
                                        AdornmentIcon="@Icons.Material.Filled.AccessTime"
                                        Class="rounded-lg">
-                                <MudSelectItem Value="RentalType.Daily">📅 Dzienny</MudSelectItem>
-                                <MudSelectItem Value="RentalType.Hourly">⏰ Godzinowy</MudSelectItem>
+                                <MudSelectItem Value="RentalType.Daily">Dzienny</MudSelectItem>
+                                <MudSelectItem Value="RentalType.Hourly">Godzinowy</MudSelectItem>
                             </MudSelect>
                         </MudItem>
                         @* Godziny pokazujemy TYLKO dla wynajmu godzinowego — dla Dziennego zbędne
@@ -644,7 +680,7 @@ else
                         {
                             <MudItem xs="6" md="3">
                                 <MudTextField T="string"
-                                              Label="⏰ Godzina od"
+                                              Label="Godzina od"
                                               Value="@FormatTime(startTime)"
                                               ValueChanged="@(v => OnStartTimeChanged(ParseTime(v)))"
                                               InputType="InputType.Time"
@@ -653,7 +689,7 @@ else
                             </MudItem>
                             <MudItem xs="6" md="3">
                                 <MudTextField T="string"
-                                              Label="⏰ Godzina do"
+                                              Label="Godzina do"
                                               Value="@FormatTime(endTime)"
                                               ValueChanged="@(v => OnEndTimeChanged(ParseTime(v)))"
                                               InputType="InputType.Time"
@@ -733,7 +769,7 @@ else
                                             <MudStack Row="true" Spacing="1" Class="mud-align-center">
                                                 <MudText Typo="Typo.caption" Color="Color.Default">@context.Sku</MudText>
                                                 <MudText Typo="Typo.caption">•</MudText>
-                                                <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">@context.DailyPrice.ToString("0.00") zł/dzień</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">@context.DailyPrice.Pln()/dzień</MudText>
                                                 <MudText Typo="Typo.caption">•</MudText>
                                                 <MudChip T="string" Size="Size.Small" Color="@(GetAvail(context.Id) > 0 ? Color.Success : Color.Error)" Variant="Variant.Text">
                                                     @GetAvail(context.Id) szt.
@@ -870,7 +906,7 @@ else
                                                      Style="width: 100px; text-align: right;" />
                                 </MudTd>
                                 <MudTd Style="text-align: right;">
-                                    <MudText Color="Color.Success" Style="font-weight: 600;">@context.Subtotal.ToString("0.00") zł</MudText>
+                                    <MudText Color="Color.Success" Style="font-weight: 600;">@context.Subtotal.Pln()</MudText>
                                 </MudTd>
                                 <MudTd>
                                     <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" 
@@ -886,7 +922,7 @@ else
                                 <MudStack Row="true" Class="mud-justify-space-between mud-align-center">
                                     <MudStack Spacing="0">
                                         <MudText Typo="Typo.body2" Style="opacity: 0.9;">Cena katalogowa</MudText>
-                                        <MudText Typo="Typo.h5" Style="@($"font-weight: 600;{(customTotalPrice.HasValue ? " text-decoration: line-through; opacity: 0.6;" : "")}")">@total.ToString("0.00") zł</MudText>
+                                        <MudText Typo="Typo.h5" Style="@($"font-weight: 600;{(customTotalPrice.HasValue ? " text-decoration: line-through; opacity: 0.6;" : "")}")">@total.Pln()</MudText>
                                     </MudStack>
                                     <MudStack Spacing="0" Class="text-right">
                                         <MudText Typo="Typo.caption" Style="opacity: 0.8;">@editItems.Sum(i => i.Quantity) produktów</MudText>
@@ -905,21 +941,22 @@ else
                                     </MudStack>
                                 </MudStack>
                                 <MudStack Row="true" Class="mud-align-center" Spacing="2">
+                                    @* Bug fix: usunięte Clearable — kolidował z spinnerem i adornmentem (× zł mush) *@
                                     <MudNumericField T="decimal?" @bind-Value="customTotalPrice"
                                                      Label="Cena indywidualna (opcjonalnie)"
                                                      Placeholder="@total.ToString("0.00")"
-                                                     Variant="Variant.Filled"
+                                                     Variant="Variant.Outlined"
                                                      Adornment="Adornment.End" AdornmentText="zł"
-                                                     Clearable="true"
                                                      Min="0"
+                                                     Step="1"
                                                      Format="0.00"
-                                                     Style="flex: 1; background: rgba(255,255,255,0.15); border-radius: 8px;"
-                                                     Class="white-text-field" />
+                                                     HideSpinButtons="true"
+                                                     Style="flex: 1;" />
                                     @if (customTotalPrice.HasValue)
                                     {
                                         <MudStack Spacing="0">
                                             <MudText Typo="Typo.body2" Style="opacity: 0.9;">Do zapłaty</MudText>
-                                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@effectiveTotal.ToString("0.00") zł</MudText>
+                                            <MudText Typo="Typo.h4" Style="font-weight: 700;">@effectiveTotal.Pln()</MudText>
                                         </MudStack>
                                     }
                                 </MudStack>
@@ -980,6 +1017,7 @@ else
                     </MudText>
                 </MudAlert>
             }
+            @* NXRE QA #14: Immediate=true + oninput → live counter update *@
             <MudTextField @bind-Value="customSmsMessage"
                           Label="Treść wiadomości SMS"
                           Placeholder="Wpisz treść SMS..."
@@ -987,6 +1025,8 @@ else
                           Lines="4"
                           MaxLength="480"
                           Counter="480"
+                          Immediate="true"
+                          DebounceInterval="50"
                           HelperText="Maksymalnie 480 znaków (3 SMS-y)" />
         </MudStack>
     </DialogContent>
@@ -1013,6 +1053,73 @@ else
 </MudDialog>
 
 <MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
+
+<style>
+    /* Rental actions panel — większe touch targets, jasna hierarchia (Maciej feedback) */
+    .rs-rental-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .rs-rental-action-primary {
+        font-weight: 600 !important;
+        padding-top: 0.65rem !important;
+        padding-bottom: 0.65rem !important;
+    }
+    .rs-rental-actions-row {
+        display: flex;
+        gap: 0.5rem;
+    }
+    .rs-rental-actions-row .mud-button {
+        font-weight: 600;
+    }
+    .rs-rental-actions-icons {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        padding: 0.5rem;
+        background: var(--surface-soft, #FAFBFD);
+        border: 1px solid var(--line, #E2E8F0);
+        border-radius: 12px;
+    }
+    .rs-rental-actions-icons .mud-button-root {
+        background: #FFFFFF !important;
+        width: 44px;
+        height: 44px;
+        border-radius: 10px !important;
+    }
+    .rs-rental-actions-icons .mud-button-root:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(24,31,69,0.12);
+    }
+    .rs-rental-actions-icons .mud-icon-root { font-size: 1.25rem !important; }
+    [data-theme="dark"] .rs-rental-actions-icons,
+    .mud-theme-dark .rs-rental-actions-icons {
+        background: rgba(255,255,255,0.04);
+        border-color: rgba(255,255,255,0.1);
+    }
+    [data-theme="dark"] .rs-rental-actions-icons .mud-button-root,
+    .mud-theme-dark .rs-rental-actions-icons .mud-button-root {
+        background: rgba(255,255,255,0.06) !important;
+    }
+
+    /* Bug fix: MudDatePicker popup nie powinien wystawać poza dialog */
+    .mud-picker-popover-paper {
+        max-width: 320px !important;
+    }
+    .mud-picker .mud-picker-toolbar {
+        padding: 12px 16px !important;
+    }
+    .mud-picker .mud-picker-toolbar .mud-typography-h4,
+    .mud-picker .mud-picker-toolbar .mud-typography-h3 {
+        font-size: 1.4rem !important;
+        font-weight: 600 !important;
+    }
+    .mud-picker .mud-picker-toolbar .mud-typography-subtitle1 {
+        font-size: 0.85rem !important;
+        opacity: 0.85;
+    }
+</style>
 
 @code {
     // ==================== BREAKPOINT ====================
@@ -1054,8 +1161,9 @@ else
     private int CurrentAvail => selectedProduct is null ? 0 : GetAvail(selectedProduct.Id);
     private string? searchTerm;
     private bool cbStarted = true;
-    private bool cbEnded = true; 
+    private bool cbEnded = true;
     private bool cbIncoming = true;
+    private bool cbActionNeeded = false;
     private IEnumerable<Rental> filteredRentals => FilterRentals();
     
     private bool customSmsDialogOpen;
@@ -1514,6 +1622,24 @@ else
             editModel.EndDateUtc = DateTime.SpecifyKind(eLocal, DateTimeKind.Local).ToUniversalTime();
             editModel.TotalAmount = effectiveTotal;
 
+            // Blokady (Maciej): nie zarezerwujesz egzemplarza, który jest zajęty.
+            // Sprawdzaj overlap dla każdego produktu w nowym/edytowanym wynajmie.
+            foreach (var item in editItems)
+            {
+                var conflict = await RentalGuards.GetReservationConflictAsync(
+                    Db,
+                    CurrentTenantId(),
+                    item.ProductId,
+                    editModel.StartDateUtc,
+                    editModel.EndDateUtc,
+                    editModel.Id == Guid.Empty ? null : editModel.Id);
+                if (conflict != null)
+                {
+                    Snackbar.Add($"Termin zajęty: {conflict}", MudBlazor.Severity.Warning);
+                    return;
+                }
+            }
+
             if (editModel.Id == Guid.Empty)
             {
                 editModel.Id = Guid.NewGuid();
@@ -1559,12 +1685,12 @@ else
                     editModel, editItems.ToList(), customer!, productsForContract, companyInfo);
                 editModel.ContractUrl = contractUrl;
                 needsPostSaveUpdate = true;
-                Snackbar.Add("📄 Umowa została wygenerowana", MudBlazor.Severity.Success);
+                Snackbar.Add("Umowa została wygenerowana", MudBlazor.Severity.Success);
             }
             catch (Exception contractEx)
             {
                 Logger.LogError(contractEx, "Failed to generate contract for rental {RentalId}", editModel.Id);
-                Snackbar.Add($"⚠️ Wynajem zapisany, ale błąd generowania umowy: {contractEx.Message}", MudBlazor.Severity.Warning);
+                Snackbar.Add($"Wynajem zapisany, ale błąd generowania umowy: {contractEx.Message}", MudBlazor.Severity.Warning);
             }
             
             if (customer != null && !string.IsNullOrWhiteSpace(customer.Email))
@@ -1575,12 +1701,12 @@ else
                         editModel, editItems.ToList(), customer, productsForContract, companyInfo);
                     editModel.IsEmailSent = true;
                     needsPostSaveUpdate = true;
-                    Snackbar.Add($"📧 Email wysłany do {customer.Email}", MudBlazor.Severity.Success);
+                    Snackbar.Add($"Email wysłany do {customer.Email}", MudBlazor.Severity.Success);
                 }
                 catch (Exception emailEx)
                 {
                     Logger.LogError(emailEx, "Failed to send email for rental {RentalId}", editModel.Id);
-                    Snackbar.Add($"⚠️ Błąd wysyłania emaila: {emailEx.Message}", MudBlazor.Severity.Warning);
+                    Snackbar.Add($"Błąd wysyłania emaila: {emailEx.Message}", MudBlazor.Severity.Warning);
                 }
             }
             
@@ -1596,12 +1722,12 @@ else
                     editModel.Status = RentalStatus.Pending;
                     needsPostSaveUpdate = true;
                     
-                    Snackbar.Add($"🔗 Link potwierdzenia wysłany do klienta", MudBlazor.Severity.Info);
+                    Snackbar.Add($"Link potwierdzenia wysłany do klienta", MudBlazor.Severity.Info);
                 }
                 catch (Exception smsEx)
                 {
                     Logger.LogError(smsEx, "Failed to send confirmation link for rental {RentalId}", editModel.Id);
-                    Snackbar.Add($"⚠️ Błąd wysyłania linku: {smsEx.Message}", MudBlazor.Severity.Warning);
+                    Snackbar.Add($"Błąd wysyłania linku: {smsEx.Message}", MudBlazor.Severity.Warning);
                 }
             }
             
@@ -1621,7 +1747,7 @@ else
             
             rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             dialogOpen = false;
-            Snackbar.Add("✅ Wynajem został zapisany!", MudBlazor.Severity.Success);
+            Snackbar.Add("Wynajem został zapisany!", MudBlazor.Severity.Success);
             StateHasChanged();
         }
         catch (Exception ex)
@@ -1724,7 +1850,16 @@ else
         {
             query = query.Where(r => statusFilter.Contains(r.Status));
         }
-        
+
+        // "Wymaga działania" — brak umowy, brak płatności, lub spóźniony zwrot.
+        if (cbActionNeeded)
+        {
+            query = query.Where(r =>
+                string.IsNullOrEmpty(r.ContractUrl)
+                || !SportRental.Admin.Services.Guards.RentalGuards.IsRentalPaid(r)
+                || (r.Status == RentalStatus.Active && r.EndDateUtc < DateTime.UtcNow && !r.ReturnedAtUtc.HasValue));
+        }
+
         return query.OrderByDescending(r => r.CreatedAtUtc);
     }
 
@@ -1889,28 +2024,34 @@ else
         {
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
-            
-            var items = await Db.RentalItems.Where(i => i.RentalId == rental.Id).ToListAsync();
-            var customer = await Db.Customers.FindAsync(rental.CustomerId);
+
+            // NXRE QA #13: nie pobieraj entities tracked — to powodowało
+            // "another instance with same key already tracked" gdy później Update(rental).
+            // AsNoTracking dla pomocniczych + ExecuteUpdate dla ContractUrl = brak konfliktu.
+            var items = await Db.RentalItems.AsNoTracking().Where(i => i.RentalId == rental.Id).ToListAsync();
+            var customer = await Db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == rental.CustomerId);
             var productIds = items.Select(i => i.ProductId).ToList();
-            var products = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
-            var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
-            
+            var products = await Db.Products.AsNoTracking().Where(p => productIds.Contains(p.Id)).ToListAsync();
+            var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+
             if (customer == null)
             {
                 Snackbar.Add("Nie znaleziono klienta", MudBlazor.Severity.Error);
                 return;
             }
-            
+
             var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(rental, items, customer, products, companyInfo);
-            
+
+            // Bulk SQL update — bez Track/Attach
+            await Db.Rentals.Where(r => r.Id == rental.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(r => r.ContractUrl, contractUrl));
+
             rental.ContractUrl = contractUrl;
-            Db.Rentals.Update(rental);
-            await Db.SaveChangesAsync();
-            
+
+            // Refresh cached list (już AsNoTracking) — bez konfliktu tracking
             rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
-            
+
             Snackbar.Add("Umowa została wygenerowana i zapisana", MudBlazor.Severity.Success);
         }
         catch (Exception ex)
@@ -1954,7 +2095,7 @@ else
                 rental.IsEmailSent = true;
             }
             
-            Snackbar.Add($"📧 Email z umową wysłany do {customer.Email}", MudBlazor.Severity.Success);
+            Snackbar.Add($"Email z umową wysłany do {customer.Email}", MudBlazor.Severity.Success);
         }
         catch (Exception ex)
         {
@@ -1968,18 +2109,30 @@ else
         {
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
-            
+
             var tracked = await Db.Rentals.FindAsync(rental.Id);
             if (tracked == null)
             {
                 Snackbar.Add("Wynajem nie istnieje", MudBlazor.Severity.Error);
                 return;
             }
+
+            // NXRE QA #17: BLOKADA — nie wolno zakończyć wynajmu który był wydany ale nie zwrócony.
+            // Inaczej stock pozostaje "zajęty" (HowManyRented) ale wynajem jest Completed → klient zostaje
+            // ze sprzętem na zawsze.
+            if (tracked.IssuedAtUtc.HasValue && !tracked.ReturnedAtUtc.HasValue)
+            {
+                Snackbar.Add(
+                    "Wynajem był wydany — najpierw przyjmij zwrot sprzętu w Wydania/Zwroty, a dopiero potem zakończ.",
+                    MudBlazor.Severity.Warning);
+                return;
+            }
+
             tracked.Status = RentalStatus.Completed;
             await Db.SaveChangesAsync();
-            
+
             Snackbar.Add($"Wynajem został zakończony", MudBlazor.Severity.Success);
-            
+
             rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
         }
@@ -2047,12 +2200,12 @@ else
                 rental.IsSmsConfirmed = true;
                 if (rental.Status == RentalStatus.Pending)
                     rental.Status = RentalStatus.Confirmed;
-                Snackbar.Add($"✅ {result.Message}", MudBlazor.Severity.Success);
+                Snackbar.Add($"{result.Message}", MudBlazor.Severity.Success);
                 StateHasChanged();
             }
             else
             {
-                Snackbar.Add($"⚠️ {result.Message}", MudBlazor.Severity.Warning);
+                Snackbar.Add($"{result.Message}", MudBlazor.Severity.Warning);
             }
         }
         catch (Exception ex)

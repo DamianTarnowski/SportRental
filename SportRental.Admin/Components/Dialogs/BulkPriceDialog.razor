@@ -1,0 +1,93 @@
+@using SportRental.Infrastructure.Domain
+@using SportRental.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.body2">
+                Wybranych produktów: <strong>@ProductIds.Count</strong>
+            </MudText>
+            <MudRadioGroup T="PriceMode" @bind-Value="_mode">
+                <MudRadio T="PriceMode" Value="@(PriceMode.SetExact)">Ustaw na konkretną kwotę</MudRadio>
+                <MudRadio T="PriceMode" Value="@(PriceMode.PercentChange)">Zmień procentowo (%)</MudRadio>
+                <MudRadio T="PriceMode" Value="@(PriceMode.AbsoluteChange)">Dodaj/odejmij kwotę (zł)</MudRadio>
+            </MudRadioGroup>
+            <MudNumericField @bind-Value="_value" Label="@LabelForMode()" Variant="Variant.Outlined"
+                             Min="@(_mode == PriceMode.PercentChange ? -90m : decimal.MinValue)"
+                             Step="@(_mode == PriceMode.SetExact ? 1m : (_mode == PriceMode.PercentChange ? 5m : 5m))"
+                             Adornment="Adornment.End"
+                             AdornmentText="@(_mode == PriceMode.PercentChange ? "%" : "zł")" />
+            <MudCheckBox T="bool" @bind-Value="_alsoHourly" Label="Zaktualizuj też cenę godzinową (jeśli ustawiona)" />
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Anuluj</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyAsync" Disabled="@_saving">
+            @(_saving ? "Zapisywanie…" : $"Zastosuj do {ProductIds.Count}")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter, EditorRequired] public List<Guid> ProductIds { get; set; } = new();
+
+    private enum PriceMode { SetExact, PercentChange, AbsoluteChange }
+    private PriceMode _mode = PriceMode.PercentChange;
+    private decimal _value = 10m;
+    private bool _alsoHourly = false;
+    private bool _saving;
+
+    private string LabelForMode() => _mode switch
+    {
+        PriceMode.SetExact => "Nowa cena dzienna (zł)",
+        PriceMode.PercentChange => "Zmiana procentowa (+/-)",
+        PriceMode.AbsoluteChange => "Kwota +/- (zł)",
+        _ => "Wartość"
+    };
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private async Task ApplyAsync()
+    {
+        _saving = true;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(TenantProvider.GetCurrentTenantId());
+            var products = await db.Products.Where(p => ProductIds.Contains(p.Id)).ToListAsync();
+
+            foreach (var p in products)
+            {
+                p.DailyPrice = ApplyToPrice(p.DailyPrice);
+                if (_alsoHourly && p.HourlyPrice.HasValue && p.HourlyPrice.Value > 0)
+                {
+                    p.HourlyPrice = ApplyToPrice(p.HourlyPrice.Value);
+                }
+                p.UpdatedAtUtc = DateTime.UtcNow;
+            }
+            await db.SaveChangesAsync();
+
+            Snackbar.Add($"Zaktualizowano ceny dla {products.Count} produktów.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd: {ex.Message}", Severity.Error);
+        }
+        finally { _saving = false; }
+    }
+
+    private decimal ApplyToPrice(decimal current) => _mode switch
+    {
+        PriceMode.SetExact => Math.Max(0, _value),
+        PriceMode.PercentChange => Math.Max(0, Math.Round(current * (1m + _value / 100m), 2)),
+        PriceMode.AbsoluteChange => Math.Max(0, Math.Round(current + _value, 2)),
+        _ => current
+    };
+}

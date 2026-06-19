@@ -2,30 +2,47 @@
 @implements IDisposable
 
 @inject SportRental.Admin.Services.UI.ThemeService Theme
+@inject IJSRuntime JS
 
 <MudThemeProvider @ref="_mudThemeProvider" @bind-IsDarkMode="_isDarkMode" Theme="@Theme.CurrentTheme" />
 
 @code {
     private MudThemeProvider? _mudThemeProvider;
     private bool _isDarkMode;
-    
+    private const string ThemeStorageKey = "rs-theme-dark";
+
     protected override void OnInitialized()
     {
-        // Domyślnie jasny motyw
         _isDarkMode = false;
         Theme.IsDarkMode = false;
         Theme.OnChanged += HandleThemeChanged;
     }
-    
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _mudThemeProvider != null)
+        if (firstRender)
         {
             try
             {
-                // NIE pobieramy preferencji systemowych - zawsze zaczynamy od jasnego motywu
-                // Użytkownik może przełączyć motyw ręcznie
-                await _mudThemeProvider.WatchSystemPreference(OnSystemPreferenceChanged);
+                // NXRE QA #4: per-device preferencja motywu z localStorage przeglądarki.
+                // Każde urządzenie pamięta swój wybór osobno (komputer ↔ telefon).
+                var saved = await JS.InvokeAsync<string?>("localStorage.getItem", ThemeStorageKey);
+                if (saved == "1")
+                {
+                    _isDarkMode = true;
+                    Theme.IsDarkMode = true;
+                    await InvokeAsync(StateHasChanged);
+                }
+                else if (saved == "0")
+                {
+                    _isDarkMode = false;
+                    Theme.IsDarkMode = false;
+                }
+
+                if (_mudThemeProvider != null)
+                {
+                    await _mudThemeProvider.WatchSystemPreference(OnSystemPreferenceChanged);
+                }
             }
             catch
             {
@@ -33,22 +50,28 @@
             }
         }
     }
-    
-    private async Task OnSystemPreferenceChanged(bool newValue)
+
+    private Task OnSystemPreferenceChanged(bool newValue)
     {
-        // Reagujemy na zmianę preferencji systemowych tylko jeśli użytkownik tego chce
-        // Na razie ignorujemy - motyw zmienia się tylko przez przycisk
-        // _isDarkMode = newValue;
-        // Theme.IsDarkMode = newValue;
-        // await InvokeAsync(StateHasChanged);
+        // OS-level dark mode change — ignorujemy, user świadomie wybiera przez toggle.
+        return Task.CompletedTask;
     }
-    
-    private void HandleThemeChanged()
+
+    private async void HandleThemeChanged()
     {
         _isDarkMode = Theme.IsDarkMode;
-        InvokeAsync(StateHasChanged);
+        try
+        {
+            // NXRE QA #4: zapisz wybór do localStorage tego urządzenia.
+            await JS.InvokeVoidAsync("localStorage.setItem", ThemeStorageKey, _isDarkMode ? "1" : "0");
+        }
+        catch
+        {
+            // SignalR rozłączony lub prerender — zignoruj.
+        }
+        await InvokeAsync(StateHasChanged);
     }
-    
+
     public void Dispose()
     {
         Theme.OnChanged -= HandleThemeChanged;

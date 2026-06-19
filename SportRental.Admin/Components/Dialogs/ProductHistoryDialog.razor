@@ -1,0 +1,162 @@
+@using SportRental.Infrastructure.Domain
+@using SportRental.Infrastructure.Data
+@using Microsoft.EntityFrameworkCore
+
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h6" Style="font-weight: 600;">@ProductName</MudText>
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+            }
+            else if (_history == null)
+            {
+                <MudAlert Severity="Severity.Warning">Nie udało się załadować historii.</MudAlert>
+            }
+            else
+            {
+                <MudGrid Spacing="2">
+                    <MudItem xs="4">
+                        <MudPaper Class="pa-3" Elevation="0" Outlined="true" Style="border-radius: 12px;">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Liczba wynajmów</MudText>
+                            <MudText Typo="Typo.h5" Style="font-weight: 700;">@_history.RentalCount</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudPaper Class="pa-3" Elevation="0" Outlined="true" Style="border-radius: 12px;">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Łączny przychód</MudText>
+                            <MudText Typo="Typo.h5" Style="font-weight: 700; color: var(--mud-palette-success);">@_history.TotalRevenue.Pln()</MudText>
+                        </MudPaper>
+                    </MudItem>
+                    <MudItem xs="4">
+                        <MudPaper Class="pa-3" Elevation="0" Outlined="true" Style="border-radius: 12px;">
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">Ostatni wynajem</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">
+                                @(_history.LastRentalAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "—")
+                            </MudText>
+                        </MudPaper>
+                    </MudItem>
+                </MudGrid>
+
+                <MudDivider />
+
+                <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">Ostatnie 20 wynajmów</MudText>
+                @if (_history.RecentRentals.Count == 0)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">Brak historii wynajmów.</MudAlert>
+                }
+                else
+                {
+                    <MudTable Items="_history.RecentRentals" Hover="true" Dense="true" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Klient</MudTh>
+                            <MudTh>Okres</MudTh>
+                            <MudTh>Ilość</MudTh>
+                            <MudTh>Kwota</MudTh>
+                            <MudTh>Status</MudTh>
+                        </HeaderContent>
+                        <RowTemplate Context="row">
+                            <MudTd>@row.CustomerName</MudTd>
+                            <MudTd>
+                                <MudText Typo="Typo.caption">
+                                    @row.Start.ToString("dd.MM") - @row.End.ToString("dd.MM.yyyy")
+                                </MudText>
+                            </MudTd>
+                            <MudTd>×@row.Quantity</MudTd>
+                            <MudTd>@row.Subtotal.Pln()</MudTd>
+                            <MudTd><MudChip T="string" Size="Size.Small" Color="@StatusColor(row.Status)">@row.Status</MudChip></MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Close">Zamknij</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter, EditorRequired] public Guid ProductId { get; set; }
+    [Parameter] public string ProductName { get; set; } = string.Empty;
+
+    private bool _loading = true;
+    private HistoryVm? _history;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(TenantProvider.GetCurrentTenantId());
+
+            var items = await db.RentalItems.AsNoTracking()
+                .Where(ri => ri.ProductId == ProductId)
+                .Include(ri => ri.Rental)
+                .ThenInclude(r => r!.Customer)
+                .OrderByDescending(ri => ri.Rental!.StartDateUtc)
+                .Take(20)
+                .ToListAsync();
+
+            var allItems = await db.RentalItems.AsNoTracking()
+                .Where(ri => ri.ProductId == ProductId)
+                .Include(ri => ri.Rental)
+                .ToListAsync();
+
+            _history = new HistoryVm
+            {
+                RentalCount = allItems.Select(ri => ri.RentalId).Distinct().Count(),
+                TotalRevenue = allItems
+                    .Where(ri => ri.Rental != null && ri.Rental.Status != RentalStatus.Cancelled)
+                    .Sum(ri => ri.Subtotal),
+                LastRentalAt = allItems.Max(ri => (DateTime?)ri.Rental!.StartDateUtc),
+                RecentRentals = items.Select(ri => new RentalRow
+                {
+                    CustomerName = ri.Rental?.Customer?.FullName ?? "—",
+                    Start = ri.Rental?.StartDateUtc.ToLocalTime() ?? DateTime.MinValue,
+                    End = ri.Rental?.EndDateUtc.ToLocalTime() ?? DateTime.MinValue,
+                    Quantity = ri.Quantity,
+                    Subtotal = ri.Subtotal,
+                    Status = ri.Rental?.Status.ToString() ?? "—"
+                }).ToList()
+            };
+        }
+        finally { _loading = false; }
+    }
+
+    private void Close() => MudDialog.Close(DialogResult.Ok(true));
+
+    private static Color StatusColor(string s) => s switch
+    {
+        "Active" => Color.Success,
+        "Confirmed" => Color.Info,
+        "Pending" => Color.Warning,
+        "Cancelled" => Color.Error,
+        "Completed" => Color.Default,
+        _ => Color.Default
+    };
+
+    private sealed class HistoryVm
+    {
+        public int RentalCount { get; set; }
+        public decimal TotalRevenue { get; set; }
+        public DateTime? LastRentalAt { get; set; }
+        public List<RentalRow> RecentRentals { get; set; } = new();
+    }
+
+    private sealed class RentalRow
+    {
+        public string CustomerName { get; set; } = "";
+        public DateTime Start { get; set; }
+        public DateTime End { get; set; }
+        public int Quantity { get; set; }
+        public decimal Subtotal { get; set; }
+        public string Status { get; set; } = "";
+    }
+}

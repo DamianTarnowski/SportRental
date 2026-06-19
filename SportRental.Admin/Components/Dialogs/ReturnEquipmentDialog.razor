@@ -19,7 +19,7 @@
     <TitleContent>
         <div class="d-flex align-center gap-2">
             <MudIcon Icon="@Icons.Material.Filled.Input" Color="Color.Primary" />
-            <MudText Typo="Typo.h6">📥 Przyjęcie zwrotu</MudText>
+            <MudText Typo="Typo.h6">Przyjęcie zwrotu</MudText>
         </div>
     </TitleContent>
     <DialogContent>
@@ -54,7 +54,7 @@
             <MudAlert Severity="Severity.Warning" Dense="true" Class="pa-2">
                 <div class="d-flex align-center justify-space-between">
                     <MudText Typo="Typo.body2">Depozyt pobrany:</MudText>
-                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@(Rental?.DepositAmount.ToString("0.00") ?? "0") zł</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@((Rental?.DepositAmount ?? 0m).Pln())</MudText>
                 </div>
             </MudAlert>
             
@@ -88,21 +88,21 @@
                          Variant="@(_equipmentCondition == "good" ? Variant.Filled : Variant.Outlined)"
                          Size="Size.Small"
                          OnClick="SetConditionGood">
-                    ✅ Dobry
+                    Dobry
                 </MudChip>
                 <MudChip T="string" 
                          Color="@(_equipmentCondition == "minor" ? Color.Warning : Color.Default)" 
                          Variant="@(_equipmentCondition == "minor" ? Variant.Filled : Variant.Outlined)"
                          Size="Size.Small"
                          OnClick="SetConditionMinor">
-                    ⚠️ Drobne
+                    Drobne
                 </MudChip>
                 <MudChip T="string" 
                          Color="@(_equipmentCondition == "damaged" ? Color.Error : Color.Default)" 
                          Variant="@(_equipmentCondition == "damaged" ? Variant.Filled : Variant.Outlined)"
                          Size="Size.Small"
                          OnClick="SetConditionDamaged">
-                    ❌ Uszkodzony
+                    Uszkodzony
                 </MudChip>
             </MudStack>
             
@@ -117,7 +117,7 @@
             @* Ocena klienta — RODO-friendly, bez tekstu, dla budowy historii zaufania.
                Opcjonalne: jeśli admin pominie, recenzja nie zostaje utworzona. *@
             <MudExpansionPanels Elevation="0" Class="mt-1">
-                <MudExpansionPanel Text="@(_rateCustomer ? "📊 Oceniasz klienta (3 oceny, opcjonalnie)" : "📊 Oceń klienta (opcjonalnie)")"
+                <MudExpansionPanel Text="@(_rateCustomer ? "Oceniasz klienta (3 oceny, opcjonalnie)" : "Oceń klienta (opcjonalnie)")"
                                    Expanded="_rateCustomer"
                                    ExpandedChanged="(v) => _rateCustomer = v">
                     <MudText Typo="Typo.caption" Class="mb-2 mud-text-secondary">
@@ -215,6 +215,16 @@
             rental.ReturnDepositRefund = _depositRefund;
             rental.DamageCharge = _damageCharge > 0 ? _damageCharge : null;
             rental.Status = RentalStatus.Completed;
+
+            // NXRE QA #17: zmniejsz HowManyRented (zwracamy sprzęt do dostępności)
+            var rentalItems = await db.RentalItems.Where(i => i.RentalId == rental.Id).ToListAsync();
+            foreach (var grp in rentalItems.GroupBy(i => i.ProductId))
+            {
+                var qty = grp.Sum(i => i.Quantity);
+                await db.Products.Where(p => p.Id == grp.Key)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.HowManyRented,
+                        p => p.HowManyRented - qty < 0 ? 0 : p.HowManyRented - qty));
+            }
 
             var conditionText = _equipmentCondition switch
             {

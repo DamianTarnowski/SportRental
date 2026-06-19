@@ -58,10 +58,10 @@
                             <MudText Typo="Typo.caption" Color="Color.Secondary">@v.IssuedToEmail</MudText>
                         }
                     </MudTd>
-                    <MudTd>@v.InitialBalance.ToString("N2") zł</MudTd>
+                    <MudTd>@v.InitialBalance.Pln()</MudTd>
                     <MudTd>
                         <MudText Style="@(v.RemainingBalance > 0 ? "font-weight: 600; color: var(--coral-700);" : "color: var(--text-secondary);")">
-                            @v.RemainingBalance.ToString("N2") zł
+                            @v.RemainingBalance.Pln()
                         </MudText>
                     </MudTd>
                     <MudTd>@(v.ExpiresAt?.ToString("dd.MM.yyyy") ?? "bezterminowo")</MudTd>

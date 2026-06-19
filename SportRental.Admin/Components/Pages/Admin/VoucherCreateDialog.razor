@@ -26,7 +26,7 @@
                         @_created.Code
                     </MudText>
                     <MudText Typo="Typo.body1" Class="mt-2" Style="font-weight: 600;">
-                        Saldo: @_created.InitialBalance.ToString("N2") zł
+                        Saldo: @_created.InitialBalance.Pln()
                     </MudText>
                 </MudPaper>
             </MudStack>

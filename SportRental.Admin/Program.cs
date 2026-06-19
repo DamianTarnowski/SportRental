@@ -221,6 +221,10 @@ builder.Services.AddScoped<SportRental.Admin.Services.IInvoiceService, SportRent
 builder.Services.AddScoped<SportRental.Admin.Services.IDiscountService, SportRental.Admin.Services.DiscountService>();
 builder.Services.AddScoped<SportRental.Admin.Services.IVoucherService, SportRental.Admin.Services.VoucherService>();
 builder.Services.AddScoped<SportRental.Admin.Services.IGoogleCalendarService, SportRental.Admin.Services.GoogleCalendarService>();
+builder.Services.AddScoped<SportRental.Admin.Data.DemoTenantSeeder>();
+builder.Services.AddScoped<SportRental.Admin.Services.Dashboard.DashboardMetricsService>();
+builder.Services.AddScoped<SportRental.Admin.Services.Search.SearchService>();
+builder.Services.AddScoped<SportRental.Admin.Services.Ai.IProductAiAssistant, SportRental.Admin.Services.Ai.ProductAiAssistant>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
 
@@ -297,7 +301,8 @@ static RemoteFileStorage CreateRemoteFileStorage(IConfiguration cfg, IServicePro
     }
     return new RemoteFileStorage(client, cfg);
 }
-builder.Services.AddSingleton<ThemeService>();
+// NXRE QA #4: per-device theme — Scoped zamiast Singleton (Singleton = wszyscy userzy współdzielili stan!)
+builder.Services.AddScoped<ThemeService>();
 builder.Services.AddSingleton<ImageVariantService>();
 
 builder.Services.AddSingleton(new RegistrationFeatureFlags
@@ -469,7 +474,32 @@ if (builder.Environment.IsDevelopment() && mediaAutoStart)
     builder.Services.AddHostedService<SportRental.Admin.Services.Media.MediaStorageProcessHostedService>();
 }
 
+// Perf: in-memory cache (tenant lookups, business hours, settings)
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<SportRental.Admin.Services.Cache.IAppCache, SportRental.Admin.Services.Cache.AppCache>();
+
+// Perf: response compression (Brotli/Gzip dla HTML/JSON/CSS) — duża oszczędność transferu
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProvider>();
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    o.MimeTypes = Microsoft.AspNetCore.ResponseCompression.ResponseCompressionDefaults.MimeTypes
+        .Concat(new[] { "application/json", "text/html", "text/css", "application/javascript", "image/svg+xml" });
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.BrotliCompressionProviderOptions>(o =>
+{
+    o.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(o =>
+{
+    o.Level = System.IO.Compression.CompressionLevel.Fastest;
+});
+
 var app = builder.Build();
+
+// Włącz response compression przed innymi middleware
+app.UseResponseCompression();
 
 // Test SMS: dotnet run --project SportRental.Admin -- --test-sms 667362375
 var testSmsArg = args.FirstOrDefault(a => a.StartsWith("--test-sms", StringComparison.OrdinalIgnoreCase));

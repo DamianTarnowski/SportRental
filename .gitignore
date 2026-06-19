@@ -9,6 +9,10 @@
 # Azure deployment secrets (ścieżka: .azure-deploy-secrets)
 .azure-deploy-secrets
 
+# ASP.NET Core DataProtection keys (runtime crypto — NIE pushować do public repo)
+**/App_Data/dpkeys/*.xml
+**/App_Data/dpkeys/
+
 # User-specific files
 *.rsuser
 *.suo

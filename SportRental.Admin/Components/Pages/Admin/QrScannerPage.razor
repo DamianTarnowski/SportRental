@@ -17,23 +17,51 @@
 <PageTitle>Skaner kodów — RentSpot</PageTitle>
 
 <MudContainer MaxWidth="MaxWidth.Medium" Class="py-4">
-    <MudStack Spacing="4">
+    <MudStack Spacing="3">
         <!-- Header -->
         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center">
             <MudStack Spacing="0">
-                <MudText Typo="Typo.h4" Class="fw-bold">📷 Skaner kodów kreskowych</MudText>
+                <MudText Typo="Typo.h4" Class="fw-bold">Skaner kodów</MudText>
                 <MudText Typo="Typo.body2" Color="Color.Secondary">
-                    Skanuj kody kreskowe produktów aby szybko je znaleźć
+                    Wybierz akcję, zeskanuj kod — system od razu otworzy odpowiednią kartę.
                 </MudText>
             </MudStack>
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" 
-                       Href="/admin/products" StartIcon="@Icons.Material.Filled.ArrowBack">
-                Powrót
-            </MudButton>
         </MudStack>
-        
+
+        <!-- 4 akcje (Maciej: Wydaj, Przyjmij, Sprawdź, Serwis) -->
+        <MudGrid Spacing="2">
+            <MudItem xs="6" sm="3">
+                <button class="rs-scan-tile @(_mode == ScanMode.Issue ? "rs-scan-tile-active" : "")"
+                        @onclick="@(() => _mode = ScanMode.Issue)">
+                    <MudIcon Icon="@Icons.Material.Filled.Output" />
+                    <span>Wydaj</span>
+                </button>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <button class="rs-scan-tile @(_mode == ScanMode.Return ? "rs-scan-tile-active" : "")"
+                        @onclick="@(() => _mode = ScanMode.Return)">
+                    <MudIcon Icon="@Icons.Material.Filled.Input" />
+                    <span>Przyjmij</span>
+                </button>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <button class="rs-scan-tile @(_mode == ScanMode.Check ? "rs-scan-tile-active" : "")"
+                        @onclick="@(() => _mode = ScanMode.Check)">
+                    <MudIcon Icon="@Icons.Material.Filled.Search" />
+                    <span>Sprawdź</span>
+                </button>
+            </MudItem>
+            <MudItem xs="6" sm="3">
+                <button class="rs-scan-tile @(_mode == ScanMode.Service ? "rs-scan-tile-active" : "")"
+                        @onclick="@(() => _mode = ScanMode.Service)">
+                    <MudIcon Icon="@Icons.Material.Filled.Build" />
+                    <span>Serwis</span>
+                </button>
+            </MudItem>
+        </MudGrid>
+
         <!-- Scanner Component -->
-        <MudPaper Elevation="2" Class="pa-4">
+        <MudPaper Elevation="0" Outlined="true" Class="pa-4" Style="border-radius: 16px;">
             <QrScanner OnScanned="HandleScanned" AutoStart="false" />
         </MudPaper>
         
@@ -83,8 +111,46 @@
     </MudStack>
 </MudContainer>
 
+<style>
+    .rs-scan-tile {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1rem 0.5rem;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 14px;
+        color: #1B2350;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: transform 180ms cubic-bezier(0.2,0.7,0.3,1), border-color 180ms, box-shadow 180ms;
+    }
+    .rs-scan-tile:hover { transform: translateY(-2px); border-color: #F96167; }
+    .rs-scan-tile .mud-icon-root { font-size: 1.5rem !important; color: #F96167 !important; }
+    .rs-scan-tile-active {
+        background: #F96167;
+        color: #FFFFFF;
+        border-color: #F96167;
+        box-shadow: 0 4px 12px rgba(249,97,103,0.3);
+    }
+    .rs-scan-tile-active .mud-icon-root { color: #FFFFFF !important; }
+    [data-theme="dark"] .rs-scan-tile,
+    .mud-theme-dark .rs-scan-tile {
+        background: rgba(255,255,255,0.04);
+        border-color: rgba(255,255,255,0.12);
+        color: #E8EBF5;
+    }
+</style>
+
 @code {
     private List<ScanRecord> _recentScans = new();
+    private ScanMode _mode = ScanMode.Check;
+
+    private enum ScanMode { Issue, Return, Check, Service }
     
     private async Task HandleScanned(string qrData)
     {
@@ -139,25 +205,37 @@
             Product = product,
             ScannedAt = DateTime.Now
         });
-        
-        // Show result dialog
+
+        // Po skanie od razu wchodzi w kartę zgodnie z wybranym trybem (Maciej feedback).
+        // Tryb "Check" zachowuje stary fallback — pokazuje dialog wyboru.
+        if (product != null && _mode != ScanMode.Check)
+        {
+            var path = _mode switch
+            {
+                ScanMode.Issue => $"/admin/equipment-handling?productId={product.Id}&action=issue",
+                ScanMode.Return => $"/admin/equipment-handling?productId={product.Id}&action=return",
+                ScanMode.Service => $"/admin/products?highlight={product.Id}&tab=service",
+                _ => $"/admin/products?highlight={product.Id}"
+            };
+            Navigation.NavigateTo(path);
+            return;
+        }
+
+        // Domyślny fallback: dialog z opcjami (Sprawdź albo brak wybranego trybu)
         var parameters = new DialogParameters<QrScanResultDialog>
         {
             { x => x.Product, product },
             { x => x.QrData, qrData },
             { x => x.ErrorMessage, errorMessage }
         };
-        
         var options = new DialogOptions
         {
             MaxWidth = MaxWidth.Small,
             FullWidth = true,
             CloseButton = true
         };
-        
         var dialog = await DialogService.ShowAsync<QrScanResultDialog>("Wynik skanowania", parameters, options);
         var result = await dialog.Result;
-        
         if (result != null && !result.Canceled && result.Data is QrAction action)
         {
             await HandleAction(action, product);

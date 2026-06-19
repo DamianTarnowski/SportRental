@@ -39,7 +39,7 @@
                         </MudItem>
                         <MudItem xs="6" md="3">
                             <MudStack Class="mud-align-center">
-                                <MudText Typo="Typo.h4" Color="Color.Success">@reportData.TotalRevenue.ToString("0.00") zł</MudText>
+                                <MudText Typo="Typo.h4" Color="Color.Success">@reportData.TotalRevenue.Pln()</MudText>
                                 <MudText Typo="Typo.caption">Przychody</MudText>
                             </MudStack>
                         </MudItem>
@@ -51,7 +51,7 @@
                         </MudItem>
                         <MudItem xs="6" md="3">
                             <MudStack Class="mud-align-center">
-                                <MudText Typo="Typo.h4" Color="Color.Warning">@reportData.AverageRentalValue.ToString("0.00") zł</MudText>
+                                <MudText Typo="Typo.h4" Color="Color.Warning">@reportData.AverageRentalValue.Pln()</MudText>
                                 <MudText Typo="Typo.caption">Średnia wartość</MudText>
                             </MudStack>
                         </MudItem>
@@ -94,7 +94,7 @@
                         <RowTemplate>
                             <MudTd>@context.ProductName</MudTd>
                             <MudTd>@context.RentalsCount</MudTd>
-                            <MudTd>@context.Revenue.ToString("0.00") zł</MudTd>
+                            <MudTd>@context.Revenue.Pln()</MudTd>
                         </RowTemplate>
                     </MudTable>
                 </MudPaper>
@@ -113,7 +113,7 @@
                         <RowTemplate>
                             <MudTd>@context.CustomerName</MudTd>
                             <MudTd>@context.RentalsCount</MudTd>
-                            <MudTd>@context.Revenue.ToString("0.00") zł</MudTd>
+                            <MudTd>@context.Revenue.Pln()</MudTd>
                         </RowTemplate>
                     </MudTable>
                 </MudPaper>

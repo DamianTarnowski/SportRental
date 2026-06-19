@@ -2,12 +2,14 @@ using System.Security.Claims;
 using System.Text.Json;
 using SportRental.Admin.Components.Account.Pages;
 using SportRental.Admin.Components.Account.Pages.Manage;
+using SportRental.Admin.Data;
 using SportRental.Infrastructure.Data;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
 
 namespace Microsoft.AspNetCore.Routing
@@ -69,6 +71,30 @@ namespace Microsoft.AspNetCore.Routing
             {
                 await signInManager.SignOutAsync();
                 return TypedResults.LocalRedirect($"~/{returnUrl}");
+            });
+
+            // One-click demo sign-in. Idempotentnie tworzy demo tenant + użytkownika
+            // demo@rentspot.eu (Owner) i loguje na cookie, potem redirect na /.
+            accountGroup.MapGet("/Demo", async (
+                [FromServices] SignInManager<ApplicationUser> signInManager,
+                [FromServices] DemoTenantSeeder seeder,
+                [FromServices] ILoggerFactory loggerFactory,
+                CancellationToken ct) =>
+            {
+                var log = loggerFactory.CreateLogger("DemoSignIn");
+                try
+                {
+                    await signInManager.SignOutAsync();
+                    var demoUser = await seeder.EnsureAsync(ct);
+                    await signInManager.SignInAsync(demoUser, isPersistent: false);
+                    log.LogInformation("Demo sign-in OK for {Email}", demoUser.Email);
+                    return TypedResults.LocalRedirect("~/");
+                }
+                catch (Exception ex)
+                {
+                    log.LogError(ex, "Demo sign-in failed");
+                    return Results.Redirect("/Account/Login?demo=failed");
+                }
             });
 
             var manageGroup = accountGroup.MapGroup("/Manage").RequireAuthorization();

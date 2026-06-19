@@ -21,6 +21,31 @@
     }
     else
     {
+        @* Presety (Maciej): lato, zima, 7 dni — jednoklik wypełnia wszystkie dni *@
+        <MudStack Row="true" Spacing="1" Class="mb-3" Wrap="Wrap.Wrap">
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mr-2 align-self-center">Gotowiec:</MudText>
+            <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.WbSunny"
+                       OnClick="@(() => ApplyPreset(PresetType.Summer))">
+                Lato (8-20)
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.AcUnit"
+                       OnClick="@(() => ApplyPreset(PresetType.Winter))">
+                Zima (9-17)
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.CalendarMonth"
+                       OnClick="@(() => ApplyPreset(PresetType.AllDays))">
+                7 dni 9-17
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                       StartIcon="@Icons.Material.Filled.Block"
+                       OnClick="@(() => ApplyPreset(PresetType.WeekendsClosed))">
+                Weekend zamknięte
+            </MudButton>
+        </MudStack>
+
         <MudPaper Class="pa-4" Elevation="0" Outlined="true" Style="border-radius: 16px;">
             <MudTable Items="@_days" Hover="true" Dense="true" Bordered="false" Elevation="0">
                 <HeaderContent>
@@ -130,6 +155,38 @@
         {
             _loading = false;
         }
+    }
+
+    private enum PresetType { Summer, Winter, AllDays, WeekendsClosed }
+
+    private void ApplyPreset(PresetType preset)
+    {
+        var (fromHour, toHour) = preset switch
+        {
+            PresetType.Summer => (8, 20),
+            PresetType.Winter => (9, 17),
+            PresetType.AllDays => (9, 17),
+            PresetType.WeekendsClosed => (9, 17),
+            _ => (8, 20)
+        };
+
+        foreach (var d in _days)
+        {
+            if (preset == PresetType.WeekendsClosed && (d.DayOfWeek == DayOfWeek.Saturday || d.DayOfWeek == DayOfWeek.Sunday))
+            {
+                d.IsClosed = true;
+                d.OpenFrom = null;
+                d.OpenTo = null;
+            }
+            else
+            {
+                d.IsClosed = false;
+                d.OpenFrom = new TimeOnly(fromHour, 0);
+                d.OpenTo = new TimeOnly(toHour, 0);
+            }
+        }
+        StateHasChanged();
+        Snackbar.Add("Gotowiec zastosowany — kliknij Zapisz aby utrwalić.", Severity.Info);
     }
 
     private async Task SaveAsync()

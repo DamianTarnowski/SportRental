@@ -46,20 +46,24 @@
                         </MudItem>
                     </MudGrid>
                     
+                    @* NXRE QA #12: jasny typ dokumentu + opis adresu *@
                     <MudGrid Spacing="2">
                         <MudItem xs="12" sm="6">
                             <MudTextField @bind-Value="Customer.DocumentNumber"
-                                          Label="Nr dokumentu"
+                                          Label="Nr dokumentu (PESEL lub dowód)"
                                           Adornment="Adornment.Start"
                                           AdornmentIcon="@Icons.Material.Filled.Badge"
                                           Variant="Variant.Outlined"
-                                          Dense="true" />
+                                          Dense="true"
+                                          HelperText="11-cyfrowy PESEL lub seria i numer dowodu (np. ABC 123456). Pomiń jeśli nie wymagasz dokumentu."
+                                          Validation="@(new Func<string?, string?>(ValidateDocumentNumber))" />
                         </MudItem>
                         <MudItem xs="12" sm="6">
                             <MudTextField @bind-Value="Customer.Address"
                                           Label="Adres"
                                           Variant="Variant.Outlined"
-                                          Dense="true" />
+                                          Dense="true"
+                                          HelperText="Pełny adres: ulica i numer, kod pocztowy, miasto (np. ul. Rynek Jeżycki 1, 60-870 Poznań)" />
                         </MudItem>
                     </MudGrid>
                     
@@ -67,7 +71,28 @@
                                   Label="Notatki"
                                   Lines="2"
                                   Variant="Variant.Outlined"
-                                  Dense="true" />
+                                  Dense="true"
+                                  HelperText="Np. „woli SMS", „odbiera osobiście", „mówi po angielsku"" />
+
+                    @* Tagi (Maciej): VIP, firma, rower, narty *@
+                    <MudText Typo="Typo.caption" Style="font-weight: 600;">Tagi</MudText>
+                    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                        @foreach (var preset in new[] { "VIP", "firma", "stały klient", "rower", "kajak", "narty", "SUP" })
+                        {
+                            var isOn = IsTagSet(preset);
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(isOn ? Color.Primary : Color.Default)"
+                                     Variant="@(isOn ? Variant.Filled : Variant.Outlined)"
+                                     OnClick="@(() => ToggleTag(preset))">
+                                @preset
+                            </MudChip>
+                        }
+                    </MudStack>
+                    <MudTextField @bind-Value="Customer.Tags"
+                                  Label="Wszystkie tagi (oddziel przecinkami)"
+                                  Variant="Variant.Outlined"
+                                  Dense="true"
+                                  HelperText="Możesz wpisać własne tagi oddzielone przecinkami." />
                 </MudStack>
             </MudForm>
         </MudStack>
@@ -115,5 +140,39 @@
     private void Cancel()
     {
         MudDialog.Cancel();
+    }
+
+    // NXRE QA #12: walidacja DocumentNumber — PESEL (11 cyfr) lub seria-numer dowodu (~9 alfa-num)
+    private string? ValidateDocumentNumber(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null; // opcjonalne
+        var trimmed = value.Trim();
+        if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^\d{11}$")) return null; // PESEL
+        if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^[A-Za-z]{2,3}\s?\d{6,7}$")) return null; // dowód
+        if (System.Text.RegularExpressions.Regex.IsMatch(trimmed, @"^[A-Za-z0-9]{7,12}$")) return null; // paszport
+        return "Niepoprawny format: 11 cyfr PESEL, ABC 123456 (dowód) lub paszport.";
+    }
+
+    private bool IsTagSet(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(Customer.Tags)) return false;
+        return Customer.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void ToggleTag(string tag)
+    {
+        var current = (Customer.Tags ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+        if (current.Any(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase)))
+        {
+            current.RemoveAll(t => string.Equals(t, tag, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            current.Add(tag);
+        }
+        Customer.Tags = string.Join(", ", current);
     }
 }

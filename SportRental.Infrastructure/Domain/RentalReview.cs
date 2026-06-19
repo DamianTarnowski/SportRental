@@ -32,6 +32,12 @@ namespace SportRental.Infrastructure.Domain
         [MaxLength(2000)]
         public string? Comment { get; set; }
 
+        // Odpowiedź właściciela (Maciej) — wystawiana po wystawieniu recenzji przez klienta.
+        // Widoczna publicznie obok komentarza klienta.
+        [MaxLength(2000)]
+        public string? OwnerReply { get; set; }
+        public DateTime? OwnerReplyAtUtc { get; set; }
+
         public bool IsHidden { get; set; } = false;
 
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;

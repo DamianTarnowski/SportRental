@@ -1,22 +1,34 @@
 @using SportRental.Infrastructure.Domain
+@using SportRental.Admin.Services.Guards
 @using MudBlazor
 
 <MudDialog>
     <DialogContent>
         <MudStack Spacing="2">
-            @* Nagłówek - kompaktowy *@
+            @* Nagłówek *@
             <div class="d-flex align-center justify-space-between flex-wrap gap-1">
                 <div>
                     <MudText Typo="Typo.h6" Style="font-weight: 600;">
-                        📋 @CustomerName
+                        @CustomerName
                     </MudText>
-                    <MudText Typo="Typo.caption" Color="Color.Default" Class="d-none d-sm-block">
-                        Historia wypożyczeń
-                    </MudText>
+                    @if (!string.IsNullOrWhiteSpace(CustomerTags))
+                    {
+                        <MudStack Row="true" Spacing="1" Class="mt-1" Wrap="Wrap.Wrap">
+                            @foreach (var tag in CustomerTags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary">@tag</MudChip>
+                            }
+                        </MudStack>
+                    }
                 </div>
-                <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">
-                    @Rentals.Count wynajmów
-                </MudChip>
+                <MudStack Row="true" Spacing="1">
+                    <MudChip T="string" Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">
+                        @Rentals.Count wynajmów
+                    </MudChip>
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined" Size="Size.Small">
+                        @Rentals.Sum(r => r.TotalAmount).PlnInt()
+                    </MudChip>
+                </MudStack>
             </div>
 
             @if (Rentals.Count == 0)
@@ -27,52 +39,147 @@
             }
             else
             {
-                <MudStack Spacing="1">
-                    @foreach (var rental in Rentals.OrderByDescending(r => r.CreatedAtUtc))
-                    {
-                        <MudCard Elevation="2" Style="border-radius: 10px;">
-                            <MudCardContent Class="pa-2">
-                                @* Nagłówek wynajmu *@
-                                <div class="d-flex align-center justify-space-between flex-wrap gap-1 mb-1">
-                                    <div class="d-flex align-center gap-1">
-                                        <MudChip T="string" Color="@StatusColor(rental.Status)" Variant="Variant.Filled" Size="Size.Small">
-                                            @StatusText(rental.Status)
-                                        </MudChip>
-                                        <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">
-                                            @rental.TotalAmount.ToString("0") zł
-                                        </MudText>
-                                    </div>
-                                    <MudText Typo="Typo.caption">
-                                        @rental.StartDateUtc.ToLocalTime().ToString("dd.MM") - @rental.EndDateUtc.ToLocalTime().ToString("dd.MM.yy")
-                                    </MudText>
-                                </div>
+                <MudTabs Elevation="0" Outlined="true" Rounded="true" PanelClass="pa-3" Class="mt-2" Style="border-radius: 12px;">
+                    @* TAB 1 — Historia wynajmów *@
+                    <MudTabPanel Text="Historia" Icon="@Icons.Material.Filled.History" BadgeData="@Rentals.Count">
+                        <MudStack Spacing="1">
+                            @foreach (var rental in Rentals.OrderByDescending(r => r.CreatedAtUtc))
+                            {
+                                <MudCard Elevation="0" Outlined="true" Style="border-radius: 10px;">
+                                    <MudCardContent Class="pa-2">
+                                        <div class="d-flex align-center justify-space-between flex-wrap gap-1 mb-1">
+                                            <div class="d-flex align-center gap-1">
+                                                <MudChip T="string" Color="@StatusColor(rental.Status)" Variant="Variant.Filled" Size="Size.Small">
+                                                    @StatusText(rental.Status)
+                                                </MudChip>
+                                                <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">
+                                                    @rental.TotalAmount.PlnInt()
+                                                </MudText>
+                                            </div>
+                                            <MudText Typo="Typo.caption">
+                                                @rental.StartDateUtc.ToLocalTime().ToString("dd.MM") - @rental.EndDateUtc.ToLocalTime().ToString("dd.MM.yy")
+                                            </MudText>
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            @foreach (var item in rental.Items.Take(3))
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
+                                                    @(item.Product?.Name ?? "?") ×@item.Quantity
+                                                </MudChip>
+                                            }
+                                            @if (rental.Items.Count > 3)
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
+                                                    +@(rental.Items.Count - 3) więcej
+                                                </MudChip>
+                                            }
+                                        </div>
+                                    </MudCardContent>
+                                </MudCard>
+                            }
+                        </MudStack>
+                    </MudTabPanel>
 
-                                @if (!string.IsNullOrWhiteSpace(rental.Notes))
-                                {
-                                    <MudText Typo="Typo.caption" Color="Color.Default" Class="mb-1" Style="font-style: italic;">
-                                        💬 @(rental.Notes.Length > 50 ? rental.Notes.Substring(0, 50) + "..." : rental.Notes)
-                                    </MudText>
-                                }
+                    @* TAB 2 — Umowy *@
+                    <MudTabPanel Text="Umowy" Icon="@Icons.Material.Filled.Description" BadgeData="@Rentals.Count(r => !string.IsNullOrEmpty(r.ContractUrl))">
+                        @{
+                            var withContracts = Rentals.Where(r => !string.IsNullOrEmpty(r.ContractUrl)).ToList();
+                        }
+                        @if (withContracts.Count == 0)
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true">Brak wygenerowanych umów.</MudAlert>
+                        }
+                        else
+                        {
+                            <MudTable Items="withContracts" Hover="true" Dense="true" Elevation="0">
+                                <HeaderContent>
+                                    <MudTh>Wynajem</MudTh>
+                                    <MudTh>Data</MudTh>
+                                    <MudTh>PDF</MudTh>
+                                </HeaderContent>
+                                <RowTemplate Context="r">
+                                    <MudTd>#@r.Id.ToString()[..8].ToUpper()</MudTd>
+                                    <MudTd>@r.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")</MudTd>
+                                    <MudTd>
+                                        <MudButton Href="@r.ContractUrl" Target="_blank" Size="Size.Small"
+                                                   StartIcon="@Icons.Material.Filled.OpenInNew" Variant="Variant.Text">
+                                            Otwórz
+                                        </MudButton>
+                                    </MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        }
+                    </MudTabPanel>
 
-                                @* Pozycje - kompaktowe *@
-                                <div class="d-flex flex-wrap gap-1">
-                                    @foreach (var item in rental.Items.Take(3))
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary">
-                                            @(item.Product?.Name ?? "?") ×@item.Quantity
-                                        </MudChip>
+                    @* TAB 3 — Płatności *@
+                    <MudTabPanel Text="Płatności" Icon="@Icons.Material.Filled.Payment">
+                        <MudTable Items="Rentals.OrderByDescending(r => r.CreatedAtUtc)" Hover="true" Dense="true" Elevation="0">
+                            <HeaderContent>
+                                <MudTh>Wynajem</MudTh>
+                                <MudTh>Kwota</MudTh>
+                                <MudTh>Status</MudTh>
+                            </HeaderContent>
+                            <RowTemplate Context="r">
+                                <MudTd>#@r.Id.ToString()[..8].ToUpper()</MudTd>
+                                <MudTd>@r.TotalAmount.Pln()</MudTd>
+                                <MudTd>
+                                    @{
+                                        var paid = RentalGuards.IsRentalPaid(r);
                                     }
-                                    @if (rental.Items.Count > 3)
-                                    {
-                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">
-                                            +@(rental.Items.Count - 3) więcej
-                                        </MudChip>
-                                    }
-                                </div>
-                            </MudCardContent>
-                        </MudCard>
-                    }
-                </MudStack>
+                                    <MudChip T="string" Size="Size.Small"
+                                             Color="@(paid ? Color.Success : Color.Error)"
+                                             Variant="Variant.Filled">
+                                        @(paid ? "Opłacone" : (string.IsNullOrEmpty(r.PaymentStatus) ? "Brak" : r.PaymentStatus))
+                                    </MudChip>
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                        <MudDivider Class="my-3" />
+                        <MudStack Row="true" Class="mud-space-between">
+                            <MudText Typo="Typo.body2">Łącznie opłacone:</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 700; color: var(--mud-palette-success);">
+                                @Rentals.Where(r => RentalGuards.IsRentalPaid(r)).Sum(r => r.TotalAmount).Pln()
+                            </MudText>
+                        </MudStack>
+                        <MudStack Row="true" Class="mud-space-between">
+                            <MudText Typo="Typo.body2">Do zapłaty:</MudText>
+                            <MudText Typo="Typo.body2" Style="font-weight: 700; color: var(--mud-palette-error);">
+                                @Rentals.Where(r => !RentalGuards.IsRentalPaid(r) && r.Status != RentalStatus.Cancelled).Sum(r => r.TotalAmount).Pln()
+                            </MudText>
+                        </MudStack>
+                    </MudTabPanel>
+
+                    @* TAB 4 — Notatki *@
+                    <MudTabPanel Text="Notatki" Icon="@Icons.Material.Filled.StickyNote2">
+                        @if (string.IsNullOrWhiteSpace(CustomerNotes))
+                        {
+                            <MudAlert Severity="Severity.Info" Dense="true">Brak notatek o tym kliencie.</MudAlert>
+                        }
+                        else
+                        {
+                            <MudPaper Class="pa-3" Elevation="0" Outlined="true" Style="border-radius: 10px;">
+                                <MudText Typo="Typo.body2">@CustomerNotes</MudText>
+                            </MudPaper>
+                        }
+                        @{
+                            var rentalNotes = Rentals.Where(r => !string.IsNullOrWhiteSpace(r.Notes)).ToList();
+                        }
+                        @if (rentalNotes.Count > 0)
+                        {
+                            <MudDivider Class="my-3" />
+                            <MudText Typo="Typo.subtitle2" Class="mb-2" Style="font-weight: 600;">Notatki z wynajmów:</MudText>
+                            @foreach (var r in rentalNotes.OrderByDescending(r => r.CreatedAtUtc))
+                            {
+                                <MudPaper Class="pa-2 mb-1" Elevation="0" Outlined="true" Style="border-radius: 8px;">
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        #@r.Id.ToString()[..8].ToUpper() · @r.StartDateUtc.ToLocalTime().ToString("dd.MM.yyyy")
+                                    </MudText>
+                                    <MudText Typo="Typo.body2">@r.Notes</MudText>
+                                </MudPaper>
+                            }
+                        }
+                    </MudTabPanel>
+                </MudTabs>
             }
         </MudStack>
     </DialogContent>
@@ -85,8 +192,7 @@
                    StartIcon="@Icons.Material.Filled.OpenInNew"
                    OnClick="GoToRentalsPage"
                    Size="Size.Small">
-            <span class="d-none d-sm-inline">Otwórz w wynajmach</span>
-            <span class="d-sm-none">Wynajmy</span>
+            Otwórz w wynajmach
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -97,6 +203,8 @@
     [Parameter] public string CustomerName { get; set; } = string.Empty;
     [Parameter] public Guid CustomerId { get; set; }
     [Parameter] public List<Rental> Rentals { get; set; } = new();
+    [Parameter] public string? CustomerTags { get; set; }
+    [Parameter] public string? CustomerNotes { get; set; }
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
 

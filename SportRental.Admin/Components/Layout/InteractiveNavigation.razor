@@ -1,35 +1,108 @@
 @rendermode InteractiveServer
 
 @inject SportRental.Admin.Services.UI.ThemeService Theme
+@inject NavigationManager Nav
+@inject SportRental.Admin.Services.Search.SearchService SearchSvc
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
 
 <MudAppBar Elevation="0" Color="Color.Surface" Fixed="true" Class="rs-appbar">
-    @if (_breakpoint < Breakpoint.Md)
-    {
-        <MudIconButton Icon="@Icons.Material.Filled.Menu"
-                       Color="Color.Default"
-                       Edge="Edge.Start"
-                       OnClick="ToggleDrawer" />
-    }
-    <div class="rs-brand">
+    <AuthorizeView>
+        <Authorized Context="authCtx">
+            @if (_breakpoint < Breakpoint.Md)
+            {
+                <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                               Color="Color.Default"
+                               Edge="Edge.Start"
+                               OnClick="ToggleDrawer" />
+            }
+        </Authorized>
+    </AuthorizeView>
+    <a href="/" class="rs-brand" style="text-decoration:none;">
         <svg class="rs-brand-mark" viewBox="0 0 100 100" aria-hidden="true">
             <circle cx="50" cy="50" r="48" fill="#F96167" />
             <text x="50" y="72" font-family="Outfit, Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
         </svg>
         <span class="rs-brand-word">RentSpot<span class="rs-brand-dot">.</span></span>
-    </div>
+    </a>
     <MudSpacer />
+    <AuthorizeView>
+        <Authorized Context="searchCtx">
+            <div class="rs-topbar-search">
+                <MudAutocomplete T="SportRental.Admin.Services.Search.SearchHit"
+                                 SearchFunc="@DoSearchAsync"
+                                 ToStringFunc="@(h => h?.Title ?? "")"
+                                 ValueChanged="@OnSearchPicked"
+                                 Placeholder="Klient, produkt, telefon, #wynajem…"
+                                 Variant="Variant.Outlined"
+                                 Dense="true"
+                                 Clearable="true"
+                                 ShowProgressIndicator="true"
+                                 DebounceInterval="200"
+                                 MinCharacters="2"
+                                 MaxItems="16"
+                                 AdornmentIcon="@Icons.Material.Filled.Search"
+                                 Adornment="Adornment.Start"
+                                 Class="rs-topbar-search-input">
+                    <ItemTemplate Context="hit">
+                        <div class="rs-search-hit">
+                            <MudIcon Icon="@SearchHitIcon(hit.Type)" Size="Size.Small" />
+                            <div>
+                                <div class="rs-search-hit-title">@hit.Title</div>
+                                <div class="rs-search-hit-sub">@hit.Subtitle</div>
+                            </div>
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-auto">
+                                @SearchHitLabel(hit.Type)
+                            </MudChip>
+                        </div>
+                    </ItemTemplate>
+                </MudAutocomplete>
+            </div>
+        </Authorized>
+    </AuthorizeView>
+    <AuthorizeView>
+        <NotAuthorized>
+            <div class="rs-topbar-cta">
+                <MudButton Href="/Account/Login"
+                           Variant="Variant.Text"
+                           Color="Color.Default"
+                           Class="rs-topbar-login">
+                    Zaloguj się
+                </MudButton>
+                <MudButton Href="/Account/Register"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Class="rs-topbar-register">
+                    <span class="rs-topbar-register-long">Załóż konto</span>
+                    <span class="rs-topbar-register-short">Konto</span>
+                </MudButton>
+            </div>
+        </NotAuthorized>
+    </AuthorizeView>
+    <AuthorizeView Roles="Owner,SuperAdmin" Context="adminCtx">
+        <Authorized>
+            <a href="/_client/" target="_blank" rel="noopener" class="rs-client-preview" title="Otwórz widok klienta w nowej karcie">
+                <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" />
+                <span class="rs-client-preview-text">Widok klienta</span>
+                <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Class="rs-client-preview-ext" />
+            </a>
+        </Authorized>
+    </AuthorizeView>
     <ThemeSwitcher />
 </MudAppBar>
 
-<MudDrawer @bind-Open="_drawerOpen"
-           ClipMode="DrawerClipMode.Always"
-           Elevation="0"
-           Variant="@(_breakpoint >= Breakpoint.Md ? DrawerVariant.Responsive : DrawerVariant.Temporary)"
-           Breakpoint="Breakpoint.Md"
-           Class="pt-14 rs-drawer"
-           Width="248px">
-    <NavMenu />
-</MudDrawer>
+<AuthorizeView>
+    <Authorized Context="drawerCtx">
+        <MudDrawer @bind-Open="_drawerOpen"
+                   ClipMode="DrawerClipMode.Always"
+                   Elevation="0"
+                   Variant="@(_breakpoint >= Breakpoint.Md ? DrawerVariant.Responsive : DrawerVariant.Temporary)"
+                   Breakpoint="Breakpoint.Md"
+                   Class="pt-14 rs-drawer"
+                   Width="248px">
+            <NavMenu />
+        </MudDrawer>
+    </Authorized>
+</AuthorizeView>
 
 <MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
@@ -49,12 +122,110 @@
         line-height: 1;
     }
     .rs-brand-dot { color: #F96167; margin-left: 1px; font-weight: 900; }
+
+    /* Topbar CTAs for unauthenticated users */
+    .rs-topbar-cta {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-right: 0.5rem;
+        min-width: 0;
+    }
+    .rs-topbar-login {
+        font-weight: 600 !important;
+        color: var(--navy-900, #1B2350) !important;
+        white-space: nowrap;
+    }
+    .rs-topbar-register {
+        font-weight: 600 !important;
+        padding: 0.35rem 1.1rem !important;
+        white-space: nowrap;
+    }
+    [data-theme="dark"] .rs-topbar-login,
+    .mud-theme-dark .rs-topbar-login { color: #E8EBF5 !important; }
+    .rs-topbar-register-short { display: none; }
+    @@media (max-width: 700px) {
+        .rs-topbar-login { display: none !important; }
+        .rs-topbar-register { padding: 0.3rem 0.85rem !important; font-size: 0.85rem !important; }
+    }
+    @@media (max-width: 420px) {
+        .rs-topbar-register-long { display: none; }
+        .rs-topbar-register-short { display: inline; }
+        .rs-topbar-register { padding: 0.3rem 0.7rem !important; font-size: 0.82rem !important; }
+    }
+
+    /* Widok klienta — link preview dla Owner/SuperAdmin */
+    .rs-client-preview {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.85rem;
+        margin-right: 0.5rem;
+        background: rgba(249, 97, 103, 0.08);
+        border: 1px solid rgba(249, 97, 103, 0.25);
+        border-radius: 999px;
+        color: var(--coral-700, #BC3138);
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background 180ms, border-color 180ms;
+    }
+    .rs-client-preview:hover {
+        background: rgba(249, 97, 103, 0.16);
+        border-color: rgba(249, 97, 103, 0.45);
+        color: var(--coral-700, #BC3138);
+        text-decoration: none;
+    }
+    .rs-client-preview .mud-icon-root { font-size: 1rem !important; color: inherit !important; }
+    .rs-client-preview-ext { opacity: 0.7; margin-left: 0.1rem; }
+    [data-theme="dark"] .rs-client-preview,
+    .mud-theme-dark .rs-client-preview {
+        background: rgba(249, 97, 103, 0.15);
+        border-color: rgba(249, 97, 103, 0.35);
+        color: #FCA0A4;
+    }
+    [data-theme="dark"] .rs-client-preview:hover,
+    .mud-theme-dark .rs-client-preview:hover { color: #FCA0A4; }
+    @@media (max-width: 700px) {
+        .rs-client-preview-text { display: none; }
+        .rs-client-preview-ext { display: none; }
+        .rs-client-preview { padding: 0.35rem 0.55rem; }
+    }
+
+    /* Global search w topbarze */
+    .rs-topbar-search {
+        max-width: 360px;
+        width: 100%;
+        margin-right: 0.75rem;
+    }
+    .rs-topbar-search-input .mud-input-control-input-container { background: transparent !important; }
+    .rs-search-hit {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.25rem 0.1rem;
+        width: 100%;
+    }
+    .rs-search-hit-title { font-weight: 600; font-size: 0.9rem; color: #1B2350; }
+    .rs-search-hit-sub { font-size: 0.78rem; color: #5B6B82; }
+    .rs-search-hit .mud-icon-root { color: #F96167 !important; }
+    @@media (max-width: 900px) {
+        .rs-topbar-search { max-width: 220px; }
+    }
+    @@media (max-width: 700px) {
+        .rs-topbar-search { display: none; }
+    }
+    [data-theme="dark"] .rs-search-hit-title,
+    .mud-theme-dark .rs-search-hit-title { color: #E8EBF5; }
+    [data-theme="dark"] .rs-search-hit-sub,
+    .mud-theme-dark .rs-search-hit-sub { color: rgba(232,235,245,0.65); }
 </style>
 
 @code {
     private bool _drawerOpen = true;
     private Breakpoint _breakpoint = Breakpoint.Md;
-    
+
     private void ToggleDrawer()
     {
         _drawerOpen = !_drawerOpen;
@@ -72,4 +243,34 @@
 
         StateHasChanged();
     }
+
+    private async Task<IEnumerable<SportRental.Admin.Services.Search.SearchHit>> DoSearchAsync(string? query, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(query)) return Array.Empty<SportRental.Admin.Services.Search.SearchHit>();
+        var tid = TenantProvider.GetCurrentTenantId();
+        if (tid is null) return Array.Empty<SportRental.Admin.Services.Search.SearchHit>();
+        return await SearchSvc.SearchAsync(tid.Value, query, max: 6, ct);
+    }
+
+    private void OnSearchPicked(SportRental.Admin.Services.Search.SearchHit? hit)
+    {
+        if (hit is null) return;
+        Nav.NavigateTo(hit.Url);
+    }
+
+    private string SearchHitIcon(SportRental.Admin.Services.Search.SearchHitType type) => type switch
+    {
+        SportRental.Admin.Services.Search.SearchHitType.Customer => Icons.Material.Filled.Person,
+        SportRental.Admin.Services.Search.SearchHitType.Product => Icons.Material.Filled.Inventory2,
+        SportRental.Admin.Services.Search.SearchHitType.Rental => Icons.Material.Filled.Assignment,
+        _ => Icons.Material.Filled.Search
+    };
+
+    private string SearchHitLabel(SportRental.Admin.Services.Search.SearchHitType type) => type switch
+    {
+        SportRental.Admin.Services.Search.SearchHitType.Customer => "Klient",
+        SportRental.Admin.Services.Search.SearchHitType.Product => "Produkt",
+        SportRental.Admin.Services.Search.SearchHitType.Rental => "Wynajem",
+        _ => ""
+    };
 }

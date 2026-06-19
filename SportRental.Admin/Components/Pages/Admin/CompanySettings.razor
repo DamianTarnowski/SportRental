@@ -3,6 +3,7 @@
 @attribute [Authorize(Roles = "Owner,SuperAdmin")]
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject SportRental.Admin.Services.Cache.IAppCache AppCache
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
@@ -16,7 +17,7 @@
         @* Nagłówek mobilny *@
         <MudPaper Class="rs-page-banner-sm pa-3 mb-2" Elevation="0">
             <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.h6" Style="font-weight: 700;">⚙️ Ustawienia firmy</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">Ustawienia firmy</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.Save" 
                                Color="Color.Inherit" 
                                OnClick="Save"
@@ -33,10 +34,10 @@
             <MudStack Spacing="2">
                 @* Informacje podstawowe *@
                 <MudExpansionPanels Elevation="2">
-                    <MudExpansionPanel Text="📋 Dane firmy" IsInitiallyExpanded="true" Style="border-radius: 10px;">
+                    <MudExpansionPanel Text="Dane firmy" IsInitiallyExpanded="true" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
                             <MudTextField @bind-Value="tenant.Name" Label="Nazwa firmy" Required="true" Dense="true" Variant="Variant.Outlined" />
-                            <MudTextField @bind-Value="companyInfo.Address" Label="Adres" Lines="2" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Address" Label="Adres" Lines="2" Dense="true" Variant="Variant.Outlined" HelperText="Ulica i numer (np. Rynek Jeżycki 1)" />
                             <MudTextField @bind-Value="companyInfo.PhoneNumber" Label="Telefon" Dense="true" Variant="Variant.Outlined" />
                             <MudTextField @bind-Value="companyInfo.Email" Label="Email" InputType="InputType.Email" Dense="true" Variant="Variant.Outlined" />
                             <MudTextField @bind-Value="companyInfo.NIP" Label="NIP" MaxLength="20" Dense="true" Variant="Variant.Outlined" />
@@ -44,7 +45,7 @@
                         </MudStack>
                     </MudExpansionPanel>
                     
-                    <MudExpansionPanel Text="🎨 Personalizacja" Style="border-radius: 10px;">
+                    <MudExpansionPanel Text="Personalizacja" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
                             <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny" Dense="true" Variant="Variant.Outlined" />
                             <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy" Dense="true" Variant="Variant.Outlined" />
@@ -57,17 +58,17 @@
                         </MudStack>
                     </MudExpansionPanel>
                     
-                    <MudExpansionPanel Text="📧 Szablony Email" Style="border-radius: 10px;">
+                    <MudExpansionPanel Text="Szablony Email" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
                             <MudTextField @bind-Value="companyInfo.EmailThanksText" Label="Email - podziękowanie" Lines="2" Dense="true" Variant="Variant.Outlined" />
                             <MudTextField @bind-Value="companyInfo.EmailReminderText" Label="Email - przypomnienie" Lines="2" Dense="true" Variant="Variant.Outlined" />
                         </MudStack>
                     </MudExpansionPanel>
                     
-                    <MudExpansionPanel Text="📱 Ustawienia SMS" Style="border-radius: 10px;">
+                    <MudExpansionPanel Text="Ustawienia SMS" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
                             <MudAlert Severity="Severity.Success" Dense="true">
-                                ✅ SMSAPI.pl aktywne
+                                SMSAPI.pl aktywne
                             </MudAlert>
                             <MudSwitch T="bool" 
                                        Value="@companyInfo.SmsConfirmationEnabled" 
@@ -96,10 +97,16 @@
                         </MudStack>
                     </MudExpansionPanel>
                     
-                    <MudExpansionPanel Text="📍 Lokalizacja" Style="border-radius: 10px;">
+                    <MudExpansionPanel Text="Lokalizacja" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
-                            <MudTextField @bind-Value="companyInfo.City" Label="Miasto" ReadOnly="true" Dense="true" Variant="Variant.Outlined" />
-                            <MudTextField @bind-Value="companyInfo.Voivodeship" Label="Województwo" ReadOnly="true" Dense="true" Variant="Variant.Outlined" />
+                            @* NXRE QA #6: edytowalne (auto-fill z mapy + manual edit) *@
+                            <MudTextField @bind-Value="companyInfo.City" Label="Miasto" Required="true" Dense="true" Variant="Variant.Outlined" HelperText="Auto-uzupełnione z mapy; możesz poprawić ręcznie." />
+                            <MudSelect T="string" @bind-Value="companyInfo.Voivodeship" Label="Województwo" Required="true" Dense="true" Variant="Variant.Outlined">
+                                @foreach (var v in _voivodeships)
+                                {
+                                    <MudSelectItem Value="@v">@v</MudSelectItem>
+                                }
+                            </MudSelect>
                             <LeafletMap MapId="company-location-map-mobile"
                                         Height="250px"
                                         Latitude="@(companyInfo.Lat ?? 52.0)"
@@ -111,7 +118,7 @@
                         </MudStack>
                     </MudExpansionPanel>
                     
-                    <MudExpansionPanel Text="📝 Dodatkowe" Style="border-radius: 10px;">
+                    <MudExpansionPanel Text="Dodatkowe" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
                             <MudTextField @bind-Value="companyInfo.LegalForm" Label="Forma prawna" Dense="true" Variant="Variant.Outlined" />
                             <MudTextField @bind-Value="companyInfo.OpeningHours" Label="Godziny otwarcia" Dense="true" Variant="Variant.Outlined" />
@@ -156,15 +163,15 @@ else
             <MudGrid Spacing="3">
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
-                        <MudText Typo="Typo.h6" Class="mb-3">📋 Informacje podstawowe</MudText>
+                        <MudText Typo="Typo.h6" Class="mb-3">Informacje podstawowe</MudText>
                         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
                             <MudText Typo="Typo.body2">
-                                📄 Te dane będą automatycznie uwzględniane w umowach PDF wysyłanych do klientów!
+                                Te dane będą automatycznie uwzględniane w umowach PDF wysyłanych do klientów!
                             </MudText>
                         </MudAlert>
                         <MudStack Spacing="3">
                             <MudTextField @bind-Value="tenant.Name" Label="Nazwa firmy" Required="true" Variant="Variant.Outlined" />
-                            <MudTextField @bind-Value="companyInfo.Address" Label="Adres" Lines="2" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="companyInfo.Address" Label="Adres" Lines="2" Variant="Variant.Outlined" HelperText="Ulica i numer (np. Rynek Jeżycki 1)" />
                             <MudTextField @bind-Value="companyInfo.PhoneNumber" Label="Telefon" Variant="Variant.Outlined" />
                             <MudTextField @bind-Value="companyInfo.Email" Label="Email" InputType="InputType.Email" Variant="Variant.Outlined" />
                             <MudTextField @bind-Value="companyInfo.NIP" Label="NIP" HelperText="10 cyfr" MaxLength="20" Variant="Variant.Outlined" />
@@ -178,7 +185,7 @@ else
                 
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
-                        <MudText Typo="Typo.h6" Class="mb-3">🎨 Personalizacja</MudText>
+                        <MudText Typo="Typo.h6" Class="mb-3">Personalizacja</MudText>
                         <MudStack Spacing="3">
                             <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny (#RRGGBB)" Variant="Variant.Outlined" />
                             <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy (#RRGGBB)" Variant="Variant.Outlined" />
@@ -197,7 +204,7 @@ else
                 
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
-                        <MudText Typo="Typo.h6" Class="mb-3">📧 Szablony Email</MudText>
+                        <MudText Typo="Typo.h6" Class="mb-3">Szablony Email</MudText>
                         <MudStack Spacing="3">
                             <MudTextField @bind-Value="companyInfo.EmailThanksText" 
                                           Label="Email - podziękowanie" 
@@ -222,10 +229,10 @@ else
                 
                 <MudItem xs="12" md="6">
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
-                        <MudText Typo="Typo.h6" Class="mb-3">📱 Ustawienia SMS</MudText>
+                        <MudText Typo="Typo.h6" Class="mb-3">Ustawienia SMS</MudText>
                         <MudAlert Severity="Severity.Success" Dense="true" Class="mb-3">
                             <MudText Typo="Typo.body2">
-                                ✅ Integracja z SMSAPI.pl jest aktywna. SMS-y będą wysyłane do klientów.
+                                Integracja z SMSAPI.pl jest aktywna. SMS-y będą wysyłane do klientów.
                             </MudText>
                         </MudAlert>
                         <MudStack Spacing="3">
@@ -321,7 +328,7 @@ else
                 
                 <MudItem xs="12">
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
-                        <MudText Typo="Typo.h6" Class="mb-3">📍 Lokalizacja wypożyczalni</MudText>
+                        <MudText Typo="Typo.h6" Class="mb-3">Lokalizacja wypożyczalni</MudText>
                         <MudAlert Severity="Severity.Info" Dense="true" Class="mb-3">
                             <MudText Typo="Typo.body2">
                                 Kliknij na mapie lub wyszukaj adres, aby ustawić lokalizację wypożyczalni. 
@@ -331,20 +338,28 @@ else
                         <MudStack Spacing="3">
                             <MudGrid Spacing="2">
                                 <MudItem xs="12" md="6">
-                                    <MudTextField @bind-Value="companyInfo.City" 
-                                                  Label="Miasto" 
-                                                  ReadOnly="true"
+                                    @* NXRE QA #6: edytowalne (auto-fill z mapy + manual edit) *@
+                                    <MudTextField @bind-Value="companyInfo.City"
+                                                  Label="Miasto"
+                                                  Required="true"
                                                   Variant="Variant.Outlined"
                                                   Adornment="Adornment.Start"
-                                                  AdornmentIcon="@Icons.Material.Filled.LocationCity" />
+                                                  AdornmentIcon="@Icons.Material.Filled.LocationCity"
+                                                  HelperText="Auto-uzupełnione z mapy; możesz poprawić ręcznie." />
                                 </MudItem>
                                 <MudItem xs="12" md="6">
-                                    <MudTextField @bind-Value="companyInfo.Voivodeship" 
-                                                  Label="Województwo" 
-                                                  ReadOnly="true"
-                                                  Variant="Variant.Outlined"
-                                                  Adornment="Adornment.Start"
-                                                  AdornmentIcon="@Icons.Material.Filled.Map" />
+                                    @* NXRE QA #6: dropdown z gotowymi województwami *@
+                                    <MudSelect T="string" @bind-Value="companyInfo.Voivodeship"
+                                               Label="Województwo"
+                                               Required="true"
+                                               Variant="Variant.Outlined"
+                                               Adornment="Adornment.Start"
+                                               AdornmentIcon="@Icons.Material.Filled.Map">
+                                        @foreach (var v in _voivodeships)
+                                        {
+                                            <MudSelectItem Value="@v">@v</MudSelectItem>
+                                        }
+                                    </MudSelect>
                                 </MudItem>
                             </MudGrid>
                             <MudStack Row="true" Spacing="2" Class="mb-2">
@@ -418,6 +433,15 @@ else
     private CompanyInfoDto companyInfo = new();
     private IBrowserFile? selectedLogoFile;
     private bool isSaving = false;
+
+    // NXRE QA #6: lista 16 województw (dropdown zamiast ręcznego wpisywania)
+    private static readonly string[] _voivodeships = new[]
+    {
+        "dolnośląskie", "kujawsko-pomorskie", "lubelskie", "lubuskie",
+        "łódzkie", "małopolskie", "mazowieckie", "opolskie",
+        "podkarpackie", "podlaskie", "pomorskie", "śląskie",
+        "świętokrzyskie", "warmińsko-mazurskie", "wielkopolskie", "zachodniopomorskie"
+    };
     
     private Guid _tenantId = Guid.Empty;
 
@@ -542,7 +566,22 @@ else
     private async Task Save()
     {
         if (tenant == null) return;
-        
+
+        // NXRE QA #7: blokada zapisu bez Miasto/Województwo
+        if (companyInfo != null)
+        {
+            if (string.IsNullOrWhiteSpace(companyInfo.City))
+            {
+                Snackbar.Add("Uzupełnij pole Miasto — wybierz lokalizację na mapie lub wpisz ręcznie.", Severity.Warning);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(companyInfo.Voivodeship))
+            {
+                Snackbar.Add("Wybierz województwo z listy.", Severity.Warning);
+                return;
+            }
+        }
+
         isSaving = true;
         try
         {
@@ -651,7 +690,10 @@ else
             }
             
             await Db.SaveChangesAsync();
-            
+
+            // Cache invalidation — tenant.Name + CompanyInfo mogły się zmienić, kolejne strony muszą odświeżyć.
+            AppCache.InvalidateTenant(_tenantId);
+
             Snackbar.Add("Ustawienia zostały zapisane", Severity.Success);
         }
         catch (Exception ex)

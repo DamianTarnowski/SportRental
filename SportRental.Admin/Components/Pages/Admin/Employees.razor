@@ -19,7 +19,7 @@
     <MudContainer MaxWidth="MaxWidth.Large" Class="mt-2 px-2">
         <MudPaper Class="rs-page-banner-sm pa-3 mb-2" Elevation="0">
             <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.h6" Style="font-weight: 700;">👔 Pracownicy</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">Pracownicy</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" 
                                Color="Color.Inherit" 
                                OnClick="OpenInviteDialog" />
@@ -36,7 +36,7 @@
         {
             @if (_pendingInvitations.Any())
             {
-                <MudText Typo="Typo.subtitle2" Class="mb-1 mt-2">📧 Oczekujące zaproszenia</MudText>
+                <MudText Typo="Typo.subtitle2" Class="mb-1 mt-2">Oczekujące zaproszenia</MudText>
                 <MudStack Spacing="1" Class="mb-2">
                     @foreach (var inv in _pendingInvitations)
                     {
@@ -59,7 +59,7 @@
                 </MudStack>
             }
 
-            <MudText Typo="Typo.subtitle2" Class="mb-1">👥 Aktywni pracownicy (@_employees.Count)</MudText>
+            <MudText Typo="Typo.subtitle2" Class="mb-1">Aktywni pracownicy (@_employees.Count)</MudText>
             <MudStack Spacing="1">
                 @foreach (var emp in _employees)
                 {
@@ -239,7 +239,7 @@ else
                        Label="Rola" 
                        Variant="Variant.Outlined">
                 <MudSelectItem Value="EmployeeRole.Pracownik">👤 Pracownik</MudSelectItem>
-                <MudSelectItem Value="EmployeeRole.Kierownik">👔 Kierownik</MudSelectItem>
+                <MudSelectItem Value="EmployeeRole.Kierownik">Kierownik</MudSelectItem>
                 <MudSelectItem Value="EmployeeRole.Manager">⭐ Manager</MudSelectItem>
             </MudSelect>
             <MudTextField @bind-Value="_inviteModel.Notes" 
@@ -254,7 +254,7 @@ else
                    Variant="Variant.Filled" 
                    OnClick="SendInvitation"
                    Disabled="@(string.IsNullOrWhiteSpace(_inviteModel.Email))">
-            📧 Wyślij zaproszenie
+            Wyślij zaproszenie
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -291,7 +291,7 @@ else
                        Label="Rola" 
                        Variant="Variant.Outlined">
                 <MudSelectItem Value="EmployeeRole.Pracownik">👤 Pracownik</MudSelectItem>
-                <MudSelectItem Value="EmployeeRole.Kierownik">👔 Kierownik</MudSelectItem>
+                <MudSelectItem Value="EmployeeRole.Kierownik">Kierownik</MudSelectItem>
                 <MudSelectItem Value="EmployeeRole.Manager">⭐ Manager</MudSelectItem>
             </MudSelect>
             <MudTextField @bind-Value="_editModel.Comment" 
@@ -306,7 +306,7 @@ else
                    Variant="Variant.Filled" 
                    OnClick="SaveEmployee"
                    Disabled="@(string.IsNullOrWhiteSpace(_editModel.FullName))">
-            💾 Zapisz
+            Zapisz
         </MudButton>
     </DialogActions>
 </MudDialog>

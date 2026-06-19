@@ -14,7 +14,7 @@
         @* Nagłówek mobilny *@
         <MudPaper Class="rs-page-banner-sm pa-3 mb-2" Elevation="0">
             <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.h6" Style="font-weight: 700;">👥 Klienci</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">Klienci</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" 
                                Color="Color.Inherit" 
                                OnClick="OpenCreateDialog" />
@@ -53,16 +53,25 @@
                                         @customer.FullName
                                     </MudText>
                                     <SportRental.Admin.Components.Shared.CustomerTrustBadge Customer="customer" ShowMetrics="false" />
+                                    @if (!string.IsNullOrWhiteSpace(customer.Tags))
+                                    {
+                                        <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mt-1">
+                                            @foreach (var tag in customer.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(3))
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@TagColor(tag)">@tag</MudChip>
+                                            }
+                                        </MudStack>
+                                    }
                                     @if (!string.IsNullOrEmpty(customer.PhoneNumber))
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Success">
-                                            📞 @customer.PhoneNumber
+                                            @customer.PhoneNumber
                                         </MudText>
                                     }
                                     else if (!string.IsNullOrEmpty(customer.Email))
                                     {
                                         <MudText Typo="Typo.caption" Color="Color.Info" Style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                                            ✉️ @customer.Email
+                                            @customer.Email
                                         </MudText>
                                     }
                                 </div>
@@ -212,6 +221,16 @@ else
                                             </div>
                                         }
                                     </MudStack>
+
+                                    @if (!string.IsNullOrWhiteSpace(customer.Tags))
+                                    {
+                                        <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                                            @foreach (var tag in customer.Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                                            {
+                                                <MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@TagColor(tag)">@tag</MudChip>
+                                            }
+                                        </MudStack>
+                                    }
 
                                     @if (!string.IsNullOrWhiteSpace(customer.Notes))
                                     {
@@ -402,7 +421,9 @@ else
         {
             ["CustomerName"] = customer.FullName,
             ["CustomerId"] = customer.Id,
-            ["Rentals"] = rentals
+            ["Rentals"] = rentals,
+            ["CustomerTags"] = customer.Tags,
+            ["CustomerNotes"] = customer.Notes
         };
 
         var options = new DialogOptions
@@ -501,4 +522,13 @@ else
         }
         return trimmed;
     }
+
+    private static Color TagColor(string tag) => tag.Trim().ToLowerInvariant() switch
+    {
+        "vip" => Color.Warning,
+        "firma" => Color.Info,
+        "stały klient" => Color.Success,
+        "rower" or "kajak" or "narty" or "sup" => Color.Primary,
+        _ => Color.Default
+    };
 }

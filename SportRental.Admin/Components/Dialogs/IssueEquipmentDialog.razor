@@ -2,6 +2,7 @@
 @using SportRental.Infrastructure.Data
 @using SportRental.Infrastructure.Domain
 @using Microsoft.EntityFrameworkCore
+@using SportRental.Admin.Services.Guards
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject ISnackbar Snackbar
@@ -10,7 +11,7 @@
     <TitleContent>
         <div class="d-flex align-center gap-2">
             <MudIcon Icon="@Icons.Material.Filled.Output" Color="Color.Success" />
-            <MudText Typo="Typo.h6">📦 Wydanie sprzętu</MudText>
+            <MudText Typo="Typo.h6">Wydanie sprzętu</MudText>
         </div>
     </TitleContent>
     <DialogContent>
@@ -89,13 +90,13 @@
     private async Task Submit()
     {
         if (Rental == null || !_confirmChecklist) return;
-        
+
         _isProcessing = true;
-        
+
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
-            
+
             var rental = await db.Rentals.FirstOrDefaultAsync(r => r.Id == Rental.Id);
             if (rental == null)
             {
@@ -103,13 +104,33 @@
                 MudDialog?.Cancel();
                 return;
             }
-            
+
+            // Blokady (Maciej): nie wydasz sprzętu bez umowy i opłaty.
+            var block = RentalGuards.GetIssueBlockReason(rental);
+            if (block is not null)
+            {
+                Snackbar.Add($"Nie można wydać sprzętu: {block}", Severity.Warning);
+                MudDialog?.Cancel();
+                return;
+            }
+
             rental.IssuedAtUtc = DateTime.UtcNow;
             rental.IssueNotes = _issueNotes;
             rental.Status = RentalStatus.Active;
-            
+
+            // NXRE QA #17: aktualizuj HowManyRented na produktach (stock decrement).
+            // Wszystkie 3 moduły (Produkty / Wynajmy / Wydania) używają AvailableQty-HowManyRented
+            // jako "wolne", więc to jedyne źródło prawdy.
+            var items = await db.RentalItems.Where(i => i.RentalId == rental.Id).ToListAsync();
+            foreach (var grp in items.GroupBy(i => i.ProductId))
+            {
+                var qty = grp.Sum(i => i.Quantity);
+                await db.Products.Where(p => p.Id == grp.Key)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.HowManyRented, p => p.HowManyRented + qty));
+            }
+
             await db.SaveChangesAsync();
-            
+
             MudDialog?.Close(DialogResult.Ok(true));
         }
         catch (Exception ex)

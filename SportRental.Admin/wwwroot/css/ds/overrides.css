@@ -32,6 +32,69 @@
 .rs-drawer,
 aside.mud-drawer {
     background: var(--navy-900, #1B2350) !important;
+    /* NXRE QA #9: drawer ZAWSZE fixed na desktop, żeby nie znikał przy scroll długiej strony. */
+    position: fixed !important;
+    top: 60px !important; /* poniżej AppBar (60px height) */
+    bottom: 0 !important;
+    height: calc(100vh - 60px) !important;
+}
+
+/* Form focus state — kluczowe: NIE zmieniaj border-width na focus (fieldset legend
+   z notchem dla labela ma fixed size i nie przelicza się na zmianie border-width,
+   przez co linia coral lądowała poza ramą). Trzymamy STAŁĄ szerokość 1px. */
+.mud-input.mud-input-outlined .mud-input-outlined-border,
+.mud-select .mud-input-outlined-border,
+fieldset.mud-input-outlined-border {
+    border-color: rgba(27, 35, 80, 0.2) !important; /* navy 20% */
+    border-width: 1px !important;
+    transition: border-color 180ms;
+}
+.mud-input.mud-input-outlined:hover .mud-input-outlined-border {
+    border-color: rgba(27, 35, 80, 0.45) !important;
+}
+.mud-input.mud-input-outlined.mud-focused .mud-input-outlined-border,
+.mud-input.mud-input-outlined.mud-input-focused .mud-input-outlined-border {
+    border-color: var(--navy-700, #2F3C7E) !important;
+    border-width: 1px !important; /* STAŁA szerokość — focus tylko kolorem */
+}
+[data-theme="dark"] .mud-input.mud-input-outlined .mud-input-outlined-border,
+.mud-theme-dark .mud-input.mud-input-outlined .mud-input-outlined-border {
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+[data-theme="dark"] .mud-input.mud-input-outlined.mud-focused .mud-input-outlined-border,
+.mud-theme-dark .mud-input.mud-input-outlined.mud-focused .mud-input-outlined-border {
+    border-color: rgba(255, 255, 255, 0.55) !important;
+}
+/* Floating label focused — navy dla form fields */
+.mud-input-label.mud-input-label-animated.mud-input-label-outlined.mud-focused,
+.mud-input-label.mud-input-label-outlined.mud-input-label-focused {
+    color: var(--navy-700, #2F3C7E) !important;
+}
+[data-theme="dark"] .mud-input-label.mud-input-label-outlined.mud-focused,
+.mud-theme-dark .mud-input-label.mud-input-label-outlined.mud-focused {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+/* Dropdown items */
+.mud-list-item-clickable:hover {
+    background-color: rgba(27, 35, 80, 0.05) !important;
+}
+.mud-list-item-clickable.mud-selected-item,
+.mud-list-item-clickable.mud-list-item-selected {
+    background-color: rgba(249, 97, 103, 0.1) !important;
+    color: var(--coral-700, #BC3138) !important;
+}
+/* Wyłącz browser default focus outline na inputach — używamy tylko border MudBlazor */
+.mud-input.mud-input-outlined input:focus,
+.mud-input.mud-input-outlined input:focus-visible,
+.mud-input.mud-input-outlined .mud-input-slot:focus,
+.mud-input.mud-input-outlined .mud-input-slot:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+@media (max-width: 959px) {
+    /* Mobile: Temporary drawer powinien się chować — pozwól MudBlazor zarządzać. */
+    .rs-drawer,
+    aside.mud-drawer { position: fixed !important; top: 0 !important; height: 100vh !important; }
 }
 .rs-drawer .mud-drawer-content,
 aside.mud-drawer .mud-drawer-content {
@@ -93,9 +156,9 @@ aside.mud-drawer .mud-nav-link.mud-nav-link-active .mud-icon-root {
    ============================================ */
 .rs-page-banner,
 .rs-page-banner-sm {
-    background: var(--surface-brand-tint, #FEF2F2) !important;
-    color: var(--coral-900, #671A1E) !important;
-    border: 1px solid var(--coral-200, #FBC8CA) !important;
+    background: var(--navy-900, #1B2350) !important;
+    color: #E8EBF5 !important;
+    border: 1px solid var(--navy-800, #242E61) !important;
     box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
     border-radius: 16px !important;
 }
@@ -104,18 +167,27 @@ aside.mud-drawer .mud-nav-link.mud-nav-link-active .mud-icon-root {
 .rs-page-banner .mud-typography,
 .rs-page-banner-sm .mud-typography,
 .rs-page-banner h1, .rs-page-banner h2, .rs-page-banner h3, .rs-page-banner h4 {
-    color: var(--coral-900, #671A1E) !important;
+    color: #FFFFFF !important;
     text-shadow: none !important;
+}
+.rs-page-banner .mud-typography-subtitle1,
+.rs-page-banner .mud-typography-subtitle2,
+.rs-page-banner .mud-typography-body1,
+.rs-page-banner .mud-typography-body2,
+.rs-page-banner-sm .mud-typography-subtitle1,
+.rs-page-banner-sm .mud-typography-body2 {
+    color: rgba(232, 235, 245, 0.75) !important;
 }
 .rs-page-banner .mud-icon-root,
 .rs-page-banner-sm .mud-icon-root {
-    color: var(--coral-700, #BC3138) !important;
+    color: var(--coral-500, #F96167) !important;
 }
 .rs-page-banner .mud-button {
-    background: rgba(255, 255, 255, 0.7) !important;
-    color: var(--coral-900, #671A1E) !important;
-    border: 1px solid var(--coral-300, #FAA3A7) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
+.rs-page-banner .mud-button:hover { background: rgba(255, 255, 255, 0.14) !important; }
 
 [data-theme="dark"] .rs-page-banner,
 [data-theme="dark"] .rs-page-banner-sm,

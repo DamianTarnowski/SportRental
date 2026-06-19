@@ -15,30 +15,90 @@
 @inject UserManager<ApplicationUser> UserManager
 
 <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
-    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-        <MudText Typo="Typo.h4">
-            <MudIcon Icon="@Icons.Material.Filled.RateReview" Class="mr-2" />
-            Opinie klientów
-        </MudText>
-        <MudChip T="string" Color="Color.Primary">@_reviews.Count</MudChip>
-    </MudStack>
-
-    <MudPaper Class="pa-3 mb-3" Elevation="1">
-        <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
-            <MudSwitch T="bool" @bind-Value="_showHidden" Color="Color.Warning" Label="Pokaż ukryte" />
-            <MudTextField @bind-Value="_search" Placeholder="Szukaj (imię, komentarz)..."
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 240px;" />
+    @* Page banner — Maciej DS v2 navy flat *@
+    <MudPaper Class="rs-page-banner pa-6 mb-4" Elevation="0">
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" />
+            <div style="flex: 1;">
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">Opinie klientów</MudText>
+                <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">
+                    @if (_reviews.Count == 0)
+                    {
+                        <text>Średnia ocena pojawi się po pierwszej recenzji</text>
+                    }
+                    else
+                    {
+                        <text>@_reviews.Count @(_reviews.Count == 1 ? "opinia" : "opinii") · średnia @_reviews.Average(r => r.AverageScore).ToString("0.0")/10</text>
+                    }
+                </MudText>
+            </div>
         </MudStack>
     </MudPaper>
 
+    @* Average rating header (Maciej) — tylko gdy są opinie *@
+    @if (_reviews.Count > 0)
+    {
+        <MudGrid Class="mb-3" Spacing="2">
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 text-center" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Średnia ocena</MudText>
+                    <MudText Typo="Typo.h3" Style="font-weight: 700; color: var(--mud-palette-success);">@_reviews.Average(r => r.AverageScore).ToString("0.0")/10</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">@_reviews.Count opinii</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 text-center" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">5★ (8-10)</MudText>
+                    <MudText Typo="Typo.h3" Style="font-weight: 700;">@_reviews.Count(r => r.AverageScore >= 8)</MudText>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" sm="4">
+                <MudPaper Elevation="0" Outlined="true" Class="pa-3 text-center" Style="border-radius: 12px;">
+                    <MudText Typo="Typo.caption" Color="Color.Secondary">Odpowiedzi właściciela</MudText>
+                    <MudText Typo="Typo.h3" Style="font-weight: 700;">@_reviews.Count(r => !string.IsNullOrEmpty(r.OwnerReply))/@_reviews.Count</MudText>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+
+        <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true" Style="border-radius: 12px;">
+            <MudStack Row="true" Spacing="3" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                <MudSwitch T="bool" @bind-Value="_showHidden" Color="Color.Warning" Label="Pokaż ukryte" />
+                <MudTextField @bind-Value="_search" Placeholder="Szukaj (imię, komentarz)..."
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Style="min-width: 240px;" />
+            </MudStack>
+        </MudPaper>
+    }
+
     @if (_isLoading)
     {
-        <MudPaper Class="pa-6 text-center"><MudProgressCircular Indeterminate="true" /></MudPaper>
+        <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" Style="border-radius: 16px;">
+            <MudProgressCircular Indeterminate="true" />
+        </MudPaper>
+    }
+    else if (_reviews.Count == 0)
+    {
+        @* Empty state — onboarding hint (Maciej: „Po zwrocie automat prosi o opinię") *@
+        <MudPaper Class="pa-6 text-center" Elevation="0" Outlined="true" Style="border-radius: 16px;">
+            <MudIcon Icon="@Icons.Material.Filled.RateReview" Size="Size.Large" Color="Color.Default" Class="mb-3" Style="opacity: 0.4;" />
+            <MudText Typo="Typo.h6" Style="font-weight: 600;">Jeszcze żadnych opinii</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                System automatycznie poprosi klienta o opinię po zakończonym wynajmie
+                (email + SMS w odstępach +24h, +3d, +7d od zwrotu).
+            </MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                Tutaj zobaczysz wszystkie opinie i będziesz mógł na nie odpowiedzieć.
+            </MudText>
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Settings"
+                       Href="/admin/company-settings" Class="mt-3">
+                Sprawdź ustawienia powiadomień
+            </MudButton>
+        </MudPaper>
     }
     else if (Filtered.Count == 0)
     {
-        <MudAlert Severity="Severity.Info">Brak opinii.</MudAlert>
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">Brak opinii pasujących do filtra.</MudAlert>
     }
     else
     {
@@ -79,6 +139,33 @@
                     @if (!string.IsNullOrWhiteSpace(r.Comment))
                     {
                         <MudText Typo="Typo.body2">@r.Comment</MudText>
+                    }
+
+                    @* Odpowiedź właściciela (Maciej) *@
+                    @if (!string.IsNullOrWhiteSpace(r.OwnerReply))
+                    {
+                        <MudPaper Class="pa-2 mt-2" Elevation="0" Style="border-radius: 8px; background: var(--surface-brand-tint, #FEF2F2); border-left: 3px solid var(--coral-500, #F96167);">
+                            <MudText Typo="Typo.caption" Style="font-weight: 600;">
+                                Odpowiedź właściciela · @r.OwnerReplyAtUtc?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            </MudText>
+                            <MudText Typo="Typo.body2">@r.OwnerReply</MudText>
+                        </MudPaper>
+                    }
+                    else
+                    {
+                        <MudExpansionPanels Elevation="0" Class="mt-2">
+                            <MudExpansionPanel Text="Dodaj odpowiedź właściciela">
+                                <MudTextField @bind-Value="r.ReplyDraft"
+                                              Label="Twoja odpowiedź"
+                                              Lines="2"
+                                              Variant="Variant.Outlined" />
+                                <MudButton Class="mt-2" Variant="Variant.Filled" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.Reply"
+                                           OnClick="@(() => SaveReplyAsync(r))">
+                                    Opublikuj odpowiedź
+                                </MudButton>
+                            </MudExpansionPanel>
+                        </MudExpansionPanels>
                     }
                 </MudPaper>
             }
@@ -131,6 +218,8 @@
                 PriceScore = r.PriceScore,
                 ServiceScore = r.ServiceScore,
                 Comment = r.Comment,
+                OwnerReply = r.OwnerReply,
+                OwnerReplyAtUtc = r.OwnerReplyAtUtc,
                 IsHidden = r.IsHidden,
                 CreatedAtUtc = r.CreatedAtUtc
             })
@@ -205,7 +294,36 @@
         public int ServiceScore { get; set; }
         public double AverageScore => (QualityScore + PriceScore + ServiceScore) / 3.0;
         public string? Comment { get; set; }
+        public string? OwnerReply { get; set; }
+        public DateTime? OwnerReplyAtUtc { get; set; }
+        public string? ReplyDraft { get; set; }
         public bool IsHidden { get; set; }
         public DateTime CreatedAtUtc { get; set; }
+    }
+
+    private async Task SaveReplyAsync(ReviewRow row)
+    {
+        if (string.IsNullOrWhiteSpace(row.ReplyDraft))
+        {
+            Snackbar.Add("Wpisz treść odpowiedzi.", Severity.Warning);
+            return;
+        }
+        var tenantId = _tenantId ?? Guid.Empty;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        var entity = await db.RentalReviews.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(r => r.Id == row.Id && r.TenantId == tenantId);
+        if (entity == null)
+        {
+            Snackbar.Add("Opinia nie znaleziona.", Severity.Warning);
+            return;
+        }
+        entity.OwnerReply = row.ReplyDraft.Trim();
+        entity.OwnerReplyAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+
+        row.OwnerReply = entity.OwnerReply;
+        row.OwnerReplyAtUtc = entity.OwnerReplyAtUtc;
+        row.ReplyDraft = null;
+        Snackbar.Add("Odpowiedź dodana.", Severity.Success);
     }
 }

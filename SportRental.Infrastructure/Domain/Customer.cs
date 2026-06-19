@@ -27,6 +27,11 @@ namespace SportRental.Infrastructure.Domain
         [MaxLength(1024)]
         public string? Notes { get; set; }
 
+        // Tagi (Maciej): comma-separated VIP, firma, rowery, narty...
+        // Trzymane jako string żeby uniknąć dodatkowej tabeli — wystarczające dla typowej skali.
+        [MaxLength(500)]
+        public string? Tags { get; set; }
+
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 
         // Rezygnacja z e-maili z prośbą o opinię. Link rezygnacji w mailu.

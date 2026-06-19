@@ -14,7 +14,7 @@
         @* Nagłówek mobilny *@
         <MudPaper Class="rs-page-banner-sm pa-3 mb-2" Elevation="0">
             <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.h6" Style="font-weight: 700;">📅 Kalendarz</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">Kalendarz</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
                                Color="Color.Inherit" 
                                OnClick="Reload" />
@@ -108,44 +108,44 @@ else
             <MudStack Row="true" Class="mud-align-center" Spacing="3">
                 <MudIcon Icon="@Icons.Material.Filled.CalendarMonth" Size="Size.Large" />
                 <div>
-                    <MudText Typo="Typo.h4" Style="font-weight: 700;">📅 Kalendarz Rezerwacji</MudText>
+                    <MudText Typo="Typo.h4" Style="font-weight: 700;">Kalendarz Rezerwacji</MudText>
                     <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj terminami i rezerwacjami klientów</MudText>
                 </div>
             </MudStack>
         </MudPaper>
 
-        <!-- Modern Controls Panel -->
-        <MudCard Elevation="2" Class="mb-4" Style="border-radius: 16px;">
-            <MudCardContent Class="pa-4">
-                <MudGrid Spacing="3" Class="align-center">
-                    <MudItem xs="12" md="6">
-                        <MudStack Row="true" Spacing="2" Class="mud-align-center">
-                            <MudIcon Icon="@Icons.Material.Filled.DateRange" Color="Color.Primary" />
-                            <MudDateRangePicker @bind-DateRange="range" 
-                                              Label="Wybierz zakres dat" 
-                                              Variant="Variant.Outlined"
-                                              Class="flex-grow-1" />
-                        </MudStack>
-                    </MudItem>
-                    <MudItem xs="12" md="6" Class="d-flex justify-end gap-2">
-                        <MudButton Variant="Variant.Filled" 
-                                 Color="Color.Primary" 
-                                 StartIcon="@Icons.Material.Filled.Refresh"
-                                 OnClick="Reload"
-                                 Class="px-4">
-                            Odśwież
-                        </MudButton>
-                        <MudButton Variant="Variant.Outlined" 
-                                 Color="Color.Secondary"
-                                 StartIcon="@Icons.Material.Filled.Today"
-                                 OnClick="SetToday"
-                                 Class="px-4">
-                            Dzisiaj
-                        </MudButton>
-                    </MudItem>
-                </MudGrid>
-            </MudCardContent>
-        </MudCard>
+        <!-- Controls Panel — flat outlined + Day/Week/Month toggle (Maciej) -->
+        <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-4" Style="border-radius: 16px;">
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                @* 3 widoki: dzień / tydzień / miesiąc *@
+                <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false">
+                    <MudButton OnClick="@(() => SetView(ViewMode.Day))"
+                               Color="@(_view == ViewMode.Day ? Color.Primary : Color.Default)"
+                               Variant="@(_view == ViewMode.Day ? Variant.Filled : Variant.Outlined)"
+                               StartIcon="@Icons.Material.Filled.Today">
+                        Dzień
+                    </MudButton>
+                    <MudButton OnClick="@(() => SetView(ViewMode.Week))"
+                               Color="@(_view == ViewMode.Week ? Color.Primary : Color.Default)"
+                               Variant="@(_view == ViewMode.Week ? Variant.Filled : Variant.Outlined)"
+                               StartIcon="@Icons.Material.Filled.ViewWeek">
+                        Tydzień
+                    </MudButton>
+                    <MudButton OnClick="@(() => SetView(ViewMode.Month))"
+                               Color="@(_view == ViewMode.Month ? Color.Primary : Color.Default)"
+                               Variant="@(_view == ViewMode.Month ? Variant.Filled : Variant.Outlined)"
+                               StartIcon="@Icons.Material.Filled.CalendarMonth">
+                        Miesiąc
+                    </MudButton>
+                </MudButtonGroup>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" OnClick="@(() => ShiftRange(-1))" />
+                <MudButton Variant="Variant.Text" OnClick="SetToday">Dzisiaj</MudButton>
+                <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" OnClick="@(() => ShiftRange(1))" />
+                <MudSpacer />
+                <MudDateRangePicker @bind-DateRange="range" Label="Zakres" Variant="Variant.Outlined" Style="max-width: 320px;" />
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Color="Color.Primary" OnClick="Reload" />
+            </MudStack>
+        </MudPaper>
 
         <!-- Statistics Cards -->
         @if (grouped.Any())
@@ -191,9 +191,45 @@ else
         }
 
         <!-- Calendar Grid -->
-        @if (!grouped.Any())
+        @if (_view == ViewMode.Month && range.Start.HasValue)
         {
-            <MudCard Elevation="2" Class="text-center py-8" Style="border-radius: 16px;">
+            @* Month view — 7×N grid z heat-map intensity per dzień (Maciej: „widać obłożenie dnia") *@
+            var monthStart = new DateTime(range.Start.Value.Year, range.Start.Value.Month, 1);
+            var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+            var firstDow = ((int)monthStart.DayOfWeek + 6) % 7; // Pon = 0
+            var maxCount = grouped.Values.DefaultIfEmpty(new List<ItemVm>()).Max(v => v?.Count ?? 0);
+            <MudPaper Elevation="0" Outlined="true" Class="pa-3" Style="border-radius: 16px;">
+                <div class="rs-month-grid">
+                    @foreach (var dow in new[] { "Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd" })
+                    {
+                        <div class="rs-month-dow">@dow</div>
+                    }
+                    @for (int i = 0; i < firstDow; i++)
+                    {
+                        <div class="rs-month-cell rs-month-cell-empty"></div>
+                    }
+                    @for (var d = monthStart; d <= monthEnd; d = d.AddDays(1))
+                    {
+                        var dayItems = grouped.TryGetValue(d.Date, out var lst) ? lst : new List<ItemVm>();
+                        var intensity = maxCount > 0 ? (double)dayItems.Count / maxCount : 0;
+                        var bgOpacity = (intensity * 0.65).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+                        var isToday = d.Date == DateTime.Today;
+                        <div class="rs-month-cell @(isToday ? "rs-month-cell-today" : "")"
+                             style="@(dayItems.Any() ? $"background: rgba(249,97,103,{bgOpacity});" : "")"
+                             @onclick="@(() => OnDayClick(d))">
+                            <div class="rs-month-cell-num">@d.Day</div>
+                            @if (dayItems.Any())
+                            {
+                                <div class="rs-month-cell-count">@dayItems.Count rez.</div>
+                            }
+                        </div>
+                    }
+                </div>
+            </MudPaper>
+        }
+        else if (!grouped.Any())
+        {
+            <MudCard Elevation="0" Outlined="true" Class="text-center py-8" Style="border-radius: 16px;">
                 <MudCardContent>
                     <MudIcon Icon="@Icons.Material.Filled.EventBusy" Size="Size.Large" Color="Color.Default" />
                     <MudText Typo="Typo.h6" Class="mt-4" Color="Color.Default">Brak rezerwacji w wybranym okresie</MudText>
@@ -269,6 +305,83 @@ else
 
 <MudBreakpointProvider OnBreakpointChanged="OnBreakpointChanged" />
 
+<style>
+    /* Month view grid — heat-map per dzień (Maciej) */
+    .rs-month-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+    }
+    .rs-month-dow {
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #5B6B82;
+        padding: 0.5rem 0;
+        text-transform: uppercase;
+    }
+    .rs-month-cell {
+        position: relative;
+        min-height: 84px;
+        padding: 0.4rem;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: transform 180ms, border-color 180ms;
+    }
+    .rs-month-cell:hover {
+        transform: translateY(-1px);
+        border-color: #F96167;
+    }
+    .rs-month-cell-empty {
+        background: transparent;
+        border: 1px dashed rgba(0,0,0,0.05);
+        cursor: default;
+    }
+    .rs-month-cell-num {
+        font-weight: 700;
+        font-size: 1rem;
+        color: #1B2350;
+        font-family: 'Outfit', sans-serif;
+    }
+    .rs-month-cell-count {
+        position: absolute;
+        bottom: 0.4rem;
+        left: 0.4rem;
+        right: 0.4rem;
+        font-size: 0.72rem;
+        color: #1B2350;
+        font-weight: 600;
+        background: rgba(255,255,255,0.85);
+        border-radius: 6px;
+        padding: 1px 4px;
+        text-align: center;
+    }
+    .rs-month-cell-today { border-color: #F96167; border-width: 2px; box-shadow: 0 0 0 3px rgba(249,97,103,0.12); }
+    .rs-month-cell-today .rs-month-cell-num { color: #F96167; }
+    @@media (max-width: 700px) {
+        .rs-month-cell { min-height: 56px; padding: 0.25rem; }
+        .rs-month-cell-num { font-size: 0.85rem; }
+        .rs-month-cell-count { font-size: 0.6rem; padding: 0 2px; }
+    }
+    [data-theme="dark"] .rs-month-cell,
+    .mud-theme-dark .rs-month-cell {
+        background: rgba(255,255,255,0.04);
+        border-color: rgba(255,255,255,0.1);
+    }
+    [data-theme="dark"] .rs-month-cell-num,
+    .mud-theme-dark .rs-month-cell-num,
+    [data-theme="dark"] .rs-month-cell-count,
+    .mud-theme-dark .rs-month-cell-count { color: #E8EBF5; }
+    [data-theme="dark"] .rs-month-cell-count,
+    .mud-theme-dark .rs-month-cell-count {
+        background: rgba(0,0,0,0.35);
+    }
+    [data-theme="dark"] .rs-month-dow,
+    .mud-theme-dark .rs-month-dow { color: rgba(232,235,245,0.65); }
+</style>
+
 @code {
     // ==================== BREAKPOINT ====================
     private bool _isMobile = false;
@@ -282,6 +395,46 @@ else
     // ==================== DATA ====================
     private MudBlazor.DateRange range = new(DateTime.Today, DateTime.Today.AddDays(7));
     private Dictionary<DateTime, List<ItemVm>> grouped = new();
+    private ViewMode _view = ViewMode.Week;
+
+    private enum ViewMode { Day, Week, Month }
+
+    private async Task SetView(ViewMode mode)
+    {
+        _view = mode;
+        var today = DateTime.Today;
+        range = mode switch
+        {
+            ViewMode.Day => new MudBlazor.DateRange(today, today),
+            ViewMode.Week => new MudBlazor.DateRange(today, today.AddDays(6)),
+            ViewMode.Month => new MudBlazor.DateRange(new DateTime(today.Year, today.Month, 1), new DateTime(today.Year, today.Month, 1).AddMonths(1).AddDays(-1)),
+            _ => range
+        };
+        await Load();
+    }
+
+    private async Task ShiftRange(int dir)
+    {
+        if (!range.Start.HasValue || !range.End.HasValue) return;
+        var step = _view switch
+        {
+            ViewMode.Day => 1,
+            ViewMode.Week => 7,
+            ViewMode.Month => 30,
+            _ => 1
+        };
+        range = new MudBlazor.DateRange(
+            range.Start.Value.AddDays(step * dir),
+            range.End.Value.AddDays(step * dir));
+        await Load();
+    }
+
+    private async Task OnDayClick(DateTime day)
+    {
+        _view = ViewMode.Day;
+        range = new MudBlazor.DateRange(day.Date, day.Date);
+        await Load();
+    }
 
     private Guid _cachedTenantId = Guid.Empty;
     

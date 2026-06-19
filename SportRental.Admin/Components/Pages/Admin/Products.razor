@@ -12,6 +12,8 @@
 @inject IDialogService DialogService
 @inject SportRental.Admin.Services.QrCode.IBarcodeGenerator BarcodeGenerator
 @inject IJSRuntime JS
+@inject SportRental.Admin.Services.Ai.IProductAiAssistant ProductAi
+@inject HttpClient Http
 @if (_isMobile)
 {
     @* ==================== MOBILE UI ==================== *@
@@ -19,7 +21,7 @@
         @* Nagłówek mobilny - kompaktowy *@
         <MudPaper Class="rs-page-banner-sm pa-3 mb-2" Elevation="0">
             <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.h6" Style="font-weight: 700;">📦 Produkty</MudText>
+                <MudText Typo="Typo.h6" Style="font-weight: 700;">Produkty</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.Add" 
                                Color="Color.Inherit" 
                                OnClick="CreateNew" />
@@ -89,11 +91,11 @@
                                     </MudText>
                                     <div class="d-flex align-center gap-1">
                                         <MudText Typo="Typo.caption" Color="Color.Success" Style="font-weight: 600;">
-                                            @product.DailyPrice.ToString("0") zł
+                                            @product.DailyPrice.PlnInt()
                                         </MudText>
                                         <MudText Typo="Typo.caption">•</MudText>
                                         <MudText Typo="Typo.caption" Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)">
-                                            @product.AvailableQuantity szt.
+                                            @(Math.Max(0, product.AvailableQuantity - product.HowManyRented))/@product.AvailableQuantity wolne
                                         </MudText>
                                     </div>
                                 </div>
@@ -248,19 +250,19 @@ else
                                         <MudStack Row="true" Class="mud-space-between" Spacing="3">
                                             <MudStack Spacing="0">
                                                 <MudText Typo="Typo.h6" Color="Color.Primary" Style="font-weight: 700;">
-                                                    @product.DailyPrice.ToString("0.00") zł/dzień
+                                                    @product.DailyPrice.Pln()/dzień
                                                 </MudText>
                                                 @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
                                                 {
                                                     <MudText Typo="Typo.body2" Color="Color.Secondary">
-                                                        @product.HourlyPrice.Value.ToString("0.00") zł/godz.
+                                                        @product.HourlyPrice.Value.Pln()/godz.
                                                     </MudText>
                                                 }
                                             </MudStack>
                                             <MudChip T="string" Size="Size.Small" 
                                                      Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)"
                                                      Variant="Variant.Filled">
-                                                @product.AvailableQuantity szt.
+                                                @(Math.Max(0, product.AvailableQuantity - product.HowManyRented))/@product.AvailableQuantity wolne
                                             </MudChip>
                                         </MudStack>
                                         
@@ -339,14 +341,53 @@ else
             }
             else
             {
+                @* Bulk action toolbar (Maciej: operacje masowe usuń/edytuj cenę/toggle) *@
+                @if (_selectedIds.Any())
+                {
+                    <MudPaper Class="pa-2 mb-2" Elevation="0" Style="border-radius: 12px; background: var(--surface-brand-tint, #FEF2F2); border: 1px solid var(--coral-200, #FBC8CA);">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Wrap="Wrap.Wrap">
+                            <MudText Typo="Typo.body2" Style="font-weight: 600;">@_selectedIds.Count zaznaczonych</MudText>
+                            <MudSpacer />
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Primary"
+                                       StartIcon="@Icons.Material.Filled.PriceChange"
+                                       OnClick="OpenBulkPriceDialog">
+                                Zmień cenę
+                            </MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Warning"
+                                       StartIcon="@Icons.Material.Filled.VisibilityOff"
+                                       OnClick="@(() => BulkToggleActiveAsync(false))">
+                                Dezaktywuj
+                            </MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Success"
+                                       StartIcon="@Icons.Material.Filled.Visibility"
+                                       OnClick="@(() => BulkToggleActiveAsync(true))">
+                                Aktywuj
+                            </MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
+                                       StartIcon="@Icons.Material.Filled.Delete"
+                                       OnClick="BulkDeleteAsync">
+                                Usuń
+                            </MudButton>
+                            <MudButton Size="Size.Small" Variant="Variant.Text"
+                                       OnClick="@(() => _selectedIds.Clear())">
+                                Wyczyść
+                            </MudButton>
+                        </MudStack>
+                    </MudPaper>
+                }
+
                 <MudStack Spacing="2">
                     @foreach (var product in filtered)
                     {
-                        <MudCard Elevation="4" Style="@($"border-radius: 16px;{(IsCurrentlyRented(product.Id) ? " border-left: 4px solid #ff9800;" : "")}")">
+                        var isSelected = _selectedIds.Contains(product.Id);
+                        <MudCard Elevation="0" Outlined="true" Style="@($"border-radius: 16px;{(IsCurrentlyRented(product.Id) ? " border-left: 4px solid #DD8413;" : "")}{(isSelected ? " background: var(--surface-brand-tint, #FEF2F2);" : "")}")">
                             <MudCardContent Class="pa-4">
                                 <MudGrid Class="mud-align-center" Spacing="3">
                                     <MudItem xs="12" md="8">
                                         <MudStack Row="true" Class="mud-align-center" Spacing="3">
+                                            <MudCheckBox T="bool" Value="@isSelected"
+                                                         ValueChanged="@((bool v) => ToggleSelection(product.Id, v))"
+                                                         Color="Color.Primary" />
                                             @if (!string.IsNullOrEmpty(product.ImageUrl))
                                             {
                                                 <MudAvatar Size="Size.Large">
@@ -361,22 +402,28 @@ else
                                             }
                                             <MudStack Spacing="1">
                                                 <MudText Typo="Typo.h6" Style="font-weight: 600;">@product.Name</MudText>
-                                                <MudStack Row="true" Spacing="2" Class="mud-align-center">
+                                                <MudStack Row="true" Spacing="2" Class="mud-align-center" Wrap="Wrap.Wrap">
                                                     <MudChip T="string" Size="Size.Small" Color="Color.Default">@product.Sku</MudChip>
                                                     <MudChip T="string" Size="Size.Small" Color="Color.Info" Icon="@Icons.Material.Filled.Category">@(product.Category ?? "Brak")</MudChip>
-                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">@product.DailyPrice.ToString("0.00") zł/dzień</MudChip>
-                                                    <MudChip T="string" Size="Size.Small" Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)">@product.AvailableQuantity szt.</MudChip>
+                                                    <MudChip T="string" Size="Size.Small" Color="Color.Success">@product.DailyPrice.Pln()/dzień</MudChip>
+                                                    <MudChip T="string" Size="Size.Small" Color="@(product.AvailableQuantity > 0 ? Color.Success : Color.Error)">@(Math.Max(0, product.AvailableQuantity - product.HowManyRented))/@product.AvailableQuantity wolne</MudChip>
                                                 </MudStack>
                                             </MudStack>
                                         </MudStack>
                                     </MudItem>
                                     <MudItem xs="12" md="4">
-                                        <MudStack Row="true" Spacing="1" Class="mud-justify-end">
+                                        <MudStack Row="true" Spacing="1" Class="mud-justify-end" Wrap="Wrap.Wrap">
+                                            <MudButton StartIcon="@Icons.Material.Filled.History"
+                                                       OnClick="@(() => OpenHistoryDialog(product))"
+                                                       Color="Color.Info"
+                                                       Size="Size.Small">
+                                                Historia
+                                            </MudButton>
                                             <MudButton StartIcon="@Icons.Material.Filled.ViewWeek"
                                                        OnClick="() => ShowProductBarcode(product)"
                                                        Color="Color.Secondary"
                                                        Size="Size.Small">
-                                                Kod kreskowy
+                                                Kod
                                             </MudButton>
                                             <MudButton StartIcon="@Icons.Material.Filled.Edit"
                                                        OnClick="async () => await Edit(product)"
@@ -384,30 +431,12 @@ else
                                                        Size="Size.Small">
                                                 Edytuj
                                             </MudButton>
-                                            <MudButton StartIcon="@Icons.Material.Filled.Delete" 
+                                            <MudButton StartIcon="@Icons.Material.Filled.Delete"
                                                        OnClick="() => Delete(product)"
                                                        Color="Color.Error"
                                                        Size="Size.Small">
                                                 Usuń
                                             </MudButton>
-                                            @if (product.IsActive)
-                                            {
-                                                <MudButton StartIcon="@Icons.Material.Filled.VisibilityOff" 
-                                                           OnClick="() => ToggleActive(product)"
-                                                           Color="Color.Warning"
-                                                           Size="Size.Small">
-                                                    Dezaktywuj
-                                                </MudButton>
-                                            }
-                                            else
-                                            {
-                                                <MudButton StartIcon="@Icons.Material.Filled.Visibility" 
-                                                           OnClick="() => ToggleActive(product)"
-                                                           Color="Color.Success"
-                                                           Size="Size.Small">
-                                                    Aktywuj
-                                                </MudButton>
-                                            }
                                         </MudStack>
                                     </MudItem>
                                 </MudGrid>
@@ -465,7 +494,7 @@ else
                                 <MudSelectItem Value="@("Rower")">🚴 Rower</MudSelectItem>
                                 <MudSelectItem Value="@("SUP")">🏄 SUP</MudSelectItem>
                                 <MudSelectItem Value="@("Kajak")">🛶 Kajak</MudSelectItem>
-                                <MudSelectItem Value="@("Inne")">📦 Inne</MudSelectItem>
+                                <MudSelectItem Value="@("Inne")">Inne</MudSelectItem>
                             </MudSelect>
                         </MudItem>
                         <MudItem xs="12" md="6">
@@ -638,8 +667,39 @@ else
                         Lub wgraj zdjęcie z dysku:
                     </MudText>
                     
-                    <ImageCropper MaxSizeMB="8" 
+                    <ImageCropper MaxSizeMB="8"
                                   OnBase64ImageReady="OnImageReadyCropped" />
+
+                    @* AI auto-fill — przycisk pojawia się gdy jest zdjęcie *@
+                    @if (!string.IsNullOrEmpty(_croppedBase64Image) || !string.IsNullOrEmpty(model.ImageUrl))
+                    {
+                        <MudPaper Elevation="0" Outlined="true" Class="pa-3 mt-2" Style="border-radius: 12px; border-color: var(--coral-300, #FAA3A7);">
+                            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                                <MudIcon Icon="@Icons.Material.Filled.AutoAwesome" Color="Color.Primary" />
+                                <div style="flex: 1; min-width: 200px;">
+                                    <MudText Typo="Typo.body2" Style="font-weight: 600;">Auto-uzupełnij ze zdjęcia</MudText>
+                                    <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                        AI rozpozna sprzęt, napisze opis i zaproponuje cenę. Możesz wszystko zmienić ręcznie.
+                                    </MudText>
+                                </div>
+                                <MudTextField @bind-Value="_aiHint" Placeholder="Dodatkowy kontekst (opcjonalnie)"
+                                              Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                                              Style="max-width: 240px;" />
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                                           StartIcon="@Icons.Material.Filled.AutoFixHigh"
+                                           OnClick="RunAiAutofillAsync"
+                                           Disabled="@_aiRunning">
+                                    @(_aiRunning ? "Generuję..." : "Wygeneruj")
+                                </MudButton>
+                            </MudStack>
+                            @if (!string.IsNullOrEmpty(_aiRationale))
+                            {
+                                <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined" Class="mt-2">
+                                    <strong>AI:</strong> @_aiRationale
+                                </MudAlert>
+                            }
+                        </MudPaper>
+                    }
                 </MudStack>
             </MudPaper>
 
@@ -732,7 +792,7 @@ else
                            Disabled="@(string.IsNullOrWhiteSpace(model.Name) || string.IsNullOrWhiteSpace(model.Sku))"
                            OnClick="Save"
                            Class="rounded-pill px-6">
-                    @(model.Id == Guid.Empty ? "✨ Dodaj produkt" : "💾 Zapisz zmiany")
+                    @(model.Id == Guid.Empty ? "Dodaj produkt" : "Zapisz zmiany")
                 </MudButton>
             </MudStack>
         </MudPaper>
@@ -755,7 +815,8 @@ else
     private List<Product> products = new();
     private IEnumerable<Product> filtered => FilteredProducts();
     private HashSet<Guid> currentlyRentedProductIds = new();
-    
+    private HashSet<Guid> _selectedIds = new();
+
     private string? search;
     private bool cbAvailable = true;
     private bool cbRented = true;
@@ -881,6 +942,13 @@ else
     {
         try
         {
+            // Maciej: zdjęcie obowiązkowe. Bez zdjęcia nie da się dodać produktu.
+            if (string.IsNullOrWhiteSpace(model.ImageUrl) && string.IsNullOrWhiteSpace(_croppedBase64Image))
+            {
+                Snackbar.Add("Zdjęcie produktu jest wymagane — wgraj zdjęcie lub podaj URL.", Severity.Warning);
+                return;
+            }
+
             await using var Db = await DbFactory.CreateDbContextAsync();
             Db.SetTenant(CurrentTenantId());
             if (model.Id == Guid.Empty)
@@ -892,7 +960,30 @@ else
             }
             else
             {
-                Db.Products.Update(model);
+                // NXRE QA #11: zamiast Update(detached) — load + modify + save.
+                // Tamto wywalało "affected 0 rows" gdy form model nie miał wszystkich kolumn
+                // tracked przez EF (np. CreatedAtUtc, City, Lat) — UPDATE setował NULLE,
+                // a query filter (TenantId) mógł nie zmatchować.
+                var existing = await Db.Products.FirstOrDefaultAsync(p => p.Id == model.Id);
+                if (existing == null)
+                {
+                    Snackbar.Add("Produkt nie istnieje (mógł zostać usunięty). Odśwież listę.", Severity.Warning);
+                    return;
+                }
+                existing.Name = model.Name;
+                existing.Sku = model.Sku;
+                existing.Category = model.Category;
+                existing.DailyPrice = model.DailyPrice;
+                existing.HourlyPrice = model.HourlyPrice;
+                existing.IsActive = model.IsActive;
+                existing.ImageUrl = model.ImageUrl;
+                existing.ImageBasePath = model.ImageBasePath;
+                existing.AvailableQuantity = model.AvailableQuantity;
+                existing.Description = model.Description;
+                existing.SerialNumber = model.SerialNumber;
+                existing.Producer = model.Producer;
+                existing.Model = model.Model;
+                existing.UpdatedAtUtc = DateTime.UtcNow;
             }
             await Db.SaveChangesAsync();
             
@@ -911,9 +1002,13 @@ else
                     
                     model.ImageBasePath = basePath;
                     model.ImageUrl = defaultUrl;
-                    Db.Products.Update(model);
-                    await Db.SaveChangesAsync();
-                    
+                    // ExecuteUpdate zamiast Db.Update(model) — nie powoduje tracking konfliktu.
+                    await Db.Products.Where(p => p.Id == model.Id)
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(p => p.ImageUrl, defaultUrl)
+                            .SetProperty(p => p.ImageBasePath, basePath)
+                            .SetProperty(p => p.UpdatedAtUtc, DateTime.UtcNow));
+
                     Snackbar.Add("Zdjęcie zapisane!", Severity.Success);
                 }
                 catch (Exception ex)
@@ -1038,6 +1133,85 @@ else
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     private string? _croppedBase64Image;
+    private string? _aiHint;
+    private string? _aiRationale;
+    private bool _aiRunning;
+
+    private async Task RunAiAutofillAsync()
+    {
+        // Wczytaj bajty zdjęcia: priorytet _croppedBase64Image (świeże), fallback download z ImageUrl.
+        byte[]? bytes = null;
+        string contentType = "image/jpeg";
+
+        if (!string.IsNullOrEmpty(_croppedBase64Image))
+        {
+            var b64 = _croppedBase64Image.Contains(",")
+                ? _croppedBase64Image.Split(',')[1]
+                : _croppedBase64Image;
+            try { bytes = Convert.FromBase64String(b64); }
+            catch { /* ignore */ }
+        }
+        else if (!string.IsNullOrEmpty(model.ImageUrl))
+        {
+            try
+            {
+                var url = model.ImageUrl;
+                if (url.StartsWith("/")) url = new Uri(new Uri("https://srental2.azurewebsites.net"), url).ToString();
+                bytes = await Http.GetByteArrayAsync(url);
+                contentType = url.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png"
+                            : url.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ? "image/webp"
+                            : "image/jpeg";
+            }
+            catch (Exception ex)
+            {
+                Snackbar.Add($"Nie udało się pobrać zdjęcia: {ex.Message}", Severity.Warning);
+                return;
+            }
+        }
+
+        if (bytes == null || bytes.Length == 0)
+        {
+            Snackbar.Add("Najpierw wgraj zdjęcie produktu.", Severity.Warning);
+            return;
+        }
+
+        _aiRunning = true;
+        _aiRationale = null;
+        try
+        {
+            var suggestion = await ProductAi.GenerateFromImagesAsync(
+                new[] { (Data: bytes, ContentType: contentType) },
+                userHint: _aiHint);
+
+            // Wypełnij pola — tylko gdy puste albo user nie wpisał ręcznie.
+            if (string.IsNullOrWhiteSpace(model.Name)) model.Name = suggestion.Name;
+            if (string.IsNullOrWhiteSpace(model.Description)) model.Description = suggestion.Description;
+            if (string.IsNullOrWhiteSpace(model.Category)) model.Category = suggestion.Category;
+            if (string.IsNullOrWhiteSpace(model.Producer) && suggestion.Producer != null) model.Producer = suggestion.Producer;
+            if (string.IsNullOrWhiteSpace(model.Model) && suggestion.Model != null) model.Model = suggestion.Model;
+            if (model.DailyPrice == 0 && suggestion.DailyPriceLow.HasValue && suggestion.DailyPriceHigh.HasValue)
+            {
+                model.DailyPrice = Math.Round((suggestion.DailyPriceLow.Value + suggestion.DailyPriceHigh.Value) / 2m, 2);
+            }
+            if ((!model.HourlyPrice.HasValue || model.HourlyPrice.Value == 0)
+                && suggestion.HourlyPriceLow.HasValue && suggestion.HourlyPriceHigh.HasValue)
+            {
+                model.HourlyPrice = Math.Round((suggestion.HourlyPriceLow.Value + suggestion.HourlyPriceHigh.Value) / 2m, 2);
+            }
+
+            _aiRationale = suggestion.PricingRationale;
+            Snackbar.Add("Propozycja gotowa — zweryfikuj i edytuj.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd AI: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _aiRunning = false;
+        }
+    }
+
 
     private void OnImageReadyCropped(string base64Image)
     {
@@ -1045,6 +1219,91 @@ else
         _selectedImageName = "image.jpg";
     }
     
+    // ==================== BULK OPS (Maciej) ====================
+    private void ToggleSelection(Guid id, bool selected)
+    {
+        if (selected) _selectedIds.Add(id);
+        else _selectedIds.Remove(id);
+    }
+
+    private async Task BulkDeleteAsync()
+    {
+        var ids = _selectedIds.ToList();
+        var bulkResult = await DialogService.ShowMessageBox(
+            "Usunąć wybrane produkty?",
+            $"Usuniesz {ids.Count} produktów. Operacja nieodwracalna. Produkty z historią wynajmów zostaną pominięte (dezaktywuj zamiast usunąć).",
+            yesText: "Usuń", cancelText: "Anuluj");
+        if (bulkResult != true) return;
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(CurrentTenantId());
+
+        int deleted = 0, skipped = 0;
+        foreach (var id in ids)
+        {
+            var p = await db.Products.FirstOrDefaultAsync(x => x.Id == id);
+            if (p == null) { skipped++; continue; }
+
+            var hasRentals = await db.RentalItems.AnyAsync(ri => ri.ProductId == id);
+            if (hasRentals) { skipped++; continue; }
+
+            db.Products.Remove(p);
+            deleted++;
+        }
+        await db.SaveChangesAsync();
+
+        Snackbar.Add($"Usunięto {deleted} produktów" + (skipped > 0 ? $", pominięto {skipped} (są w wynajmach)" : ""), Severity.Success);
+        _selectedIds.Clear();
+        products = await db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+    }
+
+    private async Task BulkToggleActiveAsync(bool active)
+    {
+        var ids = _selectedIds.ToList();
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(CurrentTenantId());
+        var toUpdate = await db.Products.Where(p => ids.Contains(p.Id)).ToListAsync();
+        foreach (var p in toUpdate)
+        {
+            p.IsActive = active;
+            p.UpdatedAtUtc = DateTime.UtcNow;
+        }
+        await db.SaveChangesAsync();
+        Snackbar.Add($"{(active ? "Aktywowano" : "Dezaktywowano")} {toUpdate.Count} produktów.", Severity.Success);
+        _selectedIds.Clear();
+        products = await db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+    }
+
+    private async Task OpenBulkPriceDialog()
+    {
+        var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.BulkPriceDialog>
+        {
+            { x => x.ProductIds, _selectedIds.ToList() }
+        };
+        var dlg = await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.BulkPriceDialog>(
+            "Zmień cenę dla zaznaczonych", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        if ((await dlg.Result) is { Canceled: false })
+        {
+            _selectedIds.Clear();
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(CurrentTenantId());
+            products = await db.Products.AsNoTracking().OrderBy(p => p.Name).ToListAsync();
+        }
+    }
+
+    private async Task OpenHistoryDialog(Product product)
+    {
+        var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.ProductHistoryDialog>
+        {
+            { x => x.ProductId, product.Id },
+            { x => x.ProductName, product.Name }
+        };
+        await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.ProductHistoryDialog>(
+            "Historia produktu", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
     private async Task OpenBarcodeLabelsDialog(Guid? preselectedProductId = null)
     {
         var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.QrLabelsDialog>
