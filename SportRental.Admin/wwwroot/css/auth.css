@@ -137,17 +137,19 @@
     box-shadow: none;
 }
 
-/* NXRE QA #2: Password reveal toggle */
+/* NXRE QA #2: Password reveal toggle — pinujemy do dołu pola tak jak lewa lock-ikonka
+   (auth-field wrap zawiera też label nad inputem, więc top:50% ląduje na linii labela). */
 .auth-input-password { padding-right: 2.75rem; }
 .auth-password-toggle {
     position: absolute;
     right: 0.5rem;
-    top: 50%;
-    transform: translateY(-50%);
+    top: auto;
+    bottom: 14px; /* (input ~56px - icon 28px) / 2 ≈ 14 — analogicznie do .auth-field-icon */
+    transform: none;
     background: transparent;
     border: none;
     cursor: pointer;
-    padding: 0.5rem;
+    padding: 0.25rem;
     color: var(--auth-text-muted);
     border-radius: 6px;
     line-height: 0;
