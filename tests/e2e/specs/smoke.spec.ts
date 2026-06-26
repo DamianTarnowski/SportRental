@@ -104,7 +104,10 @@ async function smokePage(page: Page, url: string, screenshotKey: string): Promis
 
     const criticalConsole = consoleErrors.filter(isCriticalConsoleError);
 
-    expect(pageErrors, `JS pageerror na ${url}: ${pageErrors.map((e) => e.message).join('\n')}`).toHaveLength(0);
+    // Filtruj page errors tym samym mechanizmem co console — np. flaky SignalR negotiation
+    // na WebKit mobile rzuca `Circuit host not initialized` jako window.error PRZED reconnect.
+    const criticalPageErrors = pageErrors.filter((e) => isCriticalConsoleError(e.message));
+    expect(criticalPageErrors, `JS pageerror na ${url}: ${criticalPageErrors.map((e) => e.message).join('\n')}`).toHaveLength(0);
     expect(
       criticalConsole,
       `Krytyczne console errors na ${url}:\n${criticalConsole.join('\n')}`,
