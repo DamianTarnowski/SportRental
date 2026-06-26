@@ -111,6 +111,10 @@
                                 </div>
                                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
                                     <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => Edit(rental)">Edytuj</MudMenuItem>
+                                    @if (!IsPaid(rental) && rental.Status != RentalStatus.Cancelled && rental.Status != RentalStatus.Completed)
+                                    {
+                                        <MudMenuItem Icon="@Icons.Material.Filled.Paid" OnClick="() => MarkAsPaid(rental)">Oznacz jako opłacone</MudMenuItem>
+                                    }
                                     @if (!string.IsNullOrWhiteSpace(rental.ContractUrl))
                                     {
                                         <MudMenuItem Icon="@Icons.Material.Filled.Description" Href="@rental.ContractUrl" Target="_blank">Umowa</MudMenuItem>

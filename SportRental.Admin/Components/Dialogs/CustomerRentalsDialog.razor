@@ -91,15 +91,37 @@
                         }
                         else
                         {
+                            @* NXRE r2 audit: rozszerzona tabela — numer UM/YYYY/XXX + sprzęt (items) + kwota + status podpisu *@
                             <MudTable Items="withContracts" Hover="true" Dense="true" Elevation="0">
                                 <HeaderContent>
-                                    <MudTh>Wynajem</MudTh>
+                                    <MudTh>Numer</MudTh>
                                     <MudTh>Data</MudTh>
+                                    <MudTh>Wynajem</MudTh>
+                                    <MudTh>Sprzęt</MudTh>
+                                    <MudTh>Kwota</MudTh>
+                                    <MudTh>Podpis SMS</MudTh>
                                     <MudTh>PDF</MudTh>
                                 </HeaderContent>
                                 <RowTemplate Context="r">
-                                    <MudTd>#@r.Id.ToString()[..8].ToUpper()</MudTd>
+                                    <MudTd Style="font-weight: 600;">UM/@r.CreatedAtUtc.ToLocalTime().Year/@r.Id.ToString()[..6].ToUpper()</MudTd>
                                     <MudTd>@r.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")</MudTd>
+                                    <MudTd>@r.StartDateUtc.ToLocalTime().ToString("dd.MM")&ndash;@r.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy")</MudTd>
+                                    <MudTd>@(r.Items?.Sum(i => i.Quantity) ?? 0) szt.</MudTd>
+                                    <MudTd Style="font-weight: 600;">@r.TotalAmount.Pln()</MudTd>
+                                    <MudTd>
+                                        @if (r.IsSmsConfirmed)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">potwierdzony</MudChip>
+                                        }
+                                        else if (r.IsSmsConfirmationSent)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">wysłany</MudChip>
+                                        }
+                                        else
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">brak</MudChip>
+                                        }
+                                    </MudTd>
                                     <MudTd>
                                         <MudButton Href="@r.ContractUrl" Target="_blank" Size="Size.Small"
                                                    StartIcon="@Icons.Material.Filled.OpenInNew" Variant="Variant.Text">

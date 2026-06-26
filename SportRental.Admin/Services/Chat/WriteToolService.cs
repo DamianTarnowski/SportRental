@@ -155,6 +155,15 @@ public sealed class WriteToolService
         if (rental == null)
             return JsonSerializer.Serialize(new { error = "rental_not_found", rentalId });
 
+        // NXRE r2 audit: reminder o zwrocie tylko gdy sprzęt FAKTYCZNIE wydany
+        // (chat tool nie powinien móc spamować klientów którzy nie odebrali sprzętu).
+        if (!rental.IssuedAtUtc.HasValue || rental.ReturnedAtUtc.HasValue)
+            return JsonSerializer.Serialize(new {
+                error = "reminder_not_applicable",
+                reason = !rental.IssuedAtUtc.HasValue ? "rental_not_issued" : "rental_already_returned",
+                rentalId
+            });
+
         var phone = rental.Customer?.PhoneNumber;
         if (string.IsNullOrWhiteSpace(phone))
             return JsonSerializer.Serialize(new { error = "no_phone_number", rentalId });

@@ -83,11 +83,16 @@ namespace SportRental.Admin.Services.Email
             // Per-rental decision (hourly vs daily lead) is made below.
             var maxWindowUtc = currentTimeUtc.Add(DailyReminderLead);
 
+            // NXRE r2 audit: reminder o zwrocie tylko dla wynajmów WYDANYCH — jeśli sprzęt
+            // jeszcze nie odebrany, klient nie powinien dostawać "przypomnienia o zwrocie".
+            // (Confirmed niewydane są wykluczone przez IssuedAtUtc != null).
             var candidates = await db.Rentals
                 .Include(r => r.Customer)
                 .Include(r => r.Items)
                 .Where(r => r.TenantId == company.TenantId
-                         && (r.Status == RentalStatus.Active || r.Status == RentalStatus.Confirmed)
+                         && r.Status == RentalStatus.Active
+                         && r.IssuedAtUtc != null
+                         && r.ReturnedAtUtc == null
                          && r.EndDateUtc > currentTimeUtc
                          && r.EndDateUtc <= maxWindowUtc
                          && (!r.IsReminderEmailSent || !r.IsReminderSmsSent || !r.IsFinalReminderSent))
