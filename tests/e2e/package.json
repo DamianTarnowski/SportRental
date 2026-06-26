@@ -1,0 +1,23 @@
+{
+  "name": "sportrental-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "End-to-end Playwright suite for SportRentalHybrid demo flow against srental2.azurewebsites.net",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:demo": "playwright test specs/demo-signin",
+    "test:lifecycle": "playwright test specs/rental-lifecycle",
+    "test:mobile": "playwright test --project=mobile",
+    "test:dark": "playwright test specs/dark-mode",
+    "test:a11y": "playwright test specs/a11y",
+    "test:smoke": "playwright test specs/smoke",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install chromium --with-deps"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0",
+    "@axe-core/playwright": "^4.10.0"
+  }
+}

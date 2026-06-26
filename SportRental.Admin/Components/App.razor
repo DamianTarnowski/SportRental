@@ -24,6 +24,19 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="alternate icon" type="image/png" href="favicon.png" />
     <script src="/js/barcode-scanner.js"></script>
+    @* NXRE r2 audit: synchroniczne ustawienie data-theme przed Blazor boot żeby uniknąć
+       Flash Of Unstyled Content (FOUC). InteractiveThemeProvider potem dogania state. *@
+    <script>
+        (function () {
+            try {
+                var dark = localStorage.getItem('rs-theme-dark') === '1';
+                if (dark) {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    document.documentElement.classList.add('mud-theme-dark');
+                }
+            } catch (e) { /* prywatność / starsze przeglądarki */ }
+        })();
+    </script>
     <HeadOutlet />
 </head>
 

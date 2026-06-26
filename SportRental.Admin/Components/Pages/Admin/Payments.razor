@@ -12,7 +12,7 @@
 
 <PageTitle>Płatności — RentSpot</PageTitle>
 
-<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-3">
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-3 px-2 rs-payments-container">
     @* Header banner *@
     <MudPaper Class="pa-4 mb-3 rs-payments-banner" Elevation="0"
               Style="background: #1B2350; color: #E8EBF5; border-radius: 16px;">
@@ -59,32 +59,29 @@
         </MudItem>
     </MudGrid>
 
-    @* Filtr + tabela *@
-    <MudPaper Elevation="0" Outlined="true" Class="pa-3" Style="border-radius: 16px;">
-        <MudStack Row="true" Spacing="2" Class="mud-align-center mb-3" Wrap="Wrap.Wrap">
-            <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
-                <MudButton Color="@(_filter == Filter.All ? Color.Primary : Color.Default)"
-                           Variant="@(_filter == Filter.All ? Variant.Filled : Variant.Outlined)"
-                           OnClick="@(() => SetFilter(Filter.All))">Wszystkie (@AllCount)</MudButton>
-                <MudButton Color="@(_filter == Filter.Pending ? Color.Warning : Color.Default)"
-                           Variant="@(_filter == Filter.Pending ? Variant.Filled : Variant.Outlined)"
-                           OnClick="@(() => SetFilter(Filter.Pending))">Oczekujące (@PendingCount)</MudButton>
-                <MudButton Color="@(_filter == Filter.Overdue ? Color.Error : Color.Default)"
-                           Variant="@(_filter == Filter.Overdue ? Variant.Filled : Variant.Outlined)"
-                           OnClick="@(() => SetFilter(Filter.Overdue))">Zaległe (@OverdueCount)</MudButton>
-                <MudButton Color="@(_filter == Filter.Paid ? Color.Success : Color.Default)"
-                           Variant="@(_filter == Filter.Paid ? Variant.Filled : Variant.Outlined)"
-                           OnClick="@(() => SetFilter(Filter.Paid))">Opłacone (@PaidCount)</MudButton>
-                <MudButton Color="@(_filter == Filter.Cancelled ? Color.Default : Color.Default)"
-                           Variant="@(_filter == Filter.Cancelled ? Variant.Filled : Variant.Outlined)"
-                           OnClick="@(() => SetFilter(Filter.Cancelled))">Anulowane (@CancelledCount)</MudButton>
-            </MudButtonGroup>
-            <MudSpacer />
-            <MudTextField @bind-Value="_search" Placeholder="Szukaj klient / # wynajmu"
-                          Variant="Variant.Outlined" Margin="Margin.Dense"
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                          Style="max-width: 260px;" />
-        </MudStack>
+    @* Filtr + tabela — mobile-friendly: chipy zamiast button group + wrap + horizontal scroll table *@
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 rs-payments-table-wrap" Style="border-radius: 16px;">
+        <div class="rs-payments-filters">
+            <MudChip T="string" Variant="@(_filter == Filter.All ? Variant.Filled : Variant.Outlined)"
+                     Color="@(_filter == Filter.All ? Color.Primary : Color.Default)"
+                     OnClick="@(() => SetFilter(Filter.All))">Wszystkie · @AllCount</MudChip>
+            <MudChip T="string" Variant="@(_filter == Filter.Pending ? Variant.Filled : Variant.Outlined)"
+                     Color="Color.Warning"
+                     OnClick="@(() => SetFilter(Filter.Pending))">Oczekujące · @PendingCount</MudChip>
+            <MudChip T="string" Variant="@(_filter == Filter.Overdue ? Variant.Filled : Variant.Outlined)"
+                     Color="Color.Error"
+                     OnClick="@(() => SetFilter(Filter.Overdue))">Zaległe · @OverdueCount</MudChip>
+            <MudChip T="string" Variant="@(_filter == Filter.Paid ? Variant.Filled : Variant.Outlined)"
+                     Color="Color.Success"
+                     OnClick="@(() => SetFilter(Filter.Paid))">Opłacone · @PaidCount</MudChip>
+            <MudChip T="string" Variant="@(_filter == Filter.Cancelled ? Variant.Filled : Variant.Outlined)"
+                     Color="Color.Default"
+                     OnClick="@(() => SetFilter(Filter.Cancelled))">Anulowane · @CancelledCount</MudChip>
+        </div>
+        <MudTextField @bind-Value="_search" Placeholder="Szukaj klient / # wynajmu"
+                      Variant="Variant.Outlined" Margin="Margin.Dense"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      FullWidth="true" Class="mb-3" Style="max-width: 100%;" />
 
         @if (_loading)
         {
@@ -164,6 +161,23 @@
     .rs-pay-kpi-month .rs-pay-kpi-value { color: #1B2350; }
     .rs-pay-link { color: var(--coral-600, #E04A50); text-decoration: none; font-weight: 600; }
     .rs-pay-link:hover { text-decoration: underline; }
+
+    /* Mobile-friendly: filtry jako wrap chips zamiast rozjeżdżającego ButtonGroup */
+    .rs-payments-filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+    /* Tabela: horizontal scroll wrapper na wąskich ekranach żeby viewport nie rośł */
+    .rs-payments-table-wrap .mud-table {
+        overflow-x: auto;
+    }
+    @@media (max-width: 600px) {
+        .rs-payments-container { padding-left: 8px !important; padding-right: 8px !important; }
+        .rs-payments-table-wrap .mud-table-cell { white-space: nowrap; }
+        .rs-pay-kpi-value { font-size: 1.2rem; }
+    }
     [data-theme="dark"] .rs-pay-kpi,
     .mud-theme-dark .rs-pay-kpi { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
     [data-theme="dark"] .rs-pay-kpi-label,
