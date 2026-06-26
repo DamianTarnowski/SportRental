@@ -168,8 +168,8 @@ test.describe('Performance — Web Vitals + bundle + boot', () => {
     console.log(`[perf] blazor.web.js size=${sizeKb.toFixed(1)}KB encoding=${contentEncoding} baseURL=${baseURL}`);
     recordMetric('bundle-size', { sizeBytes, sizeKb, contentEncoding });
 
-    // < 50 KB; baseline ~16 KB → regression >2x ostrzega
-    expect.soft(sizeKb, `blazor.web.js should be < 50KB (got ${sizeKb.toFixed(1)})`).toBeLessThan(50);
+    // .NET 10 Blazor Server blazor.web.js baseline ~195KB; alert >300KB jako regression signal
+    expect.soft(sizeKb, `blazor.web.js should be < 300KB (got ${sizeKb.toFixed(1)})`).toBeLessThan(300);
   });
 
   test('cold-vs-warm-comparison', async ({ page }) => {
