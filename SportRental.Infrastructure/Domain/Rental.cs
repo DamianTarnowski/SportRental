@@ -45,6 +45,10 @@ namespace SportRental.Infrastructure.Domain
         public decimal DepositAmount { get; set; }
         public string? PaymentIntentId { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
+        /// Cash / Card / Transfer / BLIK / Online — używane gdy płatność oznaczona ręcznie przez właściciela.
+        public string? PaymentMethod { get; set; }
+        /// Czas zatwierdzenia płatności (manualnej lub po Stripe webhook).
+        public DateTime? PaidAtUtc { get; set; }
         public string? ContractUrl { get; set; }
         public string? Notes { get; set; }
         public string? IdempotencyKey { get; set; }

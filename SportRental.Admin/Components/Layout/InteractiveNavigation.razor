@@ -78,6 +78,21 @@
             </div>
         </NotAuthorized>
     </AuthorizeView>
+    @* NXRE 2/3: banner trybu DEMO żeby tester wiedział że SMS/Email są symulowane *@
+    <AuthorizeView Context="demoCtx">
+        <Authorized>
+            @if (IsDemoUser(demoCtx))
+            {
+                <MudTooltip Text="W trybie demo SMS-y, e-maile i płatności są symulowane. Dane usuwają się po 8h.">
+                    <MudChip T="string" Color="Color.Warning" Size="Size.Small" Variant="Variant.Filled"
+                             Icon="@Icons.Material.Filled.Science"
+                             Class="rs-demo-chip">
+                        TRYB DEMO
+                    </MudChip>
+                </MudTooltip>
+            }
+        </Authorized>
+    </AuthorizeView>
     <AuthorizeView Roles="Owner,SuperAdmin" Context="adminCtx">
         <Authorized>
             <a href="/_client/" target="_blank" rel="noopener" class="rs-client-preview" title="Otwórz widok klienta w nowej karcie">
@@ -220,11 +235,29 @@
     .mud-theme-dark .rs-search-hit-title { color: #E8EBF5; }
     [data-theme="dark"] .rs-search-hit-sub,
     .mud-theme-dark .rs-search-hit-sub { color: rgba(232,235,245,0.65); }
+
+    /* NXRE 2/3: chip TRYB DEMO w topbar */
+    .rs-demo-chip {
+        margin-right: 0.5rem;
+        font-weight: 700 !important;
+        letter-spacing: 0.04em;
+    }
+    @@media (max-width: 600px) {
+        .rs-demo-chip .mud-chip-content { padding-inline: 0.4rem; font-size: 0.7rem; }
+    }
 </style>
 
 @code {
     private bool _drawerOpen = true;
     private Breakpoint _breakpoint = Breakpoint.Md;
+
+    /// NXRE 2/3: banner DEMO — wystarczy sprawdzić email konwencji demo+xxx@rentspot.eu
+    /// bez DB hit. Faktyczna konfiguracja IsDemoUser sprawdzana w sender decorators.
+    private static bool IsDemoUser(AuthenticationState ctx)
+    {
+        var name = ctx.User.Identity?.Name;
+        return !string.IsNullOrEmpty(name) && name.StartsWith("demo+", StringComparison.OrdinalIgnoreCase);
+    }
 
     private void ToggleDrawer()
     {

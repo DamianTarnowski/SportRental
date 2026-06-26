@@ -1,0 +1,66 @@
+@using SportRental.Infrastructure.Domain
+@using MudBlazor
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.h6" Style="font-weight: 600;">
+                <MudIcon Icon="@Icons.Material.Filled.Paid" Class="mr-2" Color="Color.Success" />
+                Oznacz płatność jako opłaconą
+            </MudText>
+
+            <MudText Typo="Typo.body2" Color="Color.Default">
+                Kwota: <strong>@Rental.TotalAmount.ToString("0.00") zł</strong> · Wynajem #@Rental.Id.ToString()[..8].ToUpper()
+            </MudText>
+
+            <MudRadioGroup T="string" @bind-Value="_method">
+                <MudStack Spacing="1">
+                    <MudRadio T="string" Value="@("Cash")" Color="Color.Primary">
+                        <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Small" Class="mr-1" />
+                        Gotówka
+                    </MudRadio>
+                    <MudRadio T="string" Value="@("Card")" Color="Color.Primary">
+                        <MudIcon Icon="@Icons.Material.Filled.CreditCard" Size="Size.Small" Class="mr-1" />
+                        Karta (terminal)
+                    </MudRadio>
+                    <MudRadio T="string" Value="@("Transfer")" Color="Color.Primary">
+                        <MudIcon Icon="@Icons.Material.Filled.AccountBalance" Size="Size.Small" Class="mr-1" />
+                        Przelew
+                    </MudRadio>
+                    <MudRadio T="string" Value="@("BLIK")" Color="Color.Primary">
+                        <MudIcon Icon="@Icons.Material.Filled.PhoneAndroid" Size="Size.Small" Class="mr-1" />
+                        BLIK
+                    </MudRadio>
+                    <MudRadio T="string" Value="@("Other")" Color="Color.Primary">
+                        Inna metoda
+                    </MudRadio>
+                </MudStack>
+            </MudRadioGroup>
+
+            <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined">
+                Po zatwierdzeniu wynajem przechodzi do kroku „Wydanie sprzętu".
+                Operacja jest logowana w audicie.
+            </MudAlert>
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" Variant="Variant.Text">Anuluj</MudButton>
+        <MudButton OnClick="Submit"
+                   Variant="Variant.Filled"
+                   Color="Color.Success"
+                   StartIcon="@Icons.Material.Filled.CheckCircle">
+            Zatwierdź płatność
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public Rental Rental { get; set; } = default!;
+
+    private string _method = "Cash";
+
+    private void Submit() => MudDialog.Close(DialogResult.Ok(_method));
+    private void Cancel() => MudDialog.Cancel();
+}
