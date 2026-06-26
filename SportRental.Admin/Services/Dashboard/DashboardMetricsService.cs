@@ -14,7 +14,11 @@ public record DashboardMetrics(
     int TodayReturns,
     int UnsignedContracts,
     int OverdueReturns,
-    int UnpaidRentals);
+    int UnpaidRentals,
+    decimal DueTodayAmount,
+    decimal OverdueAmount,
+    decimal PaidTodayAmount,
+    decimal MonthRevenue);
 
 public enum TimelineEventType { Pickup, Return, Overdue }
 
@@ -69,6 +73,18 @@ public class DashboardMetricsService
                 .SumAsync(r => (decimal?)r.TotalAmount, ct) ?? 0m;
         }
 
+        async Task<decimal> SumByFilter(Func<IQueryable<Rental>, IQueryable<Rental>> filter)
+        {
+            await using var db = await _dbFactory.CreateDbContextAsync(ct);
+            db.SetTenant(tenantId);
+            return await filter(db.Rentals.AsNoTracking())
+                .SumAsync(r => (decimal?)r.TotalAmount, ct) ?? 0m;
+        }
+
+        var firstOfMonth = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        // Whitelist statusów uznawanych za "opłacone" (zsynchronizowane z RentalGuards.IsRentalPaid).
+        var paidStatuses = new List<string> { "DepositPaid", "succeeded", "paid", "Paid" };
+
         // 10 równoległych query — typowy czas spada z ~10×50ms = 500ms do ~50-100ms
         var pendingIssuesT = CountRentals(q => q.Where(r =>
             (r.Status == RentalStatus.Confirmed || r.Status == RentalStatus.Pending)
@@ -115,15 +131,35 @@ public class DashboardMetricsService
                 || r.PaymentStatus == "requires_payment_method"
                 || r.PaymentStatus == "failed")));
 
+        // NXRE r2 punkt 2: 4 nowe metryki płatności dla kafelków na dashboardzie.
+        // Każda jako osobny await żeby utrzymać czystość WhenAll.
+        var dueTodayT = SumByFilter(q => q.Where(r =>
+            r.StartDateUtc >= today && r.StartDateUtc < tomorrow
+            && r.Status != RentalStatus.Cancelled
+            && !paidStatuses.Contains(r.PaymentStatus)));
+
+        var overdueAmountT = SumByFilter(q => q.Where(r =>
+            r.Status != RentalStatus.Cancelled && r.Status != RentalStatus.Completed
+            && r.StartDateUtc < now
+            && !paidStatuses.Contains(r.PaymentStatus)));
+
+        var paidTodayT = SumByFilter(q => q.Where(r =>
+            r.PaidAtUtc != null && r.PaidAtUtc >= today && r.PaidAtUtc < tomorrow));
+
+        var monthRevenueT = SumByFilter(q => q.Where(r =>
+            r.PaidAtUtc != null && r.PaidAtUtc >= firstOfMonth));
+
         await Task.WhenAll(
             pendingIssuesT, pendingReturnsT, activeRentalsT, availableProductsT,
             todayPickupsT, todayReturnsT, unsignedContractsT, overdueReturnsT, unpaidRentalsT);
         var todayRevenue = await todayRevenueT;
+        await Task.WhenAll(dueTodayT, overdueAmountT, paidTodayT, monthRevenueT);
 
         return new DashboardMetrics(
             pendingIssuesT.Result, pendingReturnsT.Result, activeRentalsT.Result, availableProductsT.Result,
             todayRevenue, todayPickupsT.Result, todayReturnsT.Result, unsignedContractsT.Result,
-            overdueReturnsT.Result, unpaidRentalsT.Result);
+            overdueReturnsT.Result, unpaidRentalsT.Result,
+            dueTodayT.Result, overdueAmountT.Result, paidTodayT.Result, monthRevenueT.Result);
     }
 
     /// Oś dnia (Maciej: „9:00 wydanie, 11:00 zwrot, 16:00 odbiór").

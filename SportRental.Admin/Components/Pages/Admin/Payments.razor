@@ -1,0 +1,361 @@
+@page "/admin/payments"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
+@using SportRental.Admin.Services.Guards
+@using SportRental.Infrastructure.Domain
+@using SportRental.Shared.Formatting
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
+
+<PageTitle>Płatności — RentSpot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-3">
+    @* Header banner *@
+    <MudPaper Class="pa-4 mb-3 rs-payments-banner" Elevation="0"
+              Style="background: #1B2350; color: #E8EBF5; border-radius: 16px;">
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.Payments" Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">Płatności</MudText>
+                <MudText Typo="Typo.body2" Style="opacity: 0.85;">
+                    Zarządzaj statusami płatności, oznaczaj wpływy gotówkowe i wysyłaj przypomnienia.
+                </MudText>
+            </div>
+        </MudStack>
+    </MudPaper>
+
+    @* KPI tiles *@
+    <MudGrid Class="mb-3" Spacing="3">
+        <MudItem xs="6" md="3">
+            <MudPaper Class="pa-3 rs-pay-kpi rs-pay-kpi-pending" Elevation="0">
+                <div class="rs-pay-kpi-label">Do zapłaty dziś</div>
+                <div class="rs-pay-kpi-value">@DueTodayAmount.Pln()</div>
+                <div class="rs-pay-kpi-sub">@DueTodayCount wynajmów</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <MudPaper Class="pa-3 rs-pay-kpi rs-pay-kpi-overdue" Elevation="0">
+                <div class="rs-pay-kpi-label">Zaległe</div>
+                <div class="rs-pay-kpi-value">@OverdueAmount.Pln()</div>
+                <div class="rs-pay-kpi-sub">@OverdueCount wynajmów</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <MudPaper Class="pa-3 rs-pay-kpi rs-pay-kpi-paid" Elevation="0">
+                <div class="rs-pay-kpi-label">Opłacone dziś</div>
+                <div class="rs-pay-kpi-value">@PaidTodayAmount.Pln()</div>
+                <div class="rs-pay-kpi-sub">@PaidTodayCount transakcji</div>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="6" md="3">
+            <MudPaper Class="pa-3 rs-pay-kpi rs-pay-kpi-month" Elevation="0">
+                <div class="rs-pay-kpi-label">Przychód miesiąca</div>
+                <div class="rs-pay-kpi-value">@MonthRevenueAmount.Pln()</div>
+                <div class="rs-pay-kpi-sub">@DateTime.Today.ToString("LLLL yyyy")</div>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    @* Filtr + tabela *@
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3" Style="border-radius: 16px;">
+        <MudStack Row="true" Spacing="2" Class="mud-align-center mb-3" Wrap="Wrap.Wrap">
+            <MudButtonGroup Color="Color.Primary" Variant="Variant.Outlined" Size="Size.Small">
+                <MudButton Color="@(_filter == Filter.All ? Color.Primary : Color.Default)"
+                           Variant="@(_filter == Filter.All ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => SetFilter(Filter.All))">Wszystkie (@AllCount)</MudButton>
+                <MudButton Color="@(_filter == Filter.Pending ? Color.Warning : Color.Default)"
+                           Variant="@(_filter == Filter.Pending ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => SetFilter(Filter.Pending))">Oczekujące (@PendingCount)</MudButton>
+                <MudButton Color="@(_filter == Filter.Overdue ? Color.Error : Color.Default)"
+                           Variant="@(_filter == Filter.Overdue ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => SetFilter(Filter.Overdue))">Zaległe (@OverdueCount)</MudButton>
+                <MudButton Color="@(_filter == Filter.Paid ? Color.Success : Color.Default)"
+                           Variant="@(_filter == Filter.Paid ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => SetFilter(Filter.Paid))">Opłacone (@PaidCount)</MudButton>
+                <MudButton Color="@(_filter == Filter.Cancelled ? Color.Default : Color.Default)"
+                           Variant="@(_filter == Filter.Cancelled ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => SetFilter(Filter.Cancelled))">Anulowane (@CancelledCount)</MudButton>
+            </MudButtonGroup>
+            <MudSpacer />
+            <MudTextField @bind-Value="_search" Placeholder="Szukaj klient / # wynajmu"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Style="max-width: 260px;" />
+        </MudStack>
+
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (FilteredRows.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined">
+                Brak płatności pasujących do filtra.
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="FilteredRows" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Wynajem</MudTh>
+                    <MudTh>Klient</MudTh>
+                    <MudTh>Kwota</MudTh>
+                    <MudTh>Termin</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Metoda</MudTh>
+                    <MudTh Style="text-align: right;">Akcje</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="row">
+                    <MudTd>
+                        <a href="/admin/rentals" class="rs-pay-link">#@row.RentalId.ToString()[..8].ToUpper()</a>
+                    </MudTd>
+                    <MudTd>@row.CustomerName</MudTd>
+                    <MudTd Style="font-weight: 600;">@row.Amount.Pln()</MudTd>
+                    <MudTd>@row.DueDate.ToString("dd.MM.yyyy")</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@row.StatusColor" Variant="Variant.Filled">
+                            @row.StatusText
+                        </MudChip>
+                    </MudTd>
+                    <MudTd>@(string.IsNullOrEmpty(row.Method) ? "—" : row.Method)</MudTd>
+                    <MudTd Style="text-align: right;">
+                        @if (!row.IsPaid && row.Status != RentalStatus.Cancelled)
+                        {
+                            <MudTooltip Text="Oznacz jako opłacone">
+                                <MudIconButton Icon="@Icons.Material.Filled.Paid" Color="Color.Success"
+                                               OnClick="() => MarkPaid(row)" Size="Size.Small" />
+                            </MudTooltip>
+                            <MudTooltip Text="Wyślij przypomnienie SMS">
+                                <MudIconButton Icon="@Icons.Material.Filled.Sms" Color="Color.Warning"
+                                               OnClick="() => SendPaymentReminder(row)" Size="Size.Small" />
+                            </MudTooltip>
+                        }
+                        else if (row.IsPaid)
+                        {
+                            <MudTooltip Text="Zwrot płatności">
+                                <MudIconButton Icon="@Icons.Material.Filled.Undo" Color="Color.Error"
+                                               OnClick="() => RefundPayment(row)" Size="Size.Small" />
+                            </MudTooltip>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+<style>
+    .rs-pay-kpi {
+        border-radius: 14px;
+        background: #FFFFFF;
+        border: 1px solid var(--line, #DDE2EC);
+        transition: transform 120ms;
+    }
+    .rs-pay-kpi:hover { transform: translateY(-1px); }
+    .rs-pay-kpi-label { font-size: 0.75rem; color: rgba(0,0,0,0.55); text-transform: uppercase; letter-spacing: 0.04em; }
+    .rs-pay-kpi-value { font-size: 1.6rem; font-weight: 700; margin-top: 0.25rem; }
+    .rs-pay-kpi-sub { font-size: 0.78rem; color: rgba(0,0,0,0.55); margin-top: 0.1rem; }
+    .rs-pay-kpi-pending .rs-pay-kpi-value { color: #ff9800; }
+    .rs-pay-kpi-overdue .rs-pay-kpi-value { color: #f44336; }
+    .rs-pay-kpi-paid .rs-pay-kpi-value { color: #2e7d32; }
+    .rs-pay-kpi-month .rs-pay-kpi-value { color: #1B2350; }
+    .rs-pay-link { color: var(--coral-600, #E04A50); text-decoration: none; font-weight: 600; }
+    .rs-pay-link:hover { text-decoration: underline; }
+    [data-theme="dark"] .rs-pay-kpi,
+    .mud-theme-dark .rs-pay-kpi { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+    [data-theme="dark"] .rs-pay-kpi-label,
+    .mud-theme-dark .rs-pay-kpi-label,
+    [data-theme="dark"] .rs-pay-kpi-sub,
+    .mud-theme-dark .rs-pay-kpi-sub { color: rgba(232,235,245,0.65); }
+    [data-theme="dark"] .rs-pay-kpi-month .rs-pay-kpi-value,
+    .mud-theme-dark .rs-pay-kpi-month .rs-pay-kpi-value { color: #E8EBF5; }
+</style>
+
+@code {
+    enum Filter { All, Pending, Overdue, Paid, Cancelled }
+
+    private bool _loading = true;
+    private Filter _filter = Filter.All;
+    private string _search = string.Empty;
+    private List<PaymentRow> _rows = new();
+
+    private record PaymentRow(
+        Guid RentalId, string CustomerName, decimal Amount, DateTime DueDate,
+        RentalStatus Status, bool IsPaid, bool IsOverdue, string? Method,
+        string StatusText, Color StatusColor);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(tenantId);
+
+        var today = DateTime.UtcNow;
+        var rentals = await db.Rentals
+            .Include(r => r.Customer)
+            .AsNoTracking()
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Take(500)
+            .ToListAsync();
+
+        _rows = rentals.Select(r =>
+        {
+            var paid = RentalGuards.IsRentalPaid(r);
+            var overdue = !paid && r.Status != RentalStatus.Cancelled && r.Status != RentalStatus.Completed
+                          && r.StartDateUtc < today;
+            var (txt, col) = (paid, r.Status, overdue) switch
+            {
+                (_, RentalStatus.Cancelled, _) => ("Anulowane", Color.Default),
+                (true, _, _)                    => ("Opłacone", Color.Success),
+                (_, _, true)                    => ("Zaległe", Color.Error),
+                _                               => ("Oczekuje", Color.Warning)
+            };
+            return new PaymentRow(
+                RentalId: r.Id,
+                CustomerName: r.Customer?.FullName ?? "—",
+                Amount: r.TotalAmount,
+                DueDate: r.StartDateUtc.ToLocalTime(),
+                Status: r.Status,
+                IsPaid: paid,
+                IsOverdue: overdue,
+                Method: r.PaymentMethod,
+                StatusText: txt,
+                StatusColor: col);
+        }).ToList();
+
+        _loading = false;
+    }
+
+    private void SetFilter(Filter f) => _filter = f;
+
+    private List<PaymentRow> FilteredRows
+    {
+        get
+        {
+            IEnumerable<PaymentRow> q = _rows;
+            q = _filter switch
+            {
+                Filter.Pending   => q.Where(r => !r.IsPaid && !r.IsOverdue && r.Status != RentalStatus.Cancelled),
+                Filter.Overdue   => q.Where(r => r.IsOverdue),
+                Filter.Paid      => q.Where(r => r.IsPaid),
+                Filter.Cancelled => q.Where(r => r.Status == RentalStatus.Cancelled),
+                _                => q
+            };
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var s = _search.Trim();
+                q = q.Where(r => r.CustomerName.Contains(s, StringComparison.OrdinalIgnoreCase)
+                              || r.RentalId.ToString().Contains(s, StringComparison.OrdinalIgnoreCase));
+            }
+            return q.ToList();
+        }
+    }
+
+    private int AllCount => _rows.Count;
+    private int PendingCount => _rows.Count(r => !r.IsPaid && !r.IsOverdue && r.Status != RentalStatus.Cancelled);
+    private int OverdueCount => _rows.Count(r => r.IsOverdue);
+    private int PaidCount => _rows.Count(r => r.IsPaid);
+    private int CancelledCount => _rows.Count(r => r.Status == RentalStatus.Cancelled);
+
+    private decimal DueTodayAmount => _rows
+        .Where(r => !r.IsPaid && r.Status != RentalStatus.Cancelled && r.DueDate.Date == DateTime.Today)
+        .Sum(r => r.Amount);
+    private int DueTodayCount => _rows.Count(r => !r.IsPaid && r.Status != RentalStatus.Cancelled && r.DueDate.Date == DateTime.Today);
+    private decimal OverdueAmount => _rows.Where(r => r.IsOverdue).Sum(r => r.Amount);
+    private decimal PaidTodayAmount => _rows
+        .Where(r => r.IsPaid && r.DueDate.Date == DateTime.Today)
+        .Sum(r => r.Amount);
+    private int PaidTodayCount => _rows.Count(r => r.IsPaid && r.DueDate.Date == DateTime.Today);
+    private decimal MonthRevenueAmount
+    {
+        get
+        {
+            var firstOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            return _rows.Where(r => r.IsPaid && r.DueDate >= firstOfMonth).Sum(r => r.Amount);
+        }
+    }
+
+    private async Task MarkPaid(PaymentRow row)
+    {
+        var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.MarkAsPaidDialog>();
+        // Rebuild Rental stub for the dialog (only TotalAmount + Id matter for display)
+        parameters.Add(x => x.Rental, new Rental { Id = row.RentalId, TotalAmount = row.Amount });
+        var dialog = await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.MarkAsPaidDialog>("Płatność", parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled || result.Data is not string method) return;
+
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(TenantProvider.GetCurrentTenantId() ?? Guid.Empty);
+            var now = DateTime.UtcNow;
+            await db.Rentals.Where(r => r.Id == row.RentalId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.PaymentStatus, "DepositPaid")
+                    .SetProperty(r => r.PaymentMethod, method)
+                    .SetProperty(r => r.PaidAtUtc, now));
+            Snackbar.Add($"Wynajem #{row.RentalId.ToString()[..8].ToUpper()} oznaczony jako opłacony ({method}).",
+                MudBlazor.Severity.Success);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private async Task SendPaymentReminder(PaymentRow row)
+    {
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(TenantProvider.GetCurrentTenantId() ?? Guid.Empty);
+            var customer = await db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.FullName == row.CustomerName);
+            if (customer?.PhoneNumber is null)
+            {
+                Snackbar.Add("Klient nie ma numeru telefonu.", MudBlazor.Severity.Warning);
+                return;
+            }
+            await SmsSender.SendAsync(customer.PhoneNumber,
+                $"RentSpot: przypominamy o płatności {row.Amount:0.00} zł za wynajem #{row.RentalId.ToString()[..8].ToUpper()}.");
+            Snackbar.Add("Przypomnienie wysłane.", MudBlazor.Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd wysyłki SMS: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+
+    private async Task RefundPayment(PaymentRow row)
+    {
+        var confirm = await DialogService.ShowMessageBox("Zwrot płatności",
+            $"Cofnąć płatność dla wynajmu #{row.RentalId.ToString()[..8].ToUpper()}? Zostanie oznaczona jako zwrócona.",
+            yesText: "Zwróć", cancelText: "Anuluj");
+        if (confirm != true) return;
+        try
+        {
+            await using var db = await DbFactory.CreateDbContextAsync();
+            db.SetTenant(TenantProvider.GetCurrentTenantId() ?? Guid.Empty);
+            await db.Rentals.Where(r => r.Id == row.RentalId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(r => r.PaymentStatus, "Refunded")
+                    .SetProperty(r => r.PaidAtUtc, (DateTime?)null));
+            Snackbar.Add("Płatność oznaczona jako zwrócona.", MudBlazor.Severity.Info);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd zwrotu: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+}

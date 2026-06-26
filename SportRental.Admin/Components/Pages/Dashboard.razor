@@ -80,6 +80,46 @@
         </MudItem>
     </MudGrid>
 
+    @* NXRE r2 punkt 2: rząd kafelków płatności — szybki podgląd kasy *@
+    <MudGrid Class="mt-3" Spacing="3">
+        <MudItem xs="12" sm="6" md="3">
+            <a href="/admin/payments" class="rs-kpi-card">
+                <div class="rs-kpi-icon rs-kpi-icon-pay-pending"><MudIcon Icon="@Icons.Material.Filled.HourglassEmpty" /></div>
+                <div class="rs-kpi-text">
+                    <div class="rs-kpi-value">@((metrics?.DueTodayAmount ?? 0m).Pln())</div>
+                    <div class="rs-kpi-label">Do zapłaty dziś</div>
+                </div>
+            </a>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <a href="/admin/payments" class="rs-kpi-card">
+                <div class="rs-kpi-icon rs-kpi-icon-pay-overdue"><MudIcon Icon="@Icons.Material.Filled.Warning" /></div>
+                <div class="rs-kpi-text">
+                    <div class="rs-kpi-value">@((metrics?.OverdueAmount ?? 0m).Pln())</div>
+                    <div class="rs-kpi-label">Zaległe</div>
+                </div>
+            </a>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <a href="/admin/payments" class="rs-kpi-card">
+                <div class="rs-kpi-icon rs-kpi-icon-pay-ok"><MudIcon Icon="@Icons.Material.Filled.Paid" /></div>
+                <div class="rs-kpi-text">
+                    <div class="rs-kpi-value">@((metrics?.PaidTodayAmount ?? 0m).Pln())</div>
+                    <div class="rs-kpi-label">Opłacone dziś</div>
+                </div>
+            </a>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="3">
+            <a href="/admin/payments" class="rs-kpi-card">
+                <div class="rs-kpi-icon rs-kpi-icon-pay-month"><MudIcon Icon="@Icons.Material.Filled.CalendarMonth" /></div>
+                <div class="rs-kpi-text">
+                    <div class="rs-kpi-value">@((metrics?.MonthRevenue ?? 0m).Pln())</div>
+                    <div class="rs-kpi-label">Przychód miesiąca</div>
+                </div>
+            </a>
+        </MudItem>
+    </MudGrid>
+
     @* Dzisiaj do zrobienia + Alerty (Maciej) *@
     <MudGrid Class="mt-4" Spacing="3">
         <MudItem xs="12" md="6">
@@ -327,6 +367,10 @@
     .rs-kpi-icon-return { background: #DD8413; }
     .rs-kpi-icon-stock { background: #2E66C8; }
     .rs-kpi-icon-revenue { background: #F96167; }
+    .rs-kpi-icon-pay-pending { background: #DD8413; }
+    .rs-kpi-icon-pay-overdue { background: #C62828; }
+    .rs-kpi-icon-pay-ok { background: #1F9D61; }
+    .rs-kpi-icon-pay-month { background: #1B2350; }
     .rs-kpi-value { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
     .rs-kpi-label { font-size: 0.85rem; color: #5B6B82; margin-top: 2px; }
 

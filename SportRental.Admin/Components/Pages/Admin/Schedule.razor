@@ -4,6 +4,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IDialogService DialogService
 
 <PageTitle>Kalendarz Rezerwacji</PageTitle>
 
@@ -429,11 +430,25 @@ else
         await Load();
     }
 
+    // NXRE r2 punkt E: klik w dzień otwiera drilldown z wydaniami/zwrotami/umowami/płatnościami.
+    // Stary skok do widoku Day dostępny w dialogu jako "Pokaż dzień w pełnym widoku".
     private async Task OnDayClick(DateTime day)
     {
-        _view = ViewMode.Day;
-        range = new MudBlazor.DateRange(day.Date, day.Date);
-        await Load();
+        var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.DayDetailDialog>
+        {
+            { x => x.Day, day },
+            { x => x.OnFullDayView, EventCallback.Factory.Create<DateTime>(this, async d =>
+                {
+                    _view = ViewMode.Day;
+                    range = new MudBlazor.DateRange(d.Date, d.Date);
+                    await Load();
+                })
+            }
+        };
+        await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.DayDetailDialog>(
+            day.ToString("dddd, dd MMMM yyyy"),
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true });
     }
 
     private Guid _cachedTenantId = Guid.Empty;

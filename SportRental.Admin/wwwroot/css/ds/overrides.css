@@ -317,3 +317,187 @@ body, .mud-layout {
     bottom: 18px !important;  /* (input-height ~56px - icon 20px) / 2 ≈ 18 */
     transform: none !important;
 }
+
+/* ============================================
+   DARK MODE — globalny pass dla wszystkich .rs-* card-like elementów
+   i MudBlazor surfaces. Naprawia "zmiana motywu prawie nic nie zmienia".
+   Wszystkie reguły zdublowane dla [data-theme="dark"] (custom) i .mud-theme-dark (MudBlazor).
+   ============================================ */
+
+/* MudPaper / MudCard / MudTable — domyślne białe tło → semi-transparent na navy */
+[data-theme="dark"] .mud-paper:not(.rs-page-banner):not(.rs-dash-hero):not(.rs-payments-banner):not(.rs-contracts-banner),
+.mud-theme-dark .mud-paper:not(.rs-page-banner):not(.rs-dash-hero):not(.rs-payments-banner):not(.rs-contracts-banner) {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    color: #E8EBF5 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+[data-theme="dark"] .mud-paper.mud-paper-outlined,
+.mud-theme-dark .mud-paper.mud-paper-outlined {
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+[data-theme="dark"] .mud-table,
+.mud-theme-dark .mud-table {
+    background-color: transparent !important;
+    color: #E8EBF5 !important;
+}
+[data-theme="dark"] .mud-table thead .mud-table-cell,
+.mud-theme-dark .mud-table thead .mud-table-cell {
+    color: rgba(232, 235, 245, 0.7) !important;
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+[data-theme="dark"] .mud-table tbody .mud-table-cell,
+.mud-theme-dark .mud-table tbody .mud-table-cell {
+    color: #E8EBF5 !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+[data-theme="dark"] .mud-table tbody tr.mud-table-row:hover,
+.mud-theme-dark .mud-table tbody tr.mud-table-row:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Dashboard KPI cards */
+[data-theme="dark"] .rs-kpi-card,
+.mud-theme-dark .rs-kpi-card {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+[data-theme="dark"] .rs-kpi-value,
+.mud-theme-dark .rs-kpi-value { color: #E8EBF5 !important; }
+[data-theme="dark"] .rs-kpi-label,
+.mud-theme-dark .rs-kpi-label { color: rgba(232, 235, 245, 0.7) !important; }
+
+/* Dashboard "Dzisiaj do zrobienia" / "Alerty" / TODO cards */
+[data-theme="dark"] .rs-todo-card,
+[data-theme="dark"] .rs-alerts-card,
+[data-theme="dark"] .rs-timeline-card,
+.mud-theme-dark .rs-todo-card,
+.mud-theme-dark .rs-alerts-card,
+.mud-theme-dark .rs-timeline-card {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #E8EBF5 !important;
+}
+[data-theme="dark"] .rs-section-head h3,
+.mud-theme-dark .rs-section-head h3 { color: #E8EBF5 !important; }
+[data-theme="dark"] .rs-todo-tile,
+.mud-theme-dark .rs-todo-tile {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Payments page KPI tiles */
+[data-theme="dark"] .rs-pay-kpi,
+.mud-theme-dark .rs-pay-kpi {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+[data-theme="dark"] .rs-pay-kpi-month .rs-pay-kpi-value,
+.mud-theme-dark .rs-pay-kpi-month .rs-pay-kpi-value { color: #E8EBF5 !important; }
+
+/* Day detail dialog tiles */
+[data-theme="dark"] .rs-day-tile,
+.mud-theme-dark .rs-day-tile {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+[data-theme="dark"] .rs-day-tile .lbl,
+.mud-theme-dark .rs-day-tile .lbl { color: rgba(232, 235, 245, 0.65) !important; }
+
+/* MudTabs — aktywny taby + indykator */
+[data-theme="dark"] .mud-tabs-toolbar,
+.mud-theme-dark .mud-tabs-toolbar {
+    background-color: transparent !important;
+}
+[data-theme="dark"] .mud-tab,
+.mud-theme-dark .mud-tab { color: rgba(232, 235, 245, 0.7) !important; }
+[data-theme="dark"] .mud-tab.mud-tab-active,
+.mud-theme-dark .mud-tab.mud-tab-active { color: var(--coral-500, #F96167) !important; }
+
+/* MudChip Outlined — czytelność w dark */
+[data-theme="dark"] .mud-chip-outlined,
+.mud-theme-dark .mud-chip-outlined {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: #E8EBF5 !important;
+}
+
+/* MudDialog content — domyślne białe tło */
+[data-theme="dark"] .mud-dialog .mud-dialog-content,
+.mud-theme-dark .mud-dialog .mud-dialog-content,
+[data-theme="dark"] .mud-dialog .mud-dialog-actions,
+.mud-theme-dark .mud-dialog .mud-dialog-actions {
+    background-color: var(--navy-900, #1B2350) !important;
+    color: #E8EBF5 !important;
+}
+[data-theme="dark"] .mud-dialog .mud-dialog-title,
+.mud-theme-dark .mud-dialog .mud-dialog-title {
+    background-color: var(--navy-950, #0F1530) !important;
+    color: #E8EBF5 !important;
+}
+
+/* MudAlert Info/Warning/Success — w dark mocno jasne tła; przyciemniamy */
+[data-theme="dark"] .mud-alert.mud-alert-text-info,
+.mud-theme-dark .mud-alert.mud-alert-text-info {
+    background-color: rgba(46, 102, 200, 0.15) !important;
+    color: #E8EBF5 !important;
+}
+[data-theme="dark"] .mud-alert.mud-alert-text-warning,
+.mud-theme-dark .mud-alert.mud-alert-text-warning {
+    background-color: rgba(221, 132, 19, 0.18) !important;
+    color: #FFF1DD !important;
+}
+[data-theme="dark"] .mud-alert.mud-alert-text-success,
+.mud-theme-dark .mud-alert.mud-alert-text-success {
+    background-color: rgba(31, 157, 97, 0.18) !important;
+    color: #DDF5E8 !important;
+}
+[data-theme="dark"] .mud-alert.mud-alert-text-error,
+.mud-theme-dark .mud-alert.mud-alert-text-error {
+    background-color: rgba(198, 40, 40, 0.18) !important;
+    color: #FFE0E0 !important;
+}
+
+/* MudDivider — w dark prawie niewidoczny */
+[data-theme="dark"] .mud-divider,
+.mud-theme-dark .mud-divider {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* MudExpansionPanel — białe tło → semi-transparent */
+[data-theme="dark"] .mud-expansion-panels .mud-expand-panel,
+.mud-theme-dark .mud-expansion-panels .mud-expand-panel {
+    background: rgba(255, 255, 255, 0.04) !important;
+    color: #E8EBF5 !important;
+}
+
+/* Page banners w dark zostają navy (ok bo już ciemne) — ale tekst dodatkowo wzmacniamy */
+[data-theme="dark"] .rs-page-banner,
+.mud-theme-dark .rs-page-banner,
+[data-theme="dark"] .rs-payments-banner,
+.mud-theme-dark .rs-payments-banner,
+[data-theme="dark"] .rs-contracts-banner,
+.mud-theme-dark .rs-contracts-banner,
+[data-theme="dark"] .rs-dash-hero,
+.mud-theme-dark .rs-dash-hero {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Inputy domyślne w dark — Filled variant białe tło → semi-transparent */
+[data-theme="dark"] .mud-input.mud-input-filled,
+.mud-theme-dark .mud-input.mud-input-filled {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+}
+[data-theme="dark"] .mud-input.mud-input-filled input,
+.mud-theme-dark .mud-input.mud-input-filled input,
+[data-theme="dark"] .mud-input.mud-input-outlined input,
+.mud-theme-dark .mud-input.mud-input-outlined input {
+    color: #E8EBF5 !important;
+}
+[data-theme="dark"] .mud-input-label,
+.mud-theme-dark .mud-input-label {
+    color: rgba(232, 235, 245, 0.65) !important;
+}
+[data-theme="dark"] .mud-input-helper-text,
+.mud-theme-dark .mud-input-helper-text {
+    color: rgba(232, 235, 245, 0.5) !important;
+}

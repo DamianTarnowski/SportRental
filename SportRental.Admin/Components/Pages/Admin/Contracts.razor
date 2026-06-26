@@ -1,0 +1,212 @@
+@page "/admin/contracts"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Owner,SuperAdmin,Employee")]
+@using SportRental.Infrastructure.Domain
+@using SportRental.Shared.Formatting
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject SportRental.Admin.Services.Email.IEmailSender EmailSender
+@inject IJSRuntime JS
+
+<PageTitle>Umowy — RentSpot</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-3">
+    @* Header *@
+    <MudPaper Class="pa-4 mb-3 rs-contracts-banner" Elevation="0"
+              Style="background: #1B2350; color: #E8EBF5; border-radius: 16px;">
+        <MudStack Row="true" Class="mud-align-center" Spacing="3">
+            <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" />
+            <div>
+                <MudText Typo="Typo.h5" Style="font-weight: 700;">Umowy</MudText>
+                <MudText Typo="Typo.body2" Style="opacity: 0.85;">
+                    Lista wygenerowanych umów wynajmu. Możesz podejrzeć, pobrać, wysłać e-mailem lub wydrukować każdą.
+                </MudText>
+            </div>
+        </MudStack>
+    </MudPaper>
+
+    @* Filtry *@
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3 mb-3" Style="border-radius: 14px;">
+        <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap" Class="mud-align-center">
+            <MudDateRangePicker @bind-DateRange="_dateRange" Label="Zakres dat"
+                                Variant="Variant.Outlined" Margin="Margin.Dense"
+                                Style="max-width: 320px;" />
+            <MudTextField @bind-Value="_search" Placeholder="Klient / # umowy"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Style="max-width: 280px;" />
+            <MudSpacer />
+            <MudText Typo="Typo.body2" Color="Color.Default">
+                <strong>@FilteredRows.Count</strong> umów
+            </MudText>
+        </MudStack>
+    </MudPaper>
+
+    @* Tabela *@
+    <MudPaper Elevation="0" Outlined="true" Class="pa-3" Style="border-radius: 16px;">
+        @if (_loading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (FilteredRows.Count == 0)
+        {
+            <MudAlert Severity="Severity.Info" Dense="true" Variant="Variant.Outlined">
+                Brak wygenerowanych umów w wybranym zakresie. Utwórz wynajem i kliknij „Wygeneruj umowę".
+            </MudAlert>
+        }
+        else
+        {
+            <MudTable Items="FilteredRows" Hover="true" Dense="true" Elevation="0">
+                <HeaderContent>
+                    <MudTh>Numer</MudTh>
+                    <MudTh>Klient</MudTh>
+                    <MudTh>Data utworzenia</MudTh>
+                    <MudTh>Wynajem</MudTh>
+                    <MudTh>Kwota</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh Style="text-align: right;">Akcje</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="row">
+                    <MudTd Style="font-weight: 600;">UM/@row.CreatedAtLocal.Year/@row.SequenceShort</MudTd>
+                    <MudTd>@row.CustomerName</MudTd>
+                    <MudTd>@row.CreatedAtLocal.ToString("dd.MM.yyyy")</MudTd>
+                    <MudTd>
+                        @row.StartLocal.ToString("dd.MM") – @row.EndLocal.ToString("dd.MM.yyyy")
+                    </MudTd>
+                    <MudTd>@row.Amount.Pln()</MudTd>
+                    <MudTd>
+                        <MudChip T="string" Size="Size.Small" Color="@row.StatusColor" Variant="Variant.Filled">
+                            @row.StatusText
+                        </MudChip>
+                    </MudTd>
+                    <MudTd Style="text-align: right;">
+                        <MudTooltip Text="Otwórz / pobierz PDF">
+                            <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Color="Color.Primary"
+                                           OnClick="() => OpenPdf(row)" Size="Size.Small" />
+                        </MudTooltip>
+                        <MudTooltip Text="Wyślij e-mailem">
+                            <MudIconButton Icon="@Icons.Material.Filled.Email" Color="Color.Info"
+                                           OnClick="() => EmailContract(row)" Size="Size.Small" />
+                        </MudTooltip>
+                        <MudTooltip Text="Drukuj">
+                            <MudIconButton Icon="@Icons.Material.Filled.Print" Color="Color.Default"
+                                           OnClick="() => PrintPdf(row)" Size="Size.Small" />
+                        </MudTooltip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private bool _loading = true;
+    private string _search = string.Empty;
+    private DateRange? _dateRange = new DateRange(DateTime.Today.AddMonths(-3), DateTime.Today);
+    private List<ContractRow> _rows = new();
+
+    private record ContractRow(
+        Guid RentalId, string ContractUrl, string CustomerName, string? CustomerEmail,
+        DateTime CreatedAtLocal, DateTime StartLocal, DateTime EndLocal,
+        decimal Amount, RentalStatus Status, string SequenceShort,
+        string StatusText, Color StatusColor);
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(tenantId);
+
+        var rentals = await db.Rentals
+            .Include(r => r.Customer)
+            .AsNoTracking()
+            .Where(r => r.ContractUrl != null && r.ContractUrl != "")
+            .OrderByDescending(r => r.CreatedAtUtc)
+            .Take(500)
+            .ToListAsync();
+
+        _rows = rentals.Select(r =>
+        {
+            var (txt, col) = r.Status switch
+            {
+                RentalStatus.Completed => ("Zakończona", Color.Success),
+                RentalStatus.Active    => ("Aktywna", Color.Success),
+                RentalStatus.Confirmed => ("Oczekuje wydania", Color.Info),
+                RentalStatus.Pending   => ("Oczekuje płatności", Color.Warning),
+                RentalStatus.Cancelled => ("Anulowana", Color.Default),
+                _                      => ("Szkic", Color.Default)
+            };
+            return new ContractRow(
+                RentalId: r.Id,
+                ContractUrl: r.ContractUrl!,
+                CustomerName: r.Customer?.FullName ?? "—",
+                CustomerEmail: r.Customer?.Email,
+                CreatedAtLocal: r.CreatedAtUtc.ToLocalTime(),
+                StartLocal: r.StartDateUtc.ToLocalTime(),
+                EndLocal: r.EndDateUtc.ToLocalTime(),
+                Amount: r.TotalAmount,
+                Status: r.Status,
+                SequenceShort: r.Id.ToString()[..6].ToUpper(),
+                StatusText: txt, StatusColor: col);
+        }).ToList();
+
+        _loading = false;
+    }
+
+    private List<ContractRow> FilteredRows
+    {
+        get
+        {
+            IEnumerable<ContractRow> q = _rows;
+            if (_dateRange?.Start.HasValue == true)
+                q = q.Where(r => r.CreatedAtLocal.Date >= _dateRange.Start!.Value.Date);
+            if (_dateRange?.End.HasValue == true)
+                q = q.Where(r => r.CreatedAtLocal.Date <= _dateRange.End!.Value.Date);
+            if (!string.IsNullOrWhiteSpace(_search))
+            {
+                var s = _search.Trim();
+                q = q.Where(r => r.CustomerName.Contains(s, StringComparison.OrdinalIgnoreCase)
+                              || r.SequenceShort.Contains(s, StringComparison.OrdinalIgnoreCase));
+            }
+            return q.ToList();
+        }
+    }
+
+    private async Task OpenPdf(ContractRow row) =>
+        await JS.InvokeVoidAsync("open", row.ContractUrl, "_blank");
+
+    private async Task PrintPdf(ContractRow row) =>
+        // window.open() + auto-print przez query — w razie potrzeby viewer otworzy print dialog.
+        // Najprościej: otwórz w nowej karcie i user wciska Ctrl+P. CDP-driven print byłby przesadą.
+        await JS.InvokeVoidAsync("open", row.ContractUrl, "_blank");
+
+    private async Task EmailContract(ContractRow row)
+    {
+        if (string.IsNullOrWhiteSpace(row.CustomerEmail))
+        {
+            Snackbar.Add("Klient nie ma adresu e-mail.", MudBlazor.Severity.Warning);
+            return;
+        }
+        try
+        {
+            // Wysyłka linka do umowy zamiast attachmentu — PDF leży w blob storage.
+            var subject = $"Umowa wynajmu UM/{row.CreatedAtLocal.Year}/{row.SequenceShort}";
+            var html = $@"
+                <p>Dzień dobry, {System.Net.WebUtility.HtmlEncode(row.CustomerName)},</p>
+                <p>W załączeniu / pod linkiem przekazujemy umowę wynajmu sprzętu:</p>
+                <p><a href=""{row.ContractUrl}"">Pobierz umowę PDF</a></p>
+                <p>Pozdrawiamy,<br/>RentSpot</p>";
+            await EmailSender.SendEmailAsync(row.CustomerEmail, subject, html);
+            Snackbar.Add($"Umowa wysłana na {row.CustomerEmail}.", MudBlazor.Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Błąd wysyłki: {ex.Message}", MudBlazor.Severity.Error);
+        }
+    }
+}

@@ -1,0 +1,188 @@
+@using SportRental.Admin.Services.Guards
+@using SportRental.Infrastructure.Domain
+@using SportRental.Shared.Formatting
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
+@inject NavigationManager Nav
+
+<MudDialog>
+    <DialogContent>
+        <MudStack Spacing="3">
+            <div class="d-flex align-center">
+                <MudIcon Icon="@Icons.Material.Filled.Event" Color="Color.Primary" Class="mr-2" Size="Size.Large" />
+                <div>
+                    <MudText Typo="Typo.h6" Style="font-weight: 700;">@Day.ToString("dddd, dd MMMM yyyy")</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Default">Zdarzenia i statusy dla wybranego dnia</MudText>
+                </div>
+            </div>
+
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else
+            {
+                <MudGrid Spacing="2">
+                    <MudItem xs="6" md="3"><div class="rs-day-tile rs-day-tile-pickup"><div class="lbl">Wydania</div><div class="val">@_pickups.Count</div></div></MudItem>
+                    <MudItem xs="6" md="3"><div class="rs-day-tile rs-day-tile-return"><div class="lbl">Zwroty</div><div class="val">@_returns.Count</div></div></MudItem>
+                    <MudItem xs="6" md="3"><div class="rs-day-tile rs-day-tile-contract"><div class="lbl">Umowy</div><div class="val">@_contracts.Count</div></div></MudItem>
+                    <MudItem xs="6" md="3"><div class="rs-day-tile rs-day-tile-pay"><div class="lbl">Do zapłaty</div><div class="val">@_pendingPayments.Count</div></div></MudItem>
+                </MudGrid>
+
+                <MudTabs Elevation="0" Outlined="true" Rounded="true" PanelClass="pa-2" Style="border-radius: 10px;">
+                    <MudTabPanel Text="Wydania" Icon="@Icons.Material.Filled.Output" BadgeData="_pickups.Count" BadgeColor="Color.Warning">
+                        @if (_pickups.Count == 0) { <MudAlert Severity="Severity.Info" Dense="true">Brak wydań tego dnia.</MudAlert> }
+                        else
+                        {
+                            <MudList T="string" Dense="true">
+                                @foreach (var r in _pickups)
+                                {
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.Person" OnClick="@(() => GoToRental(r.Id))">
+                                        <MudStack Row="true" Spacing="2" Class="mud-space-between mud-align-center">
+                                            <div>
+                                                <strong>@r.Customer?.FullName</strong>
+                                                <MudText Typo="Typo.caption" Color="Color.Default">
+                                                    @r.StartDateUtc.ToLocalTime().ToString("HH:mm") → @r.EndDateUtc.ToLocalTime().ToString("dd.MM HH:mm") · @r.TotalAmount.Pln()
+                                                </MudText>
+                                            </div>
+                                            <MudChip T="string" Size="Size.Small"
+                                                     Color="@(RentalGuards.IsRentalPaid(r) ? Color.Success : Color.Error)"
+                                                     Variant="Variant.Filled">
+                                                @(RentalGuards.IsRentalPaid(r) ? "opłacone" : "do zapłaty")
+                                            </MudChip>
+                                        </MudStack>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudTabPanel>
+                    <MudTabPanel Text="Zwroty" Icon="@Icons.Material.Filled.Input" BadgeData="_returns.Count" BadgeColor="Color.Error">
+                        @if (_returns.Count == 0) { <MudAlert Severity="Severity.Info" Dense="true">Brak zwrotów tego dnia.</MudAlert> }
+                        else
+                        {
+                            <MudList T="string" Dense="true">
+                                @foreach (var r in _returns)
+                                {
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.Person" OnClick="@(() => GoToRental(r.Id))">
+                                        <strong>@r.Customer?.FullName</strong>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">
+                                            Zwrot do @r.EndDateUtc.ToLocalTime().ToString("HH:mm") · @r.TotalAmount.Pln()
+                                        </MudText>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudTabPanel>
+                    <MudTabPanel Text="Umowy" Icon="@Icons.Material.Filled.Description" BadgeData="_contracts.Count" BadgeColor="Color.Info">
+                        @if (_contracts.Count == 0) { <MudAlert Severity="Severity.Info" Dense="true">Brak umów wygenerowanych tego dnia.</MudAlert> }
+                        else
+                        {
+                            <MudList T="string" Dense="true">
+                                @foreach (var r in _contracts)
+                                {
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf"
+                                                 Href="@r.ContractUrl" Target="_blank">
+                                        UM/@r.CreatedAtUtc.ToLocalTime().Year/@r.Id.ToString()[..6].ToUpper() — @r.Customer?.FullName
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudTabPanel>
+                    <MudTabPanel Text="Płatności" Icon="@Icons.Material.Filled.Payments" BadgeData="_pendingPayments.Count" BadgeColor="Color.Warning">
+                        @if (_pendingPayments.Count == 0) { <MudAlert Severity="Severity.Info" Dense="true">Brak oczekujących płatności na ten dzień.</MudAlert> }
+                        else
+                        {
+                            <MudList T="string" Dense="true">
+                                @foreach (var r in _pendingPayments)
+                                {
+                                    <MudListItem T="string" Icon="@Icons.Material.Filled.HourglassEmpty" OnClick="@(() => GoToRental(r.Id))">
+                                        <strong>@r.Customer?.FullName</strong>
+                                        <MudText Typo="Typo.caption" Color="Color.Default">
+                                            @r.TotalAmount.Pln() · termin @r.StartDateUtc.ToLocalTime().ToString("dd.MM HH:mm")
+                                        </MudText>
+                                    </MudListItem>
+                                }
+                            </MudList>
+                        }
+                    </MudTabPanel>
+                </MudTabs>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="GoToDayView" StartIcon="@Icons.Material.Filled.OpenInFull" Variant="Variant.Text" Color="Color.Primary">
+            Pokaż dzień w pełnym widoku
+        </MudButton>
+        <MudButton OnClick="Close" Variant="Variant.Filled" Color="Color.Default">Zamknij</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .rs-day-tile {
+        border-radius: 12px;
+        padding: 0.75rem;
+        text-align: center;
+        background: rgba(0,0,0,0.03);
+        border: 1px solid rgba(0,0,0,0.06);
+    }
+    .rs-day-tile .lbl { font-size: 0.7rem; text-transform: uppercase; color: rgba(0,0,0,0.55); letter-spacing: 0.04em; }
+    .rs-day-tile .val { font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem; }
+    .rs-day-tile-pickup .val { color: #DD8413; }
+    .rs-day-tile-return .val { color: #C62828; }
+    .rs-day-tile-contract .val { color: #2E66C8; }
+    .rs-day-tile-pay .val { color: #DD8413; }
+</style>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public DateTime Day { get; set; }
+    [Parameter] public EventCallback<DateTime> OnFullDayView { get; set; }
+
+    private bool _loading = true;
+    private List<Rental> _pickups = new();
+    private List<Rental> _returns = new();
+    private List<Rental> _contracts = new();
+    private List<Rental> _pendingPayments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
+        await using var db = await DbFactory.CreateDbContextAsync();
+        db.SetTenant(tenantId);
+
+        var dayStart = DateTime.SpecifyKind(Day.Date, DateTimeKind.Local).ToUniversalTime();
+        var dayEnd = DateTime.SpecifyKind(Day.Date.AddDays(1), DateTimeKind.Local).ToUniversalTime();
+
+        _pickups = await db.Rentals.Include(r => r.Customer).AsNoTracking()
+            .Where(r => r.StartDateUtc >= dayStart && r.StartDateUtc < dayEnd
+                && r.Status != RentalStatus.Cancelled)
+            .OrderBy(r => r.StartDateUtc).ToListAsync();
+        _returns = await db.Rentals.Include(r => r.Customer).AsNoTracking()
+            .Where(r => r.EndDateUtc >= dayStart && r.EndDateUtc < dayEnd
+                && r.Status != RentalStatus.Cancelled)
+            .OrderBy(r => r.EndDateUtc).ToListAsync();
+        _contracts = await db.Rentals.Include(r => r.Customer).AsNoTracking()
+            .Where(r => r.ContractUrl != null && r.ContractUrl != ""
+                && r.CreatedAtUtc >= dayStart && r.CreatedAtUtc < dayEnd)
+            .OrderBy(r => r.CreatedAtUtc).ToListAsync();
+        _pendingPayments = _pickups
+            .Where(r => !RentalGuards.IsRentalPaid(r) && r.Status != RentalStatus.Cancelled)
+            .ToList();
+
+        _loading = false;
+    }
+
+    private void GoToRental(Guid rentalId)
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+        Nav.NavigateTo($"/admin/rentals?focus={rentalId}");
+    }
+
+    private async Task GoToDayView()
+    {
+        MudDialog.Close(DialogResult.Ok(true));
+        if (OnFullDayView.HasDelegate) await OnFullDayView.InvokeAsync(Day);
+    }
+
+    private void Close() => MudDialog.Cancel();
+}
