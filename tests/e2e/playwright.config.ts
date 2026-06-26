@@ -41,6 +41,22 @@ export default defineConfig({
       name: 'mobile',
       use: { ...devices['iPhone 14'] },
     },
+    // Cross-browser matrix (uruchamiane na R620 gdzie wszystkie 3 silniki są zainstalowane)
+    {
+      name: 'desktop-chromium',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+      testMatch: /cross-browser\.spec\.ts/,
+    },
+    {
+      name: 'desktop-firefox',
+      use: { ...devices['Desktop Firefox'], viewport: { width: 1440, height: 900 } },
+      testMatch: /cross-browser\.spec\.ts/,
+    },
+    {
+      name: 'desktop-webkit',
+      use: { ...devices['Desktop Safari'], viewport: { width: 1440, height: 900 } },
+      testMatch: /cross-browser\.spec\.ts/,
+    },
   ],
 
   expect: {
