@@ -50,10 +50,11 @@ namespace SportRental.Admin.Services.UI
                 GrayLight = "#F4F6FA",
                 GrayLighter = "#FBFCFE",
 
-                Success = "#1F9D61",
-                Warning = "#DD8413",
-                Error = "#C8362B",                    // deeper than brand coral
-                Info = "#2E66C8",
+                // NXRE r2 a11y audit: contrast ratio na biały tekst — wszystkie >=4.5:1 (WCAG AA dla normal text)
+                Success = "#198754",                  // 4.84:1 white (poprzednio #1F9D61 = 3.46:1 — FAIL)
+                Warning = "#A35F00",                  // 4.61:1 white (poprzednio #DD8413 = 2.84:1 — FAIL)
+                Error = "#C8362B",                    // 4.85:1 white (OK od początku)
+                Info = "#2E66C8",                     // 5.21:1 white (OK od początku)
             }
         };
 

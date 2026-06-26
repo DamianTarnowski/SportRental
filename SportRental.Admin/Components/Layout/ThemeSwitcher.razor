@@ -3,10 +3,11 @@
 
 @inject SportRental.Admin.Services.UI.ThemeService Theme
 
-<MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)" 
-               Color="Color.Inherit" 
-               OnClick="ToggleTheme" 
-               title="Przełącz motyw" />
+<MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+               Color="Color.Inherit"
+               OnClick="ToggleTheme"
+               Title="Przełącz motyw"
+               aria-label="Przełącz motyw" />
 
 @code {
     private bool _isDarkMode;

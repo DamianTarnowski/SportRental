@@ -3,3 +3,4 @@ test-results/
 playwright-report/
 playwright/.cache/
 *.log
+# UWAGA: __snapshots__/ NIE w gitignore — visual baselines mają być trackowane (regression detection)
