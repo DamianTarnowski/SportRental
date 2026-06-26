@@ -29,50 +29,42 @@
                                   Variant="Variant.Outlined"
                                   Dense="true" />
                     
-                    <MudGrid Spacing="2">
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Customer.Email"
-                                          Label="Email"
-                                          InputType="InputType.Email"
-                                          Adornment="Adornment.Start"
-                                          AdornmentIcon="@Icons.Material.Filled.Email"
-                                          Variant="Variant.Outlined"
-                                          Dense="true" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <PhoneInput @bind-Value="Customer.PhoneNumber"
-                                        Label="Telefon"
-                                        Variant="Variant.Outlined" />
-                        </MudItem>
-                    </MudGrid>
-                    
+                    @* Mobile fix: zamieniliśmy MudGrid (2 kolumny na sm+) na flat MudStack,
+                       bo na mobile MudGrid + Spacing="2" + Dense="true" + długie HelperTexty
+                       powodował overflow/zachodzenie pól. Stack pionowy zawsze = pewne renderowanie. *@
+                    <MudTextField @bind-Value="Customer.Email"
+                                  Label="Email"
+                                  InputType="InputType.Email"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Email"
+                                  Variant="Variant.Outlined"
+                                  Dense="true" />
+                    <PhoneInput @bind-Value="Customer.PhoneNumber"
+                                Label="Telefon"
+                                Variant="Variant.Outlined" />
+
                     @* NXRE QA #12: jasny typ dokumentu + opis adresu *@
-                    <MudGrid Spacing="2">
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Customer.DocumentNumber"
-                                          Label="Nr dokumentu (PESEL lub dowód)"
-                                          Adornment="Adornment.Start"
-                                          AdornmentIcon="@Icons.Material.Filled.Badge"
-                                          Variant="Variant.Outlined"
-                                          Dense="true"
-                                          HelperText="11-cyfrowy PESEL lub seria i numer dowodu (np. ABC 123456). Pomiń jeśli nie wymagasz dokumentu."
-                                          Validation="@(new Func<string?, string?>(ValidateDocumentNumber))" />
-                        </MudItem>
-                        <MudItem xs="12" sm="6">
-                            <MudTextField @bind-Value="Customer.Address"
-                                          Label="Adres"
-                                          Variant="Variant.Outlined"
-                                          Dense="true"
-                                          HelperText="Pełny adres: ulica i numer, kod pocztowy, miasto (np. ul. Rynek Jeżycki 1, 60-870 Poznań)" />
-                        </MudItem>
-                    </MudGrid>
-                    
+                    <MudTextField @bind-Value="Customer.DocumentNumber"
+                                  Label="Nr dokumentu (PESEL lub dowód)"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Badge"
+                                  Variant="Variant.Outlined"
+                                  Dense="true"
+                                  HelperText="11-cyfrowy PESEL lub seria i numer dowodu (np. ABC 123456). Pomiń jeśli nie wymagasz dokumentu."
+                                  Validation="@(new Func<string?, string?>(ValidateDocumentNumber))" />
+                    <MudTextField @bind-Value="Customer.Address"
+                                  Label="Adres"
+                                  Variant="Variant.Outlined"
+                                  Dense="true"
+                                  HelperText="Pełny adres: ulica i numer, kod pocztowy, miasto (np. ul. Rynek Jeżycki 1, 60-870 Poznań)" />
+
+                    @* Mobile fix: ASCII " w środku stringa Razor zamykał attribute — używamy apostrofów *@
                     <MudTextField @bind-Value="Customer.Notes"
                                   Label="Notatki"
                                   Lines="2"
                                   Variant="Variant.Outlined"
                                   Dense="true"
-                                  HelperText="Np. „woli SMS", „odbiera osobiście", „mówi po angielsku"" />
+                                  HelperText="Np. 'woli SMS', 'odbiera osobiście', 'mówi po angielsku'" />
 
                     @* Tagi (Maciej): VIP, firma, rower, narty *@
                     <MudText Typo="Typo.caption" Style="font-weight: 600;">Tagi</MudText>
