@@ -356,6 +356,14 @@ public class DemoTenantSeeder
             EndDateUtc = endUtc,
             Status = status,
             PaymentStatus = paymentStatus,
+            // Dla wynajmów opłaconych w seedzie ustawiamy PaidAtUtc tak żeby Dashboard tile
+            // "Przychód miesiąca" + Payments KPI miały realne dane od razu.
+            PaidAtUtc = paymentStatus is "DepositPaid" or "succeeded" or "paid" or "Paid"
+                ? (issuedAt ?? startUtc)
+                : (DateTime?)null,
+            PaymentMethod = paymentStatus is "DepositPaid" or "succeeded" or "paid" or "Paid"
+                ? "Cash"
+                : null,
             IssuedAtUtc = issuedAt,
             ReturnedAtUtc = returnedAt,
             TotalAmount = total,
