@@ -245,7 +245,23 @@
         letter-spacing: 0.04em;
     }
     @@media (max-width: 600px) {
-        .rs-demo-chip .mud-chip-content { padding-inline: 0.4rem; font-size: 0.7rem; }
+        .rs-demo-chip .mud-chip-content { padding-inline: 0.3rem; font-size: 0.65rem; letter-spacing: 0.02em; }
+        .rs-demo-chip { margin-right: 0.25rem; }
+        /* AppBar — ścieśnij gap żeby ostatnie ikony nie wypadały poza viewport iPhone 14 (390px) */
+        .rs-appbar.mud-appbar { padding-left: 6px !important; padding-right: 6px !important; gap: 4px !important; }
+        .rs-appbar.mud-appbar > * { margin-left: 0 !important; }
+        .rs-brand { margin-left: 4px; gap: 6px; }
+        .rs-brand-word { font-size: 1.05rem; }
+        /* Widok klienta — na bardzo wąskich ukryj external icon, zostaw tylko eye + zmniejsz padding */
+        .rs-client-preview { padding: 0.3rem 0.4rem; margin-right: 0.25rem; }
+    }
+    @@media (max-width: 480px) {
+        /* iPhone 14 / SE — TRYB DEMO chip skróć do "DEMO" via CSS pseudo (oryginalny tekst hidden) */
+        .rs-demo-chip .mud-chip-content { font-size: 0; padding-inline: 0.25rem; }
+        .rs-demo-chip .mud-chip-content::after { content: "DEMO"; font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em; }
+        .rs-demo-chip .mud-chip-icon { margin-right: 0 !important; }
+        /* Widok klienta — kompletnie ukryj, eye icon nie jest krytyczny na mobile (Owner i tak głównie używa na desktop) */
+        .rs-client-preview { display: none !important; }
     }
 </style>
 

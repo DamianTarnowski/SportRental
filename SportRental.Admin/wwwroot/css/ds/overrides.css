@@ -501,3 +501,9 @@ body, .mud-layout {
 .mud-theme-dark .mud-input-helper-text {
     color: rgba(232, 235, 245, 0.5) !important;
 }
+
+/* FloatingChat FAB — ukryj gdy otwarty MudDialog (zasłaniał przyciski akcji w dialogu, szczeg. mobile) */
+body:has(.mud-dialog-container) .floating-chat-container,
+body:has(.mud-overlay-dialog) .floating-chat-container {
+    display: none !important;
+}
