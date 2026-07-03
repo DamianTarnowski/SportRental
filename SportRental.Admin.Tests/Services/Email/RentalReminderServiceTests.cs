@@ -83,6 +83,8 @@ public class RentalReminderServiceTests : IDisposable
             StartDateUtc = DateTime.UtcNow.AddDays(-2),
             EndDateUtc = DateTime.UtcNow.AddHours(12),
             Status = RentalStatus.Active,
+            // Filtr serwisu wymaga wydanego sprzętu (IssuedAtUtc != null) — NXRE r2.
+            IssuedAtUtc = DateTime.UtcNow.AddDays(-2),
             TotalAmount = 100.00m,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-2)
         };
@@ -95,6 +97,7 @@ public class RentalReminderServiceTests : IDisposable
             StartDateUtc = DateTime.UtcNow.AddDays(-1),
             EndDateUtc = DateTime.UtcNow.AddDays(2),
             Status = RentalStatus.Active,
+            IssuedAtUtc = DateTime.UtcNow.AddDays(-1),
             TotalAmount = 150.00m,
             CreatedAtUtc = DateTime.UtcNow.AddDays(-1)
         };

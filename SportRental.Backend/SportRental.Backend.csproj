@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="..\SportRental.Admin\Data\**\*.cs" Exclude="..\SportRental.Admin\Data\Migrations\**\*.cs;..\SportRental.Admin\Data\DesignTimeApplicationDbContextFactory.cs;..\SportRental.Admin\Data\TestDataSeeder.cs;..\SportRental.Admin\Data\DemoDataSeeder.cs" Link="Data\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\SportRental.Admin\Data\**\*.cs" Exclude="..\SportRental.Admin\Data\Migrations\**\*.cs;..\SportRental.Admin\Data\DesignTimeApplicationDbContextFactory.cs;..\SportRental.Admin\Data\TestDataSeeder.cs;..\SportRental.Admin\Data\DemoDataSeeder.cs;..\SportRental.Admin\Data\DemoTenantSeeder.cs" Link="Data\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
