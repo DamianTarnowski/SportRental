@@ -33,7 +33,10 @@ public class RentalContractEmailIntegrationTests : IAsyncLifetime
     private CompanyInfo? _companyInfo;
     private readonly List<Guid> _createdRentalIds = new();
 
-    private const string ConnectionString = "Host=eduedu.postgres.database.azure.com;Database=sr;Username=synapsis;Password=HasloHaslo122@@@@;SSL Mode=Require";
+    // Testowa baza z env SR_TEST_DB (ustaw lokalnie przy testach integracyjnych) — bez sekretów w repo.
+    private static readonly string ConnectionString =
+        System.Environment.GetEnvironmentVariable("SR_TEST_DB")
+        ?? "Host=localhost;Port=5432;Database=sr_test;Username=postgres;Password=postgres;SSL Mode=Disable";
     
     // Email testowy - zmień na swój email żeby otrzymać test
     private const string TestRecipientEmail = "sportrental.kontakt@gmail.com";

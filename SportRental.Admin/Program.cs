@@ -819,7 +819,10 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    // Podnieś hdtdtr@gmail.com do SuperAdmin + Owner + Reset hasła
+    // Podnieś hdtdtr@gmail.com do SuperAdmin + Owner + Reset hasła.
+    // Hasło deweloperskie czytane z konfiguracji (user-secrets / env Admin__DevPassword) —
+    // NIE trzymamy sekretu w kodzie. Bez ustawienia tej wartości seed/reset hasła jest pomijany.
+    var devSeedPassword = config["Admin:DevPassword"];
     var hdUser = await userManager.FindByEmailAsync("hdtdtr@gmail.com");
     if (hdUser != null)
     {
@@ -842,17 +845,17 @@ using (var scope = app.Services.CreateScope())
         if (!await userManager.IsInRoleAsync(hdUser, RoleNames.Client))
             await userManager.AddToRoleAsync(hdUser, RoleNames.Client);
 
-        if (app.Environment.IsDevelopment())
+        if (app.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(devSeedPassword))
         {
             var resetToken = await userManager.GeneratePasswordResetTokenAsync(hdUser);
-            var resetResult = await userManager.ResetPasswordAsync(hdUser, resetToken, "HasloHaslo122@@@");
+            var resetResult = await userManager.ResetPasswordAsync(hdUser, resetToken, devSeedPassword);
             if (resetResult.Succeeded)
             {
-                Console.WriteLine($"🔑 [DEV] Hasło dla hdtdtr@gmail.com zresetowane do hasła deweloperskiego");
+                Console.WriteLine($"🔑 [DEV] Hasło dla hdtdtr@gmail.com zresetowane (Admin:DevPassword)");
             }
         }
     }
-    else if (app.Environment.IsDevelopment())
+    else if (app.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(devSeedPassword))
     {
         hdUser = new ApplicationUser
         {
@@ -861,7 +864,7 @@ using (var scope = app.Services.CreateScope())
             EmailConfirmed = true,
             TenantId = tenantId
         };
-        var createResult = await userManager.CreateAsync(hdUser, "HasloHaslo122@@@");
+        var createResult = await userManager.CreateAsync(hdUser, devSeedPassword);
         if (createResult.Succeeded)
         {
             await userManager.AddToRoleAsync(hdUser, RoleNames.SuperAdmin);

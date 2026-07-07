@@ -41,10 +41,10 @@ w kilku endpointach — zob. SEC-A03)"*.
 
 #### Opis
 
-Na każdym starcie aplikacji hasło użytkownika `hdtdtr@gmail.com` jest
-bezwarunkowo resetowane do wartości zapisanej w konfiguracji (domyślnie
-`HasloHaslo122@@@`). Kod **NIE jest** otoczony `if (app.Environment.IsDevelopment())`,
-więc działa również w produkcji na Azure App Service.
+Na każdym starcie aplikacji hasło użytkownika `hdtdtr@gmail.com` było
+resetowane do zahardkodowanej wartości. **STATUS: naprawione** — reset/seed
+jest teraz ograniczony do `IsDevelopment()` i czyta hasło z konfiguracji
+(`Admin:DevPassword`, user-secrets/env), a nie z literału w kodzie.
 
 #### Impact
 
