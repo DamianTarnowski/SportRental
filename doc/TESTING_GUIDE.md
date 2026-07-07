@@ -21,9 +21,9 @@
 **Terminal 1 - Backend API:**
 ```powershell
 cd SportRentalHybrid
-dotnet run --project SportRental.Api
+dotnet run --project SportRental.Admin --urls http://localhost:5001
 ```
-✅ **API ready at:** `https://localhost:7142`
+✅ **API ready at:** `http://localhost:5001`
 
 **Terminal 2 - Frontend Client:**
 ```powershell
@@ -371,7 +371,7 @@ THEN I see only 5 products (rowery)
 ### Stripe Issues
 
 **❌ "Cannot redirect to Stripe"**
-- **Fix:** Check if API is running on https://localhost:7142
+- **Fix:** Check if API is running on http://localhost:5001
 - **Fix:** Verify Stripe keys in Azure Key Vault
 
 **❌ "Webhooks not working"**

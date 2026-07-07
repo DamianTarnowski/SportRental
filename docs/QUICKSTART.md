@@ -55,7 +55,6 @@ cd SportRental
 
 1. **Copy template**:
    ```bash
-   cp appsettings.Development.json.template SportRental.Api/appsettings.Development.json
    cp appsettings.Development.json.template SportRental.Admin/appsettings.Development.json
    ```
 

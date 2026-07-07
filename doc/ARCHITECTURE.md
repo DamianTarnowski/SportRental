@@ -152,7 +152,6 @@ flowchart LR
 - Reaktywacja SportRental.MediaStorage gdy zmiana hostingu z Azure
 - Wyodrebnienie kolejnych uslug (np. powiadomienia) przy uzyciu kolejek.
 - MAUI front-end wykorzystujacy `SportRental.Shared` (opis w roadmapie).
-- Przygotowanie obrazow Docker dla kazdej uslugi.
 
 ## Nowe funkcje (grudzień 2025)
 - **Wynajem godzinowy** - obsługa `HourlyPrice`, `RentalType`, `HoursRented` w produktach i wynajmach

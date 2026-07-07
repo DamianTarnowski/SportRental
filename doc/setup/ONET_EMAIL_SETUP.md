@@ -34,14 +34,14 @@ Protocol:     SMTP
 #### **1. Konto Wypożyczalni (Sender):**
 ```
 Email:    contact.sportrental@op.pl
-Password: Wypozyczalnia123
+Password: <HASLO — przechowywane w Azure Key Vault jako Email--Smtp--Password>
 Role:     Email sender (nadawca emaili z systemu)
 ```
 
 #### **2. Konto Klienta Testowego (Recipient):**
 ```
 Email:    testklient@op.pl
-Password: HasloHaslo122@@@
+Password: <HASLO — przechowywane w Azure Key Vault jako Email--Smtp--Password>
 Role:     Test recipient (odbiorca testowych emaili)
 ```
 
@@ -58,7 +58,7 @@ Role:     Test recipient (odbiorca testowych emaili)
       "Port": "465",
       "EnableSsl": "true",
       "Username": "contact.sportrental@op.pl",
-      "Password": "Wypozyczalnia123",
+      "Password": "<HASLO — przechowywane w Azure Key Vault jako Email--Smtp--Password>",
       "SenderEmail": "contact.sportrental@op.pl",
       "SenderName": "SportRental - Wypożyczalnia Sprzętu"
     }
@@ -66,11 +66,11 @@ Role:     Test recipient (odbiorca testowych emaili)
   "TestAccounts": {
     "RentalOwner": {
       "Email": "contact.sportrental@op.pl",
-      "Password": "Wypozyczalnia123"
+      "Password": "<HASLO — przechowywane w Azure Key Vault jako Email--Smtp--Password>"
     },
     "TestCustomer": {
       "Email": "testklient@op.pl",
-      "Password": "HasloHaslo122@@@"
+      "Password": "<HASLO — przechowywane w Azure Key Vault jako Email--Smtp--Password>"
     }
   }
 }
@@ -230,7 +230,7 @@ Dla produkcji użyj:
 ```powershell
 # Przykład z user secrets:
 dotnet user-secrets set "Email:Smtp:Username" "contact.sportrental@op.pl"
-dotnet user-secrets set "Email:Smtp:Password" "Wypozyczalnia123"
+dotnet user-secrets set "Email:Smtp:Password" "<HASLO — przechowywane w Azure Key Vault jako Email--Smtp--Password>"
 ```
 
 ---
@@ -294,7 +294,7 @@ dotnet user-secrets set "Email:Smtp:Password" "Wypozyczalnia123"
 ```powershell
 # Sprawdź credentials w appsettings.Development.json
 # Username: contact.sportrental@op.pl
-# Password: Wypozyczalnia123
+# Password: <HASLO — przechowywane w Azure Key Vault jako Email--Smtp--Password>
 
 # Test manualnie:
 .\test-onet-email.ps1 -SendTestEmail
@@ -330,7 +330,7 @@ dotnet user-secrets set "Email:Smtp:Password" "Wypozyczalnia123"
 ```
 URL:      https://poczta.onet.pl
 Username: testklient@op.pl
-Password: HasloHaslo122@@@
+Password: <HASLO — przechowywane w Azure Key Vault jako Email--Smtp--Password>
 ```
 
 ---

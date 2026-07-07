@@ -37,7 +37,7 @@ Co się dzieje:
 
 ### 🎯 **Option 3: Visual Studio / Rider**
 
-1. Otwórz `SportRental.sln`
+1. Otwórz `SportRentalHybrid.sln`
 2. Kliknij prawym na solution → **Properties**
 3. **Multiple Startup Projects**
 4. Ustaw:
@@ -122,8 +122,10 @@ dotnet watch run
 # All tests
 dotnet test
 
-# Specific project
-dotnet test SportRental.Api.Tests
+# Specific project (in-solution test projects)
+dotnet test SportRental.Admin.Tests
+dotnet test SportRental.Client.Tests
+dotnet test SportRental.MediaStorage.Tests
 
 # With coverage
 dotnet test /p:CollectCoverage=true
@@ -162,12 +164,18 @@ lsof -ti:5001 | xargs kill
 **Przyczyna:** PostgreSQL nie działa
 
 **Rozwiązanie:**
-```bash
-# Check status
-docker ps | grep postgres
+```powershell
+# Windows: sprawdź lokalną usługę PostgreSQL
+Get-Service -Name "postgresql*"
+Start-Service -Name "postgresql*"
 
-# Start PostgreSQL
-docker start <container_id>
+# Sprawdź czy port 5432 nasłuchuje
+netstat -ano | findstr ":5432"
+```
+```bash
+# Linux/Mac: lokalna usługa PostgreSQL
+sudo systemctl status postgresql
+sudo systemctl start postgresql
 ```
 
 ---
@@ -188,12 +196,12 @@ Dla produkcji użyj **Azure Key Vault** (jak skonfigurowane w `Program.cs`).
 
 ```
 SportRental/
-├── SportRental.Admin/          # Blazor Server (Admin Panel + API)
-├── SportRental.Api/            # Minimal APIs (Public API)
+├── SportRental.Admin/          # Blazor Server (Admin Panel + API hostowane in-process)
+├── SportRental.Api/            # ⏸️ Pusty placeholder (bez kodu) - NIE uruchamiany
 ├── SportRental.Client/         # Blazor WASM (Public Client)
 ├── SportRental.Infrastructure/ # EF Core, Domain models
 ├── SportRental.Shared/         # Shared DTOs, Services
-├── SportRental.MediaStorage/   # Media microservice
+├── SportRental.MediaStorage/   # Opcjonalny/bezczynny - domyślnie pliki idą do Azure Blob
 └── SportRental.*.Tests/        # Test projects
 ```
 

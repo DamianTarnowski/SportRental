@@ -51,7 +51,7 @@ Projekt **SportRental.Api** jest wyłączony - przygotowany na przyszłość.
 - **Odpowiedz 200:** tablica `ProductDto`.
 ```http
 GET /api/products HTTP/1.1
-Host: localhost:7142
+Host: localhost:5001
 X-Tenant-Id: 00000000-0000-0000-0000-000000000000
 ```
 ```json
@@ -142,21 +142,21 @@ Przyklad zadania:
 - **Statusy:** `204 No Content`, `404 Not Found`.
 
 ### POST /api/payments/quote
-- **Opis:** oblicza kwot� ca�kowit� oraz depozyt dla przekazanych pozycji (mockowy kalkulator po stronie API).
+- **Opis:** oblicza kwot� ca�kowit� oraz depozyt dla przekazanych pozycji (kalkulacja cen po stronie Admin, przed utworzeniem sesji Stripe).
 - **Nag��wki:** `X-Tenant-Id`.
 - **Body:** `PaymentQuoteRequest`.
 - **Odpowied� 200:** `PaymentQuoteResponse` (zawiera `totalAmount`, `depositAmount`, `currency`, `rentalDays`).
 - **B��dy:** `400 Bad Request` (brak pozycji, niepoprawne daty, brak produktu).
 
 ### POST /api/payments/intents
-- **Opis:** tworzy mockow� intencj� p�atno�ci i od razu j� autoryzuje (status `Succeeded`).
+- **Opis:** tworzy prawdziw� p�atno�� Stripe (`StripePaymentGateway`) — Stripe Checkout Session + PaymentIntent. Status pozostaje `Pending`/`RequiresPaymentMethod` do momentu zap�aty przez klienta; finalizacja nast�puje przez webhook Stripe.
 - **Nag��wki:** `X-Tenant-Id`.
 - **Body:** `CreatePaymentIntentRequest` (te same dane, co do wyliczenia kwoty).
-- **Odpowied� 200:** `PaymentIntentDto` (kwota, depozyt, daty wa�no�ci, status).
+- **Odpowied� 200:** `PaymentIntentDto` (kwota, depozyt, daty wa�no�ci, status Stripe, URL/`clientSecret` do sfinalizowania p�atno�ci).
 - **B��dy:** `400 Bad Request` (niepoprawne dane, kwota = 0).
 
 ### GET /api/payments/intents/{id}
-- **Opis:** zwraca szczeg�y mockowego `PaymentIntent` dla bie��cego tenanta.
+- **Opis:** zwraca szczeg�y `PaymentIntent` Stripe dla bie��cego tenanta.
 - **Statusy:** `200 OK`, `404 Not Found` (brak lub wygas�a intencja).
 ### GET /api/my-rentals
 - **Opis:** lista wynajm�w (dla UI klienta). Zwracane elementy zawieraj� m.in. `depositAmount` oraz `paymentStatus` do prezentacji p�atno�ci.
@@ -164,7 +164,7 @@ Przyklad zadania:
 - **Odpowiedz:** tablica `MyRentalDto` posortowana malejaco po `CreatedAtUtc`.
 
 ### POST /api/rentals
-- **Opis:** tworzy nowy wynajem i weryfikuje mockow� p�atno�� (`paymentIntentId` z wcze�niejszego kroku).
+- **Opis:** tworzy nowy wynajem i weryfikuje p�atno�� Stripe (`paymentIntentId` z wcze�niejszego kroku) — wynajem potwierdzany po zaksi�gowaniu p�atno�ci (webhook / finalizacja Stripe).
 - **Naglowki:** `X-Tenant-Id`.
 - **Body:** `CreateRentalRequest` (co najmniej jedna pozycja, wymagany `paymentIntentId`).
 - **Odpowiedz 200:** `RentalResponse` (status `Confirmed`, `totalAmount`, `depositAmount`, `paymentStatus`, opcjonalny `ContractUrl`).
@@ -203,7 +203,7 @@ API korzysta z `ProblemDetails`:
 ```
 
 ## Swagger
-- Dev UI: `https://localhost:7142/swagger`.
+- Dev UI: `http://localhost:5001/swagger` (hostowane w SportRental.Admin).
 - Dokument opisuje wymagany naglowek `X-Tenant-Id`; w UI nalezy dodac go recznie (Authorize -> ApiKey).
 
 ## MediaStorage API (⏸️ WYŁĄCZONY)

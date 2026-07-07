@@ -145,7 +145,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### C# / .NET
 
-- Use **C# 12** features where appropriate
+- Use modern **C#** features (net10.0 / C# 14) where appropriate
 - Follow **Microsoft C# Coding Conventions**
 - Use **nullable reference types**
 - Prefer **async/await** for I/O operations

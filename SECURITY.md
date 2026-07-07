@@ -13,7 +13,7 @@ All sensitive data (passwords, API keys, connection strings) are stored securely
 ### **1. Prerequisites**
 - Azure CLI installed: https://aka.ms/installazurecliwindows
 - Azure account with access to Key Vault
-- .NET 9 SDK
+- .NET 10 SDK
 
 ### **2. Login to Azure**
 ```bash
@@ -22,7 +22,7 @@ az login --tenant YOUR-TENANT-ID
 
 ### **3. Configure appsettings.Development.json**
 Copy `appsettings.Development.json.example` to `appsettings.Development.json` in both projects:
-- `BlazorApp3/appsettings.Development.json`
+- `SportRental.Admin/appsettings.Development.json`
 - `SportRental.Api/appsettings.Development.json`
 
 Set your Key Vault URL:
@@ -41,7 +41,7 @@ Contact the project owner to grant you access:
 
 ### **5. Run the application**
 ```bash
-dotnet run --project BlazorApp3
+dotnet run --project SportRental.Admin
 # or
 dotnet run --project SportRental.Api
 ```

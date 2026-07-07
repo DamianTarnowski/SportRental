@@ -110,9 +110,8 @@ Services.AddSingleton(_mockCartService.Object);
 
 ## 📊 **Test Coverage Goals**
 
-- **Checkout flow:** 100% (7/7 tests)
-- **Stripe integration:** 100% (10/10 tests)
-- **Total:** **17 tests** ✅
+- **Aktualny stan:** 6 testów w `Services/TenantServiceTests.cs`
+- **Total:** **6 tests** ✅
 
 ---
 

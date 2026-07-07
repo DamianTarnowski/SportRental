@@ -13,7 +13,7 @@
 [![Azure](https://img.shields.io/badge/Azure-Key%20Vault%20%2B%20Blob-0078D4?style=for-the-badge&logo=microsoft-azure&logoColor=white)](https://azure.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14%2B-316192?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
-[![Tests](https://img.shields.io/badge/tests-356%2F356%20passing-00C853?style=for-the-badge&logo=checkmarx&logoColor=white)](#-testing--quality)
+[![Tests](https://img.shields.io/badge/tests-315%2B%20automated-00C853?style=for-the-badge&logo=checkmarx&logoColor=white)](#-testing--quality)
 [![License](https://img.shields.io/badge/license-Proprietary-red?style=for-the-badge&logo=bookstack&logoColor=white)](#-license)
 [![Status](https://img.shields.io/badge/status-production%20ready-00C853?style=for-the-badge&logo=statuspage&logoColor=white)](#-project-status)
 
@@ -55,7 +55,7 @@
 
 ### 📄 **Document Generation**
 - ✅ Professional PDF contracts
-- ✅ QR code integration
+- ✅ Barcode (Code 128) integration (QR deprecated)
 - ✅ Company branding
 - ✅ Digital signatures ready
 
@@ -138,11 +138,11 @@ flowchart TB
 
 | Module | Description | Tech Stack | Status |
 |--------|-------------|------------|--------|
-| **🎨 SportRental.Admin** | Blazor Server admin panel + API dla klienta WASM | C# 12, Blazor Server, MudBlazor, **📱 Dual UI** | ✅ Production |
-| **📡 SportRental.Api** | Public REST API (obecnie wyłączone - na przyszłość) | ASP.NET Core 10, Minimal APIs | ⏸️ Disabled |
+| **🎨 SportRental.Admin** | Blazor Server admin panel + API dla klienta WASM | Blazor Server, MudBlazor, **📱 Dual UI** | ✅ Production |
+| **📡 SportRental.Api** | empty placeholder folder (no code); former standalone API preserved in _DEPRECATED_SportRental.Api, excluded from the build | — | ⏸️ Disabled |
 | **💻 SportRental.Client** | Blazor WebAssembly public client | Blazor WASM, TailwindCSS, **📱 Mobile-First** | ✅ Production |
 | **📸 SportRental.MediaStorage** | Media microservice (obecnie wyłączone - Azure Blob) | Minimal APIs, SQLite | ⏸️ Disabled |
-| **🔧 SportRental.Infrastructure** | EF Core, domain models, migrations | Entity Framework Core 10 | ✅ Production |
+| **🔧 SportRental.Infrastructure** | EF Core, domain models, migrations | Entity Framework Core 9.0.9 | ✅ Production |
 | **📦 SportRental.Shared** | Shared DTOs, components, HTTP clients | Razor Class Library | ✅ Production |
 | **🧪 *.Tests** | Automated tests | xUnit, bUnit, Moq | ✅ Passing |
 
@@ -154,8 +154,8 @@ flowchart TB
 
 ### **Backend**
 ![.NET](https://img.shields.io/badge/.NET%2010-512BD4?style=flat-square&logo=dotnet&logoColor=white)
-![C#](https://img.shields.io/badge/C%23%2012-239120?style=flat-square&logo=c-sharp&logoColor=white)
-![Entity Framework](https://img.shields.io/badge/EF%20Core%2010-512BD4?style=flat-square&logo=.net&logoColor=white)
+![C#](https://img.shields.io/badge/C%23-239120?style=flat-square&logo=c-sharp&logoColor=white)
+![Entity Framework](https://img.shields.io/badge/EF%20Core%209.0.9-512BD4?style=flat-square&logo=.net&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat-square&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=flat-square&logo=sqlite&logoColor=white)
 
@@ -167,8 +167,6 @@ flowchart TB
 
 ### **Cloud & DevOps**
 ![Azure](https://img.shields.io/badge/Azure-0078D4?style=flat-square&logo=microsoft-azure&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker%20Ready-2496ED?style=flat-square&logo=docker&logoColor=white)
 
 > 📝 **Uwagi dev:** na etapie lokalnym budujemy/uruchamiamy ręcznie (na laptopie) bez CI/CD w chmurze, żeby nie generować kosztów GitHub Actions. Pipeline’y CI/CD warto włączyć dopiero po przygotowaniu stałego środowiska serwerowego/budżetu na buildy.
 
@@ -227,17 +225,16 @@ dotnet run --project SportRental.Client --urls "http://localhost:5014"
 
 ## 🧪 **Testing & Quality**
 
-### **356 Automated Tests • 100% Pass Rate**
+### **315+ Automated Tests • Admin 303 · Client 6 · MediaStorage 6**
 
    ```bash
 # Run all tests
 dotnet test
 
 # Results:
-# ✅ SportRental.Admin.Tests:        301/301 passing
-# ✅ SportRental.Api.Tests:           30/30 passing  
-# ✅ SportRental.Client.Tests:        19/19 passing
-# ✅ SportRental.MediaStorage.Tests:   6/6 passing
+# ✅ SportRental.Admin.Tests:        303 tests
+# ✅ SportRental.Client.Tests:         6 tests
+# ✅ SportRental.MediaStorage.Tests:   6 tests
 ```
 
 ### **Test Coverage**
@@ -315,8 +312,7 @@ dotnet test
 - ✅ **📍 Lokalizacja** - City/Voivodeship filtering
 
 ### **🚧 In Progress / Planned**
-- 🚧 Docker & Docker Compose setup
-- 🚧 GitHub Actions CI/CD pipeline
+- ℹ️ CI/CD and containerization are intentionally out of scope — build and deploy are done locally (VS Publish / az webapp deploy)
 - 🚧 Application Insights monitoring
 - 🚧 CloudFlare CDN integration
 - 🚧 Reaktywacja SportRental.Api jako osobny serwer (gdy potrzeba skalowania)
@@ -351,11 +347,11 @@ This project uses **Azure Key Vault** for all sensitive data:
 | Component | Status | Details |
 |-----------|--------|---------|
 | 🎨 **Admin Panel** | ✅ **Production Ready** | Complete UI, all features working |
-| 📡 **Public API** | ✅ **Production Ready** | Full REST API with documentation |
+| 📡 **REST API** | ✅ **Production Ready** | Hosted in-process by SportRental.Admin (MapSportRentalApi/MapControllers); standalone SportRental.Api is disabled/empty |
 | 💻 **Client App** | ✅ **Production Ready** | Responsive UI, checkout flow |
-| 📸 **Media Service** | ✅ **Production Ready** | Chunked uploads, thumbnails |
+| 📸 **Media Storage** | ⏸️ **Optional/Idle** | Files go directly to Azure Blob; MediaStorage microservice not used in production |
 | 💳 **Payments** | ✅ **Sandbox Ready** | Stripe test mode integrated |
-| 🧪 **Tests** | ✅ **356/356 Passing** | 100% pass rate, high coverage |
+| 🧪 **Tests** | ✅ **315+ Automated** | Admin 303 · Client 6 · MediaStorage 6, high coverage |
 | 📚 **Documentation** | ✅ **Complete** | Comprehensive guides & API docs |
 
 ---

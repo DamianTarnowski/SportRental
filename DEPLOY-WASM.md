@@ -1,5 +1,7 @@
 # Deploy WASM Client na Azure App Service
 
+> ⚠️ **DEPRECATED** — Client WASM jest teraz publikowany **bundled** pod `/_client/` wewnątrz App Service **SportRental.Admin**, za pomocą targetu MSBuild `PublishClientWasmIntoAdmin`. Opisany poniżej hosting `srclient-blazor` / Azure Static Web Apps jest legacy i nie jest już aktualizowany.
+
 ## Wymagania
 - Azure CLI zalogowany (`az login`)
 - .NET SDK 10.0+

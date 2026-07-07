@@ -606,7 +606,7 @@ Dla ułatwienia - pełna mapa sekretów:
 | `Email:Smtp:Username` | `Email--Smtp--Username` |
 | `Email:Smtp:Password` | `Email--Smtp--Password` |
 | `Storage:AzureBlob:ConnectionString` | `Storage--AzureBlob--ConnectionString` |
-| `SmsApi:Token` | `SmsApi--Token` |
+| `smsApi:AuthToken` | `smsApi--AuthToken` |
 | `MediaStorage:ApiKey` | `MediaStorage--ApiKey` |
 
 ---

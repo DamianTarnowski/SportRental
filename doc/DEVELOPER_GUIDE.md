@@ -137,9 +137,9 @@ Do buildow CI wystarczy `npm run build:css` (dodaj zgodnie z potrzebami).
   ```bash
   dotnet test SportRental.MediaStorage.Tests/SportRental.MediaStorage.Tests.csproj --no-build
   ```
-- Publiczne API:
+- Klient WASM:
   ```bash
-  dotnet test SportRental.Api.Tests/SportRental.Api.Tests.csproj --no-build
+  dotnet test SportRental.Client.Tests/SportRental.Client.Tests.csproj --no-build
   ```
 - Pokrycie kodu:
   ```bash

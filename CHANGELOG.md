@@ -124,15 +124,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Entity Framework Core migrations
   - Connection string encryption
 - **Testing**
-  - 356+ automated tests
+  - ~315 automated tests
   - Unit tests with xUnit
   - Integration tests with WebApplicationFactory
   - Blazor component tests with bUnit
   - Mock payment gateway for testing
-  - >80% code coverage
+  - Unit + integration + component (bUnit) test coverage
 - **DevOps**
-  - GitHub Actions CI/CD pipeline
-  - Docker support
+  - Manual local build/deploy (VS Publish to Azure App Service)
   - Health checks
   - Logging with Serilog
   - Performance monitoring

@@ -61,10 +61,9 @@
 3. Zadania cykliczne: czyszczenie holdow, archiwizacja dokumentow.
 
 ### Operacje i infrastruktura
-1. Przygotowac pliki Docker dla wszystkich projektow (`docker-compose` do dev/test).
-2. Zbudowac podstawowy pipeline CI (GitHub Actions): restore, build, test, raport coverage.
-3. Przygotowac skrypt seeda danych demo (produkty, klienci, konta admin) do szybkich demo.
-4. Migracja na finalne .NET 9 (gdy bedzie GA) i przegl?d bibliotek.
+1. Przygotowac skrypt seeda danych demo (produkty, klienci, konta admin) do szybkich demo.
+
+> CI/CD i konteneryzacja sa swiadomie poza zakresem — build i deploy robimy lokalnie (VS Publish / az webapp deploy).
 
 ## Plan 2026 (wysoki poziom)
 ### Etap 1: MVP Plus (Q1 2026)
@@ -97,7 +96,7 @@
 - Audit trail dla operacji panelu (domyslnie logowanie do tabeli `AuditLogs`).
 
 ## Ryzyka i zaleznosci
-- **.NET 9:** ✅ Używamy aktualnej wersji (plan upgrade do .NET 10 w Q1 2026).
+- **.NET 10:** ✅ Wszystkie projekty korzystaja z .NET 10 (net10.0).
 - **Płatności:** ✅ Stripe sandbox wdrożony - przed produkcją wymaga aktywacji production keys.
 - **Media hosting:** ✅ Azure Blob Storage wdrożony - CloudFlare CDN planowany dla Q1 2026.
 - **Email:** ✅ Onet SMTP - wymaga monitorowania limitu wysyłki (może wymagać upgrade planu).
@@ -111,11 +110,9 @@
 - Code reviews z focus na security (never hardcode secrets!).
 
 ## Najblizsze kroki (Sprint następny)
-1. **Docker + Docker Compose** - konteneryzacja wszystkich serwisów dla łatwego setupu
-2. **CI/CD Pipeline** - GitHub Actions (build, test, deploy do Azure)
-3. **Monitoring & Observability** - Application Insights integration
-4. **Performance Testing** - load tests dla krytycznych endpointów
-5. **CloudFlare CDN** - dla Azure Blob Storage (faster image delivery)
+1. **Monitoring & Observability** - Application Insights integration
+2. **Performance Testing** - load tests dla krytycznych endpointów
+3. **CloudFlare CDN** - dla Azure Blob Storage (faster image delivery)
 
 
 - Rozszerzy� samoobs�ug� klient�w o zarz�dzanie holdami i powiadomienia e-mail/SMS o zmianach status�w (po wdro�eniu pe�nej autoryzacji).

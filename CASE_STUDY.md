@@ -9,8 +9,8 @@
 | Metryka | Wartość |
 |---------|---------|
 | **Stack technologiczny** | .NET 10, Blazor Server + WASM, PostgreSQL |
-| **Liczba projektów w solucji** | 11 projektów |
-| **Testy automatyczne** | 356 testów (100% passing) |
+| **Liczba projektów w solucji** | 9 projektów |
+| **Testy automatyczne** | ~315 testów automatycznych |
 | **Linie kodu** | ~50,000+ LOC |
 | **Status** | Production Ready |
 
@@ -66,7 +66,7 @@ Zaprojektowałem i zaimplementowałem pełnoprawną platformę SaaS z:
 │  • HoldService (Reservations)    │                              │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              │ Entity Framework Core 10
+                              │ Entity Framework Core 9.0.9 (on .NET 10 runtime)
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                         DATA LAYER                              │
@@ -114,10 +114,10 @@ SportRentalHybrid.sln
 ├── SportRental.MediaStorage/    # (Prepared for self-hosted files)
 │
 └── Tests/
-    ├── SportRental.Admin.Tests/     # 301 tests
-    ├── SportRental.Api.Tests/       # 30 tests
-    ├── SportRental.Client.Tests/    # 19 tests
-    └── SportRental.E2ETests/        # End-to-end tests
+    ├── SportRental.Admin.Tests/     # 303 tests (xUnit, w solucji)
+    ├── SportRental.Client.Tests/    # 6 tests (xUnit, w solucji)
+    ├── SportRental.MediaStorage.Tests/  # 6 tests (xUnit, w solucji)
+    └── SportRental.E2ETests/        # 52 testów NUnit + Playwright (uruchamiane osobno)
 ```
 
 ---
@@ -161,7 +161,7 @@ Wybrałem architekturę hybrydową:
 | Komponent | Technologia | Uzasadnienie |
 |-----------|-------------|--------------|
 | **Admin Panel** | Blazor Server | Bezpośredni dostęp do bazy, brak opóźnień WASM, autentykacja Identity |
-| **Public Client** | Blazor WASM | Statyczny hosting (Azure Static Web Apps), offline-capable, CDN |
+| **Public Client** | Blazor WASM | Publikowany bundled pod `/_client/` wewnątrz App Service SportRental.Admin (target MSBuild `PublishClientWasmIntoAdmin`); hosting Azure Static Web Apps jest legacy |
 | **Shared Library** | Razor Class Library | Współdzielenie DTOs, komponentów, serwisów HTTP |
 
 ### 3. Azure Key Vault dla Sekretów
@@ -478,7 +478,7 @@ public class EmployeePermissions
 ### Strategia Testów
 
 ```
-356 testów automatycznych
+~315 testów automatycznych
 ├── Unit Tests (Services, Validators)
 ├── Integration Tests (API Endpoints, Database)
 ├── Component Tests (Blazor bUnit)
@@ -552,11 +552,9 @@ az webapp deployment source config-zip `
     --name sradmin `
     --src ./publish/admin.zip
 
-# Client WASM (Static Web Apps)
-dotnet publish SportRental.Client -c Release -o ./publish/client
-swa deploy ./publish/client/wwwroot `
-    --deployment-token $env:SWA_TOKEN `
-    --env production
+# Client WASM jest publikowany bundled pod /_client/ wewnątrz App Service Admina
+# (target MSBuild PublishClientWasmIntoAdmin uruchamiany podczas publish Admina).
+# Osobny deploy przez `swa deploy` do Azure Static Web Apps to legacy — już nieużywany.
 ```
 
 ---
@@ -565,8 +563,8 @@ swa deploy ./publish/client/wwwroot `
 
 ### Backend
 - **.NET 10** - najnowsza wersja platformy
-- **C# 12** - pattern matching, primary constructors
-- **Entity Framework Core 10** - ORM z Query Filters
+- **C# 14** (net10.0 default) - pattern matching, primary constructors, collection expressions
+- **Entity Framework Core 9.0.9 (on .NET 10 runtime)** - ORM z Query Filters
 - **ASP.NET Core Identity** - autentykacja i autoryzacja
 - **Minimal APIs** - lekkie REST endpoints
 - **SignalR** - real-time updates
@@ -974,7 +972,7 @@ app.MapGet("/api/products", async (
 1. **Kompletne rozwiązanie SaaS** - od frontendu po deployment
 2. **Skalowalna architektura** - multi-tenant, przygotowana na microservices
 3. **Enterprise-grade security** - Azure Key Vault, zero secrets w kodzie
-4. **Production-ready** - 356 testów, dokumentacja, CI/CD ready
+4. **Production-ready** - ~315 testów, dokumentacja
 5. **Modern tech stack** - .NET 10, Blazor, TailwindCSS
 
 ### Umiejętności Zademonstrowane
@@ -996,4 +994,4 @@ app.MapGet("/api/products", async (
 
 ---
 
-*Projekt rozwijany od 2024 roku. Ostatnia aktualizacja: Grudzień 2025*
+*Projekt rozwijany od 2024 roku. Ostatnia aktualizacja: 2026*
