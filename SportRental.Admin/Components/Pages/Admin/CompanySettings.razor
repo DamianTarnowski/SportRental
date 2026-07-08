@@ -101,6 +101,8 @@
                         <MudStack Spacing="2">
                             @* NXRE QA #6: edytowalne (auto-fill z mapy + manual edit) *@
                             <MudTextField @bind-Value="companyInfo.City" Label="Miasto" Required="true" Dense="true" Variant="Variant.Outlined" HelperText="Auto-uzupełnione z mapy; możesz poprawić ręcznie." />
+                            @* Feedback #9: kod pocztowy — na umowie PDF *@
+                            <MudTextField @bind-Value="companyInfo.PostalCode" Label="Kod pocztowy" MaxLength="10" Dense="true" Variant="Variant.Outlined" HelperText="np. 60-001; auto-uzupełniony z mapy." />
                             <MudSelect T="string" @bind-Value="companyInfo.Voivodeship" Label="Województwo" Required="true" Dense="true" Variant="Variant.Outlined">
                                 @foreach (var v in _voivodeships)
                                 {
@@ -337,7 +339,7 @@ else
                         </MudAlert>
                         <MudStack Spacing="3">
                             <MudGrid Spacing="2">
-                                <MudItem xs="12" md="6">
+                                <MudItem xs="12" md="4">
                                     @* NXRE QA #6: edytowalne (auto-fill z mapy + manual edit) *@
                                     <MudTextField @bind-Value="companyInfo.City"
                                                   Label="Miasto"
@@ -347,7 +349,17 @@ else
                                                   AdornmentIcon="@Icons.Material.Filled.LocationCity"
                                                   HelperText="Auto-uzupełnione z mapy; możesz poprawić ręcznie." />
                                 </MudItem>
-                                <MudItem xs="12" md="6">
+                                <MudItem xs="12" md="4">
+                                    @* Feedback #9: kod pocztowy — na umowie PDF, auto-fill z mapy *@
+                                    <MudTextField @bind-Value="companyInfo.PostalCode"
+                                                  Label="Kod pocztowy"
+                                                  MaxLength="10"
+                                                  Variant="Variant.Outlined"
+                                                  Adornment="Adornment.Start"
+                                                  AdornmentIcon="@Icons.Material.Filled.Markunread"
+                                                  HelperText="np. 60-001; auto-uzupełniony z mapy." />
+                                </MudItem>
+                                <MudItem xs="12" md="4">
                                     @* NXRE QA #6: dropdown z gotowymi województwami *@
                                     <MudSelect T="string" @bind-Value="companyInfo.Voivodeship"
                                                Label="Województwo"
@@ -512,6 +524,7 @@ else
                 Lat = existingCompanyInfo.Lat,
                 Lon = existingCompanyInfo.Lon,
                 City = existingCompanyInfo.City,
+                PostalCode = existingCompanyInfo.PostalCode,
                 Voivodeship = existingCompanyInfo.Voivodeship,
                 SmsConfirmationEnabled = existingCompanyInfo.SmsConfirmationEnabled,
                 SmsThanksEnabled = existingCompanyInfo.SmsThanksEnabled,
@@ -547,6 +560,10 @@ else
         companyInfo.Lon = Math.Round(details.Lon, 6);
         companyInfo.City = details.City;
         companyInfo.Voivodeship = details.Voivodeship;
+        if (!string.IsNullOrWhiteSpace(details.PostalCode))
+        {
+            companyInfo.PostalCode = details.PostalCode;
+        }
         if (!string.IsNullOrWhiteSpace(details.Address))
         {
             companyInfo.Address = details.Address;
@@ -559,6 +576,7 @@ else
         companyInfo.Lat = null;
         companyInfo.Lon = null;
         companyInfo.City = null;
+        companyInfo.PostalCode = null;
         companyInfo.Voivodeship = null;
         StateHasChanged();
     }
@@ -622,6 +640,9 @@ else
             var existingCompanyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == _tenantId);
             if (existingCompanyInfo != null)
             {
+                // Feedback #8: nazwa na umowie PDF czyta CompanyInfo.Name — synchronizujemy z polem
+                // "Nazwa firmy" (Tenant.Name), inaczej PDF pokazuje stary placeholder z rejestracji.
+                existingCompanyInfo.Name = tenant.Name;
                 existingCompanyInfo.Address = companyInfo.Address;
                 existingCompanyInfo.PhoneNumber = companyInfo.PhoneNumber;
                 existingCompanyInfo.Email = companyInfo.Email;
@@ -634,6 +655,7 @@ else
                 existingCompanyInfo.Lat = companyInfo.Lat;
                 existingCompanyInfo.Lon = companyInfo.Lon;
                 existingCompanyInfo.City = companyInfo.City;
+                existingCompanyInfo.PostalCode = companyInfo.PostalCode;
                 existingCompanyInfo.Voivodeship = companyInfo.Voivodeship;
                 existingCompanyInfo.SmsConfirmationEnabled = companyInfo.SmsConfirmationEnabled;
                 existingCompanyInfo.SmsThanksEnabled = companyInfo.SmsThanksEnabled;
@@ -657,6 +679,7 @@ else
                 {
                     Id = Guid.NewGuid(),
                     TenantId = _tenantId,
+                    Name = tenant.Name,   // Feedback #8: nazwa na umowie PDF z pola "Nazwa firmy"
                     Address = companyInfo.Address,
                     PhoneNumber = companyInfo.PhoneNumber,
                     Email = companyInfo.Email,
@@ -669,6 +692,7 @@ else
                     Lat = companyInfo.Lat,
                     Lon = companyInfo.Lon,
                     City = companyInfo.City,
+                    PostalCode = companyInfo.PostalCode,
                     Voivodeship = companyInfo.Voivodeship,
                     SmsConfirmationEnabled = companyInfo.SmsConfirmationEnabled,
                     SmsThanksEnabled = companyInfo.SmsThanksEnabled,
@@ -720,6 +744,7 @@ else
         public double? Lat { get; set; }
         public double? Lon { get; set; }
         public string? City { get; set; }
+        public string? PostalCode { get; set; }
         public string? Voivodeship { get; set; }
         public bool SmsConfirmationEnabled { get; set; }
         public bool SmsThanksEnabled { get; set; }

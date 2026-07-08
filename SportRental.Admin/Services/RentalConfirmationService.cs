@@ -317,7 +317,7 @@ public class RentalConfirmationService : IRentalConfirmationService
         {
             try
             {
-                var smsMessage = $"Potwierdz wynajem {rentalCode}: {confirmUrl}";
+                var smsMessage = $"Kliknij w link, aby potwierdzic wynajem {rentalCode}: {confirmUrl}";
                 await _smsSender.SendAsync(rental.Customer.PhoneNumber, smsMessage, ct);
                 if (confirmation != null) confirmation.IsSmsSent = true;
                 _logger.LogInformation("Sent confirmation link SMS for rental {RentalId}", rentalId);
@@ -355,7 +355,7 @@ public class RentalConfirmationService : IRentalConfirmationService
                 var htmlBody = $@"<html><body style='font-family:Arial,sans-serif;color:#333;'>
 <h2 style='color:#1976d2;'>Potwierdzenie wynajmu — {companyName}</h2>
 <p>Dzień dobry <b>{customerName}</b>,</p>
-<p>Prosimy o potwierdzenie poniższego wynajmu:</p>
+<p>Umowę w formacie PDF wysłaliśmy w osobnej wiadomości. Aby sfinalizować rezerwację, prosimy o potwierdzenie wynajmu przyciskiem &quot;Potwierdź wynajem&quot; na dole tej wiadomości:</p>
 
 <h3 style='color:#333;'>📦 Szczegóły wynajmu</h3>
 <table style='border-collapse:collapse;width:100%;max-width:500px;'>
@@ -461,12 +461,20 @@ public class RentalConfirmationService : IRentalConfirmationService
 
     private string GetBaseUrl()
     {
-        // Try to get from configuration, fallback to known production URL
+        // 1) Jawna konfiguracja (App:BaseUrl z Key Vault / App Service settings) ma pierwszeństwo.
         var baseUrl = _configuration["App:BaseUrl"];
-        if (!string.IsNullOrEmpty(baseUrl))
+        if (!string.IsNullOrWhiteSpace(baseUrl))
             return baseUrl.TrimEnd('/');
 
-        return "https://sradmin.azurewebsites.net";
+        // 2) Azure App Service ustawia WEBSITE_HOSTNAME na domyślny host bieżącego wdrożenia
+        //    — dzięki temu linki potwierdzeń zawsze wskazują AKTUALNĄ appkę (bez hardkodowanego
+        //    hosta infrastruktury w publicznym repo; wcześniejszy fallback wskazywał martwy host).
+        var azureHost = Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME");
+        if (!string.IsNullOrWhiteSpace(azureHost))
+            return $"https://{azureHost}";
+
+        // 3) Dev fallback.
+        return "http://localhost:5001";
     }
 
     private static string GenerateToken()

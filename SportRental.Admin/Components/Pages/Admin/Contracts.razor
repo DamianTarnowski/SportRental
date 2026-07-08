@@ -9,6 +9,7 @@
 @inject IDialogService DialogService
 @inject SportRental.Admin.Services.Email.IEmailSender EmailSender
 @inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <PageTitle>Umowy — RentSpot</PageTitle>
 
@@ -177,13 +178,15 @@
         }
     }
 
+    // Feedback #7: otwieramy PDF przez endpoint /api/contracts/{id} (SAS-redirect na blob),
+    // a NIE przez row.ContractUrl — to relatywna referencja blob, którą przeglądarka doklejała
+    // do /admin/contracts i router Blazora zwracał 404 "Nie można znaleźć tej strony".
     private async Task OpenPdf(ContractRow row) =>
-        await JS.InvokeVoidAsync("open", row.ContractUrl, "_blank");
+        await JS.InvokeVoidAsync("open", $"/api/contracts/{row.RentalId}", "_blank");
 
     private async Task PrintPdf(ContractRow row) =>
-        // window.open() + auto-print przez query — w razie potrzeby viewer otworzy print dialog.
-        // Najprościej: otwórz w nowej karcie i user wciska Ctrl+P. CDP-driven print byłby przesadą.
-        await JS.InvokeVoidAsync("open", row.ContractUrl, "_blank");
+        // Otwórz w nowej karcie i user wciska Ctrl+P. CDP-driven print byłby przesadą.
+        await JS.InvokeVoidAsync("open", $"/api/contracts/{row.RentalId}", "_blank");
 
     private async Task EmailContract(ContractRow row)
     {
@@ -194,12 +197,16 @@
         }
         try
         {
-            // Wysyłka linka do umowy zamiast attachmentu — PDF leży w blob storage.
+            // Feedback #7: link dla KLIENTA idzie przez publiczny /c/{shortId} (AllowAnonymous,
+            // SAS-redirect) — /api/contracts/{id} wymaga cookie admina, którego klient nie ma.
+            // Musi być absolutny (BaseUri), bo trafia do maila.
+            var shortId = row.RentalId.ToString()[..8].ToLowerInvariant();
+            var contractLink = $"{Nav.BaseUri.TrimEnd('/')}/c/{shortId}";
             var subject = $"Umowa wynajmu UM/{row.CreatedAtLocal.Year}/{row.SequenceShort}";
             var html = $@"
                 <p>Dzień dobry, {System.Net.WebUtility.HtmlEncode(row.CustomerName)},</p>
-                <p>W załączeniu / pod linkiem przekazujemy umowę wynajmu sprzętu:</p>
-                <p><a href=""{row.ContractUrl}"">Pobierz umowę PDF</a></p>
+                <p>Pod poniższym linkiem przekazujemy umowę wynajmu sprzętu:</p>
+                <p><a href=""{contractLink}"">Pobierz umowę PDF</a></p>
                 <p>Pozdrawiamy,<br/>RentSpot</p>";
             await EmailSender.SendEmailAsync(row.CustomerEmail, subject, html);
             Snackbar.Add($"Umowa wysłana na {row.CustomerEmail}.", MudBlazor.Severity.Success);

@@ -23,6 +23,20 @@ namespace SportRental.Admin.Services.Contracts
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
+        // Feedback #9: pełny adres firmy na umowie — ulica+numer, "kod miasto", "woj. …".
+        // Kod pocztowy/miasto/województwo są w CompanyInfo (auto-fill z mapy), wcześniej nie trafiały na PDF.
+        private static IEnumerable<string> BuildCompanyAddressLines(CompanyInfo ci)
+        {
+            if (!string.IsNullOrWhiteSpace(ci.Address))
+                yield return ci.Address!;
+            var postalCity = string.Join(" ", new[] { ci.PostalCode, ci.City }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+            if (!string.IsNullOrWhiteSpace(postalCity))
+                yield return postalCity;
+            if (!string.IsNullOrWhiteSpace(ci.Voivodeship))
+                yield return $"woj. {ci.Voivodeship}";
+        }
+
         public Task<byte[]> GenerateRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
         {
             var productMap = products.ToDictionary(p => p.Id, p => p);
@@ -67,8 +81,8 @@ namespace SportRental.Admin.Services.Contracts
                                 row.RelativeItem().AlignRight().Column(right =>
                                 {
                                     right.Item().Text(companyInfo.Name ?? "RentSpot").Bold().FontSize(12);
-                                    if (!string.IsNullOrWhiteSpace(companyInfo.Address))
-                                        right.Item().Text(companyInfo.Address);
+                                    foreach (var line in BuildCompanyAddressLines(companyInfo))
+                                        right.Item().Text(line);
                                     if (!string.IsNullOrWhiteSpace(companyInfo.NIP))
                                         right.Item().Text($"NIP: {companyInfo.NIP}");
                                     if (!string.IsNullOrWhiteSpace(companyInfo.REGON))
@@ -93,8 +107,8 @@ namespace SportRental.Admin.Services.Contracts
                             if (companyInfo != null)
                             {
                                 parties.Item().Text($"   {companyInfo.Name}");
-                                if (!string.IsNullOrWhiteSpace(companyInfo.Address))
-                                    parties.Item().Text($"   {companyInfo.Address}");
+                                foreach (var line in BuildCompanyAddressLines(companyInfo))
+                                    parties.Item().Text($"   {line}");
                                 if (!string.IsNullOrWhiteSpace(companyInfo.NIP))
                                     parties.Item().Text($"   NIP: {companyInfo.NIP}");
                             }
@@ -264,6 +278,9 @@ namespace SportRental.Admin.Services.Contracts
                 .Replace("{{Deposit}}", rental.DepositAmount.ToString("0.00"))
                 .Replace("{{CompanyName}}", companyInfo?.Name ?? "RentSpot")
                 .Replace("{{CompanyAddress}}", companyInfo?.Address ?? "")
+                .Replace("{{CompanyPostalCode}}", companyInfo?.PostalCode ?? "")
+                .Replace("{{CompanyCity}}", companyInfo?.City ?? "")
+                .Replace("{{CompanyVoivodeship}}", companyInfo?.Voivodeship ?? "")
                 .Replace("{{CompanyNIP}}", companyInfo?.NIP ?? "")
                 .Replace("{{CompanyPhone}}", companyInfo?.PhoneNumber ?? "")
                 .Replace("{{CompanyEmail}}", companyInfo?.Email ?? "");

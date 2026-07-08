@@ -60,11 +60,11 @@
     }
 
     [JSInvokable]
-    public async Task OnLocationWithDetails(double lat, double lon, string? city, string? voivodeship, string? address)
+    public async Task OnLocationWithDetails(double lat, double lon, string? city, string? voivodeship, string? address, string? postalCode = null)
     {
         // Call both callbacks for compatibility
         await OnLocationChanged.InvokeAsync((lat, lon));
-        
+
         if (OnLocationDetailsChanged.HasDelegate)
         {
             await OnLocationDetailsChanged.InvokeAsync(new LocationDetails
@@ -73,7 +73,8 @@
                 Lon = lon,
                 City = city,
                 Voivodeship = voivodeship,
-                Address = address
+                Address = address,
+                PostalCode = postalCode
             });
         }
     }
@@ -98,5 +99,6 @@
         public string? City { get; set; }
         public string? Voivodeship { get; set; }
         public string? Address { get; set; }
+        public string? PostalCode { get; set; }
     }
 }

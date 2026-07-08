@@ -157,33 +157,37 @@ window.leafletInterop = {
             let city = null;
             let voivodeship = null;
             let address = null;
+            let postalCode = null;
 
             if (result && result.address) {
                 const addr = result.address;
-                
+
                 // City - try different fields
                 city = addr.city || addr.town || addr.village || addr.municipality || addr.county || null;
-                
+
                 // Voivodeship (state in OSM)
                 voivodeship = addr.state || null;
                 // Remove "województwo " prefix if present
                 if (voivodeship && voivodeship.toLowerCase().startsWith('województwo ')) {
                     voivodeship = voivodeship.substring(12);
                 }
-                
+
+                // Postal code (feedback #9 — na umowie PDF)
+                postalCode = addr.postcode || null;
+
                 // Full address
                 address = result.display_name || null;
             }
 
             // Call Blazor with all the data
             if (dotNetRef) {
-                dotNetRef.invokeMethodAsync('OnLocationWithDetails', lat, lon, city, voivodeship, address);
+                dotNetRef.invokeMethodAsync('OnLocationWithDetails', lat, lon, city, voivodeship, address, postalCode);
             }
         } catch (error) {
             console.error('Reverse geocoding error:', error);
             // Fallback - just send coordinates without details
             if (dotNetRef) {
-                dotNetRef.invokeMethodAsync('OnLocationWithDetails', lat, lon, null, null, null);
+                dotNetRef.invokeMethodAsync('OnLocationWithDetails', lat, lon, null, null, null, null);
             }
         }
     }

@@ -81,7 +81,7 @@
                                 @foreach (var r in _contracts)
                                 {
                                     <MudListItem T="string" Icon="@Icons.Material.Filled.PictureAsPdf"
-                                                 Href="@r.ContractUrl" Target="_blank">
+                                                 Href="@($"/api/contracts/{r.Id}")" Target="_blank">
                                         UM/@r.CreatedAtUtc.ToLocalTime().Year/@r.Id.ToString()[..6].ToUpper() — @r.Customer?.FullName
                                     </MudListItem>
                                 }

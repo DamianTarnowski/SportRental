@@ -117,7 +117,7 @@
                                     }
                                     @if (!string.IsNullOrWhiteSpace(rental.ContractUrl))
                                     {
-                                        <MudMenuItem Icon="@Icons.Material.Filled.Description" Href="@rental.ContractUrl" Target="_blank">Umowa</MudMenuItem>
+                                        <MudMenuItem Icon="@Icons.Material.Filled.Description" Href="@($"/api/contracts/{rental.Id}")" Target="_blank">Umowa</MudMenuItem>
                                     }
                                     <MudMenuItem Icon="@Icons.Material.Filled.ReceiptLong" OnClick="() => IssueInvoice(rental)">Wystaw fakturę VAT</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Email" OnClick="() => SendContractByEmail(rental)">Email</MudMenuItem>
@@ -418,13 +418,24 @@ else
                                                      Size="Size.Small">
                                                 @GetEquipmentStatusText(rental)
                                             </MudChip>
-                                            @if (rental.IsReminderSmsSent)
+                                            @if (rental.IsSmsConfirmed)
                                             {
-                                                <MudChip T="string" Icon="@Icons.Material.Filled.NotificationsActive" 
-                                                         Color="Color.Info" 
+                                                <MudChip T="string" Icon="@Icons.Material.Filled.CheckCircle"
+                                                         Color="Color.Success"
                                                          Variant="Variant.Filled"
                                                          Size="Size.Small">
-                                                    Przypomnienie SMS ✓
+                                                    Potwierdzony przez klienta
+                                                </MudChip>
+                                            }
+                                            @if (rental.IsReminderSmsSent)
+                                            {
+                                                <MudChip T="string" Icon="@Icons.Material.Filled.NotificationsActive"
+                                                         Color="Color.Info"
+                                                         Variant="Variant.Filled"
+                                                         Size="Size.Small">
+                                                    @(rental.ReminderSmsSentAtUtc.HasValue
+                                                        ? $"Przypomnienie SMS: {rental.ReminderSmsSentAtUtc.Value.ToLocalTime():dd.MM HH:mm}"
+                                                        : "Przypomnienie SMS ✓")
                                                 </MudChip>
                                             }
                                             @if (IsOverdue(rental))
@@ -507,7 +518,7 @@ else
                                                     <MudIconButton Icon="@Icons.Material.Filled.Description"
                                                                    Color="Color.Primary"
                                                                    Variant="Variant.Outlined"
-                                                                   Href="@rental.ContractUrl"
+                                                                   Href="@($"/api/contracts/{rental.Id}")"
                                                                    Target="_blank"
                                                                    Size="Size.Medium" />
                                                 </MudTooltip>
@@ -537,10 +548,10 @@ else
                                                Wcześniej pokazywało się dla Confirmed (przed wydaniem) — błąd logiki. *@
                                             @if (CanSendReturnReminder(rental))
                                             {
-                                                <MudTooltip Text="Wyślij przypomnienie SMS o zwrocie">
+                                                <MudTooltip Text="@ReturnReminderTooltip(rental)">
                                                     <MudIconButton Icon="@Icons.Material.Filled.NotificationsActive"
-                                                                   Color="Color.Warning"
-                                                                   Variant="Variant.Outlined"
+                                                                   Color="@(rental.IsReminderSmsSent ? Color.Success : Color.Warning)"
+                                                                   Variant="@(rental.IsReminderSmsSent ? Variant.Filled : Variant.Outlined)"
                                                                    OnClick="() => SendReminderSms(rental)"
                                                                    Size="Size.Medium" />
                                                 </MudTooltip>
@@ -2042,12 +2053,19 @@ else
     private static bool IsPaid(Rental rental) =>
         SportRental.Admin.Services.Guards.RentalGuards.IsRentalPaid(rental);
 
-    // NXRE 6 — reminder o zwrocie tylko po faktycznym wydaniu (IssuedAtUtc + nie zwrócony + nie wysłany).
+    // NXRE 6 — reminder o zwrocie tylko po faktycznym wydaniu (IssuedAtUtc + nie zwrócony + aktywny).
+    // Feedback #5: usunięto warunek !IsReminderSmsSent — ikona ma być ZAWSZE widoczna (zmienia stan
+    // wizualny po wysłaniu), żeby właściciel mógł w razie potrzeby wysłać przypomnienie ponownie.
     private static bool CanSendReturnReminder(Rental rental) =>
         rental.IssuedAtUtc.HasValue
         && !rental.ReturnedAtUtc.HasValue
-        && rental.Status == RentalStatus.Active
-        && !rental.IsReminderSmsSent;
+        && rental.Status == RentalStatus.Active;
+
+    // Feedback #5: tooltip informuje, czy i kiedy przypomnienie zostało wysłane.
+    private static string ReturnReminderTooltip(Rental rental) =>
+        rental.IsReminderSmsSent && rental.ReminderSmsSentAtUtc.HasValue
+            ? $"Przypomnienie wysłane: {rental.ReminderSmsSentAtUtc.Value.ToLocalTime():dd.MM HH:mm} — kliknij, aby wysłać ponownie"
+            : "Wyślij przypomnienie SMS o zwrocie";
 
     private async Task MarkAsPaid(Rental rental)
     {
@@ -2125,10 +2143,10 @@ else
             rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
 
-            // NXRE 4: pokaż action "Otwórz" w snackbarze + auto-otwarcie w nowej karcie.
-            // Tester nie znajdował umowy bo ikona była mała wśród innych; teraz wyraźny link od razu.
-            await JS.InvokeVoidAsync("open", contractUrl, "_blank");
-            Snackbar.Add($"Umowa wygenerowana — otwarta w nowej karcie. URL skopiowany do akcji.",
+            // NXRE 4: auto-otwarcie w nowej karcie. Feedback #7: otwieramy przez endpoint serwujący
+            // (SAS-redirect), NIE surową referencję blob w contractUrl — inaczej router Blazora zwraca 404.
+            await JS.InvokeVoidAsync("open", $"/api/contracts/{rental.Id}", "_blank");
+            Snackbar.Add("Umowa wygenerowana — otwarta w nowej karcie.",
                 MudBlazor.Severity.Success);
         }
         catch (Exception ex)

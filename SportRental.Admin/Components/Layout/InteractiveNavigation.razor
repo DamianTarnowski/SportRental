@@ -215,7 +215,12 @@
         max-width: 360px;
         width: 100%;
         margin-right: 0.75rem;
+        display: flex;
+        align-items: center;
     }
+    /* Feedback #1: globalny .mud-input-control{margin-bottom:1rem} (admin-theme.css) wyciekał na
+       input searcha w top-barze i wypychał go ~8px nad środek. Zerujemy dolny margines tylko tutaj. */
+    .rs-topbar-search .mud-input-control { margin-bottom: 0; }
     .rs-topbar-search-input .mud-input-control-input-container { background: transparent !important; }
     .rs-search-hit {
         display: flex;

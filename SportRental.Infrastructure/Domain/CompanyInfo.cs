@@ -105,6 +105,9 @@ namespace SportRental.Infrastructure.Domain
         [MaxLength(100)]
         public string? City { get; set; }
 
+        [MaxLength(10)]
+        public string? PostalCode { get; set; }
+
         [MaxLength(100)]
         public string? Voivodeship { get; set; }
 
