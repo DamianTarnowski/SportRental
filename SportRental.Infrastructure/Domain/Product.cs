@@ -33,6 +33,8 @@ namespace SportRental.Infrastructure.Domain
         
         public string? ImageUrl { get; set; }
         public string? ImageBasePath { get; set; } // np. images/products/{tenant}/{product}/v1
+        public int[]? ImageVariantWidths { get; set; }
+        public bool? HasOriginalImage { get; set; }
         public string? ImageAlt { get; set; }
         
         public decimal DailyPrice { get; set; }

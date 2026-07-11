@@ -36,6 +36,10 @@ namespace SportRental.Infrastructure.Domain
         public Guid CustomerId { get; set; }
         public Customer? Customer { get; set; }
 
+        public Guid? MarketplaceOrderId { get; set; }
+        public MarketplaceOrder? MarketplaceOrder { get; set; }
+        public int? OrderSequence { get; set; }
+
         public DateTime StartDateUtc { get; set; }
         public DateTime EndDateUtc { get; set; }
 
@@ -43,15 +47,28 @@ namespace SportRental.Infrastructure.Domain
 
         public decimal TotalAmount { get; set; }
         public decimal DepositAmount { get; set; }
+        /// <summary>
+        /// Kwota opłaty za wynajem faktycznie otrzymana od klienta. Nie obejmuje
+        /// zwrotnego depozytu/kaucji przechowywanego osobno w DepositAmount.
+        /// </summary>
+        public decimal PaidAmount { get; set; }
         public string? PaymentIntentId { get; set; }
         public string PaymentStatus { get; set; } = string.Empty;
         /// Cash / Card / Transfer / BLIK / Online — używane gdy płatność oznaczona ręcznie przez właściciela.
         public string? PaymentMethod { get; set; }
         /// Czas zatwierdzenia płatności (manualnej lub po Stripe webhook).
         public DateTime? PaidAtUtc { get; set; }
+        /// Czas pobrania zwrotnego depozytu/kaucji; pozostaje zachowany po opłaceniu najmu.
+        public DateTime? DepositPaidAtUtc { get; set; }
         public string? ContractUrl { get; set; }
         public string? Notes { get; set; }
         public string? IdempotencyKey { get; set; }
+
+        // Regulamin właściwy dla tej wypożyczalni w chwili checkoutu.
+        public string? RegulationsTextSnapshot { get; set; }
+        public string? RegulationsHash { get; set; }
+        public string? RegulationsVersion { get; set; }
+        public string? RegulationsSource { get; set; }
 
         // SMS and Email tracking
         public bool IsSmsConfirmationSent { get; set; } = false;  // Czy wysłano SMS z prośbą o potwierdzenie
@@ -62,8 +79,8 @@ namespace SportRental.Infrastructure.Domain
         public bool IsReminderEmailSent { get; set; } = false;
         public DateTime? ReminderEmailSentAtUtc { get; set; }
 
-        // Dodatkowy "final" reminder 15 min przed końcem — niezależnie od RentalType.
-        // Daily rental: primary (24h) + final (15min). Hourly: primary IS 15min — final pomijany.
+        // Dodatkowy "final" reminder 30 min przed końcem — niezależnie od RentalType.
+        // Daily rental: primary (24h) + final (30min). Hourly: primary IS 30min — final pomijany.
         public bool IsFinalReminderSent { get; set; } = false;
         public DateTime? FinalReminderSentAtUtc { get; set; }
 

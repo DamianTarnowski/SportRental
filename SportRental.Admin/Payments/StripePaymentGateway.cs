@@ -148,7 +148,12 @@ public sealed class StripePaymentGateway : IPaymentGateway
         }
     }
 
-    public async Task<bool> RefundPaymentAsync(Guid tenantId, string id, decimal? amount = null, string? reason = null)
+    public async Task<bool> RefundPaymentAsync(
+        Guid tenantId,
+        string id,
+        decimal? amount = null,
+        string? reason = null,
+        string? idempotencyKey = null)
     {
         try
         {
@@ -181,7 +186,10 @@ public sealed class StripePaymentGateway : IPaymentGateway
                 refundOptions.Amount = (long)(amount.Value * 100);
             }
 
-            await _refundService.CreateAsync(refundOptions);
+            var requestOptions = string.IsNullOrWhiteSpace(idempotencyKey)
+                ? null
+                : new RequestOptions { IdempotencyKey = idempotencyKey };
+            await _refundService.CreateAsync(refundOptions, requestOptions);
             return true;
         }
         catch (StripeException)

@@ -1,6 +1,7 @@
 using SportRental.Infrastructure.Domain;
 using SportRental.Admin.Services.Email;
 using SportRental.Admin.Services.Storage;
+using SportRental.Admin.Services.Time;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -41,6 +42,7 @@ namespace SportRental.Admin.Services.Contracts
         {
             var productMap = products.ToDictionary(p => p.Id, p => p);
             var rentalDays = Math.Max(1, (rental.EndDateUtc - rental.StartDateUtc).Days);
+            var nowLocal = PolishTimeZone.FromUtc(DateTime.UtcNow);
             
             var doc = Document.Create(container =>
             {
@@ -60,9 +62,9 @@ namespace SportRental.Admin.Services.Contracts
                             {
                                 text.Span("RentSpot").FontSize(13).Bold().FontColor("#2F3C7E");
                                 text.Span(".").FontSize(13).Bold().FontColor("#F96167");
-                                text.Span("  — partner Maciej Czaronek").FontSize(8).FontColor("#5B6B82");
+                                text.Span("  — platforma obsługi wypożyczalni").FontSize(8).FontColor("#5B6B82");
                             });
-                            brandRow.ConstantItem(160).AlignRight().Text("rentspot.eu  |  kontakt@rentspot.eu").FontSize(8).FontColor("#5B6B82");
+                            brandRow.ConstantItem(100).AlignRight().Text("rentspot.eu").FontSize(8).FontColor("#5B6B82");
                         });
                         col.Item().LineHorizontal(0.4f).LineColor("#F96167");
 
@@ -73,7 +75,7 @@ namespace SportRental.Admin.Services.Contracts
                             {
                                 left.Item().Text("UMOWA WYPOŻYCZENIA").Bold().FontSize(18).FontColor("#2F3C7E");
                                 left.Item().Text($"Nr: {rental.Id.ToString()[..8].ToUpper()}").FontSize(12);
-                                left.Item().Text($"Data: {DateTime.Now:dd.MM.yyyy}").FontSize(10);
+                                left.Item().Text($"Data: {nowLocal:dd.MM.yyyy}").FontSize(10);
                             });
 
                             if (companyInfo != null)
@@ -245,8 +247,8 @@ namespace SportRental.Admin.Services.Contracts
                             });
                             row.RelativeItem().AlignRight().Text(text =>
                             {
-                                text.Span("rentspot.eu  ·  kontakt@rentspot.eu").FontSize(7).FontColor("#5B6B82");
-                                text.Span($"\nWygenerowano: {DateTime.Now:dd.MM.yyyy HH:mm}").FontSize(7).FontColor("#5B6B82");
+                                text.Span("rentspot.eu").FontSize(7).FontColor("#5B6B82");
+                                text.Span($"\nWygenerowano: {nowLocal:dd.MM.yyyy HH:mm}").FontSize(7).FontColor("#5B6B82");
                             });
                         });
                     });
@@ -260,30 +262,8 @@ namespace SportRental.Admin.Services.Contracts
         public Task<byte[]> GenerateRentalContractAsync(string templateContent, Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
         {
             var productMap = products.ToDictionary(p => p.Id, p => p);
-            var itemsLines = string.Join("\n", items.Select(it =>
-            {
-                var p = productMap.GetValueOrDefault(it.ProductId);
-                return $"- {(p?.Name ?? it.ProductId.ToString())} x{it.Quantity} @ {it.PricePerDay:0.00} zł = {it.Subtotal:0.00} zł";
-            }));
-
-            var filled = templateContent
-                .Replace("{{CustomerName}}", customer.FullName)
-                .Replace("{{CustomerEmail}}", customer.Email ?? "")
-                .Replace("{{CustomerPhone}}", customer.PhoneNumber ?? "")
-                .Replace("{{CustomerAddress}}", customer.Address ?? "")
-                .Replace("{{StartDate}}", rental.StartDateUtc.ToString("dd.MM.yyyy"))
-                .Replace("{{EndDate}}", rental.EndDateUtc.ToString("dd.MM.yyyy"))
-                .Replace("{{ItemsTable}}", itemsLines)
-                .Replace("{{Total}}", rental.TotalAmount.ToString("0.00"))
-                .Replace("{{Deposit}}", rental.DepositAmount.ToString("0.00"))
-                .Replace("{{CompanyName}}", companyInfo?.Name ?? "RentSpot")
-                .Replace("{{CompanyAddress}}", companyInfo?.Address ?? "")
-                .Replace("{{CompanyPostalCode}}", companyInfo?.PostalCode ?? "")
-                .Replace("{{CompanyCity}}", companyInfo?.City ?? "")
-                .Replace("{{CompanyVoivodeship}}", companyInfo?.Voivodeship ?? "")
-                .Replace("{{CompanyNIP}}", companyInfo?.NIP ?? "")
-                .Replace("{{CompanyPhone}}", companyInfo?.PhoneNumber ?? "")
-                .Replace("{{CompanyEmail}}", companyInfo?.Email ?? "");
+            var filled = FillTemplate(templateContent, rental, items, customer, productMap, companyInfo);
+            var nowLocal = PolishTimeZone.FromUtc(DateTime.UtcNow);
 
             var doc = Document.Create(container =>
             {
@@ -292,23 +272,69 @@ namespace SportRental.Admin.Services.Contracts
                     page.Size(PageSizes.A4);
                     page.Margin(2, Unit.Centimetre);
                     page.Content().Text(filled).FontSize(11);
-                    page.Footer().AlignCenter().Text($"{companyInfo?.Name ?? "RentSpot"} · via RentSpot · rentspot.eu — {DateTime.Now:dd.MM.yyyy}").FontSize(8);
+                    page.Footer().AlignCenter().Text($"{companyInfo?.Name ?? "RentSpot"} · via RentSpot · rentspot.eu — {nowLocal:dd.MM.yyyy}").FontSize(8);
                 });
             });
             var bytes = doc.GeneratePdf();
             return Task.FromResult(bytes);
         }
 
-        public async Task<string> GenerateAndSaveRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
+        private static string FillTemplate(
+            string templateContent,
+            Rental rental,
+            IEnumerable<RentalItem> items,
+            Customer customer,
+            IReadOnlyDictionary<Guid, Product> productMap,
+            CompanyInfo? companyInfo)
+        {
+            var itemsLines = string.Join("\n", items.Select(it =>
+            {
+                var p = productMap.GetValueOrDefault(it.ProductId);
+                return $"- {(p?.Name ?? it.ProductId.ToString())} x{it.Quantity} @ {it.PricePerDay:0.00} zł = {it.Subtotal:0.00} zł";
+            }));
+            var rentalDays = Math.Max(1, (int)Math.Ceiling(
+                (rental.EndDateUtc - rental.StartDateUtc).TotalDays));
+            var companyAddress = companyInfo == null
+                ? ""
+                : string.Join(", ", BuildCompanyAddressLines(companyInfo));
+
+            return templateContent
+                .Replace("{{CustomerName}}", customer.FullName)
+                .Replace("{{CustomerDocument}}", customer.DocumentNumber ?? "")
+                .Replace("{{CustomerEmail}}", customer.Email ?? "")
+                .Replace("{{CustomerPhone}}", customer.PhoneNumber ?? "")
+                .Replace("{{CustomerAddress}}", customer.Address ?? "")
+                .Replace("{{StartDate}}", PolishTimeZone.FromUtc(rental.StartDateUtc).ToString("dd.MM.yyyy HH:mm"))
+                .Replace("{{EndDate}}", PolishTimeZone.FromUtc(rental.EndDateUtc).ToString("dd.MM.yyyy HH:mm"))
+                .Replace("{{RentalDays}}", rentalDays.ToString())
+                .Replace("{{RentalId}}", rental.Id.ToString()[..8].ToUpperInvariant())
+                .Replace("{{CurrentDate}}", PolishTimeZone.FromUtc(DateTime.UtcNow).ToString("dd.MM.yyyy"))
+                .Replace("{{ItemsTable}}", itemsLines)
+                .Replace("{{Total}}", rental.TotalAmount.ToString("0.00"))
+                .Replace("{{Deposit}}", rental.DepositAmount.ToString("0.00"))
+                .Replace("{{CompanyName}}", companyInfo?.Name ?? "RentSpot")
+                .Replace("{{CompanyAddress}}", companyAddress)
+                .Replace("{{CompanyPostalCode}}", companyInfo?.PostalCode ?? "")
+                .Replace("{{CompanyCity}}", companyInfo?.City ?? "")
+                .Replace("{{CompanyVoivodeship}}", companyInfo?.Voivodeship ?? "")
+                .Replace("{{CompanyNIP}}", companyInfo?.NIP ?? "")
+                .Replace("{{CompanyREGON}}", companyInfo?.REGON ?? "")
+                .Replace("{{CompanyPhone}}", companyInfo?.PhoneNumber ?? "")
+                .Replace("{{CompanyEmail}}", companyInfo?.Email ?? "");
+        }
+
+        public async Task<string> GenerateAndSaveRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, string? templateContent = null, CancellationToken ct = default)
         {
             if (rental == null) throw new ArgumentNullException(nameof(rental));
             if (customer == null) throw new ArgumentNullException(nameof(customer));
             if (items == null || !items.Any()) throw new ArgumentException("Rental items cannot be null or empty.", nameof(items));
             if (products == null) throw new ArgumentNullException(nameof(products));
 
-            var contractBytes = await GenerateRentalContractAsync(rental, items, customer, products, companyInfo, ct);
+            var contractBytes = string.IsNullOrWhiteSpace(templateContent)
+                ? await GenerateRentalContractAsync(rental, items, customer, products, companyInfo, ct)
+                : await GenerateRentalContractAsync(templateContent, rental, items, customer, products, companyInfo, ct);
             
-            var fileName = $"umowa_{rental.Id}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            var fileName = $"umowa_{rental.Id}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
             var filePath = $"contracts/{rental.TenantId}/{fileName}";
             
             var storageReference = await _fileStorage.SavePrivateAsync(filePath, contractBytes, ct);
@@ -338,7 +364,7 @@ namespace SportRental.Admin.Services.Contracts
             _logger.LogInformation("Umowa wysłana emailem do {Email} dla wynajmu {RentalId}", customer.Email, rental.Id);
         }
 
-        public async Task SendRentalConfirmationEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
+        public async Task SendRentalConfirmationEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, string? templateContent = null, CancellationToken ct = default)
         {
             if (rental == null) throw new ArgumentNullException(nameof(rental));
             if (customer == null) throw new ArgumentNullException(nameof(customer));
@@ -352,7 +378,9 @@ namespace SportRental.Admin.Services.Contracts
             }
 
             // Generuj PDF umowy
-            var contractBytes = await GenerateRentalContractAsync(rental, items, customer, products, companyInfo, ct);
+            var contractBytes = string.IsNullOrWhiteSpace(templateContent)
+                ? await GenerateRentalContractAsync(rental, items, customer, products, companyInfo, ct)
+                : await GenerateRentalContractAsync(templateContent, rental, items, customer, products, companyInfo, ct);
             
             // Generuj HTML emaila
             var productMap = products.ToDictionary(p => p.Id, p => p);

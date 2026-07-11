@@ -22,8 +22,13 @@ a {
 }
 a:hover { text-decoration: underline; }
 
-:focus-visible {
+/* Coral focus ring only for genuinely interactive, keyboard-focused controls. */
+:where(a, button, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
   border-radius: var(--radius-xs);
 }
+/* FocusOnNavigate (App.razor) programmatically focuses the page <h1>; never paint
+   the coral ring around a non-interactive heading. */
+:is(h1, h2, h3, [tabindex="-1"]):focus,
+:is(h1, h2, h3, [tabindex="-1"]):focus-visible { outline: none; box-shadow: none; }

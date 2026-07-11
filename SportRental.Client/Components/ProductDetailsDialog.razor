@@ -5,10 +5,14 @@
 <MudDialog Class="product-dialog">
     <DialogContent>
         <MudStack Spacing="2">
-            @{ var imageUrl = Product.GetImageUrl(600); }
+            @{ var imageUrl = Product.GetImageUrl(800); }
             @if (!string.IsNullOrEmpty(imageUrl))
             {
-                <img src="@imageUrl" alt="@Product.Name" class="product-dialog-image" />
+                <img src="@imageUrl"
+                     data-fallback-src="@Product.ImageUrl"
+                     alt="@Product.Name"
+                     class="product-dialog-image"
+                     onerror="srImg(this)" />
             }
             else
             {
@@ -22,25 +26,29 @@
                 <MudText Typo="Typo.h6" Class="fw-bold product-dialog-title">@Product.Name</MudText>
                 @if (!string.IsNullOrEmpty(Product.Category))
                 {
-                    <MudText Typo="Typo.caption" Color="Color.Secondary">🏷️ @Product.Category</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary"><Icon Name="catalog" Size="16" /> @Product.Category</MudText>
                 }
+                <div class="product-dialog-tenant">
+                    <strong>@(string.IsNullOrWhiteSpace(Product.TenantName) ? "Wypożyczalnia" : Product.TenantName)</strong>
+                    <span>Odbiór: @Product.GetPickupDisplayText()</span>
+                </div>
                 <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="flex-wrap">
-                    <MudText Typo="Typo.subtitle1" Color="Color.Primary" Class="fw-bold">@Product.DailyPrice.ToString("C")/dzień</MudText>
+                    <MudText Typo="Typo.subtitle1" Color="Color.Primary" Class="fw-bold">@Product.DailyPrice.Pln()/dzień</MudText>
                     @if (Product.HourlyPrice.HasValue && Product.HourlyPrice.Value > 0)
                     {
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">(@Product.HourlyPrice.Value.ToString("C")/godz.)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">(@Product.HourlyPrice.Value.Pln()/godz.)</MudText>
                     }
                 </MudStack>
                 <MudStack Row="true" Spacing="1" Class="mt-1 flex-wrap">
                     @if (Product.IsAvailable && Product.AvailableQuantity > 0)
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">✓ Dostępny</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled"><Icon Name="check" Size="16" /> Dostępny</MudChip>
                     }
                     else
                     {
-                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">✗ Niedostępny</MudChip>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Error" Variant="Variant.Filled">Niedostępny</MudChip>
                     }
-                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">📦 @Product.AvailableQuantity szt.</MudChip>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined">@Product.AvailableQuantity szt.</MudChip>
                 </MudStack>
             </MudStack>
 
@@ -58,7 +66,7 @@
                    Disabled="@(Product.AvailableQuantity <= 0 || !Product.IsAvailable)"
                    OnClick="AddToCartClicked"
                    StartIcon="@Icons.Material.Filled.AddShoppingCart">
-            🛒 Do koszyka
+            Do koszyka
         </MudButton>
     </DialogActions>
 </MudDialog>
@@ -85,6 +93,23 @@
         line-height: 1.5;
         max-height: 100px;
         overflow-y: auto;
+    }
+
+    .product-dialog-tenant {
+        display: flex;
+        flex-direction: column;
+        gap: 0.125rem;
+        padding: 0.625rem 0.75rem;
+        color: #263258;
+        background: #f7f8fb;
+        border: 1px solid #e2e6ef;
+        border-radius: 10px;
+        font-size: 0.85rem;
+    }
+
+    .product-dialog-tenant span {
+        color: #5b6b82;
+        font-size: 0.8rem;
     }
     
     @@media (max-width: 600px) {

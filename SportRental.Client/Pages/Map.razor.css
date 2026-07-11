@@ -1,0 +1,28 @@
+.map-page {
+    display: block;
+}
+
+.map-page-title {
+    margin: 0;
+    color: #fff;
+    font-size: clamp(1.75rem, 3vw, 2.125rem);
+    font-weight: 700;
+    line-height: 1.25;
+}
+
+::deep .map-primary-action,
+::deep .map-primary-chip {
+    background-color: #8f2429 !important;
+    color: #fff !important;
+}
+
+::deep .map-primary-outline {
+    border-color: #8f2429 !important;
+    color: #8f2429 !important;
+}
+
+::deep .map-primary-action .mud-button-label,
+::deep .map-primary-chip .mud-chip-content,
+::deep .map-primary-outline .mud-button-label {
+    color: inherit !important;
+}

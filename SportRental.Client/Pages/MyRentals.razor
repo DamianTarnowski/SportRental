@@ -1,6 +1,7 @@
 @page "/my-rentals"
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @using SportRental.Client.Components
+@using SportRental.Client.Helpers
 @using SportRental.Shared.Models
 @using SportRental.Shared.Services
 @using MudBlazor
@@ -22,11 +23,10 @@
         <!-- Mobile Header -->
         <div class="rentals-mobile-header">
             <div class="rentals-mobile-title">
-                <span></span>
                 <h1>Wypożyczenia</h1>
                 @if (_rentals?.Count > 0)
                 {
-                    <span class="rentals-mobile-count">@_rentals.Count</span>
+                    <span class="rentals-mobile-count">@RentalOrders.Count</span>
                 }
             </div>
         </div>
@@ -38,28 +38,76 @@
                 <span>Ładowanie...</span>
             </div>
         }
+        else if (_loadError is not null)
+        {
+            <div class="rentals-mobile-empty" role="alert">
+                <span class="empty-icon"><Icon Name="rentals" Size="44" /></span>
+                <h3>Nie udało się pobrać wypożyczeń</h3>
+                <p>@_loadError</p>
+                <button type="button" class="rentals-mobile-cta" @onclick="LoadRentalsAsync">Spróbuj ponownie</button>
+            </div>
+        }
         else if (_rentals == null || !_rentals.Any())
         {
             <div class="rentals-mobile-empty">
-                <span class="empty-icon"></span>
+                <span class="empty-icon"><Icon Name="rentals" Size="44" /></span>
                 <h3>Brak wypożyczeń</h3>
                 <p>Zacznij swoją przygodę ze sportem!</p>
-                <a href="/products" class="rentals-mobile-cta">Przeglądaj sprzęt</a>
+                <a href="products" class="rentals-mobile-cta">Przeglądaj sprzęt</a>
             </div>
         }
         else
         {
             <div class="rentals-mobile-list">
-                @foreach (var rental in _rentals.OrderByDescending(r => r.StartDateUtc))
+                @foreach (var order in RentalOrders)
                 {
+                    <section class="rental-order-group">
+                        @if (order.IsMarketplaceOrder)
+                        {
+                            <header class="rental-order-header">
+                                <div>
+                                    <span>Zamówienie</span>
+                                    <strong>@order.Number</strong>
+                                    <small>@PolishCount(order.Rentals.Count, "rezerwacja", "osobne rezerwacje", "osobnych rezerwacji") · @PolishCount(order.Rentals.Count, "punkt odbioru", "punkty odbioru", "punktów odbioru")</small>
+                                </div>
+                                <div class="rental-order-totals">
+                                    <span>Wynajem @order.Rentals.Sum(rental => rental.TotalAmount).Pln()</span>
+                                    <span>Depozyt początkowy @order.Rentals.Sum(rental => rental.DepositAmount).Pln()</span>
+                                    @if (RefundedDeposit(order) > 0m)
+                                    {
+                                        <span>Zwrócono @RefundedDeposit(order).Pln()</span>
+                                    }
+                                </div>
+                            </header>
+                        }
+                    @foreach (var rental in order.Rentals)
+                    {
                     <div class="rental-mobile-card @(rental.IsOverdue ? "overdue" : "")">
+                        <div class="mb-3">
+                            @if (order.Rentals.Count > 1)
+                            {
+                                <span class="rental-order-sequence">Rezerwacja @(rental.OrderSequence ?? (order.Rentals.IndexOf(rental) + 1)) z @order.Rentals.Count</span>
+                            }
+                            <strong>@TenantName(rental)</strong>
+                            @if (!string.IsNullOrWhiteSpace(RentalPresentation.PickupLocation(rental)))
+                            {
+                                <div class="text-sm text-gray-600">Odbiór: @RentalPresentation.PickupLocation(rental)</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(rental.TenantPhoneNumber))
+                            {
+                                <div class="text-sm"><a href="@($"tel:{rental.TenantPhoneNumber}")">@rental.TenantPhoneNumber</a></div>
+                            }
+                        </div>
                         <!-- Status badges -->
                         <div class="rental-mobile-badges">
                             <span class="rental-mobile-status @GetStatusClass(rental.Status)">
-                                @GetStatusEmoji(rental.Status) @GetStatusText(rental.Status)
+                                @GetStatusText(rental.Status)
                             </span>
-                            <span class="rental-mobile-equip @GetEquipmentStatusClass(rental)">
-                                @GetEquipmentStatusEmoji(rental)
+                            <span class="rental-mobile-status @GetPaymentStatusClass(rental)">
+                                @RentalPresentation.PaymentStatusText(rental)
+                            </span>
+                            <span class="rental-mobile-equip @GetEquipmentStatusClass(rental)" title="@GetEquipmentStatusText(rental)">
+                                <Icon Name="rentals" Size="20" />
                             </span>
                         </div>
 
@@ -74,20 +122,23 @@
                         <div class="rental-mobile-dates">
                             <div class="rental-mobile-date-item">
                                 <span class="date-label">Od</span>
-                                <span class="date-value">@rental.StartDateUtc.ToLocalTime().ToString("dd.MM")</span>
+                                <span class="date-value">@FormatCompactDate(rental.StartDateUtc, rental)</span>
                             </div>
                             <span class="date-arrow">→</span>
                             <div class="rental-mobile-date-item">
                                 <span class="date-label">Do</span>
-                                <span class="date-value">@rental.EndDateUtc.ToLocalTime().ToString("dd.MM")</span>
+                                <span class="date-value">@FormatCompactDate(rental.EndDateUtc, rental)</span>
                             </div>
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2">
+                            @RentalPresentation.RentalTypeText(rental) · @RentalPresentation.DurationText(rental)
                         </div>
 
                         <!-- Products preview -->
                         <div class="rental-mobile-products">
                             @foreach (var item in rental.Items.Take(2))
                             {
-                                <span class="rental-mobile-product">@item.ProductName x@(item.Quantity)</span>
+                                <span class="rental-mobile-product">@item.ProductName × @item.Quantity — @RentalPresentation.Money(item.TotalPrice)</span>
                             }
                             @if (rental.Items.Count > 2)
                             {
@@ -98,7 +149,17 @@
                         <!-- Footer -->
                         <div class="rental-mobile-footer">
                             <div class="rental-mobile-amount">
-                                <span class="amount-value">@rental.TotalAmount.ToString("C")</span>
+                                <span class="amount-value">@RentalPresentation.Money(rental.TotalAmount)</span>
+                                <span class="amount-deposit">Opłacono za wynajem: @RentalPresentation.Money(RentalPresentation.PaidAmount(rental))</span>
+                                @if (RentalPresentation.IsDepositCollected(rental))
+                                {
+                                    <span class="amount-deposit">Depozyt pobrany: @RentalPresentation.Money(rental.DepositAmount)</span>
+                                }
+                                @if (RentalPresentation.DepositSettlementText(rental) is { } depositSettlement)
+                                {
+                                    <span class="amount-deposit">@depositSettlement</span>
+                                }
+                                <span class="amount-deposit">Do zapłaty za wynajem: @RentalPresentation.Money(RentalPresentation.OutstandingAmount(rental))</span>
                             </div>
                             <button class="rental-mobile-btn" @onclick="@(() => ViewDetails(rental.Id))">
                                 Szczegóły →
@@ -117,6 +178,8 @@
                             </div>
                         }
                     </div>
+                    }
+                    </section>
                 }
             </div>
         }
@@ -144,13 +207,24 @@ else
                 </div>
             </div>
         }
+        else if (_loadError is not null)
+        {
+            <div class="rentals-empty" role="alert">
+                <div class="rentals-empty-icon"><Icon Name="rentals" Size="44" /></div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Nie udało się pobrać wypożyczeń</h2>
+                <p class="text-gray-600 mb-6">@_loadError</p>
+                <button type="button" class="cart-checkout-btn" style="max-width: 300px; margin: 0 auto;" @onclick="LoadRentalsAsync">
+                    Spróbuj ponownie
+                </button>
+            </div>
+        }
         else if (_rentals == null || !_rentals.Any())
         {
             <div class="rentals-empty">
-                <div class="rentals-empty-icon"></div>
+                <div class="rentals-empty-icon"><Icon Name="rentals" Size="44" /></div>
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">Brak wypożyczeń</h2>
                 <p class="text-gray-600 mb-6">Nie masz jeszcze żadnych wypożyczeń. Zacznij swoją przygodę ze sportem!</p>
-                <a href="/products" class="cart-checkout-btn" style="max-width: 300px; margin: 0 auto; text-decoration: none; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <a href="products" class="cart-checkout-btn" style="max-width: 300px; margin: 0 auto; text-decoration: none; background: linear-gradient(135deg, #F96167 0%, #E0454C 100%);">
                     Przeglądaj sprzęt
                 </a>
             </div>
@@ -158,26 +232,74 @@ else
         else
         {
             <div class="space-y-4">
-                @foreach (var rental in _rentals.OrderByDescending(r => r.StartDateUtc))
+                @foreach (var order in RentalOrders)
                 {
+                    <section class="rental-order-group rental-order-group-desktop">
+                        @if (order.IsMarketplaceOrder)
+                        {
+                            <header class="rental-order-header">
+                                <div>
+                                    <span>Zamówienie</span>
+                                    <strong>@order.Number</strong>
+                                    <small>@PolishCount(order.Rentals.Count, "rezerwacja", "osobne rezerwacje", "osobnych rezerwacji") w @PolishCount(order.Rentals.Count, "punkcie odbioru", "punktach odbioru", "punktach odbioru")</small>
+                                </div>
+                                <div class="rental-order-totals">
+                                    <span>Łączny wynajem <strong>@order.Rentals.Sum(rental => rental.TotalAmount).Pln()</strong></span>
+                                    <span>Depozyt początkowy <strong>@order.Rentals.Sum(rental => rental.DepositAmount).Pln()</strong></span>
+                                    @if (RefundedDeposit(order) > 0m)
+                                    {
+                                        <span>Zwrócono <strong>@RefundedDeposit(order).Pln()</strong></span>
+                                    }
+                                </div>
+                            </header>
+                        }
+                    @foreach (var rental in order.Rentals)
+                    {
                     <div class="rental-card">
+                        <div class="mb-4">
+                            @if (order.Rentals.Count > 1)
+                            {
+                                <span class="rental-order-sequence">Rezerwacja @(rental.OrderSequence ?? (order.Rentals.IndexOf(rental) + 1)) z @order.Rentals.Count</span>
+                            }
+                            <div class="text-lg font-bold text-gray-900">@TenantName(rental)</div>
+                            @if (!string.IsNullOrWhiteSpace(RentalPresentation.PickupLocation(rental)))
+                            {
+                                <div class="text-sm text-gray-600">Punkt odbioru: @RentalPresentation.PickupLocation(rental)</div>
+                            }
+                            <div class="text-sm text-gray-600">
+                                @if (!string.IsNullOrWhiteSpace(rental.TenantPhoneNumber))
+                                {
+                                    <a href="@($"tel:{rental.TenantPhoneNumber}")">@rental.TenantPhoneNumber</a>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(rental.TenantEmail))
+                                {
+                                    <span> · <a href="@($"mailto:{rental.TenantEmail}")">@rental.TenantEmail</a></span>
+                                }
+                            </div>
+                            <div class="text-sm text-gray-600">
+                                @RentalPresentation.RentalTypeText(rental) · @RentalPresentation.DurationText(rental)
+                            </div>
+                        </div>
                         <div class="rental-card-header">
                             <div class="rental-card-dates">
                                 <div class="rental-date-group">
                                     <div class="rental-date-label">Od</div>
-                                    <div class="rental-date-value">@rental.StartDateUtc.ToLocalTime().ToString("dd.MM.yyyy")</div>
+                                    <div class="rental-date-value">@FormatDesktopDate(rental.StartDateUtc, rental)</div>
                                 </div>
                                 <div class="rental-date-group">
                                     <div class="rental-date-label">Do</div>
-                                    <div class="rental-date-value">@rental.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy")</div>
+                                    <div class="rental-date-value">@FormatDesktopDate(rental.EndDateUtc, rental)</div>
                                 </div>
                             </div>
                             <div class="rental-status-badges">
                                 <span class="rental-status @GetStatusClass(rental.Status)">
-                                    @GetStatusEmoji(rental.Status) @GetStatusText(rental.Status)
+                                    @GetStatusText(rental.Status)
+                                </span>
+                                <span class="rental-status @GetPaymentStatusClass(rental)">
+                                    @RentalPresentation.PaymentStatusText(rental)
                                 </span>
                                 <span class="rental-status @GetEquipmentStatusClass(rental)">
-                                    @GetEquipmentStatusEmoji(rental) @GetEquipmentStatusText(rental)
+                                    @GetEquipmentStatusText(rental)
                                 </span>
                             </div>
                         </div>
@@ -194,8 +316,8 @@ else
                             @foreach (var item in rental.Items.Take(3))
                             {
                                 <div class="rental-product-item">
-                                    <span>@item.ProductName</span>
-                                    <span class="font-medium">x@(item.Quantity)</span>
+                                    <span>@item.ProductName × @item.Quantity</span>
+                                    <span class="font-medium">@RentalPresentation.Money(item.TotalPrice)</span>
                                 </div>
                             }
                             @if (rental.Items.Count > 3)
@@ -208,7 +330,17 @@ else
 
                         <div class="rental-card-footer">
                             <div class="rental-total">
-                                @rental.TotalAmount.ToString("C")
+                                @RentalPresentation.Money(rental.TotalAmount)
+                                <div class="text-sm font-normal text-gray-600">Opłacono za wynajem: @RentalPresentation.Money(RentalPresentation.PaidAmount(rental))</div>
+                                @if (RentalPresentation.IsDepositCollected(rental))
+                                {
+                                    <div class="text-sm font-normal text-gray-600">Depozyt pobrany: @RentalPresentation.Money(rental.DepositAmount)</div>
+                                }
+                                @if (RentalPresentation.DepositSettlementText(rental) is { } depositSettlement)
+                                {
+                                    <div class="text-sm font-normal text-gray-600">@depositSettlement</div>
+                                }
+                                <div class="text-sm font-normal text-gray-600">Do zapłaty za wynajem: @RentalPresentation.Money(RentalPresentation.OutstandingAmount(rental))</div>
                             </div>
                             <div class="rental-actions">
                                 @if (CanReview(rental))
@@ -224,15 +356,17 @@ else
                                 <button class="rental-btn rental-btn-primary" @onclick="@(() => ViewDetails(rental.Id))">
                                     Szczegóły
                                 </button>
-                                @if (rental.ContractUrl != null)
+                                @if (rental.PublicContractUrl != null)
                                 {
-                                    <a href="@rental.ContractUrl" target="_blank" class="rental-btn rental-btn-secondary">
+                                    <a href="@rental.PublicContractUrl" target="_blank" rel="noopener" class="rental-btn rental-btn-secondary">
                                         Umowa
                                     </a>
                                 }
                             </div>
                         </div>
                     </div>
+                    }
+                    </section>
                 }
             </div>
         }
@@ -243,8 +377,27 @@ else
 @code {
     private bool _isLoading = true;
     private List<MyRentalDto>? _rentals;
+    private string? _loadError;
     private bool _isMobile = false;
     private DotNetObjectReference<MyRentals>? _dotNetRef;
+
+    private IReadOnlyList<RentalOrderView> RentalOrders => (_rentals ?? new List<MyRentalDto>())
+        .GroupBy(rental => rental.MarketplaceOrderId ?? rental.Id)
+        .Select(group =>
+        {
+            var rentals = group
+                .OrderBy(rental => rental.OrderSequence ?? int.MaxValue)
+                .ThenBy(rental => rental.StartDateUtc)
+                .ToList();
+            return new RentalOrderView(
+                group.Key,
+                rentals.Select(rental => rental.MarketplaceOrderNumber)
+                    .FirstOrDefault(number => !string.IsNullOrWhiteSpace(number)),
+                rentals[0].MarketplaceOrderId.HasValue,
+                rentals);
+        })
+        .OrderByDescending(order => order.Rentals.Max(rental => rental.StartDateUtc))
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -283,6 +436,7 @@ else
     private async Task LoadRentalsAsync()
     {
         _isLoading = true;
+        _loadError = null;
         StateHasChanged();
 
         try
@@ -291,8 +445,9 @@ else
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Błąd podczas ładowania wypożyczeń: {ex.Message}", Severity.Error);
-            _rentals = new List<MyRentalDto>();
+            _loadError = "Sprawdź połączenie z internetem i spróbuj ponownie.";
+            Snackbar.Add("Nie udało się pobrać wypożyczeń.", Severity.Error);
+            Console.Error.WriteLine($"Nie udało się pobrać wypożyczeń: {ex.Message}");
         }
         finally
         {
@@ -301,83 +456,81 @@ else
         }
     }
 
-    private string GetStatusClass(string status)
-    {
-        return status.ToLower() switch
-        {
-            "draft" or "pending" => "pending",
-            "reserved" or "confirmed" => "reserved",
-            "active" or "onrent" => "active",
-            "returned" or "completed" => "completed",
-            "cancelled" => "cancelled",
-            "overdue" => "overdue",
-            _ => ""
-        };
-    }
+    private static string GetStatusClass(string status) => RentalPresentation.StatusCssClass(status);
 
-    private string GetStatusEmoji(string status)
-    {
-        return status.ToLower() switch
-        {
-            "draft" or "pending" => "⏳",
-            "reserved" or "confirmed" => "",
-            "active" or "onrent" => "",
-            "returned" or "completed" => "",
-            "cancelled" => "",
-            "overdue" => "",
-            _ => ""
-        };
-    }
+    private static string GetStatusText(string status) => RentalPresentation.StatusText(status);
 
-    private string GetStatusText(string status)
-    {
-        return status.ToLower() switch
-        {
-            "draft" => "Szkic",
-            "pending" => "Oczekujące",
-            "confirmed" => "Potwierdzone",
-            "active" => "Aktywne",
-            "completed" => "Zakończone",
-            "cancelled" => "Anulowane",
-            _ => status
-        };
-    }
+    private static string GetPaymentStatusClass(MyRentalDto rental) =>
+        RentalPresentation.IsPaymentConfirmed(rental) ? "active" : "pending";
 
     // Status wydania/zwrotu sprzętu
     private string GetEquipmentStatusClass(MyRentalDto rental)
     {
         if (rental.ReturnedAtUtc.HasValue)
             return "completed";
+        if (string.Equals(rental.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            return "completed";
+        if (string.Equals(rental.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            return "cancelled";
         if (rental.IssuedAtUtc.HasValue)
             return rental.IsOverdue ? "overdue" : "active";
+        if (string.Equals(rental.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            return rental.IsOverdue ? "overdue" : "active";
         return "pending";
-    }
-
-    private string GetEquipmentStatusEmoji(MyRentalDto rental)
-    {
-        if (rental.ReturnedAtUtc.HasValue)
-            return "";
-        if (rental.IssuedAtUtc.HasValue)
-            return rental.IsOverdue ? "" : "";
-        return "⏳";
     }
 
     private string GetEquipmentStatusText(MyRentalDto rental)
     {
         if (rental.ReturnedAtUtc.HasValue)
-            return $"Zwrócono {rental.ReturnedAtUtc.Value.ToLocalTime():dd.MM}";
+            return $"Zwrócono {PolishRentalTime.FromUtc(rental.ReturnedAtUtc.Value):dd.MM}";
+        if (string.Equals(rental.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+            return "Sprzęt zwrócony";
+        if (string.Equals(rental.Status, "Cancelled", StringComparison.OrdinalIgnoreCase))
+            return "Bez wydania";
         if (rental.IssuedAtUtc.HasValue)
-            return $"Wydano {rental.IssuedAtUtc.Value.ToLocalTime():dd.MM}";
+            return $"Wydano {PolishRentalTime.FromUtc(rental.IssuedAtUtc.Value):dd.MM}";
+        if (string.Equals(rental.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            return "Sprzęt wydany";
         return "Oczekuje na odbiór";
     }
 
     private void ViewDetails(Guid rentalId)
     {
-        Nav.NavigateTo($"/my-rentals/{rentalId}");
+        Nav.NavigateTo($"my-rentals/{rentalId}");
     }
 
-    private static bool CanReview(MyRentalDto rental) =>
-        !rental.HasReview && !string.Equals(rental.Status, "Cancelled", StringComparison.OrdinalIgnoreCase);
+    private static bool CanReview(MyRentalDto rental) => RentalPresentation.CanReview(rental);
+
+    private static string TenantName(MyRentalDto rental) =>
+        string.IsNullOrWhiteSpace(rental.TenantName) ? "Wypożyczalnia" : rental.TenantName;
+
+    private static decimal RefundedDeposit(RentalOrderView order) =>
+        order.Rentals.Sum(rental =>
+            rental.ReturnDepositRefund ??
+            (string.Equals(rental.PaymentStatus, "DepositRefunded", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(rental.PaymentStatus, "Refunded", StringComparison.OrdinalIgnoreCase)
+                ? rental.DepositAmount
+                : 0m));
+
+    private static string PolishCount(int count, string singular, string paucal, string plural)
+    {
+        var absolute = Math.Abs(count);
+        var lastTwoDigits = absolute % 100;
+        var noun = absolute == 1
+            ? singular
+            : lastTwoDigits is >= 12 and <= 14
+                ? plural
+                : absolute % 10 is >= 2 and <= 4
+                    ? paucal
+                    : plural;
+        return $"{count} {noun}";
+    }
+
+    private static string FormatCompactDate(DateTime value, MyRentalDto rental) =>
+        PolishRentalTime.FromUtc(value).ToString(rental.RentalType == RentalTypeDto.Hourly ? "dd.MM HH:mm" : "dd.MM.yyyy");
+
+    private static string FormatDesktopDate(DateTime value, MyRentalDto rental) =>
+        PolishRentalTime.FromUtc(value).ToString(rental.RentalType == RentalTypeDto.Hourly ? "dd.MM.yyyy HH:mm" : "dd.MM.yyyy");
 
     private async Task OpenReviewDialog(MyRentalDto rental)
     {
@@ -393,4 +546,10 @@ else
             await LoadRentalsAsync();
         }
     }
+
+    private sealed record RentalOrderView(
+        Guid Id,
+        string? Number,
+        bool IsMarketplaceOrder,
+        List<MyRentalDto> Rentals);
 }

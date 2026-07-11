@@ -5,8 +5,11 @@ using SportRental.Infrastructure.Tenancy;
 using SportRental.Admin.Hubs;
 using Microsoft.EntityFrameworkCore;
 
+#pragma warning disable CS0618 // Intentionally retained behind Sms:LegacyReplyConfirmationEnabled.
+
 namespace SportRental.Admin.Services.Sms
 {
+    [Obsolete("Legacy SMS reply confirmation flow. Use RentalConfirmationService instead.")]
     public class SmsConfirmationService : ISmsConfirmationService
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
@@ -327,3 +330,5 @@ namespace SportRental.Admin.Services.Sms
         }
     }
 }
+
+#pragma warning restore CS0618

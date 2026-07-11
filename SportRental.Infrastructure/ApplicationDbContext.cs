@@ -40,7 +40,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     public DbSet<EmployeeInvitation> EmployeeInvitations => Set<EmployeeInvitation>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<CheckoutSession> CheckoutSessions => Set<CheckoutSession>();
+    public DbSet<MarketplaceOrder> MarketplaceOrders => Set<MarketplaceOrder>();
+    public DbSet<GuestOrderAccessToken> GuestOrderAccessTokens => Set<GuestOrderAccessToken>();
     public DbSet<RentalConfirmation> RentalConfirmations => Set<RentalConfirmation>();
+    public DbSet<RentalReminderDelivery> RentalReminderDeliveries => Set<RentalReminderDelivery>();
     public DbSet<RentalReview> RentalReviews => Set<RentalReview>();
     public DbSet<RentalItemReview> RentalItemReviews => Set<RentalItemReview>();
     public DbSet<CustomerReview> CustomerReviews => Set<CustomerReview>();
@@ -76,6 +79,12 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<ApplicationUser>(entity =>
+        {
+            entity.Property(user => user.AcceptedTermsVersion).HasMaxLength(32);
+            entity.Property(user => user.AcknowledgedPrivacyVersion).HasMaxLength(32);
+        });
         
         // Allow API-specific entities to be configured from external assemblies
         // Example: SportRental.Api can register RefreshToken via ApiDbContextExtensions.ConfigureApiEntities()
@@ -114,17 +123,34 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(c => new { c.TenantId, c.Email });
             entity.HasIndex(c => new { c.TenantId, c.FullName });
             entity.HasIndex(c => new { c.TenantId, c.PhoneNumber });
-            entity.HasQueryFilter(c => TenantId == null || c.TenantId == TenantId);
+            // Klienci utworzeni w publicznym marketplace mogą być globalni (TenantId = Guid.Empty)
+            // albo pochodzić z innego tenanta, jeżeli wcześniej korzystali z innej wypożyczalni.
+            // Panel danego tenanta widzi takiego klienta dopiero, gdy istnieje jego wynajem
+            // w tym tenancie. Dzięki temu wspólne konto klienta działa cross-tenant bez
+            // ujawniania całej globalnej bazy klientów każdemu właścicielowi.
+            entity.HasQueryFilter(c =>
+                TenantId == null ||
+                c.TenantId == TenantId ||
+                Rentals.Any(r => r.CustomerId == c.Id && r.TenantId == TenantId));
         });
 
         modelBuilder.Entity<Rental>(entity =>
         {
             entity.HasKey(r => r.Id);
             entity.Property(r => r.TotalAmount).HasPrecision(18, 2);
+            entity.Property(r => r.DepositAmount).HasPrecision(18, 2);
+            entity.Property(r => r.PaidAmount).HasPrecision(18, 2);
             entity.Property(r => r.PaymentIntentId).HasMaxLength(64);
+            entity.Property(r => r.RegulationsHash).HasMaxLength(64);
+            entity.Property(r => r.RegulationsVersion).HasMaxLength(64);
+            entity.Property(r => r.RegulationsSource).HasMaxLength(32);
             entity.HasOne(r => r.Customer)
                 .WithMany()
                 .HasForeignKey(r => r.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(r => r.MarketplaceOrder)
+                .WithMany(o => o.Rentals)
+                .HasForeignKey(r => r.MarketplaceOrderId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(r => r.Items)
                 .WithOne(i => i.Rental)
@@ -134,6 +160,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(r => new { r.TenantId, r.StartDateUtc, r.EndDateUtc });
             entity.HasIndex(r => new { r.TenantId, r.CustomerId, r.StartDateUtc });
             entity.HasIndex(r => new { r.TenantId, r.IdempotencyKey }).IsUnique();
+            entity.HasIndex(r => r.MarketplaceOrderId);
+            entity.HasIndex(r => new { r.MarketplaceOrderId, r.TenantId }).IsUnique();
+            entity.HasIndex(r => new { r.MarketplaceOrderId, r.OrderSequence }).IsUnique();
             entity.HasQueryFilter(r => TenantId == null || r.TenantId == TenantId);
         });
 
@@ -148,6 +177,18 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(ri => ri.ProductId);
             entity.HasIndex(ri => ri.RentalId);
+        });
+
+        modelBuilder.Entity<RentalReminderDelivery>(entity =>
+        {
+            entity.HasKey(d => d.Id);
+            entity.HasOne(d => d.Rental)
+                .WithMany()
+                .HasForeignKey(d => d.RentalId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(d => new { d.RentalId, d.Stage, d.Channel }).IsUnique();
+            entity.HasIndex(d => new { d.TenantId, d.SentAtUtc });
+            entity.HasQueryFilter(d => TenantId == null || d.TenantId == TenantId);
         });
 
         modelBuilder.Entity<ReservationHold>(entity =>
@@ -437,6 +478,59 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, IdentityR
             entity.HasIndex(cs => cs.ExpiresAtUtc);
             entity.Property(cs => cs.IdempotencyKey).HasMaxLength(100).IsRequired();
             entity.Property(cs => cs.StripeSessionId).HasMaxLength(200);
+            entity.Property(cs => cs.FailureReason).HasMaxLength(500);
+            entity.Property(cs => cs.AcceptedTermsVersion).HasMaxLength(32);
+            entity.Property(cs => cs.AcknowledgedPrivacyVersion).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<MarketplaceOrder>(entity =>
+        {
+            entity.ToTable("MarketplaceOrders");
+            entity.HasKey(o => o.Id);
+            entity.Property(o => o.OrderNumber).HasMaxLength(32).IsRequired();
+            entity.Property(o => o.CustomerEmailSnapshot).HasMaxLength(320);
+            entity.Property(o => o.StripeSessionId).HasMaxLength(200);
+            entity.Property(o => o.PaymentIntentId).HasMaxLength(64);
+            entity.Property(o => o.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(o => o.Status).HasMaxLength(32).IsRequired();
+            entity.Property(o => o.PaymentStatus).HasMaxLength(32).IsRequired();
+            entity.Property(o => o.TotalAmount).HasPrecision(18, 2);
+            entity.Property(o => o.DepositAmount).HasPrecision(18, 2);
+            entity.Property(o => o.RefundedDepositAmount).HasPrecision(18, 2);
+            entity.Property(o => o.IdempotencyKey).HasMaxLength(100).IsRequired();
+            entity.Property(o => o.AcceptedTermsVersion).HasMaxLength(32);
+            entity.Property(o => o.AcknowledgedPrivacyVersion).HasMaxLength(32);
+            entity.HasIndex(o => o.OrderNumber).IsUnique();
+            entity.HasIndex(o => o.CheckoutSessionId).IsUnique();
+            entity.HasIndex(o => o.IdempotencyKey).IsUnique();
+            entity.HasIndex(o => new { o.CustomerId, o.CreatedAtUtc });
+            entity.HasOne(o => o.Customer)
+                .WithMany()
+                .HasForeignKey(o => o.CustomerId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(o => o.CheckoutSession)
+                .WithOne()
+                .HasForeignKey<MarketplaceOrder>(o => o.CheckoutSessionId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GuestOrderAccessToken>(entity =>
+        {
+            entity.ToTable("GuestOrderAccessTokens");
+            entity.HasKey(token => token.Id);
+            entity.Property(token => token.TokenHash).HasMaxLength(64).IsRequired();
+            entity.Property(token => token.RequestedFromIp).HasMaxLength(64);
+            entity.HasIndex(token => token.TokenHash).IsUnique();
+            entity.HasIndex(token => new { token.CustomerId, token.ExpiresAtUtc });
+            entity.HasIndex(token => new { token.MarketplaceOrderId, token.ExpiresAtUtc });
+            entity.HasOne(token => token.Customer)
+                .WithMany()
+                .HasForeignKey(token => token.CustomerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(token => token.MarketplaceOrder)
+                .WithMany()
+                .HasForeignKey(token => token.MarketplaceOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Faza 8a — BusinessHours per tenant

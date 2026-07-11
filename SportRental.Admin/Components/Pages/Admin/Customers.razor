@@ -78,9 +78,9 @@
                                     }
                                 </div>
                                 <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
-                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="async () => await OpenEditDialog(customer)">Edytuj</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Edit" Disabled="@(!CanManageCustomer(customer))" OnClick="async () => await OpenEditDialog(customer)">Edytuj</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Assignment" OnClick="async () => await ViewRentals(customer)">Wynajmy</MudMenuItem>
-                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" OnClick="async () => await Delete(customer)">Usuń</MudMenuItem>
+                                    <MudMenuItem Icon="@Icons.Material.Filled.Delete" Disabled="@(!CanManageCustomer(customer))" OnClick="async () => await Delete(customer)">Usuń</MudMenuItem>
                                 </MudMenu>
                             </div>
                         </MudCardContent>
@@ -177,8 +177,8 @@ else
                                         <MudAvatar Color="Color.Primary" Size="Size.Large" Class="mr-3">
                                             <MudIcon Icon="@Icons.Material.Filled.Person" />
                                         </MudAvatar>
-                                        <div Class="flex-1">
-                                            <MudText Typo="Typo.h6" Style="font-weight: 600;" Class="mb-1">
+                                        <div Class="flex-1 customer-card-header-copy">
+                                            <MudText Typo="Typo.h6" Style="font-weight: 600;" Class="mb-1 customer-card-text">
                                                 @customer.FullName
                                             </MudText>
                                             <div class="mb-1">
@@ -194,32 +194,32 @@ else
                                     <MudStack Spacing="2">
                                         @if (!string.IsNullOrEmpty(customer.Email))
                                         {
-                                            <div Class="d-flex align-center">
+                                            <div Class="d-flex align-center customer-contact-row">
                                                 <MudIcon Icon="@Icons.Material.Filled.Email" Color="Color.Info" Size="Size.Small" Class="mr-2" />
-                                                <MudText Typo="Typo.body2">@customer.Email</MudText>
+                                                <MudText Typo="Typo.body2" Class="customer-card-text">@customer.Email</MudText>
                                             </div>
                                         }
                                         @if (!string.IsNullOrEmpty(customer.PhoneNumber))
                                         {
-                                            <div Class="d-flex align-center">
+                                            <div Class="d-flex align-center customer-contact-row">
                                                 <MudIcon Icon="@Icons.Material.Filled.Phone" Color="Color.Success" Size="Size.Small" Class="mr-2" />
-                                                <MudText Typo="Typo.body2">@customer.PhoneNumber</MudText>
+                                                <MudText Typo="Typo.body2" Class="customer-card-text">@customer.PhoneNumber</MudText>
                                             </div>
                                         }
                                         @if (!string.IsNullOrEmpty(customer.Address))
                                         {
-                                            <div Class="d-flex align-center">
+                                            <div Class="d-flex align-center customer-contact-row">
                                                 <MudIcon Icon="@Icons.Material.Filled.LocationOn" Color="Color.Warning" Size="Size.Small" Class="mr-2" />
-                                                <MudText Typo="Typo.body2" Style="line-height: 1.4;">
+                                                <MudText Typo="Typo.body2" Style="line-height: 1.4;" Class="customer-card-text">
                                                     @(customer.Address.Length > 50 ? customer.Address.Substring(0, 50) + "..." : customer.Address)
                                                 </MudText>
                                             </div>
                                         }
                                         @if (!string.IsNullOrEmpty(customer.DocumentNumber))
                                         {
-                                            <div Class="d-flex align-center">
+                                            <div Class="d-flex align-center customer-contact-row">
                                                 <MudIcon Icon="@Icons.Material.Filled.Badge" Color="Color.Secondary" Size="Size.Small" Class="mr-2" />
-                                                <MudText Typo="Typo.body2">@customer.DocumentNumber</MudText>
+                                                <MudText Typo="Typo.body2" Class="customer-card-text">@customer.DocumentNumber</MudText>
                                             </div>
                                         }
                                     </MudStack>
@@ -251,6 +251,7 @@ else
                                     <MudButtonGroup Variant="Variant.Outlined" Color="Color.Primary" OverrideStyles="false" FullWidth="true">
                                         <MudButton StartIcon="@Icons.Material.Filled.Edit" 
                                                    OnClick="async () => await OpenEditDialog(customer)"
+                                                   Disabled="@(!CanManageCustomer(customer))"
                                                    Size="Size.Small">
                                             Edytuj
                                         </MudButton>
@@ -263,6 +264,7 @@ else
                                     </MudButtonGroup>
                                     <MudButton StartIcon="@Icons.Material.Filled.Delete" 
                                                OnClick="async () => await Delete(customer)"
+                                               Disabled="@(!CanManageCustomer(customer))"
                                                Color="Color.Error"
                                                Variant="Variant.Outlined"
                                                Size="Size.Small"
@@ -293,6 +295,7 @@ else
 
     // ==================== DATA ====================
     private List<Customer> customers = new();
+    private HashSet<Guid> sharedCustomerIds = new();
     private IEnumerable<Customer> filtered => string.IsNullOrWhiteSpace(search)
         ? customers
         : customers.Where(c => (c.FullName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
@@ -313,6 +316,14 @@ else
 
     private async Task OpenEditDialog(Customer c)
     {
+        if (!CanManageCustomer(c))
+        {
+            Snackbar.Add(
+                "To wspólne konto klienta marketplace. Wypożyczalnia może używać danych do realizacji rezerwacji, ale nie zmieniać jego tożsamości.",
+                Severity.Info);
+            return;
+        }
+
         await OpenCustomerDialog(c);
     }
 
@@ -393,6 +404,21 @@ else
                 return;
             }
 
+            if (existing.TenantId != CurrentTenantId())
+            {
+                Snackbar.Add("Nie można edytować wspólnego konta klienta marketplace.", Severity.Error);
+                return;
+            }
+            var isSharedIdentity = await Db.MarketplaceOrders
+                .AnyAsync(order => order.CustomerId == existing.Id) ||
+                await Db.Rentals.IgnoreQueryFilters()
+                    .AnyAsync(rental => rental.CustomerId == existing.Id && rental.TenantId != CurrentTenantId());
+            if (isSharedIdentity)
+            {
+                Snackbar.Add("Nie można edytować wspólnej tożsamości klienta używanej w marketplace lub innej wypożyczalni.", Severity.Error);
+                return;
+            }
+
             existing.FullName = model.FullName;
             existing.Email = model.Email;
             existing.PhoneNumber = model.PhoneNumber;
@@ -455,6 +481,12 @@ else
 
     private async Task Delete(Customer c)
     {
+        if (!CanManageCustomer(c))
+        {
+            Snackbar.Add("Nie można usunąć wspólnego konta klienta marketplace.", Severity.Error);
+            return;
+        }
+
         var confirm = await DialogService.ShowMessageBox(
             "Usuń klienta",
             $"Czy na pewno chcesz usunąć klienta \"{c.FullName}\" wraz z jego danymi?",
@@ -476,6 +508,20 @@ else
         if (existing is null)
         {
             Snackbar.Add("Klient nie istnieje lub został już usunięty", Severity.Warning);
+            return;
+        }
+        if (existing.TenantId != CurrentTenantId())
+        {
+            Snackbar.Add("Nie można usunąć wspólnego konta klienta marketplace.", Severity.Error);
+            return;
+        }
+        var isSharedIdentity = await Db.MarketplaceOrders
+            .AnyAsync(order => order.CustomerId == existing.Id) ||
+            await Db.Rentals.IgnoreQueryFilters()
+                .AnyAsync(rental => rental.CustomerId == existing.Id && rental.TenantId != CurrentTenantId());
+        if (isSharedIdentity)
+        {
+            Snackbar.Add("Nie można usunąć wspólnej tożsamości klienta używanej w marketplace lub innej wypożyczalni.", Severity.Error);
             return;
         }
 
@@ -508,6 +554,21 @@ else
             .OrderByDescending(p => p.CreatedAtUtc)
             .Take(500)
             .ToListAsync();
+        var visibleCustomerIds = customers.Select(customer => customer.Id).ToList();
+        var marketplaceCustomerIds = await Db.MarketplaceOrders.AsNoTracking()
+            .Where(order => visibleCustomerIds.Contains(order.CustomerId))
+            .Select(order => order.CustomerId)
+            .Distinct()
+            .ToListAsync();
+        var crossTenantCustomerIds = await Db.Rentals.IgnoreQueryFilters().AsNoTracking()
+            .Where(rental => visibleCustomerIds.Contains(rental.CustomerId) &&
+                             rental.TenantId != CurrentTenantId())
+            .Select(rental => rental.CustomerId)
+            .Distinct()
+            .ToListAsync();
+        sharedCustomerIds = marketplaceCustomerIds
+            .Concat(crossTenantCustomerIds)
+            .ToHashSet();
         StateHasChanged();
     }
 
@@ -524,6 +585,11 @@ else
         }
         return trimmed;
     }
+
+    private bool CanManageCustomer(Customer customer) =>
+        customer.TenantId != Guid.Empty &&
+        customer.TenantId == CurrentTenantId() &&
+        !sharedCustomerIds.Contains(customer.Id);
 
     private static Color TagColor(string tag) => tag.Trim().ToLowerInvariant() switch
     {

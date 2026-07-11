@@ -14,4 +14,20 @@ public class ApplicationUser : IdentityUser<Guid>
     /// SMS/Email są blokowane / kierowane na sandbox; cleanup usuwa po wygaśnięciu tenanta.
     /// </summary>
     public bool IsDemoUser { get; set; }
+
+    /// <summary>
+    /// Wersja regulaminu platformy zaakceptowana podczas ostatniej wymaganej akceptacji.
+    /// </summary>
+    public string? AcceptedTermsVersion { get; set; }
+
+    /// <summary>
+    /// Wersja polityki prywatności, z którą użytkownik potwierdził zapoznanie się.
+    /// Polityka prywatności jest informacją, a nie zgodą na przetwarzanie niezbędne do umowy.
+    /// </summary>
+    public string? AcknowledgedPrivacyVersion { get; set; }
+
+    /// <summary>
+    /// Czas zapisania powyższego oświadczenia, zawsze w UTC.
+    /// </summary>
+    public DateTime? LegalAcceptedAtUtc { get; set; }
 }

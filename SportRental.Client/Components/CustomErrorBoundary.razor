@@ -13,7 +13,7 @@ else
             <div class="text-center mb-6">
                 <div class="text-6xl mb-4">⚠️</div>
                 <h1 class="text-3xl font-bold text-red-600 mb-2">Wystąpił nieoczekiwany błąd</h1>
-                <p class="text-gray-600">Przepraszamy za niedogodności. Nasz zespół został powiadomiony o problemie.</p>
+                <p class="text-gray-600">Przepraszamy za niedogodności. Spróbuj ponownie lub wróć za chwilę.</p>
             </div>
 
             <!-- Error Details (only in Development) -->
@@ -48,7 +48,7 @@ else
                     Spróbuj ponownie
                 </button>
 
-                <a href="/"
+                <a href="./"
                    class="inline-flex items-center justify-center px-6 py-3 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
@@ -60,7 +60,7 @@ else
             <!-- Support Info -->
             <div class="mt-8 pt-6 border-t border-gray-200 text-center">
                 <p class="text-sm text-gray-600">
-                    Jeśli problem się powtarza, <a href="/contact" class="text-blue-600 hover:text-blue-800 underline">skontaktuj się z nami</a>
+                    Jeśli problem się powtarza, <a href="contact" class="text-blue-600 hover:text-blue-800 underline">skontaktuj się z nami</a>
                 </p>
             </div>
         </div>
@@ -69,6 +69,6 @@ else
 
 @code {
     [Parameter]
-    public bool ShowDetails { get; set; } = true; // Change to false in production
+    public bool ShowDetails { get; set; }
 }
 

@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Configuration;
+using SportRental.Shared.Legal;
 
 namespace SportRental.Client.Services;
 
@@ -8,17 +9,19 @@ public class AuthService
 {
     private readonly HttpClient _httpClient;
     private readonly AuthenticationStateProvider _authStateProvider;
-    private readonly TenantService _tenantService;
+    private readonly ICustomerSessionService _customerSession;
     private readonly string _apiBaseUrl;
-    private readonly string _defaultTenantId;
 
-    public AuthService(HttpClient httpClient, AuthenticationStateProvider authStateProvider, TenantService tenantService, IConfiguration configuration)
+    public AuthService(
+        HttpClient httpClient,
+        AuthenticationStateProvider authStateProvider,
+        ICustomerSessionService customerSession,
+        IConfiguration configuration)
     {
         _httpClient = httpClient;
         _authStateProvider = authStateProvider;
-        _tenantService = tenantService;
-        _apiBaseUrl = configuration["Api:BaseUrl"] ?? "http://localhost:5002";
-        _defaultTenantId = configuration["Api:TenantId"] ?? "547f5df7-a389-44b3-bcc6-090ff2fa92e5";
+        _customerSession = customerSession;
+        _apiBaseUrl = (configuration["Api:BaseUrl"] ?? "http://localhost:5001").TrimEnd('/');
     }
 
     public async Task<AuthResult> RegisterAsync(string email, string password, string? fullName = null, string? phoneNumber = null, string? documentNumber = null)
@@ -33,16 +36,11 @@ public class AuthService
                     Password = password,
                     FullName = fullName,
                     PhoneNumber = phoneNumber,
-                    DocumentNumber = documentNumber
+                    DocumentNumber = documentNumber,
+                    AcceptedTermsVersion = LegalDocumentVersions.Terms,
+                    AcknowledgedPrivacyVersion = LegalDocumentVersions.Privacy
                 })
             };
-
-            // Optionally attach tenant if one is selected (user is global)
-            var tenantId = await _tenantService.GetSelectedTenantIdAsync();
-            if (!string.IsNullOrEmpty(tenantId))
-            {
-                request.Headers.Add("X-Tenant-Id", tenantId);
-            }
 
             var response = await _httpClient.SendAsync(request);
 
@@ -55,6 +53,9 @@ public class AuthService
             var result = await response.Content.ReadFromJsonAsync<AuthResponse>();
             if (result == null)
                 return AuthResult.Failure("Nieprawidłowa odpowiedź serwera");
+
+            if (result.EmailConfirmationRequired)
+                return AuthResult.ConfirmationRequired();
 
             await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsAuthenticated(
                 result.User?.Id.ToString(),
@@ -91,8 +92,12 @@ public class AuthService
                 {
                     try
                     {
-                        var error = System.Text.Json.JsonSerializer.Deserialize<ErrorResponse>(content);
-                        return AuthResult.Failure(error?.Error ?? "Logowanie nie powiodło się");
+                        var error = System.Text.Json.JsonSerializer.Deserialize<ErrorResponse>(
+                            content,
+                            System.Text.Json.JsonSerializerOptions.Web);
+                        return AuthResult.Failure(
+                            error?.Error ?? "Logowanie nie powiodło się",
+                            error?.Code);
                     }
                     catch { }
                 }
@@ -115,23 +120,78 @@ public class AuthService
         }
     }
 
+    public async Task<bool> IsGoogleLoginAvailableAsync()
+    {
+        try
+        {
+            var providers = await _httpClient.GetFromJsonAsync<AuthProvidersResponse>(
+                $"{_apiBaseUrl}/api/auth/providers");
+            return providers?.Google == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<AuthResult> ResendEmailConfirmationAsync(string email)
+    {
+        if (string.IsNullOrWhiteSpace(email))
+            return AuthResult.Failure("Podaj adres e-mail.");
+
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync(
+                $"{_apiBaseUrl}/api/auth/resend-confirmation",
+                new { Email = email });
+            if (!response.IsSuccessStatusCode)
+                return AuthResult.Failure("Nie udało się ponowić wysyłki. Spróbuj ponownie później.");
+
+            return AuthResult.Success();
+        }
+        catch
+        {
+            return AuthResult.Failure("Nie udało się połączyć z serwerem. Spróbuj ponownie później.");
+        }
+    }
+
     public async Task LogoutAsync()
     {
-        await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsLoggedOut();
+        try
+        {
+            await ((ApiAuthenticationStateProvider)_authStateProvider).MarkUserAsLoggedOut();
+        }
+        finally
+        {
+            await _customerSession.ClearAsync();
+        }
     }
 
     // SEC-009: po /auth/login, /auth/register, /auth/guest-session serwer ustawia HttpOnly cookie
     // i NIE zwraca już JWT w body — stąd brak AccessToken/TokenType w response.
-    private record AuthResponse(int ExpiresIn, UserInfo? User);
-    private record UserInfo(Guid Id, string Email, Guid? TenantId);
-    private record ErrorResponse(string Error);
+    private record AuthResponse(int ExpiresIn, UserInfo? User, bool EmailConfirmationRequired = false);
+    private record UserInfo(Guid Id, string Email, Guid? TenantId, Guid? CustomerId);
+    private record ErrorResponse(string Error, string? Code = null);
+    private record AuthProvidersResponse(bool Google);
 }
 
 public class AuthResult
 {
     public bool Succeeded { get; init; }
     public string? ErrorMessage { get; init; }
+    public string? ErrorCode { get; init; }
+    public bool EmailConfirmationRequired { get; init; }
 
     public static AuthResult Success() => new() { Succeeded = true };
-    public static AuthResult Failure(string error) => new() { Succeeded = false, ErrorMessage = error };
+    public static AuthResult ConfirmationRequired() => new()
+    {
+        Succeeded = true,
+        EmailConfirmationRequired = true
+    };
+    public static AuthResult Failure(string error, string? code = null) => new()
+    {
+        Succeeded = false,
+        ErrorMessage = error,
+        ErrorCode = code
+    };
 }

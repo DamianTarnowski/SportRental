@@ -181,8 +181,9 @@ public class RentalReminderServiceTests : IDisposable
     {
         var method = typeof(RentalReminderService)
             .GetMethod("CheckRentalsForReminders", BindingFlags.Instance | BindingFlags.NonPublic);
-        method!.Invoke(_reminderService, new object?[] { null });
-        await Task.Delay(50);
+        var task = method!.Invoke(_reminderService, new object?[] { null }) as Task;
+        task.Should().NotBeNull();
+        await task!;
     }
 
     private class TestDbContextFactory : IDbContextFactory<ApplicationDbContext>

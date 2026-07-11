@@ -23,9 +23,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <BlazorWebAssemblyLazyLoad Include="PhoneNumbers.wasm" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Update="wwwroot\appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- Samodzielne outputy i narzędzia frontendu nie są częścią runtime WASM
+         bundlowanego pod /_client. Bez tego ProjectReference propaguje stare
+         katalogi publish-swa/pub do paczki Admin. -->
+    <Content Remove="pub\**\*;publish-swa\**\*;node_modules\**\*;*.zip;Dockerfile;nginx.conf;package.json;package-lock.json;postcss.config.js;tailwind.config.js" />
+    <None Remove="pub\**\*;publish-swa\**\*;node_modules\**\*;*.zip;Dockerfile;nginx.conf;package.json;package-lock.json;postcss.config.js;tailwind.config.js" />
   </ItemGroup>
 
   <!--

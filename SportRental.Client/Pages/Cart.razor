@@ -2,6 +2,7 @@
 @using SportRental.Shared.Models
 @using SportRental.Shared.Services
 @inject ICartService CartService
+@inject IApiService ApiService
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
@@ -18,7 +19,6 @@
         <!-- Mobile Header -->
         <div class="cart-mobile-header">
             <div class="cart-mobile-title">
-                <span></span>
                 <h1>Koszyk</h1>
                 @if (_cart.TotalItems > 0)
                 {
@@ -30,102 +30,169 @@
         @if (_cart.Items.Count == 0)
         {
             <div class="cart-mobile-empty">
-                <span class="empty-icon"></span>
-                <h3>Pusty koszyk</h3>
+                <span class="empty-icon"><Icon Name="cart" Size="44" /></span>
+                <h2>Pusty koszyk</h2>
                 <p>Dodaj sprzęt sportowy do koszyka</p>
-                <a href="/products" class="cart-mobile-cta">Przeglądaj katalog</a>
+                <a href="products" class="cart-mobile-cta">Przeglądaj katalog</a>
             </div>
         }
         else
         {
+            @if (TenantGroups.Count > 1)
+            {
+                <div class="cart-multi-tenant-notice">
+                    <strong>@PickupPointCountLabel</strong>
+                    <span>Sprzęt odbierzesz w różnych wypożyczalniach. Powstaną osobne rezerwacje, ale depozyt opłacisz jedną płatnością.</span>
+                </div>
+            }
+
             <!-- Mobile Cart Items -->
             <div class="cart-mobile-items">
-                @foreach (var item in _cart.Items)
+                @foreach (var tenantGroup in TenantGroups)
                 {
+                    <section class="cart-mobile-tenant-group">
+                        @{
+                            var groupTerms = tenantGroup.Items[0];
+                            var startInputId = $"cart-mobile-start-{tenantGroup.TenantId:N}";
+                            var endInputId = $"cart-mobile-end-{tenantGroup.TenantId:N}";
+                        }
+                        <header class="cart-mobile-tenant-header">
+                            <div>
+                                <strong>@tenantGroup.Name</strong>
+                                @if (!string.IsNullOrWhiteSpace(PickupLocation(tenantGroup)))
+                                {
+                                    <span>Odbiór: @PickupLocation(tenantGroup)</span>
+                                }
+                            </div>
+                            @if (TenantGroups.Count > 1)
+                            {
+                                <span class="cart-tenant-reservation-label">Osobna rezerwacja</span>
+                            }
+                        </header>
+
+                        <div class="cart-tenant-terms cart-tenant-terms-mobile">
+                            <p>Jeden termin dla wszystkich produktów z tego punktu</p>
+                            <div class="cart-mobile-item-dates">
+                                <div class="cart-mobile-date">
+                                    <label for="@startInputId">Od</label>
+                                    <input id="@startInputId" type="datetime-local"
+                                           value="@groupTerms.StartDate.ToString("yyyy-MM-ddTHH:mm")"
+                                           min="@EarliestStartLocal.ToString("yyyy-MM-ddTHH:mm")"
+                                           @onchange="@((e) => OnStartDateChanged(groupTerms, e))" />
+                                </div>
+                                <div class="cart-mobile-date">
+                                    <label for="@endInputId">Do</label>
+                                    <input id="@endInputId" type="datetime-local"
+                                           value="@groupTerms.EndDate.ToString("yyyy-MM-ddTHH:mm")"
+                                           min="@groupTerms.StartDate.AddHours(1).ToString("yyyy-MM-ddTHH:mm")"
+                                           @onchange="@((e) => OnEndDateChanged(groupTerms, e))" />
+                                </div>
+                            </div>
+                            <div class="cart-mobile-item-options">
+                                <label class="cart-mobile-option-control">
+                                    <span>Typ wynajmu</span>
+                                    <select value="@((int)groupTerms.RentalType)"
+                                            @onchange="@((e) => OnRentalTypeChanged(groupTerms, e))"
+                                            class="cart-mobile-select">
+                                        <option value="0">Dzienny</option>
+                                        @if (tenantGroup.Items.All(item => item.HourlyPrice is > 0m))
+                                        {
+                                            <option value="1">Godzinowy</option>
+                                        }
+                                    </select>
+                                </label>
+                                @if (groupTerms.RentalType == RentalTypeDto.Hourly)
+                                {
+                                    <label class="cart-mobile-option-control cart-mobile-hours-control">
+                                        <span>Liczba godzin</span>
+                                        <input type="number"
+                                               value="@(groupTerms.HoursRented ?? 1)"
+                                               min="1" max="24"
+                                               @onchange="@((e) => OnHoursChanged(groupTerms, e))"
+                                               class="cart-mobile-hours" />
+                                    </label>
+                                }
+                            </div>
+                        </div>
+
+                    @foreach (var item in tenantGroup.Items)
+                    {
                     <div class="cart-mobile-item">
                         <div class="cart-mobile-item-header">
                             @if (!string.IsNullOrEmpty(item.ProductImageUrl))
                             {
-                                <img src="@item.ProductImageUrl" alt="@item.ProductName" class="cart-mobile-item-image" />
+                                <img src="@item.ProductImageUrl" alt="@item.ProductName" class="cart-mobile-item-image" onerror="srImg(this)" />
                             }
                             else
                             {
-                                <div class="cart-mobile-item-placeholder"></div>
+                                <div class="cart-mobile-item-placeholder"><Icon Name="catalog" Size="24" /></div>
                             }
                             <div class="cart-mobile-item-info">
-                                <h4>@item.ProductName</h4>
-                                <span class="cart-mobile-item-price">@item.DailyPrice.ToString("C")/dzień</span>
-                            </div>
-                            <button class="cart-mobile-remove" @onclick="@(() => RemoveFromCart(item.ProductId))"></button>
-                        </div>
-                        
-                        <div class="cart-mobile-item-dates">
-                            <div class="cart-mobile-date">
-                                <label>Od</label>
-                                <input type="date" 
-                                       value="@item.StartDate.ToString("yyyy-MM-dd")" 
-                                       min="@DateTime.Today.ToString("yyyy-MM-dd")"
-                                       @onchange="@((e) => OnStartDateChanged(item, e))" />
-                            </div>
-                            <div class="cart-mobile-date">
-                                <label>Do</label>
-                                <input type="date" 
-                                       value="@item.EndDate.ToString("yyyy-MM-dd")" 
-                                       min="@item.StartDate.AddDays(1).ToString("yyyy-MM-dd")"
-                                       @onchange="@((e) => OnEndDateChanged(item, e))" />
-                            </div>
-                        </div>
-
-                        <div class="cart-mobile-item-options">
-                            <select value="@((int)item.RentalType)"
-                                    @onchange="@((e) => OnRentalTypeChanged(item, e))"
-                                    class="cart-mobile-select">
-                                <option value="0">Dzienny</option>
-                                @if (item.HourlyPrice.HasValue && item.HourlyPrice.Value > 0)
+                                <h2>@item.ProductName</h2>
+                                @if (item.RentalType == RentalTypeDto.Hourly && item.HourlyPrice is > 0m)
                                 {
-                                    <option value="1">⏰ Godzinowy</option>
+                                    <span class="cart-mobile-item-price">@item.HourlyPrice.Value.Pln()/godz.</span>
                                 }
-                            </select>
-                            @if (item.RentalType == RentalTypeDto.Hourly)
-                            {
-                                <input type="number" 
-                                       value="@(item.HoursRented ?? 1)"
-                                       min="1" max="24"
-                                       @onchange="@((e) => OnHoursChanged(item, e))"
-                                       class="cart-mobile-hours" 
-                                       placeholder="Godz." />
-                            }
+                                else
+                                {
+                                    <span class="cart-mobile-item-price">@item.DailyPrice.Pln()/dzień</span>
+                                }
+                            </div>
+                            <button class="cart-mobile-remove" aria-label="Usuń @item.ProductName z koszyka" @onclick="@(() => RemoveFromCart(item.ProductId))"><Icon Name="trash" Size="16" /></button>
                         </div>
 
                         <div class="cart-mobile-item-footer">
                             <div class="cart-mobile-quantity">
-                                <button @onclick="@(() => UpdateQuantity(item, item.Quantity - 1))">−</button>
-                                <span>@item.Quantity</span>
-                                <button @onclick="@(() => UpdateQuantity(item, item.Quantity + 1))">+</button>
+                                <button aria-label="Zmniejsz liczbę: @item.ProductName" @onclick="@(() => UpdateQuantity(item, item.Quantity - 1))">−</button>
+                                <span aria-label="Liczba sztuk">@item.Quantity</span>
+                                <button aria-label="Zwiększ liczbę: @item.ProductName" @onclick="@(() => UpdateQuantity(item, item.Quantity + 1))">+</button>
                             </div>
-                            <div class="cart-mobile-total">@item.TotalPrice.ToString("C")</div>
+                            <div class="cart-mobile-total">@ItemTotal(item).Pln()</div>
                         </div>
 
                         @if (item.HoldId is not null)
                         {
                             <div class="cart-mobile-hold">
-                                Rezerwacja do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm")
+                                Rezerwacja do @FormatPolishTime(item.HoldExpiresAtUtc, "HH:mm")
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="cart-mobile-hold cart-hold-missing">
+                                Brak aktywnej rezerwacji produktu — sprawdź termin i spróbuj ponownie.
                             </div>
                         }
                     </div>
+                    }
+                    </section>
                 }
             </div>
 
             <!-- Mobile Summary - Sticky Bottom -->
             <div class="cart-mobile-summary">
                 <div class="cart-mobile-summary-row">
-                    <span>@_cart.TotalItems produktów</span>
-                    <span class="cart-mobile-summary-total">@_cart.TotalAmount.ToString("C")</span>
+                    <span>@ProductCountLabel · @RentalShopCountLabel</span>
+                    <span></span>
                 </div>
+                <div class="cart-mobile-summary-row">
+                    <span>Wartość wynajmu</span>
+                    <span class="cart-mobile-summary-total">@CartTotal.Pln()</span>
+                </div>
+                @if (_quote is not null)
+                {
+                    <div class="cart-mobile-summary-row cart-mobile-deposit-row">
+                        <span>Depozyt płatny online</span>
+                        <strong>@_quote.DepositAmount.Pln()</strong>
+                    </div>
+                }
+                @if (_quoteError is not null)
+                {
+                    <div class="text-xs text-yellow-700 mb-2">@_quoteError</div>
+                }
                 <button class="cart-mobile-checkout" @onclick="ProceedToCheckout">
-                    Zamów • @_cart.TotalAmount.ToString("C")
+                    Przejdź do podsumowania
                 </button>
-                <a href="/products" class="cart-mobile-continue">Kontynuuj zakupy</a>
+                <a href="products" class="cart-mobile-continue">Kontynuuj zakupy</a>
             </div>
         }
     </div>
@@ -147,98 +214,128 @@ else
         {
             <!-- Empty Cart -->
             <div class="cart-empty">
-                <div class="cart-empty-icon"></div>
+                <div class="cart-empty-icon"><Icon Name="cart" Size="64" /></div>
                 <h2>Twój koszyk jest pusty</h2>
                 <p>Dodaj sprzęt sportowy, aby rozpocząć wypożyczenie</p>
-                <a href="/products" class="cart-checkout-btn" style="max-width: 300px; margin: 0 auto; text-decoration: none;">
+                <a href="products" class="cart-checkout-btn" style="max-width: 300px; margin: 0 auto; text-decoration: none;">
                     Przeglądaj katalog
                 </a>
             </div>
         }
         else
         {
+            @if (TenantGroups.Count > 1)
+            {
+                <div class="cart-multi-tenant-notice cart-multi-tenant-notice-desktop">
+                    <strong>Twój koszyk obejmuje @RentalShopCountLabel</strong>
+                    <span>Każda wypożyczalnia przygotuje osobną rezerwację i ma własny punkt odbioru. Depozyt opłacisz jedną płatnością.</span>
+                </div>
+            }
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Cart Items -->
                 <div class="lg:col-span-2 space-y-4">
-                    @foreach (var item in _cart.Items)
+                    @foreach (var tenantGroup in TenantGroups)
                     {
+                        <section class="cart-tenant-group">
+                            @{ var groupTerms = tenantGroup.Items[0]; }
+                            <header class="cart-tenant-header">
+                                <div>
+                                    <h2>@tenantGroup.Name</h2>
+                                    @if (!string.IsNullOrWhiteSpace(PickupLocation(tenantGroup)))
+                                    {
+                                        <p>Odbiór: @PickupLocation(tenantGroup)</p>
+                                    }
+                                </div>
+                                @if (TenantGroups.Count > 1)
+                                {
+                                    <span class="cart-tenant-reservation-label">Osobna rezerwacja</span>
+                                }
+                            </header>
+
+                            <div class="cart-tenant-terms cart-tenant-terms-desktop">
+                                <div class="cart-tenant-terms-copy">
+                                    <strong>Termin tej rezerwacji</strong>
+                                    <span>Dotyczy wszystkich produktów z tego punktu odbioru.</span>
+                                </div>
+                                <div class="cart-tenant-controls">
+                                    <label>
+                                        <span>Od</span>
+                                        <input type="datetime-local"
+                                               value="@groupTerms.StartDate.ToString("yyyy-MM-ddTHH:mm")"
+                                               min="@EarliestStartLocal.ToString("yyyy-MM-ddTHH:mm")"
+                                               @onchange="@((e) => OnStartDateChanged(groupTerms, e))" />
+                                    </label>
+                                    <label>
+                                        <span>Do</span>
+                                        <input type="datetime-local"
+                                               value="@groupTerms.EndDate.ToString("yyyy-MM-ddTHH:mm")"
+                                               min="@groupTerms.StartDate.AddHours(1).ToString("yyyy-MM-ddTHH:mm")"
+                                               @onchange="@((e) => OnEndDateChanged(groupTerms, e))" />
+                                    </label>
+                                    <label>
+                                        <span>Typ wynajmu</span>
+                                        <select value="@((int)groupTerms.RentalType)"
+                                                @onchange="@((e) => OnRentalTypeChanged(groupTerms, e))">
+                                            <option value="0">Dzienny</option>
+                                            @if (tenantGroup.Items.All(item => item.HourlyPrice is > 0m))
+                                            {
+                                                <option value="1">Godzinowy</option>
+                                            }
+                                        </select>
+                                    </label>
+                                    @if (groupTerms.RentalType == RentalTypeDto.Hourly)
+                                    {
+                                        <label class="cart-tenant-hours-control">
+                                            <span>Liczba godzin</span>
+                                            <input type="number"
+                                                   value="@(groupTerms.HoursRented ?? 1)"
+                                                   min="1" max="24"
+                                                   @onchange="@((e) => OnHoursChanged(groupTerms, e))" />
+                                        </label>
+                                    }
+                                </div>
+                            </div>
+
+                        @foreach (var item in tenantGroup.Items)
+                        {
                         <div class="cart-item">
                             <!-- Image -->
                             @if (!string.IsNullOrEmpty(item.ProductImageUrl))
                             {
-                                <img src="@item.ProductImageUrl" alt="@item.ProductName" class="cart-item-image" />
+                                <img src="@item.ProductImageUrl" alt="@item.ProductName" class="cart-item-image" onerror="srImg(this)" />
                             }
                             else
                             {
-                                <div class="cart-item-placeholder"></div>
+                                <div class="cart-item-placeholder"><Icon Name="catalog" Size="24" /></div>
                             }
 
                             <!-- Details -->
                             <div class="cart-item-details">
                                 <h3>@item.ProductName</h3>
-                                <p class="cart-item-price">@item.DailyPrice.ToString("C") / dzień</p>
-                                
-                                <div class="cart-item-dates">
-                                    <div class="flex flex-col">
-                                        <label class="text-xs text-gray-500 mb-1">Od</label>
-                                        <input type="date" 
-                                               value="@item.StartDate.ToString("yyyy-MM-dd")" 
-                                               min="@DateTime.Today.ToString("yyyy-MM-dd")"
-                                               @onchange="@((e) => OnStartDateChanged(item, e))"
-                                               class="px-3 py-2 border rounded-lg text-sm" />
-                                    </div>
-                                    <div class="flex flex-col">
-                                        <label class="text-xs text-gray-500 mb-1">Do</label>
-                                        <input type="date" 
-                                               value="@item.EndDate.ToString("yyyy-MM-dd")" 
-                                               min="@item.StartDate.AddDays(1).ToString("yyyy-MM-dd")"
-                                               @onchange="@((e) => OnEndDateChanged(item, e))"
-                                               class="px-3 py-2 border rounded-lg text-sm" />
-                                    </div>
-                                </div>
-
-                                @* Typ wynajmu *@
-                                <div class="flex items-center gap-3 mt-3">
-                                    <div class="flex flex-col">
-                                        <label class="text-xs text-gray-500 mb-1">Typ wynajmu</label>
-                                        <select value="@((int)item.RentalType)"
-                                                @onchange="@((e) => OnRentalTypeChanged(item, e))"
-                                                class="px-3 py-2 border rounded-lg text-sm">
-                                            <option value="0">Dzienny</option>
-                                            @if (item.HourlyPrice.HasValue && item.HourlyPrice.Value > 0)
-                                            {
-                                                <option value="1">⏰ Godzinowy</option>
-                                            }
-                                        </select>
-                                    </div>
-                                    @if (item.RentalType == RentalTypeDto.Hourly)
-                                    {
-                                        <div class="flex flex-col">
-                                            <label class="text-xs text-gray-500 mb-1">Liczba godzin</label>
-                                            <input type="number" 
-                                                   value="@(item.HoursRented ?? 1)"
-                                                   min="1" max="24"
-                                                   @onchange="@((e) => OnHoursChanged(item, e))"
-                                                   class="px-3 py-2 border rounded-lg text-sm w-20" />
-                                        </div>
-                                    }
-                                </div>
+                                <p class="cart-item-price">@item.DailyPrice.Pln() / dzień</p>
                                 
                                 <p class="text-sm text-gray-500 mt-2">
                                     @if (item.RentalType == RentalTypeDto.Hourly && item.HoursRented.HasValue)
                                     {
-                                        <span>⏱️ @item.HoursRented.Value godz. × @(item.HourlyPrice?.ToString("C") ?? "0 zł")/godz.</span>
+                                        <span>@item.HoursRented.Value godz. × @(item.HourlyPrice?.Pln() ?? 0m.Pln())/godz.</span>
                                     }
                                     else
                                     {
-                                        <span>⏱️ @item.TotalDays dni × @item.DailyPrice.ToString("C")/dzień</span>
+                                        <span>@item.TotalDays dni × @item.DailyPrice.Pln()/dzień</span>
                                     }
                                 </p>
 
                                 @if (item.HoldId is not null)
                                 {
                                     <div class="mt-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg text-sm inline-flex items-center gap-1">
-                                        Rezerwacja do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm:ss")
+                                        Rezerwacja do @FormatPolishTime(item.HoldExpiresAtUtc, "HH:mm:ss")
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="cart-hold-missing mt-2">
+                                        Brak aktywnej rezerwacji produktu — sprawdź termin i spróbuj ponownie.
                                     </div>
                                 }
                             </div>
@@ -251,13 +348,15 @@ else
                                     <button @onclick="@(() => UpdateQuantity(item, item.Quantity + 1))">+</button>
                                 </div>
                                 
-                                <div class="cart-item-total">@item.TotalPrice.ToString("C")</div>
+                                <div class="cart-item-total">@ItemTotal(item).Pln()</div>
                                 
                                 <button class="cart-remove-btn" @onclick="@(() => RemoveFromCart(item.ProductId))">
                                     Usuń
                                 </button>
                             </div>
                         </div>
+                        }
+                        </section>
                     }
                 </div>
 
@@ -268,24 +367,37 @@ else
                         
                         <div class="cart-summary-row">
                             <span>Produkty (@_cart.TotalItems)</span>
-                            <span>@_cart.TotalAmount.ToString("C")</span>
+                            <span>@CartTotal.Pln()</span>
                         </div>
                         
                         <div class="cart-summary-row">
-                            <span>Dostawa</span>
-                            <span class="text-green-600 font-medium">Gratis</span>
+                            <span>Odbiór</span>
+                            <span class="text-green-600 font-medium">@PickupPointCountLabel</span>
                         </div>
                         
                         <div class="cart-summary-row cart-summary-total">
-                            <span>Łącznie</span>
-                            <span class="text-xl text-purple-600">@_cart.TotalAmount.ToString("C")</span>
+                            <span>Wartość wynajmu</span>
+                            <span class="text-xl text-purple-600">@CartTotal.Pln()</span>
                         </div>
 
+                        @if (_quote is not null)
+                        {
+                            <div class="cart-summary-row cart-summary-deposit">
+                                <span>Depozyt płatny online</span>
+                                <strong>@_quote.DepositAmount.Pln()</strong>
+                            </div>
+                        }
+
+                        @if (_quoteError is not null)
+                        {
+                            <div class="text-sm text-yellow-700 mb-3">@_quoteError</div>
+                        }
+
                         <button class="cart-checkout-btn" @onclick="ProceedToCheckout">
-                            Przejdź do płatności
+                            Przejdź do podsumowania
                         </button>
                         
-                        <button class="cart-continue-btn" @onclick="@(() => Navigation.NavigateTo("/products"))">
+                        <button class="cart-continue-btn" @onclick="@(() => Navigation.NavigateTo("products"))">
                             Kontynuuj zakupy
                         </button>
                     </div>
@@ -297,12 +409,49 @@ else
 } @* End of Desktop UI *@
 
 @code {
+    private static string FormatPolishTime(DateTime? value, string format) =>
+        value.HasValue ? PolishRentalTime.FromUtc(value.Value).ToString(format) : string.Empty;
+
     private SportRental.Shared.Models.Cart _cart = new();
+    private PaymentQuoteResponse? _quote;
+    private Dictionary<Guid, decimal> _quotedItemTotals = new();
+    private string? _quoteError;
+    private int _quoteVersion;
     private bool _isMobile = false;
+    private DateTime EarliestStartLocal => PolishRentalTime.EarliestStartLocal();
     private DotNetObjectReference<Cart>? _dotNetRef;
 
     private CancellationTokenSource? _refreshCts;
     private Task? _refreshLoop;
+
+    private IReadOnlyList<CartTenantGroupView> TenantGroups => _cart.Items
+        .GroupBy(TenantGroupKey)
+        .Select(group =>
+        {
+            var items = group.ToList();
+            var tenantName = items
+                .Select(item => item.TenantName)
+                .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name))
+                ?? "Wypożyczalnia";
+            var pickupCity = items
+                .Select(item => item.PickupCity)
+                .FirstOrDefault(city => !string.IsNullOrWhiteSpace(city));
+            var pickupAddress = items
+                .Select(item => item.PickupAddress)
+                .FirstOrDefault(address => !string.IsNullOrWhiteSpace(address));
+
+            return new CartTenantGroupView(items[0].TenantId, tenantName, pickupAddress, pickupCity, items);
+        })
+        .OrderBy(group => group.Name, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
+
+    private static string TenantGroupKey(CartItem item)
+    {
+        if (item.TenantId != Guid.Empty)
+            return item.TenantId.ToString("N");
+
+        return $"legacy:{item.TenantName?.Trim().ToUpperInvariant()}";
+    }
 
     protected override void OnInitialized()
     {
@@ -317,6 +466,7 @@ else
         {
             _dotNetRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("setupMobileDetection", _dotNetRef);
+            await RefreshQuoteAsync();
         }
     }
     
@@ -333,7 +483,123 @@ else
     private void OnCartChanged(object? sender, EventArgs e)
     {
         _cart = CartService.GetCart();
-        InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(async () =>
+        {
+            await RefreshQuoteAsync();
+            StateHasChanged();
+        });
+    }
+
+    private decimal CartTotal => _quote?.TotalAmount ?? _cart.TotalAmount;
+
+    private string ProductCountLabel => PolishCount(_cart.TotalItems, "produkt", "produkty", "produktów");
+    private string RentalShopCountLabel => PolishCount(TenantGroups.Count, "wypożyczalnię", "wypożyczalnie", "wypożyczalni");
+    private string PickupPointCountLabel => PolishCount(TenantGroups.Count, "punkt odbioru", "punkty odbioru", "punktów odbioru");
+
+    private static string PolishCount(int count, string singular, string paucal, string plural)
+    {
+        var absolute = Math.Abs(count);
+        var lastTwoDigits = absolute % 100;
+        var noun = absolute == 1
+            ? singular
+            : lastTwoDigits is >= 12 and <= 14
+                ? plural
+                : absolute % 10 is >= 2 and <= 4
+                    ? paucal
+                    : plural;
+
+        return $"{count} {noun}";
+    }
+
+    private static string PickupLocation(CartTenantGroupView group)
+    {
+        if (string.IsNullOrWhiteSpace(group.PickupAddress))
+            return group.PickupCity ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(group.PickupCity) ||
+            group.PickupAddress.Contains(group.PickupCity, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return group.PickupAddress;
+        }
+
+        return $"{group.PickupAddress}, {group.PickupCity}";
+    }
+
+    private decimal ItemTotal(CartItem item) =>
+        _quotedItemTotals.TryGetValue(item.ProductId, out var quoted)
+            ? quoted
+            : item.TotalPrice;
+
+    private bool HasInvalidTenantGroups()
+    {
+        return TenantGroups.Any(group =>
+        {
+            if (group.TenantId == Guid.Empty || group.Items.Count == 0)
+                return true;
+
+            var first = group.Items[0];
+            return group.Items.Skip(1).Any(item =>
+                item.StartDate != first.StartDate ||
+                item.EndDate != first.EndDate ||
+                item.RentalType != first.RentalType ||
+                item.HoursRented != first.HoursRented);
+        });
+    }
+
+    private async Task RefreshQuoteAsync()
+    {
+        var version = ++_quoteVersion;
+        _quote = null;
+        _quotedItemTotals = new();
+        _quoteError = null;
+
+        if (_cart.Items.Count == 0)
+            return;
+        if (HasInvalidTenantGroups())
+        {
+            _quoteError = "Nie udało się przypisać wszystkich pozycji do wypożyczalni. Odśwież katalog i dodaj produkt ponownie.";
+            return;
+        }
+
+        var first = TenantGroups[0].Items[0];
+        try
+        {
+            var quote = await ApiService.GetPaymentQuoteAsync(new PaymentQuoteRequest
+            {
+                StartDateUtc = PolishRentalTime.ToUtc(first.StartDate),
+                EndDateUtc = PolishRentalTime.ToUtc(first.EndDate),
+                RentalType = first.RentalType,
+                HoursRented = first.HoursRented,
+                Items = new List<CreateRentalItem>(),
+                RentalGroups = TenantGroups.Select(group =>
+                {
+                    var groupTerms = group.Items[0];
+                    return new RentalGroupQuoteRequest
+                    {
+                        TenantId = group.TenantId,
+                        StartDateUtc = PolishRentalTime.ToUtc(groupTerms.StartDate),
+                        EndDateUtc = PolishRentalTime.ToUtc(groupTerms.EndDate),
+                        RentalType = groupTerms.RentalType,
+                        HoursRented = groupTerms.HoursRented,
+                        Items = group.Items.Select(item => new CreateRentalItem
+                        {
+                            ProductId = item.ProductId,
+                            Quantity = item.Quantity
+                        }).ToList()
+                    };
+                }).ToList()
+            });
+
+            if (version != _quoteVersion)
+                return;
+
+            _quote = quote;
+            _quotedItemTotals = quote.Items.ToDictionary(item => item.ProductId, item => item.Subtotal);
+        }
+        catch
+        {
+            if (version == _quoteVersion)
+                _quoteError = "Nie udało się pobrać dokładnej wyceny. Spróbuj ponownie przed płatnością.";
+        }
     }
 
     private async Task UpdateQuantity(CartItem item, int newQuantity)
@@ -351,21 +617,30 @@ else
     {
         if (DateTime.TryParse(e.Value?.ToString(), out var newDate))
         {
-            if (newDate < DateTime.Today)
+            if (!PolishRentalTime.TryToUtc(newDate, out var startUtc))
             {
-                Snackbar.Add("Data rozpoczęcia nie może być z przeszłości", Severity.Warning);
+                Snackbar.Add("Wybrana godzina nie istnieje z powodu zmiany czasu. Wybierz inną godzinę.", Severity.Warning);
                 return;
             }
 
-            item.StartDate = newDate;
-            
-            if (item.EndDate <= item.StartDate)
+            if (!PolishRentalTime.IsStartSafelyInFuture(startUtc, DateTime.UtcNow))
             {
-                item.EndDate = item.StartDate.AddDays(1);
+                Snackbar.Add("Data rozpoczęcia musi być co najmniej 2 minuty w przyszłości.", Severity.Warning);
+                return;
+            }
+
+            var endDate = item.EndDate;
+            if (item.RentalType == RentalTypeDto.Hourly)
+            {
+                endDate = newDate.AddHours(item.HoursRented ?? 1);
+            }
+            else if (endDate <= newDate)
+            {
+                endDate = newDate.AddDays(1);
                 Snackbar.Add("Data zakończenia została dostosowana", Severity.Info);
             }
-            
-            await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
+
+            await UpdateTenantTermsAsync(item, newDate, endDate, item.RentalType, item.HoursRented);
         }
     }
 
@@ -373,21 +648,36 @@ else
     {
         if (DateTime.TryParse(e.Value?.ToString(), out var newDate))
         {
+            if (!PolishRentalTime.TryToUtc(newDate, out _))
+            {
+                Snackbar.Add("Wybrana godzina nie istnieje z powodu zmiany czasu. Wybierz inną godzinę.", Severity.Warning);
+                return;
+            }
+
             if (newDate <= item.StartDate)
             {
                 Snackbar.Add("Data zakończenia musi być późniejsza niż data rozpoczęcia", Severity.Warning);
                 return;
             }
 
-            var daysDiff = (newDate - item.StartDate).Days;
-            if (daysDiff > 365)
+            if (item.RentalType == RentalTypeDto.Hourly)
+            {
+                var hours = (int)Math.Ceiling((newDate - item.StartDate).TotalHours);
+                if (hours is < 1 or > 24)
+                {
+                    Snackbar.Add("Wynajem godzinowy może trwać od 1 do 24 godzin", Severity.Warning);
+                    return;
+                }
+                await UpdateTenantTermsAsync(item, item.StartDate, newDate, RentalTypeDto.Hourly, hours);
+                return;
+            }
+            else if ((newDate - item.StartDate).TotalDays > 365)
             {
                 Snackbar.Add("Maksymalny okres wypożyczenia to 365 dni", Severity.Warning);
                 return;
             }
 
-            item.EndDate = newDate;
-            await CartService.UpdateDatesAsync(item.ProductId, item.StartDate, item.EndDate);
+            await UpdateTenantTermsAsync(item, item.StartDate, newDate, item.RentalType, item.HoursRented);
         }
     }
 
@@ -397,7 +687,20 @@ else
         {
             var rentalType = (RentalTypeDto)typeValue;
             var hours = rentalType == RentalTypeDto.Hourly ? (item.HoursRented ?? 1) : (int?)null;
-            await CartService.UpdateRentalTypeAsync(item.ProductId, rentalType, hours);
+            var group = TenantGroups.FirstOrDefault(candidate => candidate.TenantId == item.TenantId);
+            if (rentalType == RentalTypeDto.Hourly &&
+                (group is null || group.Items.Any(groupItem => groupItem.HourlyPrice is not > 0m)))
+            {
+                Snackbar.Add("Nie każdy produkt z tej wypożyczalni można wynająć godzinowo.", Severity.Warning);
+                return;
+            }
+
+            var endDate = rentalType == RentalTypeDto.Hourly
+                ? item.StartDate.AddHours(hours ?? 1)
+                : item.EndDate <= item.StartDate
+                    ? item.StartDate.AddDays(1)
+                    : item.EndDate;
+            await UpdateTenantTermsAsync(item, item.StartDate, endDate, rentalType, hours);
         }
     }
 
@@ -407,8 +710,34 @@ else
         {
             if (hours < 1) hours = 1;
             if (hours > 24) hours = 24;
-            await CartService.UpdateRentalTypeAsync(item.ProductId, RentalTypeDto.Hourly, hours);
+            await UpdateTenantTermsAsync(
+                item,
+                item.StartDate,
+                item.StartDate.AddHours(hours),
+                RentalTypeDto.Hourly,
+                hours);
         }
+    }
+
+    private async Task UpdateTenantTermsAsync(
+        CartItem item,
+        DateTime startDate,
+        DateTime endDate,
+        RentalTypeDto rentalType,
+        int? hoursRented)
+    {
+        if (item.TenantId == Guid.Empty)
+        {
+            Snackbar.Add("Nie udało się rozpoznać wypożyczalni. Usuń produkt i dodaj go ponownie z katalogu.", Severity.Error);
+            return;
+        }
+
+        await CartService.UpdateTenantRentalTermsAsync(
+            item.TenantId,
+            startDate,
+            endDate,
+            rentalType,
+            hoursRented);
     }
 
     private async Task ProceedToCheckout()
@@ -419,11 +748,24 @@ else
             return;
         }
 
+        if (HasInvalidTenantGroups())
+        {
+            Snackbar.Add("Każda pozycja musi być przypisana do wypożyczalni, a produkty z jednego punktu muszą mieć wspólny termin.", Severity.Error);
+            return;
+        }
+
         foreach (var item in _cart.Items)
         {
-            if (item.StartDate < DateTime.Today)
+            if (!PolishRentalTime.TryToUtc(item.StartDate, out var startUtc) ||
+                !PolishRentalTime.TryToUtc(item.EndDate, out _))
             {
-                Snackbar.Add($"Data rozpoczęcia dla {item.ProductName} jest nieprawidłowa", Severity.Error);
+                Snackbar.Add($"Termin dla {item.ProductName} przypada na nieistniejącą godzinę zmiany czasu.", Severity.Error);
+                return;
+            }
+
+            if (!PolishRentalTime.IsStartSafelyInFuture(startUtc, DateTime.UtcNow))
+            {
+                Snackbar.Add($"Data rozpoczęcia dla {item.ProductName} musi być co najmniej 2 minuty w przyszłości.", Severity.Error);
                 return;
             }
 
@@ -438,7 +780,9 @@ else
         var holdsOk = await CartService.EnsureHoldsAsync();
         if (!holdsOk)
         {
-            Snackbar.Add("Nie udało się zarezerwować wybranych produktów. Zaktualizuj koszyk i spróbuj ponownie.", Severity.Error);
+            Snackbar.Add(
+                CartService.LastHoldError ?? "Nie udało się zarezerwować wybranych produktów. Zaktualizuj koszyk i spróbuj ponownie.",
+                Severity.Error);
             return;
         }
 
@@ -459,7 +803,7 @@ else
             return;
         }
 
-        Navigation.NavigateTo("/checkout");
+        Navigation.NavigateTo("checkout");
     }
 
     private void StartRefreshLoop()
@@ -491,4 +835,11 @@ else
         catch { }
         _dotNetRef?.Dispose();
     }
+
+    private sealed record CartTenantGroupView(
+        Guid TenantId,
+        string Name,
+        string? PickupAddress,
+        string? PickupCity,
+        IReadOnlyList<CartItem> Items);
 }

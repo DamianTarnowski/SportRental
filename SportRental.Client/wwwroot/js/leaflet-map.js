@@ -5,9 +5,118 @@ window.leafletMap = {
     circles: {},
     shopMarkerGroups: {},
     dotNetRefs: {},
+    leafletLoadPromise: null,
+
+    // Leaflet is needed only on /map. Loading it here avoids a third-party
+    // request and extra CSS/JS on every catalog, cart and account visit.
+    ensureLeaflet: function () {
+        if (window.L) {
+            return Promise.resolve();
+        }
+        if (this.leafletLoadPromise) {
+            return this.leafletLoadPromise;
+        }
+
+        this.leafletLoadPromise = new Promise((resolve, reject) => {
+            if (!document.querySelector('link[data-rentspot-leaflet]')) {
+                const stylesheet = document.createElement('link');
+                stylesheet.rel = 'stylesheet';
+                stylesheet.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+                stylesheet.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+                stylesheet.crossOrigin = '';
+                stylesheet.dataset.rentspotLeaflet = 'true';
+                document.head.appendChild(stylesheet);
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=';
+            script.crossOrigin = '';
+            script.dataset.rentspotLeaflet = 'true';
+            script.onload = () => resolve();
+            script.onerror = () => {
+                this.leafletLoadPromise = null;
+                script.remove();
+                reject(new Error('Nie udało się załadować biblioteki mapy.'));
+            };
+            document.head.appendChild(script);
+        });
+
+        return this.leafletLoadPromise;
+    },
+
+    // Build popup content from DOM nodes so tenant-controlled fields are always
+    // rendered as text. Passing an HTML template to Leaflet here would turn
+    // stored company data (name/address/phone) into an XSS sink.
+    createShopPopup: function (loc) {
+        const popup = document.createElement('div');
+        popup.style.cssText = 'min-width: 220px; font-family: system-ui, -apple-system, sans-serif;';
+
+        const title = document.createElement('div');
+        title.style.cssText = 'font-size: 15px; font-weight: 600; color: #1f2937; margin-bottom: 8px;';
+        title.textContent = loc.tenantName || 'Wypożyczalnia';
+        popup.appendChild(title);
+
+        if (loc.distance) {
+            const distance = document.createElement('div');
+            distance.style.cssText = 'color: #667eea; font-weight: 600; margin: 4px 0;';
+            distance.textContent = `📏 ${loc.distance}`;
+            popup.appendChild(distance);
+        }
+
+        if (loc.address) {
+            const address = document.createElement('div');
+            address.style.cssText = 'color: #6b7280; font-size: 13px; margin: 4px 0;';
+            address.textContent = `📍 ${loc.address}`;
+            popup.appendChild(address);
+        }
+
+        if (loc.phoneNumber) {
+            const phone = document.createElement('div');
+            phone.style.cssText = 'color: #6b7280; font-size: 13px;';
+            phone.textContent = `📞 ${loc.phoneNumber}`;
+            popup.appendChild(phone);
+        }
+
+        if (Number.isInteger(loc.productCount) && loc.productCount > 0) {
+            const offer = document.createElement('div');
+            offer.style.cssText = 'color: #8f2429; font-size: 13px; font-weight: 700; margin-top: 6px;';
+            const lastTwoDigits = loc.productCount % 100;
+            const productNoun = loc.productCount === 1
+                ? 'produkt'
+                : loc.productCount % 10 >= 2 && loc.productCount % 10 <= 4
+                  && (lastTwoDigits < 12 || lastTwoDigits > 14)
+                    ? 'produkty'
+                    : 'produktów';
+            offer.textContent = `${loc.productCount} ${productNoun} w katalogu`;
+            popup.appendChild(offer);
+        }
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.style.cssText = [
+            'margin-top: 10px',
+            'padding: 8px 16px',
+            'width: 100%',
+            'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'color: white',
+            'border: none',
+            'border-radius: 6px',
+            'cursor: pointer',
+            'font-weight: 500',
+            'font-size: 13px',
+            'transition: transform 0.2s'
+        ].join(';');
+        button.textContent = 'Zobacz produkty →';
+        button.addEventListener('click', () => this.goToProducts(loc.tenantId));
+        popup.appendChild(button);
+
+        return popup;
+    },
 
     // Initialize map
-    initMap: function (mapId, centerLat, centerLon, zoom, dotNetRef) {
+    initMap: async function (mapId, centerLat, centerLon, zoom, dotNetRef) {
+        await this.ensureLeaflet();
         console.log('Initializing map:', mapId);
         
         if (this.maps[mapId]) {
@@ -149,27 +258,11 @@ window.leafletMap = {
                     popupAnchor: [0, -20]
                 });
 
-                const distanceText = loc.distance ? `<div style="color: #667eea; font-weight: 600; margin: 4px 0;">📏 ${loc.distance}</div>` : '';
-                
-                const marker = L.marker([loc.lat, loc.lon], { icon: shopIcon })
-                    .bindPopup(`
-                        <div style="min-width: 220px; font-family: system-ui, -apple-system, sans-serif;">
-                            <div style="font-size: 15px; font-weight: 600; color: #1f2937; margin-bottom: 8px;">
-                                ${loc.tenantName || 'Wypożyczalnia'}
-                            </div>
-                            ${distanceText}
-                            ${loc.address ? `<div style="color: #6b7280; font-size: 13px; margin: 4px 0;">📍 ${loc.address}</div>` : ''}
-                            ${loc.phoneNumber ? `<div style="color: #6b7280; font-size: 13px;">📞 ${loc.phoneNumber}</div>` : ''}
-                            <button onclick="window.leafletMap.goToProducts('${loc.tenantId}')" 
-                                    style="margin-top: 10px; padding: 8px 16px; width: 100%;
-                                           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                                           color: white; border: none; border-radius: 6px; 
-                                           cursor: pointer; font-weight: 500; font-size: 13px;
-                                           transition: transform 0.2s;">
-                                Zobacz produkty →
-                            </button>
-                        </div>
-                    `);
+                const marker = L.marker([loc.lat, loc.lon], {
+                    icon: shopIcon,
+                    tenantId: String(loc.tenantId || '').toLowerCase()
+                })
+                    .bindPopup(this.createShopPopup(loc));
 
                 group.addLayer(marker);
             }
@@ -228,9 +321,31 @@ window.leafletMap = {
         }
     },
 
+    // Center the selected shop and expose its details immediately. The list action
+    // previously moved the map only, leaving users without confirmation which marker
+    // had been selected.
+    focusShopMarker: function (mapId, tenantId, lat, lon, zoom) {
+        const map = this.maps[mapId];
+        if (!map) return;
+
+        map.setView([lat, lon], zoom || map.getZoom());
+        const wantedTenantId = String(tenantId || '').toLowerCase();
+        const group = this.shopMarkerGroups[mapId];
+        const marker = group?.getLayers().find(layer =>
+            String(layer.options?.tenantId || '').toLowerCase() === wantedTenantId);
+
+        if (marker) {
+            window.setTimeout(() => marker.openPopup(), 0);
+        }
+    },
+
     // Navigate to products page with tenant filter
     goToProducts: function (tenantId) {
-        window.location.href = `/products?tenant=${tenantId}`;
+        const url = new URL('products', document.baseURI);
+        if (tenantId) {
+            url.searchParams.set('tenantId', tenantId);
+        }
+        window.location.assign(url.toString());
     },
 
     // Get user location from localStorage

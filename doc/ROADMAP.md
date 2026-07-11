@@ -89,6 +89,8 @@
 | Biznes | Minimum 3 tenanci produkcyjni | Ekspansja na kolejne rynki, integracje partnerskie |
 
 ## Zadania techniczne (backlog)
+- Rabaty i vouchery w aplikacji klienckiej: odłożone do osobnego etapu. Przed implementacją trzeba ustalić wpływ na cenę najmu i depozyt, łączenie promocji, zakres tenantów oraz zasady zwrotu/anulowania; obecnych ekranów administracyjnych nie traktujemy jeszcze jako gotowego przepływu sprzedażowego.
+- Standalone `SportRental.MediaStorage`: odlozony; aktywna sciezka produkcyjna korzysta z Azure Blob. Wrocic do modulu tylko, jesli pojawi sie potrzeba lokalnego storage.
 - Refaktoryzacja widokow MudBlazor do komponentow czastkowych.
 - Indexy w bazie (produkty, holdy, rentals) + plan VACUUM/analiza.
 - Observability: Serilog + Application Insights, logi strukturalne.

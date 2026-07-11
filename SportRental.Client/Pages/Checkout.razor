@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 @using System.ComponentModel.DataAnnotations
 @using SportRental.Shared.Models
+@using SportRental.Shared.Legal
 @using CartModel = SportRental.Shared.Models.Cart
 @using SportRental.Shared.Services
 @using SportRental.Shared.Components
@@ -38,52 +39,70 @@
         <!-- Mobile Header -->
         <div class="checkout-mobile-header">
             <div class="checkout-mobile-title">
-                <span></span>
                 <h1>Zamówienie</h1>
             </div>
-            <div class="checkout-mobile-steps">
-                <span class="step done"></span>
-                <span class="step-line"></span>
-                <span class="step active"></span>
-                <span class="step-line"></span>
-                <span class="step"></span>
-            </div>
+            <ol class="checkout-mobile-steps" aria-label="Postęp zamówienia">
+                <li class="step done" aria-label="Krok 1 z 3: koszyk zakończony">1</li>
+                <li class="step-line" aria-hidden="true"></li>
+                <li class="step active" aria-current="step" aria-label="Krok 2 z 3: dane i warunki">2</li>
+                <li class="step-line" aria-hidden="true"></li>
+                <li class="step" aria-label="Krok 3 z 3: płatność">3</li>
+            </ol>
         </div>
 
         @if (_cart.Items.Count == 0)
         {
             <div class="checkout-mobile-empty">
-                <span class="empty-icon"></span>
-                <h3>Pusty koszyk</h3>
+                <span class="empty-icon"><Icon Name="cart" Size="44" /></span>
+                <h2>Pusty koszyk</h2>
                 <p>Dodaj produkty do koszyka</p>
-                <a href="/products" class="checkout-mobile-cta">Przeglądaj katalog</a>
+                <a href="products" class="checkout-mobile-cta">Przeglądaj katalog</a>
             </div>
         }
         else
         {
             <!-- Cart Summary - Collapsible -->
             <div class="checkout-mobile-section">
-                <button class="checkout-mobile-section-header" @onclick="() => _showMobileItems = !_showMobileItems">
+                <button class="checkout-mobile-section-header"
+                        @onclick="() => _showMobileItems = !_showMobileItems"
+                        aria-expanded="@(_showMobileItems ? "true" : "false")"
+                        aria-controls="checkout-mobile-items">
                     <span>Produkty (@_cart.TotalItems)</span>
                     <span class="section-toggle">@(_showMobileItems ? "▲" : "▼")</span>
                 </button>
                 @if (_showMobileItems)
                 {
-                    <div class="checkout-mobile-items">
-                        @foreach (var item in _cart.Items)
+                    <div class="checkout-mobile-items" id="checkout-mobile-items">
+                        @foreach (var group in CartGroups)
                         {
-                            <div class="checkout-mobile-item">
-                                <span class="item-name">@item.ProductName</span>
-                                <span class="item-qty">x@(item.Quantity)</span>
-                                <span class="item-price">@item.TotalPrice.ToString("C")</span>
-                            </div>
+                            <section class="checkout-mobile-rental-group">
+                                <header>
+                                    <div>
+                                        <strong>@group.Name</strong>
+                                        <span>@FormatCartPickup(group)</span>
+                                    </div>
+                                    @if (CartGroups.Count > 1)
+                                    {
+                                        <span class="checkout-separate-reservation">Osobna rezerwacja</span>
+                                    }
+                                </header>
+                                <div class="checkout-mobile-group-period">@FormatCartGroupPeriod(group)</div>
+                                @foreach (var item in group.Items)
+                                {
+                                    <div class="checkout-mobile-item">
+                                        <span class="item-name">@item.ProductName</span>
+                                        <span class="item-qty">x@(item.Quantity)</span>
+                                        <span class="item-price">@QuotedItemSubtotal(item.ProductId).Pln()</span>
+                                    </div>
+                                }
+                            </section>
                         }
                     </div>
                 }
-                @if (_hasMixedDates)
+                @if (_hasInvalidGroups)
                 {
                     <div class="checkout-mobile-warning">
-                        Różne daty w produktach
+                        Produkty z jednego punktu mają niespójny termin. Wróć do koszyka i popraw dane.
                     </div>
                 }
             </div>
@@ -91,41 +110,97 @@
             <!-- Customer Form -->
             <div class="checkout-mobile-section">
                 <div class="checkout-mobile-section-title">Twoje dane</div>
-                <EditForm Model="_customer">
+                <EditForm EditContext="_customerEditContext">
                     <DataAnnotationsValidator />
                     <div class="checkout-mobile-form">
                         <div class="form-group">
-                            <label>Imię i nazwisko *</label>
-                            <InputText @bind-Value="_customer.FullName" placeholder="Jan Kowalski" />
+                            <label for="checkout-mobile-fullname">Imię i nazwisko *</label>
+                            <InputText id="checkout-mobile-fullname" @bind-Value="_customer.FullName" placeholder="Jan Kowalski" />
+                            <ValidationMessage For="@(() => _customer.FullName)" />
                         </div>
                         <div class="form-group-row">
                             <div class="form-group flex-1">
-                                <label>Email *</label>
-                                <InputText @bind-Value="_customer.Email" type="email" 
+                                <label for="checkout-mobile-email">Email *</label>
+                                <InputText id="checkout-mobile-email" @bind-Value="_customer.Email" type="email"
                                            @onfocusout="HandleEmailBlur" placeholder="jan@example.com" />
+                                <ValidationMessage For="@(() => _customer.Email)" />
                             </div>
-                            <button type="button" class="lookup-btn" 
-                                    disabled="@(!CanSearchExisting || _isLookupInProgress)"
-                                    @onclick="LookupCustomerButtonAsync">
-                                @(_isLookupInProgress ? "" : "")
-                            </button>
+                            @if (_canLookupOwnProfile)
+                            {
+                                <button type="button" class="lookup-btn" aria-label="Odśwież dane profilu"
+                                        disabled="@(!CanSearchExisting || _isLookupInProgress)"
+                                        @onclick="LookupCustomerButtonAsync">
+                                    <Icon Name="search" Size="20" />
+                                </button>
+                            }
                         </div>
                         <div class="form-group">
-                            <label>Telefon *</label>
-                            <PhoneInput @bind-Value="_customer.PhoneNumber" Label="" Required="true" 
+                            <PhoneInput @bind-Value="_customer.PhoneNumber" Label="Numer telefonu *" Required="true"
                                         Variant="MudBlazor.Variant.Outlined" />
+                            <ValidationMessage For="@(() => _customer.PhoneNumber)" />
                         </div>
                         <div class="form-group">
-                            <label>Adres</label>
-                            <InputTextArea @bind-Value="_customer.Address" rows="2" placeholder="ul. Sportowa 123" />
+                            <label for="checkout-mobile-address">Adres</label>
+                            <InputTextArea id="checkout-mobile-address" @bind-Value="_customer.Address" rows="2" placeholder="ul. Sportowa 123" />
+                            <ValidationMessage For="@(() => _customer.Address)" />
                         </div>
                         <div class="form-group">
-                            <label>Uwagi</label>
-                            <InputTextArea @bind-Value="_notes" rows="2" placeholder="Dodatkowe informacje..." />
+                            <label for="checkout-mobile-notes">Uwagi</label>
+                            <InputTextArea id="checkout-mobile-notes" @bind-Value="_notes" rows="2" placeholder="Dodatkowe informacje..." />
                         </div>
                     </div>
                 </EditForm>
             </div>
+
+            @if (_quote is not null)
+            {
+                <div class="checkout-mobile-section">
+                    <div class="checkout-mobile-section-title">
+                        @PolishCount(_quote.Tenants.Count, "wypożyczalnia i jej warunki", "wypożyczalnie i ich warunki", "wypożyczalni i ich warunki")
+                    </div>
+                    <div class="checkout-rental-groups-summary checkout-rental-groups-summary-mobile">
+                        @foreach (var tenant in _quote.Tenants)
+                        {
+                            <article class="checkout-rental-group-summary">
+                                <div class="checkout-rental-group-heading">
+                                    <div>
+                                        <strong>@tenant.TenantName</strong>
+                                        <span>@FormatPickup(tenant)</span>
+                                    </div>
+                                    @if (_quote.Tenants.Count > 1)
+                                    {
+                                        <span class="checkout-separate-reservation">Osobna rezerwacja</span>
+                                    }
+                                </div>
+                                <div class="checkout-rental-group-period">@FormatRentalPeriod(tenant)</div>
+                                <div class="checkout-rental-group-amounts">
+                                    <span>Wynajem: <strong>@tenant.TotalAmount.Pln()</strong></span>
+                                    <span>Depozyt: <strong>@tenant.DepositAmount.Pln()</strong></span>
+                                </div>
+                                <details class="checkout-rental-terms">
+                                    <summary>
+                                        @tenant.RentalTerms.Title
+                                        @if (tenant.RentalTerms.UsesPlatformDefault)
+                                        {
+                                            <span>standard RentSpot</span>
+                                        }
+                                    </summary>
+                                    @if (!string.IsNullOrWhiteSpace(tenant.RentalTerms.Content))
+                                    {
+                                        <div class="checkout-rental-terms-content">@tenant.RentalTerms.Content</div>
+                                    }
+                                </details>
+                                <label class="checkout-tenant-legal-ack">
+                                    <input type="checkbox"
+                                           checked="@IsTenantTermsAccepted(tenant)"
+                                           @onchange="@(args => OnTenantTermsAcceptanceChanged(tenant, args))" />
+                                    <span>Akceptuję regulamin wypożyczalni @tenant.TenantName.</span>
+                                </label>
+                            </article>
+                        }
+                    </div>
+                </div>
+            }
 
             <!-- Payment Summary - Sticky Bottom -->
             <div class="checkout-mobile-summary">
@@ -146,20 +221,33 @@
                 else
                 {
                     <div class="checkout-mobile-summary-row highlight">
-                        <span>Do zapłaty</span>
-                        <span class="summary-amount">@_quote.TotalAmount.ToString("C")</span>
+                        <span>Depozyt płatny teraz</span>
+                        <span class="summary-amount">@_quote.DepositAmount.Pln()</span>
                     </div>
+                    <div class="checkout-mobile-summary-row">
+                        <span>Cena wynajmu (płatna osobno)</span>
+                        <span>@_quote.TotalAmount.Pln()</span>
+                    </div>
+                    <p class="checkout-mobile-secure">Depozyt jest zwrotny i nie pomniejsza ceny wynajmu.</p>
+
                 }
+                <label class="checkout-legal-ack">
+                    <input type="checkbox" @bind="_acceptPlatformLegal" />
+                    <span>
+                        Akceptuję <a href="terms" target="_blank" rel="noopener">regulamin platformy</a> i potwierdzam
+                        zapoznanie się z <a href="privacy" target="_blank" rel="noopener">polityką prywatności</a>.
+                    </span>
+                </label>
                 <button class="checkout-mobile-submit" 
-                        disabled="@(_isSubmitting || _isPaymentInProgress || _cart.Items.Count == 0 || _hasMixedDates || _quote is null || _quoteError is not null)"
+                        disabled="@(_isSubmitting || _isPaymentInProgress || !AllLegalAccepted || _cart.Items.Count == 0 || _hasInvalidGroups || _quote is null || _quoteError is not null)"
                         @onclick="SubmitAsync">
                     @if (_isSubmitting)
                     {
-                        <span>⏳ Przetwarzanie...</span>
+                        <span>Przetwarzanie...</span>
                     }
                     else
                     {
-                        <span>Zapłać @_quote?.TotalAmount.ToString("C")</span>
+                        <span>Zapłać depozyt @_quote?.DepositAmount.Pln()</span>
                     }
                 </button>
                 <p class="checkout-mobile-secure">Bezpieczna płatność Stripe</p>
@@ -180,7 +268,7 @@ else
             <p>Ostatni krok - sprawdź szczegóły i dokonaj płatności</p>
             <div class="checkout-steps">
                 <div class="checkout-step">
-                    <span class="checkout-step-number"></span>
+                    <span class="checkout-step-number">1</span>
                     <span>Koszyk</span>
                 </div>
                 <div class="checkout-step active">
@@ -197,10 +285,10 @@ else
         @if (_cart.Items.Count == 0)
         {
             <div class="text-center py-20 bg-white rounded-3xl shadow-sm">
-                <div class="text-8xl mb-6"></div>
+                <div class="flex justify-center mb-6"><Icon Name="cart" Size="64" /></div>
                 <h2 class="text-2xl font-bold text-gray-800 mb-3">Koszyk jest pusty</h2>
                 <p class="text-gray-600 mb-8">Dodaj produkty do koszyka aby kontynuować</p>
-                <a href="/products" class="checkout-submit-btn" style="max-width: 280px; margin: 0 auto; text-decoration: none;">
+                <a href="products" class="checkout-submit-btn" style="max-width: 280px; margin: 0 auto; text-decoration: none;">
                     Przeglądaj katalog
                 </a>
             </div>
@@ -210,41 +298,64 @@ else
             <div class="checkout-grid">
                 <!-- Items List -->
                 <div class="checkout-items-card">
-                    <h2>Produkty do wypożyczenia</h2>
-                    
-                    @foreach (var item in _cart.Items)
+                    <h2>@PolishCount(CartGroups.Count, "rezerwacja", "osobne rezerwacje", "osobnych rezerwacji")</h2>
+                    @if (CartGroups.Count > 1)
                     {
-                        <div class="checkout-item">
-                            <div style="flex: 1;">
-                                <div class="checkout-item-name">@item.ProductName</div>
-                                <div class="checkout-item-details">
-                                    @if (item.RentalType == RentalTypeDto.Hourly && item.HoursRented.HasValue)
-                                    {
-                                        <span>@item.Quantity szt. × @item.HoursRented.Value godz. (⏰ godzinowy)</span>
-                                    }
-                                    else
-                                    {
-                                        <span>@item.Quantity szt. × @item.TotalDays dni</span>
-                                    }
-                                    <span class="ml-2">(@item.StartDate.ToShortDateString() - @item.EndDate.ToShortDateString())</span>
-                                </div>
-                                @if (item.HoldId is not null)
-                                {
-                                    <span class="inline-block mt-1 px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-lg">
-                                        Zarezerwowany do @item.HoldExpiresAtUtc?.ToLocalTime().ToString("HH:mm:ss")
-                                    </span>
-                                }
-                            </div>
-                            <div class="checkout-item-price">@item.TotalPrice.ToString("C")</div>
-                            <button class="checkout-remove-btn" @onclick="@(() => RemoveFromCart(item.ProductId))" title="Usuń z zamówienia">
-                                </button>
+                        <div class="checkout-marketplace-notice">
+                            Każda wypożyczalnia odpowiada za własny sprzęt, termin i punkt odbioru. Depozyty opłacisz razem w Stripe.
                         </div>
                     }
+                    
+                    @foreach (var group in CartGroups)
+                    {
+                        <section class="checkout-tenant-items">
+                            <header class="checkout-tenant-items-header">
+                                <div>
+                                    <h3>@group.Name</h3>
+                                    <p>@FormatCartPickup(group)</p>
+                                    <p>@FormatCartGroupPeriod(group)</p>
+                                </div>
+                                @if (CartGroups.Count > 1)
+                                {
+                                    <span class="checkout-separate-reservation">Osobna rezerwacja</span>
+                                }
+                            </header>
 
-                    @if (_hasMixedDates)
+                            @foreach (var item in group.Items)
+                            {
+                                <div class="checkout-item">
+                                    <div style="flex: 1;">
+                                        <div class="checkout-item-name">@item.ProductName</div>
+                                        <div class="checkout-item-details">
+                                            @if (item.RentalType == RentalTypeDto.Hourly && item.HoursRented.HasValue)
+                                            {
+                                                <span>@item.Quantity szt. × @item.HoursRented.Value godz. (godzinowy)</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@item.Quantity szt. × @item.TotalDays dni</span>
+                                            }
+                                        </div>
+                                        @if (item.HoldId is not null)
+                                        {
+                                            <span class="inline-block mt-1 px-2 py-1 bg-blue-50 text-blue-600 text-xs rounded-lg">
+                                                Zarezerwowany do @FormatPolishTime(item.HoldExpiresAtUtc, "HH:mm:ss")
+                                            </span>
+                                        }
+                                    </div>
+                                    <div class="checkout-item-price">@QuotedItemSubtotal(item.ProductId).Pln()</div>
+                                    <button class="checkout-remove-btn" @onclick="@(() => RemoveFromCart(item.ProductId))" title="Usuń z zamówienia" aria-label="Usuń pozycję">
+                                        <Icon Name="trash" Size="20" />
+                                    </button>
+                                </div>
+                            }
+                        </section>
+                    }
+
+                    @if (_hasInvalidGroups)
                     {
                         <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-yellow-800">
-                            Pozycje mają różne daty. Ujednolić daty przed finalizacją.
+                            Produkty z jednego punktu mają niespójny termin. Wróć do koszyka i popraw dane.
                         </div>
                     }
                 </div>
@@ -253,58 +364,57 @@ else
                 <div class="checkout-form-card">
                     <h2>Dane do rezerwacji</h2>
 
-                    <EditForm Model="_customer">
+                    <EditForm EditContext="_customerEditContext">
                         <DataAnnotationsValidator />
                         
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Imię i nazwisko *</label>
-                                <InputText @bind-Value="_customer.FullName" 
+                                <label for="checkout-fullname" class="block text-sm font-medium text-gray-700 mb-1">Imię i nazwisko *</label>
+                                <InputText id="checkout-fullname" @bind-Value="_customer.FullName"
                                            class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
                                            placeholder="Jan Kowalski" />
+                                <ValidationMessage For="@(() => _customer.FullName)" />
                             </div>
 
                             <div class="flex gap-2">
                                 <div class="flex-1">
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                                    <InputText @bind-Value="_customer.Email" type="email"
+                                    <label for="checkout-email" class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                                    <InputText id="checkout-email" @bind-Value="_customer.Email" type="email"
                                                @onfocusout="HandleEmailBlur"
                                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
                                                placeholder="jan@example.com" />
+                                    <ValidationMessage For="@(() => _customer.Email)" />
                                 </div>
-                                <button type="button" 
-                                        class="self-end px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium transition"
-                                        disabled="@(!CanSearchExisting || _isLookupInProgress)"
-                                        @onclick="LookupCustomerButtonAsync">
-                                    @if (_isLookupInProgress)
-                                    {
-                                        <span></span>
-                                    }
-                                    else
-                                    {
-                                        <span></span>
-                                    }
-                                </button>
+                                @if (_canLookupOwnProfile)
+                                {
+                                    <button type="button" aria-label="Odśwież dane profilu"
+                                            class="self-end px-4 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium transition"
+                                            disabled="@(!CanSearchExisting || _isLookupInProgress)"
+                                            @onclick="LookupCustomerButtonAsync">
+                                        <Icon Name="search" Size="20" />
+                                    </button>
+                                }
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Telefon *</label>
                                 <PhoneInput @bind-Value="_customer.PhoneNumber"
-                                            Label=""
+                                            Label="Numer telefonu *"
                                             Required="true"
                                             Variant="MudBlazor.Variant.Outlined" />
+                                <ValidationMessage For="@(() => _customer.PhoneNumber)" />
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Adres (opcjonalnie)</label>
-                                <InputTextArea @bind-Value="_customer.Address" rows="2"
+                                <label for="checkout-address" class="block text-sm font-medium text-gray-700 mb-1">Adres (opcjonalnie)</label>
+                                <InputTextArea id="checkout-address" @bind-Value="_customer.Address" rows="2"
                                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
                                                placeholder="ul. Sportowa 123, Warszawa" />
+                                <ValidationMessage For="@(() => _customer.Address)" />
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Uwagi do rezerwacji</label>
-                                <InputTextArea @bind-Value="_notes" rows="2"
+                                <label for="checkout-notes" class="block text-sm font-medium text-gray-700 mb-1">Uwagi do rezerwacji</label>
+                                <InputTextArea id="checkout-notes" @bind-Value="_notes" rows="2"
                                                class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
                                                placeholder="Dodatkowe informacje..." />
                             </div>
@@ -331,27 +441,80 @@ else
                         }
                         else
                         {
-                            <div class="checkout-summary-row">
-                                <span>Łącznie za wypożyczenie</span>
-                                <span class="font-semibold">@_quote.TotalAmount.ToString("C")</span>
-                            </div>
                             <div class="checkout-summary-row checkout-summary-total">
-                                <span>Do zapłaty</span>
-                                <span class="text-xl text-blue-600">@_quote.TotalAmount.ToString("C")</span>
+                                <span>Depozyt płatny teraz</span>
+                                <span class="text-xl text-blue-600">@_quote.DepositAmount.Pln()</span>
+                            </div>
+                            <div class="checkout-summary-row">
+                                <span>Cena wynajmu do zapłaty osobno</span>
+                                <span>@_quote.TotalAmount.Pln()</span>
+                            </div>
+                            <div class="text-sm text-gray-500 mt-2">
+                                Depozyt jest zwrotny po rozliczeniu sprzętu i nie pomniejsza ceny wynajmu.
+                            </div>
+
+                            <div class="checkout-rental-groups-summary">
+                                @foreach (var tenant in _quote.Tenants)
+                                {
+                                    <article class="checkout-rental-group-summary">
+                                        <div class="checkout-rental-group-heading">
+                                            <div>
+                                                <strong>@tenant.TenantName</strong>
+                                                <span>@FormatPickup(tenant)</span>
+                                            </div>
+                                            @if (_quote.Tenants.Count > 1)
+                                            {
+                                                <span class="checkout-separate-reservation">Osobna rezerwacja</span>
+                                            }
+                                        </div>
+                                        <div class="checkout-rental-group-period">@FormatRentalPeriod(tenant)</div>
+                                        <div class="checkout-rental-group-amounts">
+                                            <span>Wynajem: <strong>@tenant.TotalAmount.Pln()</strong></span>
+                                            <span>Depozyt: <strong>@tenant.DepositAmount.Pln()</strong></span>
+                                        </div>
+                                        <details class="checkout-rental-terms">
+                                            <summary>
+                                                @tenant.RentalTerms.Title
+                                                @if (tenant.RentalTerms.UsesPlatformDefault)
+                                                {
+                                                    <span>standard RentSpot</span>
+                                                }
+                                            </summary>
+                                            @if (!string.IsNullOrWhiteSpace(tenant.RentalTerms.Content))
+                                            {
+                                                <div class="checkout-rental-terms-content">@tenant.RentalTerms.Content</div>
+                                            }
+                                        </details>
+                                        <label class="checkout-tenant-legal-ack">
+                                            <input type="checkbox"
+                                                   checked="@IsTenantTermsAccepted(tenant)"
+                                                   @onchange="@(args => OnTenantTermsAcceptanceChanged(tenant, args))" />
+                                            <span>Akceptuję regulamin wypożyczalni @tenant.TenantName.</span>
+                                        </label>
+                                    </article>
+                                }
                             </div>
                         }
                     </div>
 
+                    <label class="checkout-legal-ack">
+                        <input type="checkbox" @bind="_acceptPlatformLegal" />
+                        <span>
+                            Akceptuję <a href="terms" target="_blank" rel="noopener">regulamin platformy</a> i potwierdzam
+                            zapoznanie się z <a href="privacy" target="_blank" rel="noopener">polityką prywatności</a>.
+                        </span>
+                    </label>
+
                     <button class="checkout-submit-btn" 
-                            disabled="@(_isSubmitting || _isPaymentInProgress || _cart.Items.Count == 0 || _hasMixedDates || _quote is null || _quoteError is not null)"
+                            disabled="@(_isSubmitting || _isPaymentInProgress || !AllLegalAccepted || _cart.Items.Count == 0 || _hasInvalidGroups || _quote is null || _quoteError is not null)"
                             @onclick="SubmitAsync">
                         @if (_isSubmitting)
                         {
-                            <span>⏳ Przetwarzanie...</span>
+                            <span>Przetwarzanie...</span>
                         }
                         else
                         {
-                            <span>Potwierdź i zapłać</span>
+                            <span>Zamawiam i płacę depozyt @_quote?.DepositAmount.Pln()</span>
                         }
                     </button>
 
@@ -366,31 +529,66 @@ else
 } @* End of Desktop UI *@
 
 @code {
+    private static string FormatPolishTime(DateTime? value, string format) =>
+        value.HasValue ? PolishRentalTime.FromUtc(value.Value).ToString(format) : string.Empty;
+
     private CartModel _cart = new();
     private bool _isSubmitting;
     private CheckoutCustomerModel _customer = new();
+    private EditContext _customerEditContext = null!;
     private string? _notes;
-    private bool _hasMixedDates;
+    private bool _hasInvalidGroups;
     private Guid? _existingCustomerId;
     private string? _lastLookupEmail;
     private bool _isLookupInProgress;
+    private bool _canLookupOwnProfile;
     private CancellationTokenSource? _refreshCts;
     private Task? _refreshLoop;
     private PaymentQuoteResponse? _quote;
     private string? _quoteError;
+    private int _quoteVersion;
     private bool _isPaymentInProgress;
+    private bool _acceptPlatformLegal;
+    private readonly Dictionary<Guid, string> _acceptedRentalTermHashes = new();
     
     // Mobile state
     private bool _isMobile = false;
     private bool _showMobileItems = true;
     private DotNetObjectReference<Checkout>? _dotNetRef;
 
-    private bool CanSearchExisting => !string.IsNullOrWhiteSpace(_customer.Email);
+    private bool CanSearchExisting => _canLookupOwnProfile && !string.IsNullOrWhiteSpace(_customer.Email);
+
+    private decimal? QuotedItemSubtotal(Guid productId) =>
+        _quote?.Items.FirstOrDefault(item => item.ProductId == productId)?.Subtotal;
+
+    private IReadOnlyList<CheckoutCartGroup> CartGroups => _cart.Items
+        .GroupBy(item => item.TenantId)
+        .Select(group =>
+        {
+            var items = group.ToList();
+            return new CheckoutCartGroup(
+                group.Key,
+                items.Select(item => item.TenantName)
+                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name)) ?? "Wypożyczalnia",
+                items.Select(item => item.PickupAddress)
+                    .FirstOrDefault(address => !string.IsNullOrWhiteSpace(address)),
+                items.Select(item => item.PickupCity)
+                    .FirstOrDefault(city => !string.IsNullOrWhiteSpace(city)),
+                items);
+        })
+        .OrderBy(group => group.Name, StringComparer.CurrentCultureIgnoreCase)
+        .ToList();
+
+    private bool AllLegalAccepted =>
+        _acceptPlatformLegal &&
+        _quote is { Tenants.Count: > 0 } &&
+        _quote.Tenants.All(IsTenantTermsAccepted);
 
     protected override async Task OnInitializedAsync()
     {
+        _customerEditContext = new EditContext(_customer);
         _cart = CartService.GetCart();
-        _hasMixedDates = HasMixedDates(_cart);
+        _hasInvalidGroups = HasInvalidGroups(_cart);
         CartService.CartChanged += OnCartChanged;
         await PrefillFromSessionAsync();
         _ = RefreshPaymentSummaryAsync();
@@ -420,8 +618,18 @@ else
     {
         try
         {
-            // First try to get from session
-            var customer = await Session.GetCustomerAsync();
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            if (user.Identity?.IsAuthenticated != true)
+                return;
+
+            _canLookupOwnProfile = true;
+
+            CustomerDto? customer = null;
+            var customerIdValue = user.FindFirst("customer-id")?.Value;
+            if (Guid.TryParse(customerIdValue, out var customerId))
+                customer = await Api.GetCustomerAsync(customerId);
+
             if (customer is not null)
             {
                 _existingCustomerId = customer.Id;
@@ -436,45 +644,35 @@ else
                 return;
             }
 
-            // If no session, try to get from authenticated user
-            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-            var user = authState.User;
-            if (user.Identity?.IsAuthenticated == true)
+            var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                     ?? user.FindFirst("email")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(email))
             {
-                var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value 
-                         ?? user.FindFirst("email")?.Value;
-                
-                if (!string.IsNullOrWhiteSpace(email))
+                _customer.Email = email;
+                _lastLookupEmail = email;
+
+                try
                 {
-                    _customer.Email = email;
-                    _lastLookupEmail = email;
-                    
-                    // Try to find existing customer by email
-                    try
+                    var existing = await Api.FindCustomerByEmailAsync(email);
+                    if (existing is not null)
                     {
-                        var existing = await Api.FindCustomerByEmailAsync(email);
-                        if (existing is not null)
-                        {
-                            _existingCustomerId = existing.Id;
-                            _customer.FullName = existing.FullName ?? string.Empty;
-                            _customer.Email = existing.Email ?? string.Empty;
-                            _customer.PhoneNumber = existing.PhoneNumber ?? string.Empty;
-                            _customer.Address = existing.Address;
-                            _customer.DocumentNumber = existing.DocumentNumber;
-                            _customer.Notes = existing.Notes;
-                            _lastLookupEmail = existing.Email;
-                            
-                            // Save to session for future use
-                            await Session.SetCustomerAsync(existing);
-                        }
+                        _existingCustomerId = existing.Id;
+                        _customer.FullName = existing.FullName ?? string.Empty;
+                        _customer.Email = existing.Email ?? string.Empty;
+                        _customer.PhoneNumber = existing.PhoneNumber ?? string.Empty;
+                        _customer.Address = existing.Address;
+                        _customer.DocumentNumber = existing.DocumentNumber;
+                        _lastLookupEmail = existing.Email;
+                        await Session.SetCustomerAsync(existing);
                     }
-                    catch (Exception ex)
-                    {
-                        Console.Error.WriteLine("[Checkout] Failed to lookup customer by email: {0}", ex);
-                    }
-                    
-                    await InvokeAsync(StateHasChanged);
                 }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("[Checkout] Failed to lookup customer by email: {0}", ex);
+                }
+
+                await InvokeAsync(StateHasChanged);
             }
         }
         catch (Exception ex)
@@ -486,7 +684,7 @@ else
     private void OnCartChanged(object? sender, EventArgs e)
     {
         _cart = CartService.GetCart();
-        _hasMixedDates = HasMixedDates(_cart);
+        _hasInvalidGroups = HasInvalidGroups(_cart);
         _ = RefreshPaymentSummaryAsync();
     }
 
@@ -494,21 +692,34 @@ else
     {
         await CartService.RemoveFromCartAsync(productId);
         _cart = CartService.GetCart();
-        _hasMixedDates = HasMixedDates(_cart);
+        _hasInvalidGroups = HasInvalidGroups(_cart);
         await RefreshPaymentSummaryAsync();
         Snackbar.Add("Produkt usunięty z zamówienia", Severity.Info);
     }
 
-    private static bool HasMixedDates(CartModel cart)
+    private static bool HasInvalidGroups(CartModel cart)
     {
-        if (cart.Items.Count == 0) return false;
-        var start = cart.Items[0].StartDate;
-        var end = cart.Items[0].EndDate;
-        return cart.Items.Any(i => i.StartDate != start || i.EndDate != end);
+        if (cart.Items.Count == 0)
+            return false;
+
+        return cart.Items
+            .GroupBy(item => item.TenantId)
+            .Any(group =>
+            {
+                if (group.Key == Guid.Empty)
+                    return true;
+                var first = group.First();
+                return group.Skip(1).Any(item =>
+                    item.StartDate != first.StartDate ||
+                    item.EndDate != first.EndDate ||
+                    item.RentalType != first.RentalType ||
+                    item.HoursRented != first.HoursRented);
+            });
     }
 
     private async Task RefreshPaymentSummaryAsync()
     {
+        var quoteVersion = ++_quoteVersion;
         if (_cart.Items.Count == 0)
         {
             _quote = null;
@@ -517,42 +728,164 @@ else
             return;
         }
 
-        var first = _cart.Items[0];
-        var request = new PaymentQuoteRequest
-        {
-            StartDateUtc = first.StartDate.ToUniversalTime(),
-            EndDateUtc = first.EndDate.ToUniversalTime(),
-            Items = BuildCartItemsPayload(),
-            RentalType = first.RentalType,
-            HoursRented = first.HoursRented
-        };
-
         try
         {
-            _quote = await Api.GetPaymentQuoteAsync(request);
+            if (_hasInvalidGroups)
+                throw new InvalidOperationException("Produkty z jednego punktu odbioru muszą mieć wspólny termin.");
+
+            var quote = await Api.GetPaymentQuoteAsync(BuildPaymentQuoteRequest());
+            if (quoteVersion != _quoteVersion)
+                return;
+
+            _quote = quote;
+            ReconcileAcceptedRentalTerms(quote);
             _quoteError = null;
         }
         catch (Exception ex)
         {
             _quote = null;
-            _quoteError = $"Nie udało się obliczyć kosztu: {ex.Message}";
+            _quoteError = "Nie udało się obliczyć kosztu. Sprawdź terminy i spróbuj ponownie.";
+            Console.Error.WriteLine($"Checkout quote failed: {ex.GetType().Name}");
         }
 
         await InvokeAsync(StateHasChanged);
     }
 
-    private List<CreateRentalItem> BuildCartItemsPayload()
+    private PaymentQuoteRequest BuildPaymentQuoteRequest()
     {
-        return _cart.Items.Select(i => new CreateRentalItem
+        if (CartGroups.Count == 0)
+            return new PaymentQuoteRequest();
+
+        var first = CartGroups[0].Items[0];
+        return new PaymentQuoteRequest
         {
-            ProductId = i.ProductId,
-            Quantity = i.Quantity
-        }).ToList();
+            // Pola top-level pozostają dla zgodności ze starszym API. Backend v2
+            // korzysta z RentalGroups i terminów właściwych dla wypożyczalni.
+            StartDateUtc = PolishRentalTime.ToUtc(first.StartDate),
+            EndDateUtc = PolishRentalTime.ToUtc(first.EndDate),
+            RentalType = first.RentalType,
+            HoursRented = first.HoursRented,
+            Items = new List<CreateRentalItem>(),
+            RentalGroups = CartGroups.Select(group =>
+            {
+                var terms = group.Items[0];
+                return new RentalGroupQuoteRequest
+                {
+                    TenantId = group.TenantId,
+                    StartDateUtc = PolishRentalTime.ToUtc(terms.StartDate),
+                    EndDateUtc = PolishRentalTime.ToUtc(terms.EndDate),
+                    RentalType = terms.RentalType,
+                    HoursRented = terms.HoursRented,
+                    Items = group.Items.Select(item => new CreateRentalItem
+                    {
+                        ProductId = item.ProductId,
+                        Quantity = item.Quantity
+                    }).ToList()
+                };
+            }).ToList()
+        };
+    }
+
+    private void ReconcileAcceptedRentalTerms(PaymentQuoteResponse quote)
+    {
+        var current = quote.Tenants.ToDictionary(
+            tenant => tenant.TenantId,
+            tenant => tenant.RentalTerms.ContentHash);
+        foreach (var accepted in _acceptedRentalTermHashes.ToList())
+        {
+            if (!current.TryGetValue(accepted.Key, out var currentHash) ||
+                !string.Equals(accepted.Value, currentHash, StringComparison.OrdinalIgnoreCase))
+            {
+                _acceptedRentalTermHashes.Remove(accepted.Key);
+            }
+        }
+    }
+
+    private bool IsTenantTermsAccepted(TenantQuoteBreakdown tenant) =>
+        _acceptedRentalTermHashes.TryGetValue(tenant.TenantId, out var acceptedHash) &&
+        string.Equals(
+            acceptedHash,
+            tenant.RentalTerms.ContentHash,
+            StringComparison.OrdinalIgnoreCase);
+
+    private void OnTenantTermsAcceptanceChanged(
+        TenantQuoteBreakdown tenant,
+        ChangeEventArgs args)
+    {
+        var accepted = args.Value is bool boolValue
+            ? boolValue
+            : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
+        if (accepted)
+            _acceptedRentalTermHashes[tenant.TenantId] = tenant.RentalTerms.ContentHash;
+        else
+            _acceptedRentalTermHashes.Remove(tenant.TenantId);
+    }
+
+    private static string FormatPickup(TenantQuoteBreakdown tenant)
+    {
+        return FormatPickupLocation(
+            tenant.PickupAddress,
+            tenant.PickupCity,
+            "Adres odbioru potwierdzi wypożyczalnia");
+    }
+
+    private static string FormatCartPickup(CheckoutCartGroup group) =>
+        FormatPickupLocation(
+            group.PickupAddress,
+            group.PickupCity,
+            "Punkt odbioru w potwierdzeniu");
+
+    private static string FormatPickupLocation(
+        string? address,
+        string? city,
+        string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(address))
+            return string.IsNullOrWhiteSpace(city) ? fallback : $"Odbiór: {city}";
+        if (string.IsNullOrWhiteSpace(city) ||
+            address.Contains(city, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return $"Odbiór: {address}";
+        }
+
+        return $"Odbiór: {address}, {city}";
+    }
+
+    private static string PolishCount(int count, string singular, string paucal, string plural)
+    {
+        var absolute = Math.Abs(count);
+        var lastTwoDigits = absolute % 100;
+        var noun = absolute == 1
+            ? singular
+            : lastTwoDigits is >= 12 and <= 14
+                ? plural
+                : absolute % 10 is >= 2 and <= 4
+                    ? paucal
+                    : plural;
+        return $"{count} {noun}";
+    }
+
+    private static string FormatRentalPeriod(TenantQuoteBreakdown tenant)
+    {
+        var start = PolishRentalTime.FromUtc(tenant.StartDateUtc);
+        var end = PolishRentalTime.FromUtc(tenant.EndDateUtc);
+        return tenant.RentalType == RentalTypeDto.Hourly
+            ? $"{start:dd.MM.yyyy, HH:mm}–{end:HH:mm} ({tenant.HoursRented ?? 1} godz.)"
+            : $"{start:dd.MM.yyyy, HH:mm} – {end:dd.MM.yyyy, HH:mm}";
+    }
+
+    private static string FormatCartGroupPeriod(CheckoutCartGroup group)
+    {
+        var item = group.Items[0];
+        return item.RentalType == RentalTypeDto.Hourly
+            ? $"{item.StartDate:dd.MM.yyyy, HH:mm}–{item.EndDate:HH:mm} ({item.HoursRented ?? 1} godz.)"
+            : $"{item.StartDate:dd.MM.yyyy, HH:mm} – {item.EndDate:dd.MM.yyyy, HH:mm}";
     }
 
     private async Task HandleEmailBlur(FocusEventArgs _)
     {
-        await LookupCustomerAsync(showFeedback: false);
+        if (_canLookupOwnProfile)
+            await LookupCustomerAsync(showFeedback: false);
     }
 
     private async Task LookupCustomerButtonAsync()
@@ -611,7 +944,8 @@ else
         {
             if (showFeedback)
             {
-                Snackbar.Add($"Błąd podczas wyszukiwania klienta: {ex.Message}", Severity.Error);
+                Snackbar.Add("Nie udało się sprawdzić danych klienta. Spróbuj ponownie.", Severity.Error);
+                Console.Error.WriteLine($"Customer lookup failed: {ex.GetType().Name}");
             }
         }
         finally
@@ -626,22 +960,48 @@ else
         _isSubmitting = true;
         try
         {
+            if (!AllLegalAccepted)
+            {
+                Snackbar.Add("Zaakceptuj regulamin platformy, politykę prywatności i regulamin każdej wypożyczalni.", Severity.Warning);
+                return;
+            }
+
             if (_cart.Items.Count == 0)
             {
                 Snackbar.Add("Koszyk jest pusty", Severity.Warning);
                 return;
             }
 
-            if (_hasMixedDates)
+            if (_hasInvalidGroups)
             {
-                Snackbar.Add("Różne daty w pozycjach koszyka - ustaw te same daty dla wszystkich pozycji.", Severity.Error);
+                Snackbar.Add("Produkty z jednego punktu odbioru muszą mieć wspólny termin i typ wynajmu.", Severity.Error);
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(_customer.FullName) || string.IsNullOrWhiteSpace(_customer.Email) || string.IsNullOrWhiteSpace(_customer.PhoneNumber))
+            _customer.FullName = _customer.FullName.Trim();
+            _customer.Email = _customer.Email.Trim();
+            _customer.PhoneNumber = _customer.PhoneNumber?.Trim() ?? string.Empty;
+            if (!_customerEditContext.Validate())
             {
-                Snackbar.Add("Uzupełnij poprawnie dane klienta.", Severity.Error);
+                Snackbar.Add("Popraw oznaczone dane klienta.", Severity.Error);
                 return;
+            }
+
+            foreach (var group in CartGroups)
+            {
+                var selectedTerm = group.Items[0];
+                if (!PolishRentalTime.TryToUtc(selectedTerm.StartDate, out var selectedStartUtc) ||
+                    !PolishRentalTime.TryToUtc(selectedTerm.EndDate, out _))
+                {
+                    Snackbar.Add($"Termin dla {group.Name} przypada na nieistniejącą godzinę zmiany czasu.", Severity.Error);
+                    return;
+                }
+
+                if (!PolishRentalTime.IsStartSafelyInFuture(selectedStartUtc, DateTime.UtcNow))
+                {
+                    Snackbar.Add($"Termin dla {group.Name} musi zaczynać się co najmniej 2 minuty w przyszłości.", Severity.Error);
+                    return;
+                }
             }
 
             await CartService.RefreshHoldsIfNeededAsync();
@@ -664,7 +1024,7 @@ else
                     customer = await Api.UpdateCustomerAsync(_existingCustomerId.Value, new CreateCustomerRequest
                     {
                         FullName = _customer.FullName,
-                        Email = _customer.Email,
+                        Email = _customer.Email!,
                         PhoneNumber = _customer.PhoneNumber,
                         Address = _customer.Address,
                         DocumentNumber = _customer.DocumentNumber,
@@ -673,7 +1033,8 @@ else
                 }
                 catch (Exception ex)
                 {
-                    Snackbar.Add($"Nie udało się zaktualizować danych klienta: {ex.Message}", Severity.Error);
+                    Snackbar.Add("Nie udało się zaktualizować danych klienta. Spróbuj ponownie.", Severity.Error);
+                    Console.Error.WriteLine($"Customer update failed: {ex.GetType().Name}");
                     return;
                 }
 
@@ -695,22 +1056,22 @@ else
 
                     if (alreadyAuthenticated)
                     {
-                        customer = await Api.CreateCustomerAsync(new CreateCustomerRequest
+                        var customerClaim = guestAuth.User.FindFirst("customer-id")?.Value;
+                        if (Guid.TryParse(customerClaim, out var authenticatedCustomerId))
+                            customer = await Api.GetCustomerAsync(authenticatedCustomerId);
+
+                        if (customer is null)
                         {
-                            FullName = _customer.FullName,
-                            Email = _customer.Email,
-                            PhoneNumber = _customer.PhoneNumber,
-                            Address = _customer.Address,
-                            DocumentNumber = _customer.DocumentNumber,
-                            Notes = _customer.Notes
-                        });
+                            Snackbar.Add("Nie udało się odczytać profilu zalogowanego klienta. Wyloguj się i spróbuj ponownie.", Severity.Error);
+                            return;
+                        }
                     }
                     else
                     {
                         var guest = await Api.CreateGuestSessionAsync(new GuestSessionPayload
                         {
                             FullName = _customer.FullName,
-                            Email = _customer.Email,
+                            Email = _customer.Email!,
                             PhoneNumber = _customer.PhoneNumber,
                             Address = _customer.Address,
                             DocumentNumber = _customer.DocumentNumber,
@@ -739,7 +1100,8 @@ else
                 }
                 catch (Exception ex)
                 {
-                    Snackbar.Add($"Nie udało się zapisać danych klienta: {ex.Message}", Severity.Error);
+                    Snackbar.Add("Nie udało się zapisać danych klienta. Spróbuj ponownie.", Severity.Error);
+                    Console.Error.WriteLine($"Customer create failed: {ex.GetType().Name}");
                     return;
                 }
             }
@@ -762,28 +1124,27 @@ else
 
             await Session.SetCustomerAsync(customer);
 
-            var itemsPayload = BuildCartItemsPayload();
-            var first = _cart.Items[0];
-            var startUtc = first.StartDate.ToUniversalTime();
-            var endUtc = first.EndDate.ToUniversalTime();
+            var first = CartGroups[0].Items[0];
+            var startUtc = PolishRentalTime.ToUtc(first.StartDate);
+            var endUtc = PolishRentalTime.ToUtc(first.EndDate);
 
             PaymentQuoteResponse quote;
             try
             {
-                quote = await Api.GetPaymentQuoteAsync(new PaymentQuoteRequest
-                {
-                    StartDateUtc = startUtc,
-                    EndDateUtc = endUtc,
-                    Items = itemsPayload,
-                    RentalType = first.RentalType,
-                    HoursRented = first.HoursRented
-                });
+                quote = await Api.GetPaymentQuoteAsync(BuildPaymentQuoteRequest());
                 _quote = quote;
+                ReconcileAcceptedRentalTerms(quote);
                 _quoteError = null;
+                if (!AllLegalAccepted)
+                {
+                    Snackbar.Add("Regulamin jednej z wypożyczalni zmienił się. Przeczytaj i zaakceptuj aktualną wersję.", Severity.Warning);
+                    return;
+                }
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Nie udało się obliczyć płatności: {ex.Message}", Severity.Error);
+                Snackbar.Add("Nie udało się obliczyć płatności. Sprawdź koszyk i spróbuj ponownie.", Severity.Error);
+                Console.Error.WriteLine($"Payment quote failed: {ex.GetType().Name}");
                 return;
             }
 
@@ -794,33 +1155,64 @@ else
                 
                 var customerEmail = _customer?.Email ?? "";
                 
+                var holdSessionId = await CartService.GetHoldSessionIdAsync();
                 session = await Api.CreateCheckoutSessionAsync(new CreateCheckoutSessionRequest(
                     StartDateUtc: startUtc,
                     EndDateUtc: endUtc,
-                    Items: itemsPayload.Select(i => new CheckoutItem(i.ProductId, i.Quantity)).ToList(),
+                    Items: _cart.Items.Select(i => new CheckoutItem(i.ProductId, i.Quantity, i.HoldId)).ToList(),
                     CustomerEmail: customerEmail,
                     CustomerId: customerId,
                     RentalType: first.RentalType,
-                    HoursRented: first.HoursRented
+                    HoursRented: first.HoursRented,
+                    Notes: _notes,
+                    HoldSessionId: holdSessionId,
+                    AcceptedTermsVersion: LegalDocumentVersions.Terms,
+                    AcknowledgedPrivacyVersion: LegalDocumentVersions.Privacy,
+                    RentalGroups: CartGroups.Select(group =>
+                    {
+                        var terms = group.Items[0];
+                        var tenantQuote = quote.Tenants.Single(tenant => tenant.TenantId == group.TenantId);
+                        return new CheckoutRentalGroupRequest(
+                            group.TenantId,
+                            PolishRentalTime.ToUtc(terms.StartDate),
+                            PolishRentalTime.ToUtc(terms.EndDate),
+                            group.Items.Select(item => new CheckoutItem(
+                                item.ProductId,
+                                item.Quantity,
+                                item.HoldId)).ToList(),
+                            terms.RentalType,
+                            terms.HoursRented,
+                            tenantQuote.RentalTerms.ContentHash);
+                    }).ToList()
                 ));
+
+                // Backend przedłuża holdy na cały czas życia sesji Stripe. Zapisujemy
+                // ten sam termin lokalnie przed opuszczeniem WASM, aby powrót z anulowanej
+                // płatności nie uznał własnych holdów za wygasłe i nie tworzył kolizji.
+                var checkoutHoldIds = _cart.Items
+                    .Where(item => item.HoldId.HasValue)
+                    .Select(item => item.HoldId!.Value)
+                    .ToArray();
+                await CartService.UpdateHoldExpirationsAsync(
+                    checkoutHoldIds,
+                    session.HoldExpiresAtUtc ?? session.ExpiresAt);
                 
                 Snackbar.Add("Przekierowanie do Stripe...", Severity.Info);
             }
             catch (Exception ex)
             {
-                Snackbar.Add($"Błąd płatności: {ex.Message}", Severity.Error);
+                Snackbar.Add("Nie udało się rozpocząć płatności. Spróbuj ponownie za chwilę.", Severity.Error);
+                Console.Error.WriteLine($"Checkout session failed: {ex.GetType().Name}");
                 _isPaymentInProgress = false;
                 return;
             }
 
-            await CartService.ReleaseAllHoldsAsync();
-            await CartService.ClearCartAsync();
-            
             Nav.NavigateTo(session.Url, forceLoad: true);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Błąd podczas finalizacji: {ex.Message}", Severity.Error);
+            Snackbar.Add("Nie udało się dokończyć zamówienia. Koszyk pozostał bez zmian.", Severity.Error);
+            Console.Error.WriteLine($"Checkout submit failed: {ex.GetType().Name}");
         }
         finally
         {
@@ -881,4 +1273,11 @@ else
 
         public string? Notes { get; set; }
     }
+
+    private sealed record CheckoutCartGroup(
+        Guid TenantId,
+        string Name,
+        string? PickupAddress,
+        string? PickupCity,
+        IReadOnlyList<CartItem> Items);
 }

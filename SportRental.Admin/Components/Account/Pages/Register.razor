@@ -119,7 +119,7 @@
         </div>
         
         <div class="auth-footer">
-            Rejestrując się, akceptujesz <a href="#">Regulamin</a> oraz <a href="#">Politykę Prywatności</a>.
+            Rejestrując się, akceptujesz <a href="/_client/terms">Regulamin</a> oraz <a href="/_client/privacy">Politykę Prywatności</a>.
         </div>
     </div>
 </div>
@@ -213,9 +213,10 @@
         var userId = await UserManager.GetUserIdAsync(user);
         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+        var safeReturnUrl = SafeReturnUrl.ResolveLocal(ReturnUrl, "/dashboard");
         var callbackUrl = NavigationManager.GetUriWithQueryParameters(
             NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = safeReturnUrl });
 
         await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
 
@@ -223,11 +224,11 @@
         {
             RedirectManager.RedirectTo(
                 "Account/RegisterConfirmation",
-                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+                new() { ["email"] = Input.Email, ["returnUrl"] = safeReturnUrl });
         }
 
         await SignInManager.SignInAsync(user, isPersistent: false);
-        RedirectManager.RedirectTo(ReturnUrl);
+        RedirectManager.RedirectTo(safeReturnUrl);
     }
 
     private ApplicationUser CreateUser()

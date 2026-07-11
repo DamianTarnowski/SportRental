@@ -1,0 +1,340 @@
+@page "/guest-access"
+@layout HomeLayout
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Authorization
+@using SportRental.Client.Services
+@using SportRental.Shared.Models
+@using SportRental.Shared.Services
+@inject IApiService Api
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ICustomerSessionService CustomerSession
+@inject NavigationManager Navigation
+
+<PageTitle>Odzyskaj rezerwacje gościa — RentSpot</PageTitle>
+
+<main class="guest-access-page">
+    <section class="guest-access-card" aria-labelledby="guest-access-title">
+        <a href="./" class="guest-access-logo">RentSpot<span>.</span></a>
+
+        @if (_isRedeeming)
+        {
+            <div class="guest-access-state" role="status">
+                <div class="guest-access-spinner" aria-hidden="true"></div>
+                <h1 id="guest-access-title">Sprawdzamy link</h1>
+                <p>Za chwilę otworzymy Twoje rezerwacje.</p>
+            </div>
+        }
+        else if (_redeemFailed)
+        {
+            <div class="guest-access-state" role="alert">
+                <h1 id="guest-access-title">Link jest nieprawidłowy lub wygasł</h1>
+                <p>Link jest jednorazowy i działa przez 20 minut. Poproś o nowy poniżej.</p>
+                <button type="button" class="guest-access-secondary" @onclick="ShowRequestForm">
+                    Wyślij nowy link
+                </button>
+            </div>
+        }
+        else if (_requestSent)
+        {
+            <div class="guest-access-state" role="status">
+                <div class="guest-access-success" aria-hidden="true">✓</div>
+                <h1 id="guest-access-title">Sprawdź swoją skrzynkę</h1>
+                <p>
+                    Jeżeli e-mail i numer zamówienia pasują, wysłaliśmy jednorazowy link.
+                    Ze względów bezpieczeństwa nie potwierdzamy, czy dane istnieją w systemie.
+                </p>
+                <button type="button" class="guest-access-secondary" @onclick="ShowRequestForm">
+                    Wyślij ponownie
+                </button>
+            </div>
+        }
+        else
+        {
+            <header>
+                <span class="guest-access-eyebrow">Checkout bez konta</span>
+                <h1 id="guest-access-title">Odzyskaj dostęp do rezerwacji</h1>
+                <p>
+                    Podaj adres użyty przy płatności oraz numer zamówienia z potwierdzenia,
+                    np. <strong>RS-20260710-ABC12345</strong>.
+                </p>
+            </header>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="guest-access-error" role="alert">@_error</div>
+            }
+
+            <EditForm Model="_model" OnValidSubmit="RequestAccessAsync" class="guest-access-form">
+                <DataAnnotationsValidator />
+
+                <label>
+                    <span>Adres e-mail</span>
+                    <InputText @bind-Value="_model.Email" type="email" autocomplete="email" placeholder="twoj@email.pl" />
+                    <ValidationMessage For="@(() => _model.Email)" />
+                </label>
+
+                <label>
+                    <span>Numer zamówienia</span>
+                    <InputText @bind-Value="_model.OrderNumber" autocomplete="off" placeholder="RS-20260710-ABC12345" />
+                    <ValidationMessage For="@(() => _model.OrderNumber)" />
+                </label>
+
+                <button type="submit" disabled="@_isSubmitting">
+                    @(_isSubmitting ? "Wysyłamy link…" : "Wyślij jednorazowy link")
+                </button>
+            </EditForm>
+
+            <footer>
+                <a href="login">Mam konto — zaloguj mnie</a>
+                <a href="contact">Potrzebuję pomocy</a>
+            </footer>
+        }
+    </section>
+</main>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "token")]
+    public string? Token { get; set; }
+
+    private readonly GuestAccessModel _model = new();
+    private bool _isSubmitting;
+    private bool _requestSent;
+    private bool _isRedeeming;
+    private bool _redeemFailed;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Token))
+            await RedeemAsync(Token);
+    }
+
+    private async Task RequestAccessAsync()
+    {
+        if (_isSubmitting)
+            return;
+
+        _isSubmitting = true;
+        _error = null;
+        try
+        {
+            var sent = await Api.RequestGuestOrderAccessAsync(new GuestOrderAccessRequest
+            {
+                Email = _model.Email.Trim(),
+                OrderNumber = _model.OrderNumber.Trim().ToUpperInvariant()
+            });
+            if (!sent)
+            {
+                _error = "Nie udało się wysłać prośby. Sprawdź format danych i spróbuj ponownie.";
+                return;
+            }
+
+            _requestSent = true;
+        }
+        catch (Exception ex)
+        {
+            _error = "Nie udało się wysłać prośby o dostęp. Sprawdź połączenie i spróbuj ponownie.";
+            Console.Error.WriteLine($"Guest access request failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
+    }
+
+    private async Task RedeemAsync(string token)
+    {
+        _isRedeeming = true;
+        try
+        {
+            var guest = await Api.RedeemGuestOrderAccessAsync(token);
+            if (guest is null)
+            {
+                _redeemFailed = true;
+                return;
+            }
+
+            await ((ApiAuthenticationStateProvider)AuthStateProvider)
+                .MarkUserAsAuthenticated(guest.CustomerId.ToString(), guest.Email);
+            await CustomerSession.SetCustomerAsync(new CustomerDto
+            {
+                Id = guest.CustomerId,
+                FullName = guest.FullName,
+                Email = guest.Email
+            });
+            Navigation.NavigateTo("my-rentals", replace: true);
+        }
+        catch (Exception ex)
+        {
+            _redeemFailed = true;
+            Console.Error.WriteLine($"Guest access redeem failed: {ex.GetType().Name}");
+        }
+        finally
+        {
+            _isRedeeming = false;
+        }
+    }
+
+    private void ShowRequestForm()
+    {
+        _requestSent = false;
+        _redeemFailed = false;
+        _error = null;
+        Token = null;
+        Navigation.NavigateTo("guest-access", replace: true);
+    }
+
+    private sealed class GuestAccessModel
+    {
+        [Required(ErrorMessage = "Podaj adres e-mail.")]
+        [EmailAddress(ErrorMessage = "Podaj poprawny adres e-mail.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Podaj numer zamówienia.")]
+        [RegularExpression(
+            "^RS-[0-9]{8}-[A-Fa-f0-9]{8}$",
+            ErrorMessage = "Numer ma format RS-RRRRMMDD-XXXXXXXX.")]
+        public string OrderNumber { get; set; } = string.Empty;
+    }
+}
+
+<style>
+    .guest-access-page {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 2rem 1rem;
+        background: #1b2350;
+    }
+
+    .guest-access-card {
+        width: min(100%, 520px);
+        padding: 2rem;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 24px;
+        background: #fff;
+        box-shadow: 0 24px 70px rgba(4, 9, 35, .35);
+        color: #172033;
+    }
+
+    .guest-access-logo {
+        display: inline-block;
+        margin-bottom: 2rem;
+        color: #1b2350;
+        font-size: 1.25rem;
+        font-weight: 850;
+        text-decoration: none;
+    }
+
+    .guest-access-logo span,
+    .guest-access-eyebrow { color: #d94750; }
+
+    .guest-access-card header h1,
+    .guest-access-state h1 {
+        margin: .35rem 0 .65rem;
+        font-size: clamp(1.65rem, 5vw, 2.15rem);
+        line-height: 1.12;
+    }
+
+    .guest-access-card header p,
+    .guest-access-state p {
+        margin: 0;
+        color: #64748b;
+        line-height: 1.6;
+    }
+
+    .guest-access-eyebrow {
+        font-size: .72rem;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    .guest-access-form {
+        display: grid;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .guest-access-form label > span {
+        display: block;
+        margin-bottom: .35rem;
+        color: #334155;
+        font-size: .82rem;
+        font-weight: 700;
+    }
+
+    .guest-access-form input {
+        width: 100%;
+        padding: .85rem 1rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        color: #172033;
+    }
+
+    .guest-access-form input:focus {
+        outline: 3px solid rgba(249, 97, 103, .18);
+        border-color: #f96167;
+    }
+
+    .guest-access-form .validation-message {
+        display: block;
+        margin-top: .3rem;
+        color: #b91c1c;
+        font-size: .75rem;
+    }
+
+    .guest-access-form button,
+    .guest-access-secondary {
+        padding: .9rem 1rem;
+        border: 0;
+        border-radius: 12px;
+        background: #f96167;
+        color: #fff;
+        font-weight: 750;
+        cursor: pointer;
+    }
+
+    .guest-access-form button:disabled { opacity: .6; cursor: wait; }
+
+    .guest-access-card footer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: .75rem;
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .guest-access-card footer a {
+        color: #4f46e5;
+        font-size: .8rem;
+        font-weight: 650;
+    }
+
+    .guest-access-state { text-align: center; }
+    .guest-access-secondary { margin-top: 1rem; }
+    .guest-access-success { color: #059669; font-size: 2.5rem; font-weight: 850; }
+    .guest-access-error {
+        margin-top: 1rem;
+        padding: .75rem;
+        border-radius: 10px;
+        background: #fef2f2;
+        color: #b91c1c;
+        font-size: .82rem;
+    }
+
+    .guest-access-spinner {
+        width: 42px;
+        height: 42px;
+        margin: 0 auto 1rem;
+        border: 4px solid #e2e8f0;
+        border-top-color: #f96167;
+        border-radius: 50%;
+        animation: guest-access-spin .8s linear infinite;
+    }
+
+    @@keyframes guest-access-spin { to { transform: rotate(360deg); } }
+</style>

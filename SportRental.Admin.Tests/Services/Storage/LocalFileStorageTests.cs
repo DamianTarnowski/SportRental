@@ -172,6 +172,18 @@ public class LocalFileStorageTests : IDisposable
         File.Exists(fullPath).Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("../outside.txt")]
+    [InlineData("nested/../../outside.txt")]
+    [InlineData("nested//file.txt")]
+    public async Task SaveAsync_WithInvalidPath_RejectsIt(string relativePath)
+    {
+        var content = new byte[] { 1 };
+
+        await _storage.Invoking(s => s.SaveAsync(relativePath, content))
+            .Should().ThrowAsync<ArgumentException>();
+    }
+
     [Fact]
     public async Task SaveAsync_WithLargeFile_Works()
     {

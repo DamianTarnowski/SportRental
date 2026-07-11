@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.JSInterop;
 using SportRental.Shared.Models;
+using SportRental.Shared.Time;
 
 namespace SportRental.Shared.Services;
 
@@ -14,6 +15,7 @@ public class CartService : ICartService
     private static readonly TimeSpan DefaultRefreshBeforeExpiry = TimeSpan.FromMinutes(2);
     private IReadOnlyCollection<Guid> _lastUnavailableProducts = Array.Empty<Guid>();
     private string? _holdSessionId;
+    private readonly Task _loadTask;
 
     public event EventHandler? CartChanged;
 
@@ -21,10 +23,10 @@ public class CartService : ICartService
     {
         _jsRuntime = jsRuntime;
         _apiService = apiService;
-        _ = LoadCartFromStorageAsync();
+        _loadTask = LoadCartFromStorageAsync();
     }
 
-    private async Task<string> GetHoldSessionIdAsync()
+    public async Task<string> GetHoldSessionIdAsync()
     {
         if (!string.IsNullOrWhiteSpace(_holdSessionId)) return _holdSessionId!;
         try
@@ -49,32 +51,63 @@ public class CartService : ICartService
 
     public Cart GetCart() => _cart;
     public IReadOnlyCollection<Guid> LastUnavailableProductIds => _lastUnavailableProducts;
+    public string? LastHoldError { get; private set; }
 
     public async Task AddToCartAsync(ProductDto product, int quantity = 1, DateTime? startDate = null, DateTime? endDate = null)
     {
+        await _loadTask;
+        if (quantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be greater than zero.");
         if (startDate.HasValue && endDate.HasValue && endDate <= startDate)
         {
             throw new ArgumentException("End date must be later than start date", nameof(endDate));
         }
 
-        _cart.AddItem(product, quantity, startDate, endDate);
+        var existing = _cart.Items.FirstOrDefault(i => i.ProductId == product.Id);
+        var tenantTemplate = product.TenantId == Guid.Empty
+            ? null
+            : _cart.Items.FirstOrDefault(i => i.TenantId == product.TenantId);
+        if (existing?.HoldId is Guid existingHoldId)
+        {
+            await DeleteHoldWithSessionAsync(existingHoldId);
+            existing.HoldId = null;
+            existing.HoldExpiresAtUtc = null;
+        }
+
+        // A checkout creates one rental per tenant, so all products from that tenant must
+        // share one set of rental terms. Treat the first tenant item as the canonical
+        // template even when an already-added product is being added again. This also
+        // repairs a previously inconsistent item instead of preserving its stale terms.
+        var effectiveStartDate = tenantTemplate?.StartDate ?? existing?.StartDate ?? startDate;
+        var effectiveEndDate = tenantTemplate?.EndDate ?? existing?.EndDate ?? endDate;
+        _cart.AddItem(product, quantity, effectiveStartDate, effectiveEndDate);
+
+        var addedItem = _cart.Items.First(i => i.ProductId == product.Id);
+        if (tenantTemplate is not null)
+        {
+            addedItem.StartDate = tenantTemplate.StartDate;
+            addedItem.EndDate = tenantTemplate.EndDate;
+            addedItem.RentalType = tenantTemplate.RentalType;
+            addedItem.HoursRented = tenantTemplate.HoursRented;
+        }
         await SaveCartToStorageAsync();
         CartChanged?.Invoke(this, EventArgs.Empty);
 
         // Attempt to secure holds immediately when dates are provided
         if (startDate.HasValue && endDate.HasValue)
         {
-            _ = EnsureHoldsAsync();
+            await EnsureHoldsAsync();
         }
     }
 
     public async Task RemoveFromCartAsync(Guid productId)
     {
+        await _loadTask;
         // Release hold if exists
         var item = _cart.Items.FirstOrDefault(i => i.ProductId == productId);
         if (item?.HoldId is Guid hid)
         {
-            _ = DeleteHoldWithSessionAsync(hid); // fire-and-forget
+            await DeleteHoldWithSessionAsync(hid);
         }
         _cart.RemoveItem(productId);
         await SaveCartToStorageAsync();
@@ -83,13 +116,24 @@ public class CartService : ICartService
 
     public async Task UpdateQuantityAsync(Guid productId, int quantity)
     {
+        await _loadTask;
+        var item = _cart.Items.FirstOrDefault(i => i.ProductId == productId);
+        if (item?.HoldId is Guid holdId)
+        {
+            await DeleteHoldWithSessionAsync(holdId);
+            item.HoldId = null;
+            item.HoldExpiresAtUtc = null;
+        }
         _cart.UpdateQuantity(productId, quantity);
         await SaveCartToStorageAsync();
         CartChanged?.Invoke(this, EventArgs.Empty);
+        if (quantity > 0)
+            await EnsureHoldsAsync();
     }
 
     public async Task UpdateDatesAsync(Guid productId, DateTime startDate, DateTime endDate)
     {
+        await _loadTask;
         var item = _cart.Items.FirstOrDefault(i => i.ProductId == productId);
         if (item != null)
         {
@@ -98,7 +142,7 @@ public class CartService : ICartService
             // Dates changed: previous hold becomes invalid; release it
             if (item.HoldId is Guid hid)
             {
-                _ = DeleteHoldWithSessionAsync(hid);
+                await DeleteHoldWithSessionAsync(hid);
                 item.HoldId = null;
                 item.HoldExpiresAtUtc = null;
             }
@@ -110,6 +154,7 @@ public class CartService : ICartService
 
     public async Task UpdateRentalTypeAsync(Guid productId, Models.RentalTypeDto rentalType, int? hoursRented)
     {
+        await _loadTask;
         var item = _cart.Items.FirstOrDefault(i => i.ProductId == productId);
         if (item != null)
         {
@@ -120,14 +165,52 @@ public class CartService : ICartService
         }
     }
 
+    public async Task UpdateTenantRentalTermsAsync(
+        Guid tenantId,
+        DateTime startDate,
+        DateTime endDate,
+        Models.RentalTypeDto rentalType,
+        int? hoursRented)
+    {
+        await _loadTask;
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("TenantId is required.", nameof(tenantId));
+        if (endDate <= startDate)
+            throw new ArgumentException("End date must be later than start date.", nameof(endDate));
+        if (rentalType == Models.RentalTypeDto.Hourly && hoursRented is not (>= 1 and <= 24))
+            throw new ArgumentOutOfRangeException(nameof(hoursRented), "Hourly rental must last from 1 to 24 hours.");
+
+        var tenantItems = _cart.Items.Where(item => item.TenantId == tenantId).ToList();
+        if (tenantItems.Count == 0)
+            return;
+
+        foreach (var item in tenantItems)
+        {
+            if (item.HoldId is Guid holdId)
+                await DeleteHoldWithSessionAsync(holdId);
+
+            item.HoldId = null;
+            item.HoldExpiresAtUtc = null;
+            item.StartDate = startDate;
+            item.EndDate = endDate;
+            item.RentalType = rentalType;
+            item.HoursRented = rentalType == Models.RentalTypeDto.Hourly ? hoursRented : null;
+        }
+
+        await SaveCartToStorageAsync();
+        CartChanged?.Invoke(this, EventArgs.Empty);
+        await EnsureHoldsAsync();
+    }
+
     public async Task ClearCartAsync()
     {
+        await _loadTask;
         // Release all holds
         foreach (var it in _cart.Items)
         {
             if (it.HoldId is Guid hid)
             {
-                _ = DeleteHoldWithSessionAsync(hid);
+                await DeleteHoldWithSessionAsync(hid);
             }
         }
         _cart.Clear();
@@ -137,6 +220,7 @@ public class CartService : ICartService
 
     public async Task<bool> ValidateAvailabilityAsync()
     {
+        await _loadTask;
         _lastUnavailableProducts = Array.Empty<Guid>();
 
         if (_cart.Items.Count == 0)
@@ -147,13 +231,8 @@ public class CartService : ICartService
         try
         {
             var requestedIds = _cart.Items.Select(i => i.ProductId).Distinct().ToList();
-            if (requestedIds.Count == 0)
-            {
-                return true;
-            }
-
-            var catalog = await _apiService.GetProductsAsync(1, 200);
-            var lookup = catalog.ToDictionary(p => p.Id, p => p);
+            var products = await Task.WhenAll(requestedIds.Select(_apiService.GetProductAsync));
+            var lookup = products.Where(p => p is not null).ToDictionary(p => p!.Id, p => p!);
 
             var unavailable = new HashSet<Guid>();
             foreach (var cartItem in _cart.Items)
@@ -179,9 +258,29 @@ public class CartService : ICartService
 
     public async Task<bool> EnsureHoldsAsync()
     {
+        await _loadTask;
+        LastHoldError = null;
         var success = true;
+        var nowUtc = DateTime.UtcNow;
         foreach (var it in _cart.Items)
         {
+            if (!PolishRentalTime.TryToUtc(it.StartDate, out var startUtc) ||
+                !PolishRentalTime.TryToUtc(it.EndDate, out var endUtc) ||
+                !PolishRentalTime.IsStartSafelyInFuture(startUtc, nowUtc))
+            {
+                if (it.HoldId is Guid invalidHoldId)
+                    await DeleteHoldWithSessionAsync(invalidHoldId);
+                it.HoldId = null;
+                it.HoldExpiresAtUtc = null;
+                success = false;
+                continue;
+            }
+
+            if (it.HoldId.HasValue && it.HoldExpiresAtUtc <= DateTime.UtcNow)
+            {
+                it.HoldId = null;
+                it.HoldExpiresAtUtc = null;
+            }
             if (it.HoldId == null)
             {
                 var sessionId = await GetHoldSessionIdAsync();
@@ -189,13 +288,14 @@ public class CartService : ICartService
                 {
                     ProductId = it.ProductId,
                     Quantity = it.Quantity,
-                    StartDateUtc = it.StartDate.ToUniversalTime(),
-                    EndDateUtc = it.EndDate.ToUniversalTime(),
+                    StartDateUtc = startUtc,
+                    EndDateUtc = endUtc,
                     TtlMinutes = 10,
                     SessionId = sessionId
                 });
                 if (resp == null)
                 {
+                    LastHoldError ??= _apiService.LastHoldError;
                     success = false;
                 }
                 else
@@ -212,40 +312,65 @@ public class CartService : ICartService
 
     public async Task RefreshHoldsIfNeededAsync(TimeSpan? beforeExpiry = null)
     {
+        await _loadTask;
         var threshold = beforeExpiry ?? DefaultRefreshBeforeExpiry;
         var nowUtc = DateTime.UtcNow;
+        var success = true;
         foreach (var it in _cart.Items)
         {
             if (it.HoldId == null || it.HoldExpiresAtUtc == null) continue;
             if (it.HoldExpiresAtUtc.Value - nowUtc <= threshold)
             {
                 var sessionId = await GetHoldSessionIdAsync();
-                // Recreate hold (no extend endpoint yet)
-                var newHold = await _apiService.CreateHoldAsync(new CreateHoldRequest
+                var refreshed = await _apiService.RefreshHoldAsync(it.HoldId.Value, sessionId, 10);
+                if (refreshed != null)
                 {
-                    ProductId = it.ProductId,
-                    Quantity = it.Quantity,
-                    StartDateUtc = it.StartDate.ToUniversalTime(),
-                    EndDateUtc = it.EndDate.ToUniversalTime(),
-                    TtlMinutes = 10,
-                    SessionId = sessionId
-                });
-                if (newHold != null)
+                    it.HoldId = refreshed.Id;
+                    it.HoldExpiresAtUtc = refreshed.ExpiresAtUtc;
+                }
+                else
                 {
-                    // release old hold
-                    var old = it.HoldId.Value;
-                    _ = DeleteHoldWithSessionAsync(old);
-                    it.HoldId = newHold.Id;
-                    it.HoldExpiresAtUtc = newHold.ExpiresAtUtc;
+                    it.HoldId = null;
+                    it.HoldExpiresAtUtc = null;
+                    success = false;
                 }
             }
         }
+        await SaveCartToStorageAsync();
+        CartChanged?.Invoke(this, EventArgs.Empty);
+        if (!success)
+            await EnsureHoldsAsync();
+    }
+
+    public async Task UpdateHoldExpirationsAsync(
+        IReadOnlyCollection<Guid> holdIds,
+        DateTime expiresAtUtc)
+    {
+        await _loadTask;
+        if (holdIds.Count == 0)
+            return;
+
+        var ids = holdIds.ToHashSet();
+        var changed = false;
+        foreach (var item in _cart.Items)
+        {
+            if (item.HoldId is not Guid holdId || !ids.Contains(holdId))
+                continue;
+
+            item.HoldExpiresAtUtc = expiresAtUtc;
+            changed = true;
+        }
+
+        if (!changed)
+            return;
+
         await SaveCartToStorageAsync();
         CartChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public async Task ReleaseHoldAsync(Guid productId)
     {
+        await _loadTask;
         var it = _cart.Items.FirstOrDefault(i => i.ProductId == productId);
         if (it?.HoldId is Guid hid)
         {
@@ -265,11 +390,12 @@ public class CartService : ICartService
 
     public async Task ReleaseAllHoldsAsync()
     {
+        await _loadTask;
         foreach (var it in _cart.Items)
         {
             if (it.HoldId is Guid hid)
             {
-                _ = DeleteHoldWithSessionAsync(hid);
+                await DeleteHoldWithSessionAsync(hid);
                 it.HoldId = null;
                 it.HoldExpiresAtUtc = null;
             }
@@ -302,6 +428,7 @@ public class CartService : ICartService
                 if (cart != null)
                 {
                     _cart = cart;
+                    await HydrateTenantMetadataAsync();
                     CartChanged?.Invoke(this, EventArgs.Empty);
                 }
             }
@@ -311,5 +438,44 @@ public class CartService : ICartService
             // Handle JS interop errors silently
             _cart = new Cart();
         }
+    }
+
+    private async Task HydrateTenantMetadataAsync()
+    {
+        var itemsToHydrate = _cart.Items
+            .Where(item => item.TenantId == Guid.Empty ||
+                           string.IsNullOrWhiteSpace(item.TenantName) ||
+                           string.IsNullOrWhiteSpace(item.PickupCity))
+            .ToList();
+        if (itemsToHydrate.Count == 0)
+            return;
+
+        var changed = false;
+        foreach (var item in itemsToHydrate)
+        {
+            ProductDto? product;
+            try
+            {
+                product = await _apiService.GetProductAsync(item.ProductId);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (product is null || product.TenantId == Guid.Empty)
+                continue;
+
+            item.TenantId = product.TenantId;
+            item.TenantName = string.IsNullOrWhiteSpace(product.TenantName)
+                ? "Wypożyczalnia"
+                : product.TenantName;
+            item.PickupAddress = product.PickupAddress;
+            item.PickupCity = product.City;
+            changed = true;
+        }
+
+        if (changed)
+            await SaveCartToStorageAsync();
     }
 }

@@ -1,6 +1,7 @@
 @page "/Account/Login"
 
 @using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 @using SportRental.Admin.Data
@@ -40,12 +41,28 @@
                     <span class="auth-logged-in-user">@currentUserName</span>
                 </p>
                 <div class="auth-button-group">
-                    <a href="dashboard" class="auth-submit" style="text-decoration: none; display: inline-block; text-align: center;">
-                        Przejdź do panelu
-                    </a>
-                    <form action="Account/Logout" method="post" style="margin: 0;">
+                    @if (canOpenClientPreview)
+                    {
+                        <a href="/api/auth/client-preview?returnUrl=%2F_client%2F"
+                           class="auth-submit"
+                           style="text-decoration: none; display: inline-block; text-align: center;">
+                            Przejdź do aplikacji klienta
+                        </a>
+                        <a href="dashboard" class="auth-button-secondary" style="text-align: center; justify-content: center;">
+                            Wróć do panelu partnera
+                        </a>
+                    }
+                    else
+                    {
+                        <a href="@(isClientUser ? "/_client/" : "dashboard")"
+                           class="auth-submit"
+                           style="text-decoration: none; display: inline-block; text-align: center;">
+                            @(isClientUser ? "Przejdź do aplikacji klienta" : "Przejdź do panelu")
+                        </a>
+                    }
+                    <form action="/Account/Logout" method="post" style="margin: 0;">
                         <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@NavigationManager.Uri" />
+                        <input type="hidden" name="ReturnUrl" value="/Account/Login" />
                         <button type="submit" class="auth-button-secondary">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -144,6 +161,8 @@
     private string? errorMessage;
     private bool isAuthenticated;
     private string? currentUserName;
+    private bool canOpenClientPreview;
+    private bool isClientUser;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -167,11 +186,7 @@
         }
 
         var authState = await AuthenticationStateTask;
-        isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
-        if (isAuthenticated)
-        {
-            currentUserName = authState.User.Identity?.Name;
-        }
+        ApplyAuthenticationState(authState.User);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -180,14 +195,22 @@
         {
             var authState = await AuthenticationStateTask;
             var wasAuthenticated = isAuthenticated;
-            isAuthenticated = authState.User.Identity?.IsAuthenticated == true;
+            ApplyAuthenticationState(authState.User);
 
             if (isAuthenticated && !wasAuthenticated)
             {
-                currentUserName = authState.User.Identity?.Name;
                 StateHasChanged();
             }
         }
+    }
+
+    private void ApplyAuthenticationState(ClaimsPrincipal user)
+    {
+        isAuthenticated = user.Identity?.IsAuthenticated == true;
+        currentUserName = isAuthenticated ? user.Identity?.Name : null;
+        canOpenClientPreview = isAuthenticated &&
+            (user.IsInRole("Owner") || user.IsInRole("SuperAdmin"));
+        isClientUser = isAuthenticated && user.IsInRole("Client");
     }
 
     public async Task LoginUser()
@@ -196,14 +219,15 @@
         if (result.Succeeded)
         {
             Logger.LogInformation("User logged in.");
-            var target = string.IsNullOrWhiteSpace(ReturnUrl) ? "dashboard" : ReturnUrl;
+            var target = SafeReturnUrl.ResolveLocal(ReturnUrl, "/dashboard");
             NavigationManager.NavigateTo(target);
             return;
         }
         else if (result.RequiresTwoFactor)
         {
+            var target = SafeReturnUrl.ResolveLocal(ReturnUrl, "/dashboard");
             var uri = NavigationManager.GetUriWithQueryParameters("Account/LoginWith2fa",
-                new Dictionary<string, object?> { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe });
+                new Dictionary<string, object?> { ["returnUrl"] = target, ["rememberMe"] = Input.RememberMe });
             NavigationManager.NavigateTo(uri);
             return;
         }

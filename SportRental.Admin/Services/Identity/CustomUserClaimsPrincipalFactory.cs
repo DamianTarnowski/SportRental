@@ -36,7 +36,7 @@ public class CustomUserClaimsPrincipalFactory : UserClaimsPrincipalFactory<Appli
         }
 
         var customerId = await ResolveCustomerIdAsync(user);
-        if (customerId.HasValue)
+        if (customerId.HasValue && !identity.HasClaim(c => c.Type == AuthClaims.CustomerId))
         {
             identity.AddClaim(new Claim(AuthClaims.CustomerId, customerId.Value.ToString()));
         }
@@ -46,7 +46,14 @@ public class CustomUserClaimsPrincipalFactory : UserClaimsPrincipalFactory<Appli
 
     private async Task<Guid?> ResolveCustomerIdAsync(ApplicationUser user)
     {
-        if (string.IsNullOrWhiteSpace(user.Email)) return null;
+        if (string.IsNullOrWhiteSpace(user.Email) ||
+            !user.TenantId.HasValue ||
+            user.TenantId.Value == Guid.Empty)
+        {
+            // Globalne konto musi mieć jawnie zapisany claim customer-id. Dopasowanie
+            // po samym e-mailu mogłoby podpiąć konto do profilu anonimowego gościa.
+            return null;
+        }
 
         await using var db = await _dbFactory.CreateDbContextAsync();
         var email = user.Email.Trim().ToLower();
@@ -54,10 +61,7 @@ public class CustomUserClaimsPrincipalFactory : UserClaimsPrincipalFactory<Appli
         var query = db.Customers.IgnoreQueryFilters()
             .Where(c => c.Email != null && c.Email.ToLower() == email);
 
-        if (user.TenantId.HasValue && user.TenantId.Value != Guid.Empty)
-        {
-            query = query.Where(c => c.TenantId == user.TenantId.Value);
-        }
+        query = query.Where(c => c.TenantId == user.TenantId.Value);
 
         var customer = await query
             .OrderBy(c => c.CreatedAtUtc)

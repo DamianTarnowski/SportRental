@@ -77,6 +77,28 @@ public class SmsApiSenderTests
         output.Should().Contain("[SMS-DISABLED]");
     }
 
+    [Fact]
+    public async Task SendAsync_WithConfirmationLink_ShouldPreserveUrl()
+    {
+        // Arrange
+        var settings = CreateSettings(isEnabled: false);
+        var sender = new SmsApiSender(settings, _loggerMock.Object);
+        var confirmUrl = "https://app.example.com/confirm/abc123";
+        var message = $"Kliknij w link, aby potwierdzic wynajem 1954EB65: {confirmUrl}";
+
+        using var sw = new StringWriter();
+        Console.SetOut(sw);
+
+        // Act
+        await sender.SendAsync("123456789", message);
+
+        // Assert
+        var output = sw.ToString();
+        output.Should().Contain("Kliknij w link");
+        output.Should().Contain(confirmUrl);
+        output.Should().Contain("1954EB65");
+    }
+
     [Theory]
     [InlineData("+48123456789", "123456789")]
     [InlineData("48123456789", "123456789")]

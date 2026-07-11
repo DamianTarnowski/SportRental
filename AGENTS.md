@@ -17,7 +17,7 @@ tenants (rental shops); each tenant is isolated via EF Core global query filters
   ASP.NET Core packages are on 10.x while EF stays on 9.x — this mix is intentional. No central package
   management (versions are per-csproj), no `Directory.Build.props`, no `global.json`.
 - **Integrations:** Stripe.net `49.0.0` (Checkout Sessions + PaymentIntents), QuestPDF `2025.7.2`
-  (contracts/invoices), SMSAPI.pl `2.2.0` (SMS), MailKit (SMTP email), Azure.Identity + Azure Blob +
+  (contracts/invoices), SMSAPI.pl `2.2.1` (SMS), MailKit (SMTP email), Azure.Identity + Azure Blob +
   Key Vault config provider, BarcodeLib/QRCoder + SkiaSharp (Code 128 barcodes).
 - **Tests:** xUnit + bUnit + Moq + FluentAssertions + Testcontainers.PostgreSql; E2E is NUnit + Playwright.
 - **SQLite** is used **only** by the standalone `SportRental.MediaStorage` microservice — the main app is PostgreSQL.

@@ -8,12 +8,14 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject IDialogService DialogService
 @inject SportRental.Admin.Services.Sms.ISmsSender SmsSender
-@inject SportRental.Admin.Services.Sms.ISmsConfirmationService SmsConfirmationService
 @inject SportRental.Admin.Services.IRentalConfirmationService RentalConfirmationService
 @inject SportRental.Admin.Services.IInvoiceService InvoiceService
 @inject ILogger<Rentals> Logger
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Wynajmy — RentSpot</PageTitle>
+
 @if (_isMobile)
 {
     @* ==================== MOBILE UI ==================== *@
@@ -21,10 +23,11 @@
         @* Nagłówek mobilny *@
         <MudPaper Class="rs-page-banner-sm pa-3 mb-2" Elevation="0">
             <div class="d-flex align-center justify-space-between">
-                <MudText Typo="Typo.h6" Style="font-weight: 700;">Wynajmy</MudText>
+                <MudText Typo="Typo.h6" HtmlTag="h1" Style="font-weight: 700;">Wynajmy</MudText>
                 <MudIconButton Icon="@Icons.Material.Filled.Add" 
                                Color="Color.Inherit" 
-                               OnClick="CreateNew" />
+                               OnClick="CreateNew"
+                               aria-label="Dodaj wynajem" />
             </div>
         </MudPaper>
 
@@ -85,7 +88,8 @@
                     <MudCard Elevation="2" Style="@($"border-radius: 10px; border-left: 3px solid {GetStatusColorHex(rental.Status)};")">
                         <MudCardContent Class="pa-2">
                             <div class="d-flex align-center gap-2">
-                                <MudAvatar Color="@GetStatusColor(rental.Status)" Size="Size.Medium">
+                                <MudAvatar Color="@GetStatusColor(rental.Status)" Size="Size.Medium"
+                                           aria-label="@($"Status: {GetStatusText(rental.Status)}")">
                                     <MudIcon Icon="@GetStatusIcon(rental.Status)" Size="Size.Small" />
                                 </MudAvatar>
                                 <div class="flex-1 overflow-hidden">
@@ -109,7 +113,8 @@
                                         </MudText>
                                     </div>
                                 </div>
-                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true">
+                                <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true"
+                                         AriaLabel="@($"Akcje wynajmu: {customersDict.GetValueOrDefault(rental.CustomerId)?.FullName ?? "klient"}")">
                                     <MudMenuItem Icon="@Icons.Material.Filled.Edit" OnClick="() => Edit(rental)">Edytuj</MudMenuItem>
                                     @if (!IsPaid(rental) && rental.Status != RentalStatus.Cancelled && rental.Status != RentalStatus.Completed)
                                     {
@@ -122,6 +127,15 @@
                                     <MudMenuItem Icon="@Icons.Material.Filled.ReceiptLong" OnClick="() => IssueInvoice(rental)">Wystaw fakturę VAT</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Email" OnClick="() => SendContractByEmail(rental)">Email</MudMenuItem>
                                     <MudMenuItem Icon="@Icons.Material.Filled.Sms" OnClick="() => OpenCustomSmsDialog(rental)">SMS</MudMenuItem>
+                                    @if (CanSendReturnReminder(rental))
+                                    {
+                                        <MudMenuItem Icon="@Icons.Material.Filled.NotificationsActive"
+                                                     OnClick="() => SendReminderSms(rental)">
+                                            @(rental.ReminderSmsSentAtUtc.HasValue
+                                                ? $"Wyślij przypomnienie ponownie ({SportRental.Admin.Services.Time.PolishTimeZone.FromUtc(rental.ReminderSmsSentAtUtc.Value):dd.MM HH:mm})"
+                                                : "Przypomnienie o zwrocie")
+                                        </MudMenuItem>
+                                    }
                                     @if (rental.Status == RentalStatus.Active || rental.Status == RentalStatus.Confirmed)
                                     {
                                         <MudMenuItem Icon="@Icons.Material.Filled.CheckCircle" OnClick="() => CompleteRental(rental)">Zakończ</MudMenuItem>
@@ -136,6 +150,13 @@
                                 </MudText>
                             }
                             <div class="d-flex align-center gap-1 flex-wrap mt-1">
+                                @if (rental.MarketplaceOrder is not null)
+                                {
+                                    <MudChip T="string" Icon="@Icons.Material.Filled.Storefront"
+                                             Color="Color.Secondary" Size="Size.Small" Variant="Variant.Outlined">
+                                        @rental.MarketplaceOrder.OrderNumber · część @(rental.OrderSequence ?? 1)
+                                    </MudChip>
+                                }
                                 @if (rental.IsSmsConfirmationSent)
                                 {
                                     <MudChip T="string" Icon="@Icons.Material.Filled.Sms" 
@@ -153,11 +174,11 @@
                                         </MudButton>
                                     }
                                 }
-                                @if (rental.IsReminderSmsSent)
+                                @if (rental.ReminderSmsSentAtUtc.HasValue)
                                 {
                                     <MudChip T="string" Icon="@Icons.Material.Filled.NotificationsActive" 
                                              Color="Color.Info" Size="Size.Small">
-                                        Przyp. ✓
+                                        Przyp. @SportRental.Admin.Services.Time.PolishTimeZone.FromUtc(rental.ReminderSmsSentAtUtc.Value).ToString("dd.MM HH:mm")
                                     </MudChip>
                                 }
                                 @if (IsOverdue(rental))
@@ -183,7 +204,7 @@ else
                 <MudStack Row="true" Class="mud-align-center" Spacing="3">
                     <MudIcon Icon="@Icons.Material.Filled.Assignment" Size="Size.Large" />
                     <div>
-                        <MudText Typo="Typo.h4" Style="font-weight: 700;">Wynajmy</MudText>
+                        <MudText Typo="Typo.h4" HtmlTag="h1" Style="font-weight: 700;">Wynajmy</MudText>
                         <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Zarządzaj wypożyczeniami sprzętu sportowego</MudText>
                     </div>
                 </MudStack>
@@ -235,7 +256,6 @@ else
                             Immediate="true" 
                             Adornment="Adornment.Start" 
                             AdornmentIcon="@Icons.Material.Filled.Search" 
-                            Clearable="true"
                             Variant="Variant.Outlined"
                             Class="rounded-lg" />
                     </MudItem>
@@ -260,6 +280,7 @@ else
                             <MudIconButton Icon="@Icons.Material.Filled.Refresh" 
                                            Color="Color.Primary" 
                                            OnClick="RefreshRentals"
+                                           aria-label="Odśwież listę wynajmów"
                                            Size="Size.Large" />
                         </MudTooltip>
                     </MudItem>
@@ -282,11 +303,12 @@ else
                                 <MudItem xs="12" md="8">
                                     <MudStack Spacing="2">
                                         <div Class="d-flex align-center mb-2">
-                                            <MudAvatar Color="@GetStatusColor(rental.Status)" Size="Size.Large" Class="mr-3">
+                                            <MudAvatar Color="@GetStatusColor(rental.Status)" Size="Size.Large" Class="mr-3"
+                                                       aria-label="@($"Status: {GetStatusText(rental.Status)}")">
                                                 <MudIcon Icon="@GetStatusIcon(rental.Status)" />
                                             </MudAvatar>
                                             <div>
-                                                <MudText Typo="Typo.h6" Style="font-weight: 600;">
+                                                <MudText Typo="Typo.h6" HtmlTag="h2" Style="font-weight: 600;">
                                                     @GetRentalTitle(rental)
                                                 </MudText>
                                                 <MudText Typo="Typo.body2" Color="Color.Default">
@@ -347,7 +369,8 @@ else
                                                         <MudChip T="string" Icon="@Icons.Material.Filled.SportsSoccer"
                                                                  Size="Size.Small"
                                                                  Variant="Variant.Text"
-                                                                 Color="Color.Primary">
+                                                                 Color="Color.Primary"
+                                                                 Class="rs-product-chip">
                                                             @label
                                                         </MudChip>
                                                     }
@@ -361,11 +384,20 @@ else
                                         </div>
 
                                         <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+                                            @if (rental.MarketplaceOrder is not null)
+                                            {
+                                                <MudChip T="string" Icon="@Icons.Material.Filled.Storefront"
+                                                         Color="Color.Secondary"
+                                                         Variant="Variant.Outlined"
+                                                         Size="Size.Small">
+                                                    Marketplace: @rental.MarketplaceOrder.OrderNumber · część @(rental.OrderSequence ?? 1)
+                                                </MudChip>
+                                            }
                                             <MudChip T="string" Icon="@Icons.Material.Filled.AttachMoney"
-                                                     Color="@(SportRental.Admin.Services.Guards.RentalGuards.IsRentalPaid(rental) ? Color.Success : Color.Error)"
+                                                     Color="@PaymentColor(rental)"
                                                      Variant="Variant.Filled"
                                                      Size="Size.Small">
-                                                @rental.TotalAmount.Pln() @(SportRental.Admin.Services.Guards.RentalGuards.IsRentalPaid(rental) ? "(opłacono)" : "(do zapłaty)")
+                                                @PaymentSummary(rental)
                                             </MudChip>
                                             @if (rental.Status == RentalStatus.Active && !rental.ReturnedAtUtc.HasValue)
                                             {
@@ -379,13 +411,15 @@ else
                                             <MudChip T="string" Icon="@GetStatusIcon(rental.Status)"
                                                      Color="@GetStatusColor(rental.Status)"
                                                      Variant="Variant.Text"
-                                                     Size="Size.Small">
+                                                     Size="Size.Small"
+                                                     Class="rs-status-chip">
                                                 @GetRentalStatusText(rental)
                                             </MudChip>
                                             <MudChip T="string" Icon="@Icons.Material.Filled.Email" 
                                                      Color="@(rental.IsEmailSent ? Color.Success : Color.Default)" 
                                                      Variant="Variant.Text"
-                                                     Size="Size.Small">
+                                                     Size="Size.Small"
+                                                     Class="rs-status-chip">
                                                 Email: @(rental.IsEmailSent ? "✓" : "—")
                                             </MudChip>
                                             @if (rental.IsSmsConfirmationSent)
@@ -520,6 +554,7 @@ else
                                                                    Variant="Variant.Outlined"
                                                                    Href="@($"/api/contracts/{rental.Id}")"
                                                                    Target="_blank"
+                                                                   aria-label="Otwórz umowę PDF"
                                                                    Size="Size.Medium" />
                                                 </MudTooltip>
                                             }
@@ -528,6 +563,7 @@ else
                                                                Color="Color.Default"
                                                                Variant="Variant.Outlined"
                                                                OnClick="() => GenerateContract(rental)"
+                                                               aria-label="Wygeneruj umowę"
                                                                Size="Size.Medium" />
                                             </MudTooltip>
                                             <MudTooltip Text="Wyślij email z umową">
@@ -535,6 +571,7 @@ else
                                                                Color="Color.Default"
                                                                Variant="Variant.Outlined"
                                                                OnClick="() => SendContractByEmail(rental)"
+                                                               aria-label="Wyślij email z umową"
                                                                Size="Size.Medium" />
                                             </MudTooltip>
                                             <MudTooltip Text="Wyślij SMS">
@@ -542,6 +579,7 @@ else
                                                                Color="Color.Info"
                                                                Variant="Variant.Outlined"
                                                                OnClick="() => OpenCustomSmsDialog(rental)"
+                                                               aria-label="Wyślij SMS"
                                                                Size="Size.Medium" />
                                             </MudTooltip>
                                             @* NXRE 6: przypomnienie o zwrocie TYLKO gdy sprzęt wydany i jeszcze nie zwrócony.
@@ -550,9 +588,10 @@ else
                                             {
                                                 <MudTooltip Text="@ReturnReminderTooltip(rental)">
                                                     <MudIconButton Icon="@Icons.Material.Filled.NotificationsActive"
-                                                                   Color="@(rental.IsReminderSmsSent ? Color.Success : Color.Warning)"
-                                                                   Variant="@(rental.IsReminderSmsSent ? Variant.Filled : Variant.Outlined)"
+                                                                   Color="@(rental.ReminderSmsSentAtUtc.HasValue ? Color.Success : Color.Warning)"
+                                                                   Variant="@(rental.ReminderSmsSentAtUtc.HasValue ? Variant.Filled : Variant.Outlined)"
                                                                    OnClick="() => SendReminderSms(rental)"
+                                                                   aria-label="@ReturnReminderTooltip(rental)"
                                                                    Size="Size.Medium" />
                                                 </MudTooltip>
                                             }
@@ -1150,6 +1189,14 @@ else
         font-size: 0.85rem !important;
         opacity: 0.85;
     }
+
+    .rs-product-chip {
+        color: #8F1F27 !important;
+        background: #FFF2F3 !important;
+    }
+    .rs-status-chip.mud-chip-color-success {
+        color: #126B43 !important;
+    }
 </style>
 
 @code {
@@ -1222,7 +1269,7 @@ else
             productsDict = products.ToDictionary(p => p.Id, p => p);
             customers = await Db.Customers.AsNoTracking().OrderBy(c => c.FullName).ToListAsync();
             customersDict = customers.ToDictionary(c => c.Id, c => c);
-            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            rentals = await Db.Rentals.Include(r => r.Items).Include(r => r.MarketplaceOrder).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             _smsConfirmationEnabled = companyInfo?.SmsConfirmationEnabled == true;
             await UpdateReservedMap();
@@ -1313,8 +1360,16 @@ else
         _ = UpdateReservedMap();
     }
 
-    private void Edit(Rental r)
+    private bool Edit(Rental r)
     {
+        if (r.MarketplaceOrderId.HasValue)
+        {
+            Snackbar.Add(
+                "Rezerwacja online jest częścią opłaconego zamówienia marketplace. Zmieniaj jej status przez akcje realizacji; korekta klienta, pozycji lub kwot wymaga osobnego procesu.",
+                MudBlazor.Severity.Info);
+            return false;
+        }
+
         using var Db = DbFactory.CreateDbContext();
         Db.SetTenant(CurrentTenantId());
         editModel = new Rental
@@ -1340,6 +1395,7 @@ else
         editItems = Db.RentalItems.Where(i => i.RentalId == r.Id).ToList();
         dialogOpen = true;
         _ = UpdateReservedMap();
+        return true;
     }
 
     private void AddItem()
@@ -1671,6 +1727,7 @@ else
                 }
             }
 
+            Rental rentalToSave;
             if (editModel.Id == Guid.Empty)
             {
                 editModel.Id = Guid.NewGuid();
@@ -1678,11 +1735,37 @@ else
                 editModel.TenantId = CurrentTenantId();
                 editModel.Status = RentalStatus.Confirmed;
                 await Db.Rentals.AddAsync(editModel);
+                rentalToSave = editModel;
             }
             else
             {
-                Db.Rentals.Update(editModel);
-                var existing = Db.RentalItems.Where(i => i.RentalId == editModel.Id);
+                var trackedRental = await Db.Rentals
+                    .SingleOrDefaultAsync(rental => rental.Id == editModel.Id);
+                if (trackedRental is null)
+                {
+                    Snackbar.Add("Nie znaleziono wynajmu albo nie masz już do niego dostępu.", MudBlazor.Severity.Error);
+                    return;
+                }
+                if (trackedRental.MarketplaceOrderId.HasValue)
+                {
+                    Snackbar.Add(
+                        "Nie można edytować danych finansowych opłaconej rezerwacji marketplace w zwykłym formularzu.",
+                        MudBlazor.Severity.Error);
+                    return;
+                }
+
+                // Aktualizujemy wyłącznie pola dostępne w formularzu. Pozostałe dane,
+                // zwłaszcza powiązanie marketplace, płatność i snapshot regulaminu,
+                // muszą pozostać nienaruszone.
+                trackedRental.CustomerId = editModel.CustomerId;
+                trackedRental.StartDateUtc = editModel.StartDateUtc;
+                trackedRental.EndDateUtc = editModel.EndDateUtc;
+                trackedRental.TotalAmount = editModel.TotalAmount;
+                trackedRental.RentalType = editModel.RentalType;
+                trackedRental.HoursRented = editModel.HoursRented;
+                rentalToSave = trackedRental;
+
+                var existing = Db.RentalItems.Where(i => i.RentalId == rentalToSave.Id);
                 Db.RentalItems.RemoveRange(existing);
             }
 
@@ -1691,7 +1774,7 @@ else
                 var newItem = new RentalItem
                 {
                     Id = Guid.NewGuid(),
-                    RentalId = editModel.Id,
+                    RentalId = rentalToSave.Id,
                     ProductId = item.ProductId,
                     Quantity = item.Quantity,
                     PricePerDay = item.PricePerDay,
@@ -1702,10 +1785,12 @@ else
 
             await Db.SaveChangesAsync();
             
-            var customer = await Db.Customers.FindAsync(editModel.CustomerId);
+            var customer = await Db.Customers.FindAsync(rentalToSave.CustomerId);
             var productIds = editItems.Select(i => i.ProductId).ToList();
             var productsForContract = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
             var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+            var contractTemplate = await Db.ContractTemplates.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.TenantId == CurrentTenantId());
             
             // Collect all post-save updates, then save ONCE to avoid concurrency exceptions
             bool needsPostSaveUpdate = false;
@@ -1713,14 +1798,15 @@ else
             try
             {
                 var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(
-                    editModel, editItems.ToList(), customer!, productsForContract, companyInfo);
-                editModel.ContractUrl = contractUrl;
+                    rentalToSave, editItems.ToList(), customer!, productsForContract, companyInfo,
+                    contractTemplate?.Content);
+                rentalToSave.ContractUrl = contractUrl;
                 needsPostSaveUpdate = true;
                 Snackbar.Add("Umowa została wygenerowana", MudBlazor.Severity.Success);
             }
             catch (Exception contractEx)
             {
-                Logger.LogError(contractEx, "Failed to generate contract for rental {RentalId}", editModel.Id);
+                Logger.LogError(contractEx, "Failed to generate contract for rental {RentalId}", rentalToSave.Id);
                 Snackbar.Add($"Wynajem zapisany, ale błąd generowania umowy: {contractEx.Message}", MudBlazor.Severity.Warning);
             }
             
@@ -1729,14 +1815,15 @@ else
                 try
                 {
                     await ContractGenerator.SendRentalConfirmationEmailAsync(
-                        editModel, editItems.ToList(), customer, productsForContract, companyInfo);
-                    editModel.IsEmailSent = true;
+                        rentalToSave, editItems.ToList(), customer, productsForContract, companyInfo,
+                        contractTemplate?.Content);
+                    rentalToSave.IsEmailSent = true;
                     needsPostSaveUpdate = true;
                     Snackbar.Add($"Email wysłany do {customer.Email}", MudBlazor.Severity.Success);
                 }
                 catch (Exception emailEx)
                 {
-                    Logger.LogError(emailEx, "Failed to send email for rental {RentalId}", editModel.Id);
+                    Logger.LogError(emailEx, "Failed to send email for rental {RentalId}", rentalToSave.Id);
                     Snackbar.Add($"Błąd wysyłania emaila: {emailEx.Message}", MudBlazor.Severity.Warning);
                 }
             }
@@ -1746,18 +1833,32 @@ else
             {
                 try
                 {
-                    var token = await RentalConfirmationService.CreateConfirmationAsync(editModel.Id);
-                    await RentalConfirmationService.SendConfirmationLinkAsync(editModel.Id, token);
-                    
-                    editModel.IsSmsConfirmationSent = true;
-                    editModel.Status = RentalStatus.Pending;
-                    needsPostSaveUpdate = true;
-                    
-                    Snackbar.Add($"Link potwierdzenia wysłany do klienta", MudBlazor.Severity.Info);
+                    var token = await RentalConfirmationService.CreateConfirmationAsync(rentalToSave.Id);
+                    var delivery = await RentalConfirmationService.SendConfirmationLinkAsync(rentalToSave.Id, token);
+
+                    if (!delivery.AnySent)
+                    {
+                        Snackbar.Add("Nie udało się wysłać linku potwierdzającego żadnym kanałem.", MudBlazor.Severity.Error);
+                    }
+                    else
+                    {
+                        rentalToSave.IsSmsConfirmationSent |= delivery.SmsSent;
+                        if (rentalToSave.Status == RentalStatus.Draft)
+                            rentalToSave.Status = RentalStatus.Pending;
+                        needsPostSaveUpdate = true;
+
+                        var channels = new List<string>();
+                        if (delivery.SmsSent) channels.Add("SMS");
+                        if (delivery.EmailSent) channels.Add("e-mail");
+                        var severity = delivery.AllAttemptedSent
+                            ? MudBlazor.Severity.Info
+                            : MudBlazor.Severity.Warning;
+                        Snackbar.Add($"Link potwierdzenia wysłany: {string.Join(" i ", channels)}.", severity);
+                    }
                 }
                 catch (Exception smsEx)
                 {
-                    Logger.LogError(smsEx, "Failed to send confirmation link for rental {RentalId}", editModel.Id);
+                    Logger.LogError(smsEx, "Failed to send confirmation link for rental {RentalId}", rentalToSave.Id);
                     Snackbar.Add($"Błąd wysyłania linku: {smsEx.Message}", MudBlazor.Severity.Warning);
                 }
             }
@@ -1767,16 +1868,17 @@ else
             {
                 try
                 {
-                    Db.Rentals.Update(editModel);
                     await Db.SaveChangesAsync();
                 }
                 catch (Exception postSaveEx)
                 {
-                    Logger.LogError(postSaveEx, "Failed to save post-processing updates for rental {RentalId}", editModel.Id);
+                    Logger.LogError(postSaveEx, "Failed to save post-processing updates for rental {RentalId}", rentalToSave.Id);
                 }
             }
+
+            editModel = rentalToSave;
             
-            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            rentals = await Db.Rentals.Include(r => r.Items).Include(r => r.MarketplaceOrder).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             dialogOpen = false;
             Snackbar.Add("Wynajem został zapisany!", MudBlazor.Severity.Success);
             StateHasChanged();
@@ -1829,7 +1931,7 @@ else
         {
             await using var Db = await DbFactory.CreateDbContextAsync(ct);
             Db.SetTenant(CurrentTenantId());
-            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync(ct);
+            rentals = await Db.Rentals.Include(r => r.Items).Include(r => r.MarketplaceOrder).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync(ct);
             var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId(), ct);
             _smsConfirmationEnabled = companyInfo?.SmsConfirmationEnabled == true;
 
@@ -2053,6 +2155,28 @@ else
     private static bool IsPaid(Rental rental) =>
         SportRental.Admin.Services.Guards.RentalGuards.IsRentalPaid(rental);
 
+    private static string PaymentSummary(Rental rental)
+    {
+        var paid = SportRental.Admin.Services.Guards.RentalGuards.GetPaidAmount(rental);
+        var outstanding = SportRental.Admin.Services.Guards.RentalGuards.GetOutstandingAmount(rental);
+        if (outstanding <= 0m)
+            return $"{rental.TotalAmount.Pln()} (opłacono)";
+        return paid > 0m
+            ? $"Wpłacono {paid.Pln()} · pozostało {outstanding.Pln()}"
+            : SportRental.Admin.Services.Guards.RentalGuards.IsDepositCollected(rental) && rental.DepositAmount > 0m
+                ? $"{rental.TotalAmount.Pln()} do zapłaty · depozyt {rental.DepositAmount.Pln()} pobrany"
+                : $"{rental.TotalAmount.Pln()} (do zapłaty)";
+    }
+
+    private static Color PaymentColor(Rental rental) =>
+        SportRental.Admin.Services.Guards.RentalGuards.IsRentalPaid(rental)
+            ? Color.Success
+            : SportRental.Admin.Services.Guards.RentalGuards.HasAnyPayment(rental)
+                ? Color.Warning
+                : SportRental.Admin.Services.Guards.RentalGuards.IsDepositCollected(rental)
+                    ? Color.Info
+                    : Color.Error;
+
     // NXRE 6 — reminder o zwrocie tylko po faktycznym wydaniu (IssuedAtUtc + nie zwrócony + aktywny).
     // Feedback #5: usunięto warunek !IsReminderSmsSent — ikona ma być ZAWSZE widoczna (zmienia stan
     // wizualny po wysłaniu), żeby właściciel mógł w razie potrzeby wysłać przypomnienie ponownie.
@@ -2063,8 +2187,8 @@ else
 
     // Feedback #5: tooltip informuje, czy i kiedy przypomnienie zostało wysłane.
     private static string ReturnReminderTooltip(Rental rental) =>
-        rental.IsReminderSmsSent && rental.ReminderSmsSentAtUtc.HasValue
-            ? $"Przypomnienie wysłane: {rental.ReminderSmsSentAtUtc.Value.ToLocalTime():dd.MM HH:mm} — kliknij, aby wysłać ponownie"
+        rental.ReminderSmsSentAtUtc.HasValue
+            ? $"Przypomnienie wysłane: {SportRental.Admin.Services.Time.PolishTimeZone.FromUtc(rental.ReminderSmsSentAtUtc.Value):dd.MM HH:mm} — kliknij, aby wysłać ponownie"
             : "Wyślij przypomnienie SMS o zwrocie";
 
     private async Task MarkAsPaid(Rental rental)
@@ -2087,19 +2211,21 @@ else
             var now = DateTime.UtcNow;
             await Db.Rentals.Where(r => r.Id == rental.Id)
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(r => r.PaymentStatus, "DepositPaid")
+                    .SetProperty(r => r.PaymentStatus, "Paid")
+                    .SetProperty(r => r.PaidAmount, r => r.TotalAmount)
                     .SetProperty(r => r.PaymentMethod, method)
                     .SetProperty(r => r.PaidAtUtc, now));
 
             // Mutacja lokalna żeby UI od razu odzwierciedlał stan bez ponownego load
-            rental.PaymentStatus = "DepositPaid";
+            rental.PaymentStatus = "Paid";
+            rental.PaidAmount = rental.TotalAmount;
             rental.PaymentMethod = method;
             rental.PaidAtUtc = now;
 
             Snackbar.Add($"Płatność zatwierdzona ({method}). Teraz możesz wydać sprzęt.", MudBlazor.Severity.Success);
 
             // Refresh list żeby chip "do zapłaty"→"opłacono" się odświeżył
-            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking()
+            rentals = await Db.Rentals.Include(r => r.Items).Include(r => r.MarketplaceOrder).AsNoTracking()
                 .OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
         }
@@ -2124,6 +2250,8 @@ else
             var productIds = items.Select(i => i.ProductId).ToList();
             var products = await Db.Products.AsNoTracking().Where(p => productIds.Contains(p.Id)).ToListAsync();
             var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+            var contractTemplate = await Db.ContractTemplates.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.TenantId == CurrentTenantId());
 
             if (customer == null)
             {
@@ -2131,7 +2259,8 @@ else
                 return;
             }
 
-            var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(rental, items, customer, products, companyInfo);
+            var contractUrl = await ContractGenerator.GenerateAndSaveRentalContractAsync(
+                rental, items, customer, products, companyInfo, contractTemplate?.Content);
 
             // Bulk SQL update — bez Track/Attach
             await Db.Rentals.Where(r => r.Id == rental.Id)
@@ -2140,7 +2269,7 @@ else
             rental.ContractUrl = contractUrl;
 
             // Refresh cached list (już AsNoTracking) — bez konfliktu tracking
-            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            rentals = await Db.Rentals.Include(r => r.Items).Include(r => r.MarketplaceOrder).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
 
             // NXRE 4: auto-otwarcie w nowej karcie. Feedback #7: otwieramy przez endpoint serwujący
@@ -2167,6 +2296,8 @@ else
             var productIds = items.Select(i => i.ProductId).ToList();
             var products = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
             var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+            var contractTemplate = await Db.ContractTemplates.AsNoTracking()
+                .FirstOrDefaultAsync(t => t.TenantId == CurrentTenantId());
             
             if (customer == null)
             {
@@ -2180,7 +2311,8 @@ else
                 return;
             }
             
-            await ContractGenerator.SendRentalConfirmationEmailAsync(rental, items, customer, products, companyInfo);
+            await ContractGenerator.SendRentalConfirmationEmailAsync(
+                rental, items, customer, products, companyInfo, contractTemplate?.Content);
             
             var tracked = await Db.Rentals.FindAsync(rental.Id);
             if (tracked != null)
@@ -2228,7 +2360,7 @@ else
 
             Snackbar.Add($"Wynajem został zakończony", MudBlazor.Severity.Success);
 
-            rentals = await Db.Rentals.Include(r => r.Items).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
+            rentals = await Db.Rentals.Include(r => r.Items).Include(r => r.MarketplaceOrder).AsNoTracking().OrderByDescending(r => r.CreatedAtUtc).Take(200).ToListAsync();
             StateHasChanged();
         }
         catch (Exception ex)
@@ -2267,12 +2399,13 @@ else
             var tracked = await Db.Rentals.FindAsync(rental.Id);
             if (tracked != null)
             {
-                tracked.IsReminderSmsSent = true;
+                // Ręczna wysyłka nie może wyłączyć późniejszego automatycznego reminderu.
+                // Flaga IsReminderSmsSent jest zarezerwowana dla harmonogramu; timestamp
+                // pokazuje w UI ostatnią udaną wysyłkę dowolnego typu.
                 tracked.ReminderSmsSentAtUtc = DateTime.UtcNow;
                 await Db.SaveChangesAsync();
             }
 
-            rental.IsReminderSmsSent = true;
             rental.ReminderSmsSentAtUtc = DateTime.UtcNow;
 
             Snackbar.Add("Przypomnienie SMS wysłane!", MudBlazor.Severity.Success);
@@ -2342,7 +2475,8 @@ else
 
     private void ExtendRental(Rental rental)
     {
-        Edit(rental);
+        if (!Edit(rental))
+            return;
 
         // BUG sprzed 2026-04-25: brałem DateTime.Now (local) i zapisywał z Kind=Utc bez
         // konwersji — efekt: rental kończył się 2h za późno (Polska UTC+2 latem), a

@@ -3,7 +3,10 @@
 @using SportRental.Infrastructure.Domain
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.DataProtection
+@using System.Data
+@using SportRental.Admin.Services
 @using SportRental.Admin.Services.Email
+@using SportRental.Admin.Services.Guards
 
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject ISnackbar Snackbar
@@ -14,6 +17,7 @@
 @inject SportRental.Admin.Services.IReviewSurveyTokenService SurveyTokenService
 @inject SportRental.Admin.Services.ICustomerTrustCalculator TrustCalc
 @inject NavigationManager NavigationManager
+@inject SportRental.Admin.Payments.IPaymentGateway PaymentGateway
 
 <MudDialog>
     <TitleContent>
@@ -54,7 +58,7 @@
             <MudAlert Severity="Severity.Warning" Dense="true" Class="pa-2">
                 <div class="d-flex align-center justify-space-between">
                     <MudText Typo="Typo.body2">Depozyt pobrany:</MudText>
-                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@((Rental?.DepositAmount ?? 0m).Pln())</MudText>
+                    <MudText Typo="Typo.body2" Style="font-weight: 600;">@(CollectedDepositAmount.Pln())</MudText>
                 </div>
             </MudAlert>
             
@@ -66,7 +70,7 @@
                                      Adornment="Adornment.End"
                                      AdornmentText="zł"
                                      Min="0"
-                                     Max="@(Rental?.DepositAmount ?? 0)"
+                                     Max="@CollectedDepositAmount"
                                      Dense="true" />
                 </MudItem>
                 <MudItem xs="6">
@@ -179,8 +183,12 @@
 
     protected override void OnParametersSet()
     {
-        _depositRefund = Rental?.DepositAmount ?? 0;
+        _depositRefund = CollectedDepositAmount;
     }
+
+    private decimal CollectedDepositAmount => Rental is not null && RentalGuards.IsDepositCollected(Rental)
+        ? Math.Max(0m, Rental.DepositAmount)
+        : 0m;
 
     private void Cancel() => MudDialog?.Cancel();
     
@@ -197,10 +205,19 @@
         try
         {
             await using var db = await DbFactory.CreateDbContextAsync();
+            await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            var usesPostgresRowLocks = db.Database.ProviderName?.Contains(
+                "Npgsql",
+                StringComparison.OrdinalIgnoreCase) == true;
 
-            var rental = await db.Rentals
-                .Include(r => r.Customer)
-                .FirstOrDefaultAsync(r => r.Id == Rental.Id);
+            var rental = usesPostgresRowLocks
+                ? await db.Rentals
+                    .FromSqlInterpolated($"SELECT * FROM \"Rentals\" WHERE \"Id\" = {Rental.Id} FOR UPDATE")
+                    .Include(r => r.Customer)
+                    .FirstOrDefaultAsync()
+                : await db.Rentals
+                    .Include(r => r.Customer)
+                    .FirstOrDefaultAsync(r => r.Id == Rental.Id);
 
             if (rental == null)
             {
@@ -209,12 +226,89 @@
                 return;
             }
 
+            if (rental.ReturnedAtUtc.HasValue || rental.Status == RentalStatus.Completed)
+            {
+                Snackbar.Add("Ten zwrot został już wcześniej zapisany.", Severity.Info);
+                MudDialog?.Close(DialogResult.Ok(true));
+                return;
+            }
+
+            MarketplaceOrder? marketplaceOrder = null;
+            if (rental.MarketplaceOrderId.HasValue)
+            {
+                marketplaceOrder = usesPostgresRowLocks
+                    ? await db.MarketplaceOrders
+                        .FromSqlInterpolated($"SELECT * FROM \"MarketplaceOrders\" WHERE \"Id\" = {rental.MarketplaceOrderId.Value} FOR UPDATE")
+                        .FirstOrDefaultAsync()
+                    : await db.MarketplaceOrders
+                        .FirstOrDefaultAsync(order => order.Id == rental.MarketplaceOrderId.Value);
+            }
+
+            var collectedDeposit = RentalGuards.IsDepositCollected(rental)
+                ? Math.Max(0m, rental.DepositAmount)
+                : 0m;
+            if (_depositRefund < 0m || _depositRefund > collectedDeposit)
+            {
+                Snackbar.Add("Kwota zwrotu depozytu jest nieprawidłowa. Odśwież wynajem i spróbuj ponownie.", Severity.Error);
+                return;
+            }
+
             var now = DateTime.UtcNow;
+
+            // Depozyt online musi zostać faktycznie zwrócony w Stripe, zanim panel
+            // zapisze sukces. Dla depozytu gotówkowego zapis potwierdza operację kasową.
+            if (_depositRefund > 0m && !string.IsNullOrWhiteSpace(rental.PaymentIntentId))
+            {
+                var refundSucceeded = await PaymentGateway.RefundPaymentAsync(
+                    Guid.Empty,
+                    rental.PaymentIntentId,
+                    _depositRefund,
+                    "requested_by_customer",
+                    $"return-deposit:{rental.Id:N}");
+                if (!refundSucceeded)
+                {
+                    Snackbar.Add("Nie udało się zwrócić depozytu w Stripe. Zwrot sprzętu nie został zapisany.", Severity.Error);
+                    return;
+                }
+            }
+
             rental.ReturnedAtUtc = now;
             rental.ReturnNotes = _returnNotes;
             rental.ReturnDepositRefund = _depositRefund;
+            if (_depositRefund > 0m)
+            {
+                rental.PaymentStatus = _depositRefund >= rental.DepositAmount
+                    ? "DepositRefunded"
+                    : "DepositPartiallyRefunded";
+                if (_depositRefund >= rental.DepositAmount)
+                    rental.DepositPaidAtUtc = null;
+            }
+            else if (collectedDeposit > 0m)
+            {
+                rental.PaymentStatus = "DepositRetained";
+            }
             rental.DamageCharge = _damageCharge > 0 ? _damageCharge : null;
             rental.Status = RentalStatus.Completed;
+
+            if (marketplaceOrder is not null)
+            {
+                if (_depositRefund > 0m)
+                    SportRental.Admin.Payments.MarketplaceOrderAccounting.ApplyRefund(
+                        marketplaceOrder,
+                        _depositRefund,
+                        now);
+
+                var hasOpenRental = await db.Rentals.IgnoreQueryFilters()
+                    .AnyAsync(other =>
+                        other.MarketplaceOrderId == marketplaceOrder.Id &&
+                        other.Id != rental.Id &&
+                        other.Status != RentalStatus.Completed &&
+                        other.Status != RentalStatus.Cancelled);
+                SportRental.Admin.Payments.MarketplaceOrderAccounting.MarkRentalCompleted(
+                    marketplaceOrder,
+                    hasOpenRental,
+                    now);
+            }
 
             // NXRE QA #17: zmniejsz HowManyRented (zwracamy sprzęt do dostępności)
             var rentalItems = await db.RentalItems.Where(i => i.RentalId == rental.Id).ToListAsync();
@@ -239,15 +333,6 @@
                 rental.ReturnNotes = string.IsNullOrEmpty(rental.ReturnNotes)
                     ? conditionText
                     : $"{conditionText}. {rental.ReturnNotes}";
-            }
-
-            // Thank-you mail + pierwsza prośba o opinię (zastępuje slot +24h w ReviewRequestService).
-            // Jeśli się nie uda wysłać, zwrot i tak zapisujemy — mail to "best effort".
-            var mailSent = await TrySendReturnThankYouAsync(rental, now);
-            if (mailSent)
-            {
-                rental.ReviewRequestCount = 1;
-                rental.LastReviewRequestSentAtUtc = now;
             }
 
             // Ocena klienta (opcjonalna) — RODO-friendly, bez tekstów. Pomijamy jeśli admin
@@ -276,6 +361,17 @@
             }
 
             await db.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            // Thank-you mail wysyłamy dopiero po trwałym zapisie zwrotu. Błąd kanału
+            // komunikacji nie może wycofać rozliczenia ani trzymać blokady zamówienia.
+            var mailSent = await TrySendReturnThankYouAsync(rental, now);
+            if (mailSent)
+            {
+                rental.ReviewRequestCount = 1;
+                rental.LastReviewRequestSentAtUtc = now;
+                await db.SaveChangesAsync();
+            }
 
             // Recalc trust level — dopiero po SaveChanges, bo Recalculate czyta z bazy.
             if (newCustomerReview != null)
@@ -312,7 +408,7 @@
             var reviewUrl = $"{adminBaseUrl}/ankieta/{rental.Id:D}?t={Uri.EscapeDataString(surveyToken)}";
 
             // Opt-out zostaje na kliencie WASM (tam jest publiczna lista opinii z linkiem "zrezygnuj").
-            var clientBaseUrl = Config["ClientApp:PublicBaseUrl"]?.TrimEnd('/') ?? adminBaseUrl;
+            var clientBaseUrl = ClientAppUrlResolver.Resolve(Config, adminBaseUrl);
             var optOutProtector = ProtectorProvider.CreateProtector("ReviewOptOut");
             var optOutToken = optOutProtector.Protect(rental.Customer.Id.ToString("N"));
             var optOutUrl = $"{clientBaseUrl}/reviews/opt-out?token={Uri.EscapeDataString(optOutToken)}";

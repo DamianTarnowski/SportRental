@@ -6,6 +6,8 @@
 @inject HttpClient Http
 @inject IConfiguration Config
 
+<PageTitle>Moje konto — RentSpot</PageTitle>
+
 <MudContainer MaxWidth="MaxWidth.Medium" Class="mt-8">
     <MudPaper Elevation="4" Class="pa-8">
         <MudText Typo="Typo.h4" Class="mb-6">Moje konto</MudText>
@@ -13,16 +15,9 @@
         <AuthorizeView>
             <Authorized>
                 <MudGrid>
-                    <MudItem xs="12" md="6">
+                    <MudItem xs="12">
                         <MudTextField Label="Email"
                                       Value="@context.User.Identity?.Name"
-                                      ReadOnly="true"
-                                      Variant="Variant.Outlined"
-                                      Class="mb-4" />
-                    </MudItem>
-                    <MudItem xs="12" md="6">
-                        <MudTextField Label="Tenant ID"
-                                      Value="@GetTenantId(context)"
                                       ReadOnly="true"
                                       Variant="Variant.Outlined"
                                       Class="mb-4" />
@@ -33,9 +28,9 @@
                    Statusy negatywne są mapowane do neutralnego po stronie API. *@
                 @if (_trust is not null)
                 {
-                    <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%); border-radius: 12px;">
+                    <MudPaper Class="pa-4 mb-4" Elevation="0" Style="background: linear-gradient(135deg, #FEF2F2 0%, #FDE3E4 100%); border-radius: 12px;">
                         <div class="d-flex align-center gap-3">
-                            <div style="font-size: 2.5rem;">@_trust.TrustEmoji</div>
+                            <div style="color: #F96167; line-height: 0;"><Icon Name="star" Size="40" /></div>
                             <div class="flex-1">
                                 <MudText Typo="Typo.subtitle1" Style="font-weight: 600;">@_trust.TrustLabel</MudText>
                                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
@@ -65,30 +60,27 @@
                     <MudButton Variant="Variant.Outlined" 
                                Color="Color.Primary" 
                                StartIcon="@Icons.Material.Filled.Edit"
-                               Disabled="true">
-                        Zmień dane osobowe (wkrótce)
+                               Href="profile">
+                        Zmień dane osobowe
                     </MudButton>
 
-                    <MudButton Variant="Variant.Outlined" 
-                               Color="Color.Primary" 
-                               StartIcon="@Icons.Material.Filled.Lock"
-                               Disabled="true">
-                        Zmień hasło (wkrótce)
-                    </MudButton>
+                    @if (!context.User.IsInRole("GuestCustomer"))
+                    {
+                        <MudButton Variant="Variant.Outlined"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.Lock"
+                                   Href="@GetAccountManagementUrl("/Account/Manage/ChangePassword")">
+                            Zmień hasło
+                        </MudButton>
+                    }
 
                     <MudButton Variant="Variant.Outlined" 
                                Color="Color.Primary" 
                                StartIcon="@Icons.Material.Filled.Receipt"
-                               Href="/my-rentals">
+                               Href="my-rentals">
                         Moje wypożyczenia
                     </MudButton>
 
-                    <MudButton Variant="Variant.Outlined" 
-                               Color="Color.Error" 
-                               StartIcon="@Icons.Material.Filled.Delete"
-                               Disabled="true">
-                        Usuń konto (wkrótce)
-                    </MudButton>
                 </MudStack>
             </Authorized>
         </AuthorizeView>
@@ -113,9 +105,6 @@
         catch { /* tichy fallback — bez statusu */ }
     }
 
-    private string GetTenantId(AuthenticationState state)
-    {
-        var claim = state.User.FindFirst("tenant-id");
-        return claim?.Value ?? "N/A";
-    }
+    private string GetAccountManagementUrl(string path) =>
+        $"{(Config["Api:BaseUrl"] ?? string.Empty).TrimEnd('/')}{path}";
 }

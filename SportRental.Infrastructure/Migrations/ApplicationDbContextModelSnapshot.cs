@@ -158,8 +158,16 @@ namespace SportRental.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AcceptedTermsVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<int>("AccessFailedCount")
                         .HasColumnType("integer");
+
+                    b.Property<string>("AcknowledgedPrivacyVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -174,6 +182,9 @@ namespace SportRental.Infrastructure.Migrations
 
                     b.Property<bool>("IsDemoUser")
                         .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("LegalAcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
@@ -468,11 +479,23 @@ namespace SportRental.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AcceptedTermsVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("AcknowledgedPrivacyVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("ExpiresAtUtc")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("IdempotencyKey")
                         .IsRequired()
@@ -482,9 +505,15 @@ namespace SportRental.Infrastructure.Migrations
                     b.Property<bool>("IsProcessed")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("LegalAcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("PayloadJson")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTime?>("RefundedAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("StripeSessionId")
                         .HasMaxLength(200)
@@ -1300,6 +1329,48 @@ namespace SportRental.Infrastructure.Migrations
                     b.ToTable("GoogleCalendarEvents", (string)null);
                 });
 
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.GuestOrderAccessToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MarketplaceOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestedFromIp")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UsedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("CustomerId", "ExpiresAtUtc");
+
+                    b.HasIndex("MarketplaceOrderId", "ExpiresAtUtc");
+
+                    b.ToTable("GuestOrderAccessTokens", (string)null);
+                });
+
             modelBuilder.Entity("SportRental.Infrastructure.Domain.Invoice", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1383,6 +1454,105 @@ namespace SportRental.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("InvoiceCounters", (string)null);
+                });
+
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.MarketplaceOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AcceptedTermsVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("AcknowledgedPrivacyVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<Guid>("CheckoutSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("CustomerEmailSnapshot")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DepositAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("LegalAcceptedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("PaidAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaymentIntentId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("PaymentStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<decimal>("RefundedDepositAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("StripeSessionId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CheckoutSessionId")
+                        .IsUnique();
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("OrderNumber")
+                        .IsUnique();
+
+                    b.HasIndex("CustomerId", "CreatedAtUtc");
+
+                    b.ToTable("MarketplaceOrders", (string)null);
                 });
 
             modelBuilder.Entity("SportRental.Infrastructure.Domain.PriceRule", b =>
@@ -1469,6 +1639,9 @@ namespace SportRental.Infrastructure.Migrations
                     b.Property<bool>("Disabled")
                         .HasColumnType("boolean");
 
+                    b.Property<bool?>("HasOriginalImage")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal?>("HourlyPrice")
                         .HasColumnType("numeric");
 
@@ -1483,6 +1656,9 @@ namespace SportRental.Infrastructure.Migrations
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
+
+                    b.PrimitiveCollection<int[]>("ImageVariantWidths")
+                        .HasColumnType("integer[]");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
@@ -1660,7 +1836,11 @@ namespace SportRental.Infrastructure.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<decimal>("DepositAmount")
-                        .HasColumnType("numeric");
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateTime?>("DepositPaidAtUtc")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("EndDateUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1704,8 +1884,18 @@ namespace SportRental.Infrastructure.Migrations
                     b.Property<DateTime?>("LastReviewRequestSentAtUtc")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("MarketplaceOrderId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Notes")
                         .HasColumnType("text");
+
+                    b.Property<int?>("OrderSequence")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
 
                     b.Property<DateTime?>("PaidAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1720,6 +1910,21 @@ namespace SportRental.Infrastructure.Migrations
                     b.Property<string>("PaymentStatus")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<string>("RegulationsHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("RegulationsSource")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("RegulationsTextSnapshot")
+                        .HasColumnType("text");
+
+                    b.Property<string>("RegulationsVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTime?>("ReminderEmailSentAtUtc")
                         .HasColumnType("timestamp with time zone");
@@ -1767,7 +1972,15 @@ namespace SportRental.Infrastructure.Migrations
 
                     b.HasIndex("IssuedByEmployeeId");
 
+                    b.HasIndex("MarketplaceOrderId");
+
                     b.HasIndex("ReturnedByEmployeeId");
+
+                    b.HasIndex("MarketplaceOrderId", "OrderSequence")
+                        .IsUnique();
+
+                    b.HasIndex("MarketplaceOrderId", "TenantId")
+                        .IsUnique();
 
                     b.HasIndex("TenantId", "CreatedAtUtc");
 
@@ -1918,6 +2131,37 @@ namespace SportRental.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("RentalItemReviews");
+                });
+
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.RentalReminderDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("RentalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("SentAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "SentAtUtc");
+
+                    b.HasIndex("RentalId", "Stage", "Channel")
+                        .IsUnique();
+
+                    b.ToTable("RentalReminderDeliveries");
                 });
 
             modelBuilder.Entity("SportRental.Infrastructure.Domain.RentalReview", b =>
@@ -2574,6 +2818,25 @@ namespace SportRental.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.GuestOrderAccessToken", b =>
+                {
+                    b.HasOne("SportRental.Infrastructure.Domain.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SportRental.Infrastructure.Domain.MarketplaceOrder", "MarketplaceOrder")
+                        .WithMany()
+                        .HasForeignKey("MarketplaceOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("MarketplaceOrder");
+                });
+
             modelBuilder.Entity("SportRental.Infrastructure.Domain.Invoice", b =>
                 {
                     b.HasOne("SportRental.Infrastructure.Domain.Customer", "Customer")
@@ -2599,6 +2862,25 @@ namespace SportRental.Infrastructure.Migrations
                     b.Navigation("Rental");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.MarketplaceOrder", b =>
+                {
+                    b.HasOne("SportRental.Infrastructure.Domain.CheckoutSession", "CheckoutSession")
+                        .WithOne()
+                        .HasForeignKey("SportRental.Infrastructure.Domain.MarketplaceOrder", "CheckoutSessionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SportRental.Infrastructure.Domain.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CheckoutSession");
+
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("SportRental.Infrastructure.Domain.PriceRule", b =>
@@ -2653,6 +2935,11 @@ namespace SportRental.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("IssuedByEmployeeId");
 
+                    b.HasOne("SportRental.Infrastructure.Domain.MarketplaceOrder", "MarketplaceOrder")
+                        .WithMany("Rentals")
+                        .HasForeignKey("MarketplaceOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("SportRental.Infrastructure.Domain.Employee", "ReturnedByEmployee")
                         .WithMany()
                         .HasForeignKey("ReturnedByEmployeeId");
@@ -2660,6 +2947,8 @@ namespace SportRental.Infrastructure.Migrations
                     b.Navigation("Customer");
 
                     b.Navigation("IssuedByEmployee");
+
+                    b.Navigation("MarketplaceOrder");
 
                     b.Navigation("ReturnedByEmployee");
                 });
@@ -2727,6 +3016,17 @@ namespace SportRental.Infrastructure.Migrations
                     b.Navigation("RentalItem");
 
                     b.Navigation("RentalReview");
+                });
+
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.RentalReminderDelivery", b =>
+                {
+                    b.HasOne("SportRental.Infrastructure.Domain.Rental", "Rental")
+                        .WithMany()
+                        .HasForeignKey("RentalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Rental");
                 });
 
             modelBuilder.Entity("SportRental.Infrastructure.Domain.RentalReview", b =>
@@ -2829,6 +3129,11 @@ namespace SportRental.Infrastructure.Migrations
             modelBuilder.Entity("SportRental.Infrastructure.Domain.Employee", b =>
                 {
                     b.Navigation("Permissions");
+                });
+
+            modelBuilder.Entity("SportRental.Infrastructure.Domain.MarketplaceOrder", b =>
+                {
+                    b.Navigation("Rentals");
                 });
 
             modelBuilder.Entity("SportRental.Infrastructure.Domain.ProductCategory", b =>

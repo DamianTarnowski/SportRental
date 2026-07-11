@@ -18,6 +18,11 @@ public interface IRentalConfirmationService
     Task<string> CreateConfirmationAsync(Guid rentalId, CancellationToken ct = default);
 
     /// <summary>
+    /// Wariant dla procesów bez ambient tenant context, np. webhooka Stripe.
+    /// </summary>
+    Task<string> CreateConfirmationForTenantAsync(Guid tenantId, Guid rentalId, CancellationToken ct = default);
+
+    /// <summary>
     /// Pobiera dane potwierdzenia po tokenie (publiczny, bez tenanta)
     /// </summary>
     Task<ConfirmationPageData?> GetConfirmationDataAsync(string token, CancellationToken ct = default);
@@ -30,7 +35,13 @@ public interface IRentalConfirmationService
     /// <summary>
     /// Wysyła link potwierdzający SMS-em i/lub emailem
     /// </summary>
-    Task SendConfirmationLinkAsync(Guid rentalId, string token, CancellationToken ct = default);
+    Task<ConfirmationDeliveryResult> SendConfirmationLinkAsync(Guid rentalId, string token, CancellationToken ct = default);
+
+    /// <summary>
+    /// Wariant dla procesów bez ambient tenant context, np. webhooka Stripe.
+    /// </summary>
+    Task<ConfirmationDeliveryResult> SendConfirmationLinkForTenantAsync(
+        Guid tenantId, Guid rentalId, string token, CancellationToken ct = default);
 
     /// <summary>
     /// Ręczne potwierdzenie wynajmu przez pracownika z panelu admina
@@ -57,6 +68,17 @@ public record ConfirmationPageData(
 public record ConfirmationItemData(string ProductName, int Quantity, decimal PricePerDay, decimal Subtotal);
 
 public record ConfirmationResult(bool Success, string Message);
+
+public record ConfirmationDeliveryResult(
+    bool SmsAttempted,
+    bool SmsSent,
+    bool EmailAttempted,
+    bool EmailSent)
+{
+    public bool AnySent => SmsSent || EmailSent;
+    public bool AllAttemptedSent =>
+        (!SmsAttempted || SmsSent) && (!EmailAttempted || EmailSent);
+}
 
 public class RentalConfirmationService : IRentalConfirmationService
 {
@@ -86,11 +108,24 @@ public class RentalConfirmationService : IRentalConfirmationService
         _emailSender = emailSender;
     }
 
-    public async Task<string> CreateConfirmationAsync(Guid rentalId, CancellationToken ct = default)
+    public Task<string> CreateConfirmationAsync(Guid rentalId, CancellationToken ct = default)
     {
         var tenantId = _tenantProvider.GetCurrentTenantId();
         if (tenantId == null)
             throw new InvalidOperationException("No tenant context available");
+
+        return CreateConfirmationForTenantAsync(tenantId.Value, rentalId, ct);
+    }
+
+    public Task<string> CreateConfirmationForTenantAsync(
+        Guid tenantId, Guid rentalId, CancellationToken ct = default) =>
+        CreateConfirmationCoreAsync(tenantId, rentalId, ct);
+
+    private async Task<string> CreateConfirmationCoreAsync(
+        Guid tenantId, Guid rentalId, CancellationToken ct)
+    {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Tenant id cannot be empty.", nameof(tenantId));
 
         await using var context = await _contextFactory.CreateDbContextAsync(ct);
         context.SetTenant(tenantId);
@@ -136,7 +171,7 @@ public class RentalConfirmationService : IRentalConfirmationService
         var confirmation = new RentalConfirmation
         {
             Id = Guid.NewGuid(),
-            TenantId = tenantId.Value,
+            TenantId = tenantId,
             RentalId = rentalId,
             Token = token,
             PhoneNumber = rental.Customer.PhoneNumber,
@@ -154,6 +189,12 @@ public class RentalConfirmationService : IRentalConfirmationService
 
     public async Task<ConfirmationPageData?> GetConfirmationDataAsync(string token, CancellationToken ct = default)
     {
+        if (!IsValidTokenFormat(token))
+        {
+            _logger.LogWarning("Invalid confirmation token format (length={Length})", token?.Length ?? 0);
+            return null;
+        }
+
         await using var context = await _contextFactory.CreateDbContextAsync(ct);
 
         var confirmation = await context.RentalConfirmations
@@ -174,12 +215,13 @@ public class RentalConfirmationService : IRentalConfirmationService
             .IgnoreQueryFilters()
             .Include(r => r.Customer)
             .Include(r => r.Items).ThenInclude(i => i.Product)
-            .FirstOrDefaultAsync(r => r.Id == confirmation.RentalId, ct);
+            .FirstOrDefaultAsync(r => r.Id == confirmation.RentalId
+                && r.TenantId == confirmation.TenantId, ct);
 
         if (rental == null)
         {
-            _logger.LogWarning("Rental {RentalId} not found for confirmation token {Token}",
-                confirmation.RentalId, token);
+            _logger.LogWarning("Rental {RentalId} not found for confirmation {ConfirmationId}",
+                confirmation.RentalId, confirmation.Id);
             return null;
         }
 
@@ -211,7 +253,9 @@ public class RentalConfirmationService : IRentalConfirmationService
             rental.TotalAmount,
             rental.DepositAmount,
             items,
-            company?.RegulationsText,
+            !string.IsNullOrWhiteSpace(rental.RegulationsTextSnapshot)
+                ? rental.RegulationsTextSnapshot
+                : company?.RegulationsText,
             confirmation.IsConfirmed,
             confirmation.ExpiresAt < DateTime.UtcNow
         );
@@ -219,6 +263,9 @@ public class RentalConfirmationService : IRentalConfirmationService
 
     public async Task<ConfirmationResult> ProcessConfirmationAsync(string token, string ip, string userAgent, CancellationToken ct = default)
     {
+        if (!IsValidTokenFormat(token))
+            return new ConfirmationResult(false, "Nieprawidłowy link potwierdzenia.");
+
         await using var context = await _contextFactory.CreateDbContextAsync(ct);
 
         var confirmation = await context.RentalConfirmations
@@ -239,17 +286,21 @@ public class RentalConfirmationService : IRentalConfirmationService
         var rental = await context.Rentals
             .IgnoreQueryFilters()
             .Include(r => r.Customer)
-            .FirstOrDefaultAsync(r => r.Id == confirmation.RentalId, ct);
+            .FirstOrDefaultAsync(r => r.Id == confirmation.RentalId
+                && r.TenantId == confirmation.TenantId, ct);
 
         if (rental == null)
             return new ConfirmationResult(false, "Wynajem nie został znaleziony.");
 
-        // Get regulations hash
-        var company = await context.CompanyInfos.FirstOrDefaultAsync(ct);
-        string? regulationsHash = null;
-        if (!string.IsNullOrEmpty(company?.RegulationsText))
+        // Dla checkoutu online zapisujemy dowód dokładnie tej wersji, którą klient
+        // zobaczył przed płatnością. Bieżący tekst firmy jest tylko fallbackiem dla
+        // starszych i ręcznie tworzonych wynajmów bez snapshotu.
+        var regulationsHash = rental.RegulationsHash;
+        if (string.IsNullOrWhiteSpace(regulationsHash))
         {
-            regulationsHash = ComputeSha256Hash(company.RegulationsText);
+            var company = await context.CompanyInfos.FirstOrDefaultAsync(ct);
+            if (!string.IsNullOrWhiteSpace(company?.RegulationsText))
+                regulationsHash = ComputeSha256Hash(company.RegulationsText);
         }
 
         // Record confirmation proof
@@ -289,37 +340,78 @@ public class RentalConfirmationService : IRentalConfirmationService
         return new ConfirmationResult(true, "Wynajem został potwierdzony. Dziękujemy!");
     }
 
-    public async Task SendConfirmationLinkAsync(Guid rentalId, string token, CancellationToken ct = default)
+    public Task<ConfirmationDeliveryResult> SendConfirmationLinkAsync(
+        Guid rentalId, string token, CancellationToken ct = default)
     {
         var tenantId = _tenantProvider.GetCurrentTenantId();
-        if (tenantId == null) return;
+        if (tenantId == null)
+            throw new InvalidOperationException("No tenant context available");
+
+        return SendConfirmationLinkForTenantAsync(tenantId.Value, rentalId, token, ct);
+    }
+
+    public Task<ConfirmationDeliveryResult> SendConfirmationLinkForTenantAsync(
+        Guid tenantId, Guid rentalId, string token, CancellationToken ct = default) =>
+        SendConfirmationLinkCoreAsync(tenantId, rentalId, token, ct);
+
+    private async Task<ConfirmationDeliveryResult> SendConfirmationLinkCoreAsync(
+        Guid tenantId, Guid rentalId, string token, CancellationToken ct)
+    {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Tenant id cannot be empty.", nameof(tenantId));
+        if (!IsValidTokenFormat(token))
+            throw new ArgumentException("Confirmation token has an invalid format.", nameof(token));
 
         await using var context = await _contextFactory.CreateDbContextAsync(ct);
         context.SetTenant(tenantId);
 
         var rental = await context.Rentals
             .Include(r => r.Customer)
+            .Include(r => r.MarketplaceOrder)
             .FirstOrDefaultAsync(r => r.Id == rentalId, ct);
 
-        if (rental?.Customer == null) return;
+        if (rental?.Customer == null)
+            throw new InvalidOperationException("Rental or customer not found");
 
         var baseUrl = GetBaseUrl();
         var confirmUrl = $"{baseUrl}/confirm/{token}";
         var rentalCode = rentalId.ToString()[..8].ToUpper();
         var customerName = rental.Customer.FullName ?? "Klient";
+        var marketplaceOrderNumber = string.IsNullOrWhiteSpace(rental.MarketplaceOrder?.OrderNumber)
+            ? null
+            : rental.MarketplaceOrder.OrderNumber.Trim();
 
         var confirmation = await context.RentalConfirmations
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(rc => rc.Token == token, ct);
+            .FirstOrDefaultAsync(rc => rc.Token == token
+                && rc.TenantId == tenantId
+                && rc.RentalId == rentalId, ct);
+
+        if (confirmation == null)
+            throw new InvalidOperationException("Confirmation token does not match the rental");
+
+        // Webhook Stripe i redirect klienta mogą wejść równolegle w finalizację.
+        // Flagi na confirmation czynią wysyłkę kanałów idempotentną przy retry.
+        var smsAttempted = !confirmation.IsSmsSent &&
+                           !string.IsNullOrWhiteSpace(rental.Customer.PhoneNumber);
+        var emailAttempted = !confirmation.IsEmailSent &&
+                             !string.IsNullOrWhiteSpace(rental.Customer.Email);
+        var smsSent = confirmation.IsSmsSent;
+        var emailSent = confirmation.IsEmailSent;
 
         // Send SMS
-        if (!string.IsNullOrWhiteSpace(rental.Customer.PhoneNumber))
+        if (smsAttempted)
         {
             try
             {
-                var smsMessage = $"Kliknij w link, aby potwierdzic wynajem {rentalCode}: {confirmUrl}";
-                await _smsSender.SendAsync(rental.Customer.PhoneNumber, smsMessage, ct);
-                if (confirmation != null) confirmation.IsSmsSent = true;
+                var orderRecoveryHint = marketplaceOrderNumber == null
+                    ? string.Empty
+                    : $" Numer zamowienia potrzebny do odzyskania dostepu: {marketplaceOrderNumber}.";
+                var smsMessage = $"Kliknij w link, aby potwierdzic wynajem {rentalCode}.{orderRecoveryHint} {confirmUrl}";
+                await _smsSender.SendAsync(rental.Customer.PhoneNumber!, smsMessage, ct);
+                confirmation.IsSmsSent = true;
+                rental.IsSmsConfirmationSent = true;
+                smsSent = true;
                 _logger.LogInformation("Sent confirmation link SMS for rental {RentalId}", rentalId);
             }
             catch (Exception ex)
@@ -329,13 +421,23 @@ public class RentalConfirmationService : IRentalConfirmationService
         }
 
         // Send Email with regulations + confirmation link
-        if (!string.IsNullOrWhiteSpace(rental.Customer.Email))
+        if (emailAttempted)
         {
             try
             {
                 var company = await context.CompanyInfos.FirstOrDefaultAsync(ct);
                 var companyName = company?.Name ?? "SportRental";
-                var regulationsText = company?.RegulationsText;
+                var regulationsText = !string.IsNullOrWhiteSpace(rental.RegulationsTextSnapshot)
+                    ? rental.RegulationsTextSnapshot
+                    : company?.RegulationsText;
+                var encodedCompanyName = System.Net.WebUtility.HtmlEncode(companyName);
+                var encodedCustomerName = System.Net.WebUtility.HtmlEncode(customerName);
+                var marketplaceOrderSection = marketplaceOrderNumber == null
+                    ? string.Empty
+                    : $@"<div style='background:#eef6ff;border:1px solid #b8d8ff;border-radius:8px;padding:14px 16px;margin:16px 0;'>
+  <b>Numer zamówienia:</b> {System.Net.WebUtility.HtmlEncode(marketplaceOrderNumber)}<br>
+  <span style='font-size:13px;color:#445;'>Zachowaj ten numer — będzie potrzebny do odzyskania dostępu do zamówienia bez logowania.</span>
+</div>";
 
                 var items = await context.Set<RentalItem>()
                     .Where(ri => ri.RentalId == rentalId)
@@ -343,7 +445,7 @@ public class RentalConfirmationService : IRentalConfirmationService
                     .ToListAsync(ct);
 
                 var itemsHtml = string.Join("", items.Select(i =>
-                    $"<tr><td style='padding:6px 12px;border:1px solid #ddd;'>{i.Product?.Name ?? "Produkt"}</td>" +
+                    $"<tr><td style='padding:6px 12px;border:1px solid #ddd;'>{System.Net.WebUtility.HtmlEncode(i.Product?.Name ?? "Produkt")}</td>" +
                     $"<td style='padding:6px 12px;border:1px solid #ddd;text-align:center;'>{i.Quantity}</td>" +
                     $"<td style='padding:6px 12px;border:1px solid #ddd;text-align:right;'>{i.Subtotal:N2} zł</td></tr>"));
 
@@ -353,9 +455,10 @@ public class RentalConfirmationService : IRentalConfirmationService
                     : "";
 
                 var htmlBody = $@"<html><body style='font-family:Arial,sans-serif;color:#333;'>
-<h2 style='color:#1976d2;'>Potwierdzenie wynajmu — {companyName}</h2>
-<p>Dzień dobry <b>{customerName}</b>,</p>
+<h2 style='color:#1976d2;'>Potwierdzenie wynajmu — {encodedCompanyName}</h2>
+<p>Dzień dobry <b>{encodedCustomerName}</b>,</p>
 <p>Umowę w formacie PDF wysłaliśmy w osobnej wiadomości. Aby sfinalizować rezerwację, prosimy o potwierdzenie wynajmu przyciskiem &quot;Potwierdź wynajem&quot; na dole tej wiadomości:</p>
+{marketplaceOrderSection}
 
 <h3 style='color:#333;'>📦 Szczegóły wynajmu</h3>
 <table style='border-collapse:collapse;width:100%;max-width:500px;'>
@@ -379,15 +482,16 @@ public class RentalConfirmationService : IRentalConfirmationService
   <a href='{confirmUrl}' style='display:inline-block;background:#1976d2;color:white;padding:14px 32px;text-decoration:none;border-radius:8px;font-size:16px;font-weight:bold;'>✅ Potwierdź wynajem</a>
 </div>
 <p style='font-size:12px;color:#888;margin-top:16px;'>Link ważny 48 godzin. Klikając &quot;Potwierdź wynajem&quot; akceptujesz warunki regulaminu wypożyczalni.</p>
-<p>Pozdrawiamy,<br>{companyName}</p>
+<p>Pozdrawiamy,<br>{encodedCompanyName}</p>
 </body></html>";
 
                 await _emailSender.SendEmailAsync(
-                    rental.Customer.Email,
+                    rental.Customer.Email!,
                     $"Potwierdzenie wynajmu — {companyName}",
                     htmlBody);
 
-                if (confirmation != null) confirmation.IsEmailSent = true;
+                confirmation.IsEmailSent = true;
+                emailSent = true;
                 _logger.LogInformation("Sent confirmation email for rental {RentalId} to {Email}", rentalId, rental.Customer.Email);
             }
             catch (Exception ex)
@@ -396,8 +500,14 @@ public class RentalConfirmationService : IRentalConfirmationService
             }
         }
 
-        if (confirmation != null)
+        if (smsSent || emailSent)
             await context.SaveChangesAsync(ct);
+
+        return new ConfirmationDeliveryResult(
+            smsAttempted,
+            smsSent,
+            emailAttempted,
+            emailSent);
     }
 
     public async Task<ConfirmationResult> ConfirmByAdminAsync(Guid rentalId, string adminUserName, CancellationToken ct = default)
@@ -485,6 +595,20 @@ public class RentalConfirmationService : IRentalConfirmationService
             .Replace("+", "-")
             .Replace("/", "_")
             .Replace("=", "");
+    }
+
+    private static bool IsValidTokenFormat(string? token)
+    {
+        if (string.IsNullOrWhiteSpace(token) || token.Length is < 32 or > 128)
+            return false;
+
+        foreach (var character in token)
+        {
+            if (!char.IsAsciiLetterOrDigit(character) && character is not '-' and not '_')
+                return false;
+        }
+
+        return true;
     }
 
     private static string ComputeSha256Hash(string text)

@@ -2,7 +2,7 @@
 
 @inject NavigationManager NavigationManager
 
-<MudNavMenu Class="mud-width-full rs-nav-menu">
+<MudNavMenu Class="mud-width-full rs-nav-menu" aria-label="Nawigacja główna">
     <MudNavLink Href="dashboard" Icon="@Icons.Material.Filled.Dashboard">
         Dashboard
     </MudNavLink>
@@ -133,9 +133,14 @@
             <MudNavLink Href="Account/Manage" Icon="@Icons.Material.Filled.Person" Class="rs-user-link">
                 <span class="rs-user-name" title="@context.User.Identity?.Name">@DisplayName(context.User.Identity?.Name)</span>
             </MudNavLink>
-            <MudNavLink Href="Account/Logout" Icon="@Icons.Material.Filled.Logout" IconColor="Color.Error">
-                Wyloguj
-            </MudNavLink>
+            <form action="/Account/Logout" method="post" class="rs-logout-form">
+                <AntiforgeryToken />
+                <input type="hidden" name="ReturnUrl" value="/Account/Login" />
+                <button type="submit" class="rs-logout-link">
+                    <MudIcon Icon="@Icons.Material.Filled.Logout" Color="Color.Error" />
+                    <span>Wyloguj</span>
+                </button>
+            </form>
         </Authorized>
         <NotAuthorized>
             <MudDivider Class="my-2" />
@@ -195,5 +200,25 @@
         white-space: nowrap;
         display: inline-block;
         max-width: 180px;
+    }
+    .rs-logout-form { margin: 0; }
+    .rs-logout-link {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--mud-palette-text-primary);
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    .rs-logout-link:hover,
+    .rs-logout-link:focus-visible {
+        background: var(--mud-palette-action-default-hover);
+        outline: none;
     }
 </style>

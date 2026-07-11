@@ -70,9 +70,19 @@ public class CrossAppRentalIntegrationTests : IAsyncLifetime
         _testCustomerEmail = uniqueEmail;
         _output.WriteLine($"[CrossApp Test] Created WASM customer: {customer.FullName} ({customer.Email})");
 
-        // Get product
-        var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.TenantId == _testTenantId && p.AvailableQuantity > 0);
-        _testProductId = product!.Id;
+        // Własny produkt usuwa zależność od kolejności tenantów i danych demo.
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = _testTenantId,
+            Name = "Cross App Integration Product",
+            Sku = $"CROSS-{Guid.NewGuid():N}",
+            DailyPrice = 60,
+            AvailableQuantity = 100
+        };
+        _dbContext.Products.Add(product);
+        await _dbContext.SaveChangesAsync();
+        _testProductId = product.Id;
         _testProductName = product.Name;
         _testProductPrice = product.DailyPrice;
         _output.WriteLine($"[CrossApp Test] Product: {_testProductName} ({_testProductPrice}/day)");
@@ -99,6 +109,12 @@ public class CrossAppRentalIntegrationTests : IAsyncLifetime
         if (customer is not null)
         {
             _dbContext.Customers.Remove(customer);
+        }
+
+        var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == _testProductId);
+        if (product is not null)
+        {
+            _dbContext.Products.Remove(product);
         }
 
         await _dbContext.SaveChangesAsync();

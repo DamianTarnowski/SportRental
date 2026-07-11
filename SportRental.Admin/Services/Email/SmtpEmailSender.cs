@@ -72,10 +72,7 @@ namespace SportRental.Admin.Services.Email
                     : (smtpSettings.UseSsl ? MailKit.Security.SecureSocketOptions.SslOnConnect : MailKit.Security.SecureSocketOptions.Auto);
                 await client.ConnectAsync(smtpSettings.Host, smtpSettings.Port, secureOption);
                 
-                if (!string.IsNullOrEmpty(smtpSettings.Username))
-                {
-                    await client.AuthenticateAsync(smtpSettings.Username, smtpSettings.Password);
-                }
+                await AuthenticateIfConfiguredAsync(client, smtpSettings);
 
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
@@ -131,10 +128,7 @@ namespace SportRental.Admin.Services.Email
                     : (smtpSettings.UseSsl ? MailKit.Security.SecureSocketOptions.SslOnConnect : MailKit.Security.SecureSocketOptions.Auto);
                 await client.ConnectAsync(smtpSettings.Host, smtpSettings.Port, secureOption);
                 
-                if (!string.IsNullOrEmpty(smtpSettings.Username))
-                {
-                    await client.AuthenticateAsync(smtpSettings.Username, smtpSettings.Password);
-                }
+                await AuthenticateIfConfiguredAsync(client, smtpSettings);
 
                 await client.SendAsync(message);
                 await client.DisconnectAsync(true);
@@ -212,6 +206,22 @@ namespace SportRental.Admin.Services.Email
             {
                 throw new ArgumentException("Invalid email format.", nameof(email));
             }
+        }
+
+        private static Task AuthenticateIfConfiguredAsync(SmtpClient client, SmtpSettings settings)
+        {
+            if (string.IsNullOrEmpty(settings.Username))
+            {
+                return Task.CompletedTask;
+            }
+
+            if (string.IsNullOrEmpty(settings.Password))
+            {
+                throw new InvalidOperationException(
+                    "Email:Smtp:Password is required when Email:Smtp:Username is configured.");
+            }
+
+            return client.AuthenticateAsync(settings.Username, settings.Password);
         }
 
         private SmtpSettings GetSmtpSettings()

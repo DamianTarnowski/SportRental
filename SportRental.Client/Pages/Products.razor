@@ -27,8 +27,12 @@
                 <h1>Katalog</h1>
                 <span class="products-mobile-count">@totalProductCount</span>
             </div>
-            <button class="products-mobile-filter-btn" @onclick="ToggleMobileFilters">
-                <span></span>
+            <button class="products-mobile-filter-btn"
+                    @onclick="ToggleMobileFilters"
+                    aria-label="Filtry katalogu"
+                    aria-expanded="@(_showMobileFilters ? "true" : "false")"
+                    aria-controls="mobile-product-filters">
+                <Icon Name="filter" Size="20" />
                 @if (HasActiveFilters())
                 {
                     <span class="filter-badge">!</span>
@@ -39,43 +43,70 @@
         <!-- Mobile Quick Stats -->
         <div class="products-mobile-stats">
             <div class="mobile-stat">
-                <span></span>
-                <span>@availableProductCount dostępnych</span>
+                <span>@availableProductCount @AvailabilityAdjective(availableProductCount)</span>
             </div>
             <div class="mobile-stat">
-                <span></span>
-                <span>od @minPrice.ToString("N0") zł</span>
+                <span>od @resultMinPrice.PlnInt()</span>
             </div>
         </div>
+
+        @if (selectedTenantId.HasValue)
+        {
+            <div class="products-mobile-tenant-context" role="status">
+                <span>Oferta: <strong>@SelectedTenantDisplayName</strong></span>
+                <button type="button" @onclick="OpenMobileTenantFilter">Zmień wypożyczalnię</button>
+            </div>
+        }
 
         <!-- Mobile Filters Panel -->
         @if (_showMobileFilters)
         {
-            <div class="products-mobile-filters">
+            <div class="products-mobile-filters" id="mobile-product-filters">
                 <!-- Search -->
                 <MudTextField @bind-Value="searchText"
-                              Placeholder="Szukaj produktów..."
+                              Placeholder="Wpisz nazwę i naciśnij Enter"
+                              Immediate="true"
                               Variant="Variant.Outlined"
                               Margin="Margin.Dense"
                               Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentAriaLabel="Szukaj"
+                              OnAdornmentClick="SearchProducts"
                               OnKeyDown="OnSearchKeyDown"
                               Class="mb-2" />
 
                 <!-- Category chips - horizontal scroll -->
                 <div class="mobile-filter-chips">
-                    <div class="filter-chip-mobile @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")" 
-                         @onclick="@(() => SelectCategory(string.Empty))">
+                    <button type="button"
+                            class="filter-chip-mobile @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")"
+                            aria-pressed="@(string.IsNullOrEmpty(selectedCategory) ? "true" : "false")"
+                            @onclick="@(() => SelectCategory(string.Empty))">
                         Wszystkie
-                    </div>
+                    </button>
                     @foreach (var cat in GetCategoryChips())
                     {
-                        <div class="filter-chip-mobile @(selectedCategory == cat.Name ? "active" : "")"
-                             @onclick="@(() => SelectCategory(cat.Name))">
-                            @cat.Icon @cat.Name
-                        </div>
+                        <button type="button"
+                                class="filter-chip-mobile @(selectedCategory == cat.Name ? "active" : "")"
+                                aria-pressed="@(selectedCategory == cat.Name ? "true" : "false")"
+                                @onclick="@(() => SelectCategory(cat.Name))">
+                            @cat.Name
+                        </button>
                     }
                 </div>
+
+                <MudSelect T="Guid?" Label="Wypożyczalnia"
+                           Value="selectedTenantId"
+                           ValueChanged="OnTenantChangedAsync"
+                           Variant="Variant.Outlined"
+                           Dense="true"
+                           Margin="Margin.Dense"
+                           Clearable="true"
+                           Class="mb-2">
+                    @foreach (var tenant in tenants)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)tenant.Id)">@tenant.Name</MudSelectItem>
+                    }
+                </MudSelect>
 
                 <!-- Location selects -->
                 <div class="mobile-filter-row">
@@ -126,10 +157,21 @@
                 <span>Ładowanie...</span>
             </div>
         }
+        else if (_loadError is not null)
+        {
+            <div class="products-mobile-empty" role="alert">
+                <span class="empty-icon"><Icon Name="warning" Size="44" /></span>
+                <h3>Nie udało się pobrać katalogu</h3>
+                <p>@_loadError</p>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="LoadInitialData">
+                    Spróbuj ponownie
+                </MudButton>
+            </div>
+        }
         else if (!filteredProducts.Any())
         {
             <div class="products-mobile-empty">
-                <span class="empty-icon"></span>
+                <span class="empty-icon"><Icon Name="search" Size="44" /></span>
                 <h3>Brak produktów</h3>
                 <p>Zmień kryteria wyszukiwania</p>
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ClearFilters">
@@ -142,42 +184,66 @@
             <div class="products-mobile-grid">
                 @foreach (var product in filteredProducts)
                 {
-                    var imageUrl = product.GetImageUrl(300);
+                    var imageUrl = product.GetImageUrl(400);
                     var categoryIcon = GetCategoryIcon(product.Category);
                     
-                    <div class="product-mobile-card" @onclick="@(() => NavigateToProduct(product.Id))">
-                        <div class="product-mobile-image">
+                    <article class="product-mobile-card">
+                        <div class="product-mobile-card-image">
                             @if (!string.IsNullOrEmpty(imageUrl))
                             {
-                                <img src="@imageUrl" alt="@product.Name" loading="lazy" />
+                                <img src="@imageUrl"
+                                     data-fallback-src="@product.ImageUrl"
+                                     alt="@product.Name"
+                                     loading="lazy"
+                                     onerror="srImg(this)" />
                             }
                             else
                             {
-                                <div class="product-mobile-placeholder"></div>
+                                <div class="product-mobile-card-placeholder" aria-hidden="true">
+                                    <Icon Name="catalog" Size="30" />
+                                    <span>Zdjęcie wkrótce</span>
+                                </div>
                             }
                             @if (product.IsAvailable && product.AvailableQuantity > 0)
                             {
-                                <span class="product-mobile-badge available"></span>
+                                <span class="product-mobile-card-badge available" aria-hidden="true"></span>
+                                <span class="sr-only">Dostępny</span>
                             }
                             else
                             {
-                                <span class="product-mobile-badge unavailable"></span>
+                                <span class="product-mobile-card-badge unavailable" aria-hidden="true"></span>
+                                <span class="sr-only">Niedostępny</span>
                             }
                         </div>
-                        <div class="product-mobile-info">
-                            <span class="product-mobile-category">@categoryIcon @product.Category</span>
-                            <h4 class="product-mobile-name">@product.Name</h4>
-                            <div class="product-mobile-price">
-                                <span class="price-main">@product.DailyPrice.ToString("N0") zł</span>
+                        <div class="product-mobile-card-info">
+                            @if (!string.IsNullOrWhiteSpace(product.Category))
+                            {
+                                <span class="product-mobile-card-category">@product.Category</span>
+                            }
+                            <h2 class="product-mobile-card-name">@product.Name</h2>
+                            <div class="product-mobile-card-tenant">
+                                <span>@TenantDisplayName(product)</span>
+                                <span class="product-tenant-city">Odbiór: @product.GetPickupDisplayText()</span>
+                            </div>
+                            <div class="product-mobile-card-price">
+                                <span class="price-main">@product.DailyPrice.PlnInt()</span>
                                 <span class="price-period">/dzień</span>
                             </div>
                         </div>
-                        <button class="product-mobile-cart-btn" 
-                                disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
-                                @onclick="@(async () => await AddToCart(product))"
-                                @onclick:stopPropagation="true">
+                        <div class="product-mobile-card-actions">
+                            <button class="product-mobile-details-btn"
+                                    @onclick="@(() => NavigateToProduct(product.Id))"
+                                    aria-label="Zobacz szczegóły produktu @product.Name">
+                                Zobacz szczegóły
                             </button>
-                    </div>
+                            <button class="product-mobile-cart-btn"
+                                    disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
+                                    @onclick="@(async () => await AddToCart(product))"
+                                    aria-label="Dodaj @product.Name do koszyka">
+                                <Icon Name="cart-plus" Size="18" />
+                            </button>
+                        </div>
+                    </article>
                 }
             </div>
 
@@ -213,18 +279,15 @@ else
             </p>
             <div class="products-stats">
                 <div class="products-stat">
-                    <span class="products-stat-icon"></span>
                     <span class="products-stat-value">@totalProductCount</span>
-                    <span class="products-stat-label">produktów</span>
+                    <span class="products-stat-label">@ProductNoun(totalProductCount)</span>
                 </div>
                 <div class="products-stat">
-                    <span class="products-stat-icon"></span>
                     <span class="products-stat-value">@availableProductCount</span>
-                    <span class="products-stat-label">dostępnych</span>
+                    <span class="products-stat-label">@AvailabilityAdjective(availableProductCount)</span>
                 </div>
                 <div class="products-stat">
-                    <span class="products-stat-icon"></span>
-                    <span class="products-stat-value">@avgPrice.ToString("C")</span>
+                    <span class="products-stat-value">@avgPrice.Pln()</span>
                     <span class="products-stat-label">śr. cena</span>
                 </div>
             </div>
@@ -259,10 +322,13 @@ else
             <MudItem xs="12" md="4">
                 <MudTextField @bind-Value="searchText"
                               Label="Szukaj produktów"
-                              Placeholder="Wpisz nazwę..."
+                              Placeholder="Wpisz nazwę i naciśnij Enter"
+                              Immediate="true"
                               Variant="Variant.Outlined"
                               Adornment="Adornment.End"
                               AdornmentIcon="@Icons.Material.Filled.Search"
+                              AdornmentAriaLabel="Szukaj"
+                              OnAdornmentClick="SearchProducts"
                               OnKeyDown="OnSearchKeyDown"
                               Style="border-radius: 12px;" />
             </MudItem>
@@ -273,6 +339,7 @@ else
                            StartIcon="@Icons.Material.Filled.Refresh"
                            OnClick="ClearFilters"
                            FullWidth="true"
+                           Class="products-reset-filter-button"
                            Style="height: 56px;">
                     Resetuj
                 </MudButton>
@@ -282,26 +349,34 @@ else
             <MudItem xs="12">
                 <div class="filter-section-title">Kategorie</div>
                 <div class="filter-chips">
-                    <div class="filter-chip @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")" 
-                         @onclick="@(() => SelectCategory(string.Empty))">
-                        <span></span> Wszystkie
-                    </div>
+                    <button type="button"
+                            class="filter-chip @(string.IsNullOrEmpty(selectedCategory) ? "active" : "")"
+                            aria-pressed="@(string.IsNullOrEmpty(selectedCategory) ? "true" : "false")"
+                            @onclick="@(() => SelectCategory(string.Empty))">
+                        Wszystkie
+                    </button>
                     @foreach (var cat in GetCategoryChips())
                     {
-                        <div class="filter-chip @(selectedCategory == cat.Name ? "active" : "")"
-                             @onclick="@(() => SelectCategory(cat.Name))">
-                            <span>@cat.Icon</span> @cat.Name
-                        </div>
+                        <button type="button"
+                                class="filter-chip @(selectedCategory == cat.Name ? "active" : "")"
+                                aria-pressed="@(selectedCategory == cat.Name ? "true" : "false")"
+                                @onclick="@(() => SelectCategory(cat.Name))">
+                            @cat.Name
+                        </button>
                     }
                 </div>
             </MudItem>
             
             <!-- Additional filters row -->
             <MudItem xs="12" md="3">
-                <MudSelect T="string" Label="Wypożyczalnia" @bind-Value="SelectedTenant" Variant="Variant.Outlined" Clearable="true">
+                <MudSelect T="Guid?" Label="Wypożyczalnia"
+                           Value="selectedTenantId"
+                           ValueChanged="OnTenantChangedAsync"
+                           Variant="Variant.Outlined"
+                           Clearable="true">
                     @foreach (var t in filteredTenants)
                     {
-                        <MudSelectItem Value="@t">@t</MudSelectItem>
+                        <MudSelectItem T="Guid?" Value="@((Guid?)t.Id)">@t.Name</MudSelectItem>
                     }
                 </MudSelect>
             </MudItem>
@@ -368,10 +443,21 @@ else
             }
         </div>
     }
+    else if (_loadError is not null)
+    {
+        <div class="products-empty" role="alert">
+            <div class="products-empty-icon"><Icon Name="warning" Size="44" /></div>
+            <h3 class="products-empty-title">Nie udało się pobrać katalogu</h3>
+            <p class="products-empty-text">@_loadError</p>
+            <button class="products-reset-btn" @onclick="LoadInitialData">
+                Spróbuj ponownie
+            </button>
+        </div>
+    }
     else if (!filteredProducts.Any())
     {
         <div class="products-empty">
-            <div class="products-empty-icon"></div>
+            <div class="products-empty-icon"><Icon Name="search" Size="44" /></div>
             <h3 class="products-empty-title">Brak produktów</h3>
             <p class="products-empty-text">Nie znaleźliśmy produktów spełniających Twoje kryteria.</p>
             <button class="products-reset-btn" @onclick="ClearFilters">
@@ -387,17 +473,22 @@ else
                 var imageUrl = product.GetImageUrl(400);
                 var categoryIcon = GetCategoryIcon(product.Category);
                 
-                <div class="product-card" @onclick="@(() => ViewProduct(product))">
+                <article class="product-card">
                     <!-- Image section -->
                     <div class="product-card-image">
                         @if (!string.IsNullOrEmpty(imageUrl))
                         {
-                            <img src="@imageUrl" alt="@product.Name" loading="lazy" />
+                            <img src="@imageUrl"
+                                 data-fallback-src="@product.ImageUrl"
+                                 alt="@product.Name"
+                                 loading="lazy"
+                                 onerror="srImg(this)" />
                         }
                         else
                         {
                             <div class="product-card-placeholder">
-                                <span class="product-card-placeholder-icon"></span>
+                                <Icon Name="catalog" Size="34" />
+                                <span>Zdjęcie wkrótce</span>
                             </div>
                         }
                         
@@ -415,7 +506,7 @@ else
                             @if (!string.IsNullOrEmpty(product.Category))
                             {
                                 <span class="product-badge product-badge-category">
-                                    @categoryIcon @product.Category
+                                    @product.Category
                                 </span>
                             }
                         </div>
@@ -424,28 +515,33 @@ else
                         <div class="product-card-actions-overlay">
                             <button class="product-quick-btn product-quick-btn-primary"
                                     disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
-                                    @onclick="@(async () => await AddToCart(product))"
-                                    @onclick:stopPropagation="true">
+                                    @onclick="@(async () => await AddToCart(product))">
                                 Do koszyka
                             </button>
                             <button class="product-quick-btn product-quick-btn-secondary"
                                     @onclick="@(() => NavigateToProduct(product.Id))"
-                                    @onclick:stopPropagation="true">
-                                </button>
+                                    aria-label="Zobacz szczegóły">
+                                <Icon Name="eye" Size="16" />
+                            </button>
                         </div>
                     </div>
                     
                     <!-- Content section -->
                     <div class="product-card-content">
-                        <h3 class="product-card-title">@product.Name</h3>
+                        <h2 class="product-card-title">@product.Name</h2>
+
+                        <div class="product-card-tenant">
+                            <span class="product-card-tenant-name">@TenantDisplayName(product)</span>
+                            <span class="product-card-tenant-city">Odbiór: @product.GetPickupDisplayText()</span>
+                        </div>
                         
                         <div class="product-card-price">
-                            <span class="product-price-amount">@product.DailyPrice.ToString("N0") zł</span>
+                            <span class="product-price-amount">@product.DailyPrice.PlnInt()</span>
                             <span class="product-price-period">/ dzień</span>
                             @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
                             {
                                 <div class="product-price-hourly">
-                                    <span class="product-price-amount-small">@product.HourlyPrice.Value.ToString("N0") zł</span>
+                                    <span class="product-price-amount-small">@product.HourlyPrice.Value.PlnInt()</span>
                                     <span class="product-price-period-small">/ godz.</span>
                                 </div>
                             }
@@ -453,7 +549,6 @@ else
                         
                         <div class="product-card-meta">
                             <div class="product-meta-item">
-                                <span class="product-meta-icon"></span>
                                 <span>@product.AvailableQuantity szt.</span>
                             </div>
                         </div>
@@ -461,14 +556,18 @@ else
                     
                     <!-- Footer with button -->
                     <div class="product-card-footer">
+                        <button class="product-details-link-btn"
+                                @onclick="@(() => NavigateToProduct(product.Id))"
+                                aria-label="Zobacz szczegóły produktu @product.Name">
+                            Szczegóły
+                        </button>
                         <button class="product-add-btn"
                                 disabled="@(product.AvailableQuantity <= 0 || !product.IsAvailable)"
-                                @onclick="@(async () => await AddToCart(product))"
-                                @onclick:stopPropagation="true">
-                            <span></span> Dodaj do koszyka
+                                @onclick="@(async () => await AddToCart(product))">
+                            <Icon Name="cart-plus" Size="18" /> Dodaj do koszyka
                         </button>
                     </div>
-                </div>
+                </article>
             }
         </div>
 
@@ -495,16 +594,20 @@ else
     private DotNetObjectReference<Products>? _dotNetRef;
     
     private void ToggleMobileFilters() => _showMobileFilters = !_showMobileFilters;
+
+    private void OpenMobileTenantFilter() => _showMobileFilters = true;
     
     private bool HasActiveFilters() => 
         !string.IsNullOrEmpty(searchText) || 
         !string.IsNullOrEmpty(selectedCategory) || 
         !string.IsNullOrEmpty(selectedVoivodeship) || 
         !string.IsNullOrEmpty(selectedCity) ||
+        selectedTenantId.HasValue ||
         showOnlyAvailable;
     private List<ProductDto> filteredProducts = new();
     private List<string> categories = new();
     private bool isLoading = true;
+    private string? _loadError;
 
     private string searchText = string.Empty;
     private string selectedCategory = string.Empty;
@@ -523,13 +626,19 @@ else
     private List<string> voivodeships = new();
     private List<string> cities = new();
     private List<string> filteredCities = new();
+    private List<ProductCatalogLocationFacetDto> marketplaceLocations = new();
     private string? selectedVoivodeship;
     private string? selectedCity;
     
     // Tenant (wypożyczalnia) filter
-    private List<string> tenants = new();
-    private List<string> filteredTenants = new();
-    private string? selectedTenant;
+    private List<TenantOption> tenants = new();
+    private List<TenantOption> filteredTenants = new();
+    private Guid? selectedTenantId;
+
+    private string SelectedTenantDisplayName => selectedTenantId.HasValue
+        ? tenants.FirstOrDefault(tenant => tenant.Id == selectedTenantId.Value)?.Name
+            ?? "Wybrana wypożyczalnia"
+        : "Wszystkie wypożyczalnie";
     
     // User location (from localStorage - set on map page)
     private double? userLat;
@@ -537,10 +646,54 @@ else
     
     // Stats (loaded once at init)
     private int totalProductCount;
+
+    private static string ProductNoun(int count)
+    {
+        var absolute = Math.Abs(count);
+        var lastTwoDigits = absolute % 100;
+        return absolute == 1
+            ? "produkt"
+            : lastTwoDigits is >= 12 and <= 14
+                ? "produktów"
+                : absolute % 10 is >= 2 and <= 4
+                    ? "produkty"
+                    : "produktów";
+    }
+
+    private static string AvailabilityAdjective(int count)
+    {
+        var absolute = Math.Abs(count);
+        var lastTwoDigits = absolute % 100;
+        return absolute == 1
+            ? "dostępny"
+            : lastTwoDigits is >= 12 and <= 14
+                ? "dostępnych"
+                : absolute % 10 is >= 2 and <= 4
+                    ? "dostępne"
+                    : "dostępnych";
+    }
+
     private int availableProductCount;
     private decimal avgPrice;
+    private decimal resultMinPrice;
+
+    [SupplyParameterFromQuery(Name = "search")]
+    private string? SearchQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "category")]
+    private string? CategoryQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "tenantId")]
+    private string? TenantIdQuery { get; set; }
+
+    private bool _queryParametersApplied;
+    private bool _initialDataLoaded;
+    private string? _lastSearchQuery;
+    private string? _lastCategoryQuery;
+    private string? _lastTenantIdQuery;
 
     private record CategoryChip(string Name, string Icon);
+    private sealed record TenantOption(Guid Id, string Name);
 
     private List<CategoryChip> GetCategoryChips()
     {
@@ -611,21 +764,55 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        // ============================================================================
-        // WAŻNE: Domyślnie wyświetlamy WSZYSTKIE produkty ze WSZYSTKICH wypożyczalni!
-        // NIE ładujemy tenanta z localStorage - filtrowanie tylko na życzenie użytkownika.
-        // Użytkownik może wybrać wypożyczalnię w filtrach jeśli chce.
-        // ============================================================================
-        
-        // WYŁĄCZONE - nie filtrujemy domyślnie po tenancie!
-        // var savedTenantName = await TenantService.GetSelectedTenantNameAsync();
-        // if (!string.IsNullOrEmpty(savedTenantName))
-        // {
-        //     selectedTenant = savedTenantName;
-        // }
-        
+        ApplyQueryParameters();
         await LoadInitialData();
+        _initialDataLoaded = true;
     }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Router zachowuje instancję komponentu przy zmianie samego query stringa.
+        // Ponownie pobierz dane tylko wtedy, gdy faktycznie zmienił się filtr z URL.
+        if (_initialDataLoaded && ApplyQueryParameters())
+        {
+            await LoadInitialData();
+        }
+    }
+
+    private bool ApplyQueryParameters()
+    {
+        var nextSearch = NormalizeQueryValue(SearchQuery);
+        var nextCategory = NormalizeQueryValue(CategoryQuery);
+        var nextTenantId = NormalizeTenantId(TenantIdQuery);
+
+        if (_queryParametersApplied &&
+            string.Equals(_lastSearchQuery, nextSearch, StringComparison.Ordinal) &&
+            string.Equals(_lastCategoryQuery, nextCategory, StringComparison.Ordinal) &&
+            string.Equals(_lastTenantIdQuery, nextTenantId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        _lastSearchQuery = nextSearch;
+        _lastCategoryQuery = nextCategory;
+        _lastTenantIdQuery = nextTenantId;
+        _queryParametersApplied = true;
+
+        searchText = nextSearch ?? string.Empty;
+        selectedCategory = nextCategory ?? string.Empty;
+        selectedTenantId = Guid.TryParse(nextTenantId, out var tenantId) ? tenantId : null;
+        currentPage = 1;
+
+        return true;
+    }
+
+    private static string? NormalizeQueryValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeTenantId(string? value)
+        => Guid.TryParse(value?.Trim(), out var tenantId) && tenantId != Guid.Empty
+            ? tenantId.ToString("D")
+            : null;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -693,71 +880,55 @@ else
     private async Task LoadInitialData()
     {
         isLoading = true;
+        _loadError = null;
         try
         {
-            // Load first page and get filter options from a larger sample
-            // Użyj wybranego tenanta jeśli jest ustawiony
-            var initialResponse = await ApiService.GetProductsPagedAsync(new ProductFilterRequest 
-            { 
-                Page = 1, 
-                PageSize = 200,
-                Tenant = string.IsNullOrWhiteSpace(selectedTenant) ? null : selectedTenant
-            });
-            
-            // Extract filter options from initial load
-            var allProducts = initialResponse.Items;
-            
-            categories = allProducts
-                .Where(p => !string.IsNullOrWhiteSpace(p.Category))
-                .Select(p => p.Category!)
-                .Distinct()
-                .OrderBy(c => c)
-                .ToList();
+            var facets = await ApiService.GetProductCatalogFacetsAsync();
+            marketplaceLocations = facets.Locations;
 
-            voivodeships = allProducts
-                .Where(p => !string.IsNullOrWhiteSpace(p.Voivodeship))
-                .Select(p => p.Voivodeship!)
-                .Distinct()
+            categories = facets.Categories;
+
+            voivodeships = facets.Locations
+                .Where(location => !string.IsNullOrWhiteSpace(location.Voivodeship))
+                .Select(location => location.Voivodeship!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(v => v)
                 .ToList();
 
-            cities = allProducts
-                .Where(p => !string.IsNullOrWhiteSpace(p.City))
-                .Select(p => p.City!)
-                .Distinct()
+            cities = facets.Locations
+                .Where(location => !string.IsNullOrWhiteSpace(location.City))
+                .Select(location => location.City!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(c => c)
                 .ToList();
             
-            filteredCities = cities;
+            UpdateFilteredCities();
 
-            tenants = allProducts
-                .Where(p => !string.IsNullOrWhiteSpace(p.TenantName))
-                .Select(p => p.TenantName!)
-                .Distinct()
-                .OrderBy(t => t)
+            tenants = facets.Tenants
+                .Where(tenant => tenant.TenantId != Guid.Empty && !string.IsNullOrWhiteSpace(tenant.Name))
+                .Select(tenant => new TenantOption(tenant.TenantId, tenant.Name))
+                .OrderBy(t => t.Name)
                 .ToList();
             
             filteredTenants = tenants;
 
-            if (allProducts.Any())
-            {
-                minPrice = allProducts.Min(p => p.DailyPrice);
-                maxPrice = allProducts.Max(p => p.DailyPrice);
-                selectedMinPrice = minPrice;
-                selectedMaxPrice = maxPrice;
-            }
-
-            // Store for stats
-            totalProductCount = initialResponse.TotalCount;
-            availableProductCount = allProducts.Count(p => p.IsAvailable && p.AvailableQuantity > 0);
-            avgPrice = allProducts.Any() ? Math.Round(allProducts.Average(p => p.DailyPrice), 2) : 0m;
+            minPrice = facets.MinimumPrice;
+            maxPrice = facets.MaximumPrice;
+            selectedMinPrice = minPrice;
+            selectedMaxPrice = maxPrice;
+            resultMinPrice = minPrice;
+            totalProductCount = facets.TotalCount;
+            availableProductCount = facets.AvailableCount;
+            avgPrice = facets.AveragePrice;
 
             // Now load first page with actual filters
             await LoadProductsAsync();
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Nie udało się załadować produktów: {ex.Message}", Severity.Error);
+            _loadError = "Sprawdź połączenie i ponów próbę.";
+            Snackbar.Add("Nie udało się załadować produktów.", Severity.Error);
+            Console.Error.WriteLine($"Nie udało się załadować katalogu: {ex.Message}");
         }
         finally
         {
@@ -768,6 +939,7 @@ else
     private async Task LoadProductsAsync()
     {
         isLoading = true;
+        _loadError = null;
         try
         {
             var filter = new ProductFilterRequest
@@ -778,7 +950,7 @@ else
                 Category = string.IsNullOrWhiteSpace(selectedCategory) ? null : selectedCategory,
                 City = string.IsNullOrWhiteSpace(selectedCity) ? null : selectedCity,
                 Voivodeship = string.IsNullOrWhiteSpace(selectedVoivodeship) ? null : selectedVoivodeship,
-                Tenant = string.IsNullOrWhiteSpace(selectedTenant) ? null : selectedTenant,
+                TenantId = selectedTenantId,
                 MinPrice = selectedMinPrice > minPrice ? selectedMinPrice : null,
                 MaxPrice = selectedMaxPrice < maxPrice ? selectedMaxPrice : null,
                 Available = showOnlyAvailable ? true : null,
@@ -790,12 +962,18 @@ else
             var response = await ApiService.GetProductsPagedAsync(filter);
             
             filteredProducts = response.Items;
+            totalProductCount = response.TotalCount;
+            availableProductCount = response.AvailableCount;
+            avgPrice = response.AveragePrice;
+            resultMinPrice = response.MinimumPrice;
             totalPages = response.TotalPages > 0 ? response.TotalPages : 1;
             currentPage = Math.Clamp(response.Page, 1, totalPages);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Błąd ładowania: {ex.Message}", Severity.Error);
+            _loadError = "Sprawdź połączenie i ponów próbę.";
+            Snackbar.Add("Nie udało się odświeżyć katalogu.", Severity.Error);
+            Console.Error.WriteLine($"Nie udało się odświeżyć katalogu: {ex.Message}");
         }
         finally
         {
@@ -810,13 +988,13 @@ else
         _ = LoadProductsAsync();
     }
 
-    private void ClearFilters()
+    private async Task ClearFilters()
     {
         searchText = string.Empty;
         selectedCategory = string.Empty;
         selectedVoivodeship = null;
         selectedCity = null;
-        selectedTenant = null;
+        selectedTenantId = null;
         filteredCities = cities;
         filteredTenants = tenants;
         selectedSort = "featured";
@@ -824,7 +1002,8 @@ else
         currentPage = 1;
         selectedMinPrice = minPrice;
         selectedMaxPrice = maxPrice;
-        _ = LoadProductsAsync();
+        await TenantService.ClearSelectedTenantAsync();
+        await LoadProductsAsync();
     }
 
     private string? SelectedVoivodeship
@@ -835,6 +1014,7 @@ else
             if (selectedVoivodeship != value)
             {
                 selectedVoivodeship = value;
+                UpdateFilteredCities();
                 // Clear city if voivodeship changed
                 if (!string.IsNullOrWhiteSpace(selectedCity))
                 {
@@ -860,18 +1040,45 @@ else
         }
     }
 
-    private string? SelectedTenant
+    private void UpdateFilteredCities()
     {
-        get => selectedTenant;
-        set
+        filteredCities = string.IsNullOrWhiteSpace(selectedVoivodeship)
+            ? cities
+            : marketplaceLocations
+                .Where(location =>
+                    !string.IsNullOrWhiteSpace(location.City) &&
+                    string.Equals(location.Voivodeship, selectedVoivodeship, StringComparison.OrdinalIgnoreCase))
+                .Select(location => location.City!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(city => city, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+    }
+
+    private async Task OnTenantChangedAsync(Guid? tenantId)
+    {
+        if (selectedTenantId == tenantId)
         {
-            if (selectedTenant != value)
-            {
-                selectedTenant = value;
-                currentPage = 1;
-                _ = LoadProductsAsync();
-            }
+            return;
         }
+
+        selectedTenantId = tenantId;
+        currentPage = 1;
+
+        var selectedTenant = tenantId.HasValue
+            ? tenants.FirstOrDefault(option => option.Id == tenantId.Value)
+            : null;
+
+        if (selectedTenant is null)
+        {
+            await TenantService.ClearSelectedTenantAsync();
+        }
+        else
+        {
+            await TenantService.SetSelectedTenantAsync(
+                selectedTenant.Id.ToString("D"), selectedTenant.Name);
+        }
+
+        await LoadProductsAsync();
     }
 
     private void OnMinPriceChanged(decimal value)
@@ -899,13 +1106,43 @@ else
 
     private async Task AddToCart(ProductDto product)
     {
-        await CartService.AddToCartAsync(product);
-        Snackbar.Add($"{product.Name} dodany do koszyka!", Severity.Success);
+        var todayInPoland = PolishRentalTime.TodayLocal;
+        var startDate = todayInPoland.AddDays(1).AddHours(9);
+        var endDate = todayInPoland.AddDays(2).AddHours(17);
+        try
+        {
+            await CartService.AddToCartAsync(product, 1, startDate, endDate);
+            var holdSecured = await CartService.EnsureHoldsAsync();
+            var addedItem = CartService.GetCart().Items.FirstOrDefault(item => item.ProductId == product.Id);
+
+            if (!holdSecured || addedItem?.HoldId is null)
+            {
+                Snackbar.Add(
+                    CartService.LastHoldError
+                    ?? $"Nie udało się zarezerwować produktu {product.Name}. Produkt pozostał w koszyku bez aktywnej rezerwacji — zmień termin lub spróbuj ponownie.",
+                    Severity.Error);
+                return;
+            }
+
+            Snackbar.Add(
+                $"{product.Name} dodany do koszyka w {TenantDisplayName(product)} na termin " +
+                $"{startDate:dd.MM, HH:mm}–{endDate:dd.MM, HH:mm}. Termin możesz zmienić w koszyku.",
+                Severity.Success);
+        }
+        catch (Exception)
+        {
+            Snackbar.Add(
+                $"Nie udało się dodać produktu {product.Name} do koszyka. Spróbuj ponownie.",
+                Severity.Error);
+        }
     }
+
+    private static string TenantDisplayName(ProductDto product) =>
+        string.IsNullOrWhiteSpace(product.TenantName) ? "Wypożyczalnia" : product.TenantName;
 
     private Task AddToCartFromDialog(ProductDto product) => AddToCart(product);
 
-    private void ViewProduct(ProductDto product)
+    private async Task ViewProduct(ProductDto product)
     {
         var parameters = new DialogParameters
         {
@@ -920,11 +1157,12 @@ else
             FullWidth = true
         };
 
-        DialogService.Show<ProductDetailsDialog>("Product details", parameters, options);
+        await DialogService.ShowAsync<ProductDetailsDialog>("Szczegóły produktu", parameters, options);
     }
 
     private void NavigateToProduct(Guid id)
     {
-        Navigation.NavigateTo($"/products/{id}");
+        Navigation.NavigateTo($"products/{id}");
     }
+
 }

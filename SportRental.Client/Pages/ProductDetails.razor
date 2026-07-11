@@ -23,6 +23,14 @@
                 <span>Ładowanie produktu...</span>
             </div>
         }
+        else if (_loadError is not null)
+        {
+            <div class="product-mobile-empty" role="alert">
+                <h3>Nie udało się pobrać produktu</h3>
+                <p>@_loadError</p>
+                <button class="product-mobile-cta" @onclick="LoadProductAsync">Spróbuj ponownie</button>
+            </div>
+        }
         else if (notFound || product is null)
         {
             <div class="product-mobile-empty">
@@ -35,18 +43,25 @@
         else
         {
             <!-- Mobile Image -->
+            var mobileImageUrl = product.GetImageUrl(800);
             <div class="product-mobile-image">
-                @if (!string.IsNullOrWhiteSpace(product.GetImageUrl(800)))
+                @if (!string.IsNullOrWhiteSpace(mobileImageUrl))
                 {
-                    <img src="@product.GetImageUrl(800)" alt="@product.Name" />
+                    <img src="@mobileImageUrl"
+                         data-fallback-src="@product.ImageUrl"
+                         alt="@product.Name"
+                         onerror="srImg(this)" />
                 }
                 else
                 {
-                    <div class="product-mobile-image-placeholder"></div>
+                    <div class="product-mobile-image-placeholder" aria-hidden="true">
+                        <Icon Name="catalog" Size="42" />
+                        <span>Zdjęcie wkrótce</span>
+                    </div>
                 }
                 
                 <!-- Back button -->
-                <button class="product-mobile-back" @onclick="GoBack">←</button>
+                <button class="product-mobile-back" @onclick="GoBack" aria-label="Wróć"><Icon Name="arrow-left" Size="20" /></button>
                 
                 <!-- Badges -->
                 <div class="product-mobile-image-badges">
@@ -72,13 +87,13 @@
                 
                 <div class="product-mobile-prices">
                     <div class="price-main">
-                        <span class="price-value">@product.DailyPrice.ToString("N0") zł</span>
+                        <span class="price-value">@product.DailyPrice.PlnInt()</span>
                         <span class="price-period">/ dzień</span>
                     </div>
                     @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
                     {
                         <div class="price-hourly">
-                            <span>@product.HourlyPrice.Value.ToString("N0") zł</span>
+                            <span>@product.HourlyPrice.Value.PlnInt()</span>
                             <span>/ godz.</span>
                         </div>
                     }
@@ -86,17 +101,36 @@
 
                 <div class="product-mobile-stock">@product.AvailableQuantity szt. w magazynie</div>
 
+                <div class="product-mobile-description">
+                    <h3>Wypożyczalnia i odbiór</h3>
+                    <p><strong>@(product.TenantName ?? "Wypożyczalnia")</strong></p>
+                    <p>Odbiór: @ProductPickupDisplay(product)</p>
+                    @if (_tenantLocation is not null)
+                    {
+                        @if (!string.IsNullOrWhiteSpace(_tenantLocation.OpeningHours))
+                        {
+                            <p>Godziny: @_tenantLocation.OpeningHours</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_tenantLocation.PhoneNumber))
+                        {
+                            <a href="@($"tel:{_tenantLocation.PhoneNumber}")">@_tenantLocation.PhoneNumber</a>
+                        }
+                    }
+                </div>
+
                 <!-- Dates selection -->
                 <div class="product-mobile-dates">
                     <h3>Okres wypożyczenia</h3>
                     <div class="dates-row">
                         <div class="date-input">
                             <label>Od</label>
-                            <input type="date" @bind="startDate" min="@DateTime.Today.ToString("yyyy-MM-dd")" />
+                            <input type="datetime-local" @bind="startDate" @bind:format="yyyy-MM-ddTHH:mm"
+                                   min="@EarliestStartLocal.ToString("yyyy-MM-ddTHH:mm")" />
                         </div>
                         <div class="date-input">
                             <label>Do</label>
-                            <input type="date" @bind="endDate" min="@startDate?.AddDays(1).ToString("yyyy-MM-dd")" />
+                            <input type="datetime-local" @bind="endDate" @bind:format="yyyy-MM-ddTHH:mm"
+                                   min="@startDate?.AddHours(1).ToString("yyyy-MM-ddTHH:mm")" />
                         </div>
                     </div>
                     
@@ -105,7 +139,7 @@
                             <option value="0">Wynajem dzienny</option>
                             @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
                             {
-                                <option value="1">⏰ Wynajem godzinowy</option>
+                                <option value="1">Wynajem godzinowy</option>
                             }
                         </select>
                         @if (selectedRentalType == 1)
@@ -117,25 +151,26 @@
 
                     @if (startDate.HasValue && endDate.HasValue && endDate > startDate)
                     {
-                        var days = (endDate.Value - startDate.Value).Days;
+                        var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
                         decimal totalPrice;
                         string priceDescription;
                         
                         if (selectedRentalType == 1 && product.HourlyPrice.HasValue)
                         {
                             totalPrice = product.HourlyPrice.Value * selectedHours;
-                            priceDescription = $"{selectedHours} godz. × {product.HourlyPrice.Value.ToString("N0")} zł";
+                            priceDescription = $"{selectedHours} godz. × {product.HourlyPrice.Value.PlnInt()}";
                         }
                         else
                         {
                             totalPrice = product.DailyPrice * days;
-                            priceDescription = $"{days} dni × {product.DailyPrice.ToString("N0")} zł";
+                            priceDescription = $"{days} dni × {product.DailyPrice.PlnInt()}";
                         }
                         
                         <div class="price-summary">
                             <span>@priceDescription</span>
-                            <span class="price-total">= @totalPrice.ToString("N0") zł</span>
+                            <span class="price-total">= @totalPrice.PlnInt()</span>
                         </div>
+                        <p class="text-xs text-gray-500 mt-1">Cena orientacyjna; dokładna wycena z regułami sezonowymi pojawi się w koszyku.</p>
                     }
                 </div>
 
@@ -167,11 +202,15 @@ else
 <div class="product-details-container">
     <div class="max-w-6xl mx-auto">
         <!-- Breadcrumbs -->
+        <style>
+            .rs-crumb { color:#E0454C; text-decoration:none; }
+            .rs-crumb:hover { color:#F96167; text-decoration:underline; }
+        </style>
         <div class="mb-6">
             <nav class="flex items-center gap-2 text-sm text-gray-500">
-                <a href="/" class="hover:text-gray-700">Home</a>
+                <a href="./" class="rs-crumb">Home</a>
                 <span>/</span>
-                <a href="/products" class="hover:text-gray-700">Katalog</a>
+                <a href="products" class="rs-crumb">Katalog</a>
                 <span>/</span>
                 <span class="text-gray-800 font-medium">@(product?.Name ?? "...")</span>
             </nav>
@@ -189,6 +228,16 @@ else
                     <div class="h-24 bg-gray-200 rounded"></div>
                     <div class="h-12 bg-gray-200 rounded w-1/2"></div>
                 </div>
+            </div>
+        }
+        else if (_loadError is not null)
+        {
+            <div class="text-center py-20" role="alert">
+                <h1 class="text-3xl font-bold text-gray-800 mb-3">Nie udało się pobrać produktu</h1>
+                <p class="text-gray-600 mb-8">@_loadError</p>
+                <button @onclick="LoadProductAsync" class="product-details-add-btn" style="max-width: 250px; margin: 0 auto;">
+                    Spróbuj ponownie
+                </button>
             </div>
         }
         else if (notFound || product is null)
@@ -214,20 +263,22 @@ else
                     }
                     @if (!string.IsNullOrWhiteSpace(imageUrl))
                     {
-                        <div class="product-details-image-wrapper" @onclick="@(() => ShowImageLightbox(originalUrl, product.Name))">
+                        <div class="product-details-image-wrapper" @onclick="@(() => ShowImageLightbox(originalUrl, product.Name, product.ImageUrl))">
                             @if (!string.IsNullOrEmpty(imageSrcSet))
                             {
                                 <img src="@imageUrl"
                                      srcset="@imageSrcSet"
                                      sizes="(max-width: 600px) 400px, (max-width: 900px) 800px, 1280px"
+                                     data-fallback-src="@product.ImageUrl"
                                      alt="@product.Name"
-                                     class="product-details-image" />
+                                     class="product-details-image" onerror="srImg(this)" />
                             }
                             else
                             {
                                 <img src="@imageUrl"
+                                     data-fallback-src="@product.ImageUrl"
                                      alt="@product.Name"
-                                     class="product-details-image" />
+                                     class="product-details-image" onerror="srImg(this)" />
                             }
                             <div class="product-details-zoom-hint">
                                 Kliknij aby powiększyć
@@ -237,7 +288,7 @@ else
                     else
                     {
                         <div class="product-details-image-placeholder">
-                            <div class="text-6xl mb-4"></div>
+                            <Icon Name="catalog" Size="48" />
                             <p>Zdjęcie wkrótce dostępne</p>
                         </div>
                     }
@@ -255,10 +306,10 @@ else
                     <h1 class="product-details-title">@product.Name</h1>
 
                     <div class="product-details-price-row">
-                        <span class="product-details-price">@product.DailyPrice.ToString("C") / dzień</span>
+                        <span class="product-details-price">@product.DailyPrice.Pln() / dzień</span>
                         @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
                         {
-                            <span class="product-details-price-hourly">@product.HourlyPrice.Value.ToString("C") / godz.</span>
+                            <span class="product-details-price-hourly">@product.HourlyPrice.Value.Pln() / godz.</span>
                         }
                         @if (product.IsAvailable && product.AvailableQuantity > 0)
                         {
@@ -271,22 +322,46 @@ else
                         <span class="product-details-stock">@product.AvailableQuantity szt.</span>
                     </div>
 
+                    <div class="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                        <div class="font-semibold text-gray-900">@(product.TenantName ?? "Wypożyczalnia")</div>
+                        <div class="text-sm text-gray-600 mt-1">Odbiór: @ProductPickupDisplay(product)</div>
+                        @if (_tenantLocation is not null)
+                        {
+                            @if (!string.IsNullOrWhiteSpace(_tenantLocation.OpeningHours))
+                            {
+                                <div class="text-sm text-gray-600 mt-1">Godziny: @_tenantLocation.OpeningHours</div>
+                            }
+                            <div class="flex gap-4 mt-2 text-sm">
+                                @if (!string.IsNullOrWhiteSpace(_tenantLocation.PhoneNumber))
+                                {
+                                    <a href="@($"tel:{_tenantLocation.PhoneNumber}")" class="rs-crumb">@_tenantLocation.PhoneNumber</a>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(_tenantLocation.Email))
+                                {
+                                    <a href="@($"mailto:{_tenantLocation.Email}")" class="rs-crumb">@_tenantLocation.Email</a>
+                                }
+                            </div>
+                        }
+                    </div>
+
                     <!-- Date Selection -->
                     <div class="product-details-dates">
                         <h3>Wybierz okres wypożyczenia</h3>
                         <div class="product-details-dates-grid">
                             <div>
                                 <label class="block text-sm font-medium text-gray-600 mb-2">Data rozpoczęcia</label>
-                                <input type="date" 
+                                <input type="datetime-local"
                                        @bind="startDate"
-                                       min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                       @bind:format="yyyy-MM-ddTHH:mm"
+                                       min="@EarliestStartLocal.ToString("yyyy-MM-ddTHH:mm")"
                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-600 mb-2">Data zakończenia</label>
-                                <input type="date" 
+                                <input type="datetime-local"
                                        @bind="endDate"
-                                       min="@startDate?.AddDays(1).ToString("yyyy-MM-dd")"
+                                       @bind:format="yyyy-MM-ddTHH:mm"
+                                       min="@startDate?.AddHours(1).ToString("yyyy-MM-ddTHH:mm")"
                                        class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none" />
                             </div>
                         </div>
@@ -300,7 +375,7 @@ else
                                     <option value="0">Dzienny</option>
                                     @if (product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
                                     {
-                                        <option value="1">⏰ Godzinowy</option>
+                                        <option value="1">Godzinowy</option>
                                     }
                                 </select>
                             </div>
@@ -318,27 +393,28 @@ else
                         
                         @if (startDate.HasValue && endDate.HasValue && endDate > startDate)
                         {
-                            var days = (endDate.Value - startDate.Value).Days;
+                            var days = Math.Max(1, (int)Math.Ceiling((endDate.Value - startDate.Value).TotalDays));
                             decimal totalPrice;
                             string priceDescription;
                             
                             if (selectedRentalType == 1 && product.HourlyPrice.HasValue && product.HourlyPrice.Value > 0)
                             {
                                 totalPrice = product.HourlyPrice.Value * selectedHours;
-                                priceDescription = $"⏱️ {selectedHours} godz. × {product.HourlyPrice.Value.ToString("C")}";
+                                priceDescription = $"{selectedHours} godz. × {product.HourlyPrice.Value.Pln()}";
                             }
                             else
                             {
                                 totalPrice = product.DailyPrice * days;
-                                priceDescription = $"⏱️ {days} dni × {product.DailyPrice.ToString("C")}";
+                                priceDescription = $"{days} dni × {product.DailyPrice.Pln()}";
                             }
                             
-                            <div class="mt-4 p-4 bg-purple-50 rounded-xl">
+                            <div class="mt-4 p-4 bg-purple-50 rounded-xl" style="background:#FEF2F2">
                                 <div class="flex justify-between items-center">
                                     <span class="text-gray-600">@priceDescription</span>
-                                    <span class="text-xl font-bold text-purple-600">= @totalPrice.ToString("C")</span>
+                                    <span class="text-xl font-bold text-purple-600" style="color:#E0454C">= @totalPrice.Pln()</span>
                                 </div>
                             </div>
+                            <p class="text-xs text-gray-500 mt-1">Cena orientacyjna; dokładna wycena z regułami sezonowymi pojawi się w koszyku.</p>
                         }
                     </div>
 
@@ -372,19 +448,45 @@ else
                     <div class="related-products-grid">
                         @foreach (var related in relatedProducts)
                         {
-                            <div class="related-product-card" @onclick="@(() => NavigateToProduct(related.Id))">
-                                @{ var relatedImage = related.FullImageUrl ?? related.ImageUrl; }
+                            <div class="related-product-card"
+                                 role="link"
+                                 tabindex="0"
+                                 aria-label="@RelatedProductAriaLabel(related)"
+                                 @onclick="@(() => NavigateToProduct(related.Id))"
+                                 @onkeydown="@(args => OpenRelatedProductFromKeyboard(args, related.Id))">
+                                @{
+                                    var relatedImage = related.GetImageUrl(400);
+                                    if (string.IsNullOrWhiteSpace(relatedImage))
+                                    {
+                                        relatedImage = related.FullImageUrl;
+                                    }
+                                }
                                 @if (!string.IsNullOrWhiteSpace(relatedImage))
                                 {
-                                    <img src="@relatedImage" alt="@related.Name" class="related-product-image" />
+                                    <img src="@relatedImage"
+                                         data-fallback-src="@related.ImageUrl"
+                                         alt="@related.Name"
+                                         class="related-product-image"
+                                         onerror="srImg(this)" />
                                 }
                                 else
                                 {
                                     <div class="related-product-image bg-gray-100 flex items-center justify-center text-4xl"></div>
                                 }
                                 <div class="related-product-info">
+                                    @if (product is not null && related.TenantId != product.TenantId)
+                                    {
+                                        <div class="related-product-other-tenant">Inna wypożyczalnia</div>
+                                    }
                                     <div class="related-product-name">@related.Name</div>
-                                    <div class="related-product-price">@related.DailyPrice.ToString("C") / dzień</div>
+                                    <div class="related-product-tenant">
+                                        @(string.IsNullOrWhiteSpace(related.TenantName) ? "Wypożyczalnia partnerska" : related.TenantName)
+                                    </div>
+                                    <div class="related-product-pickup">
+                                        <span aria-hidden="true">📍</span>
+                                        <span>@RelatedPickupDisplay(related)</span>
+                                    </div>
+                                    <div class="related-product-price">@related.DailyPrice.Pln() / dzień</div>
                                 </div>
                             </div>
                         }
@@ -401,7 +503,11 @@ else
     <DialogContent>
         <div class="text-center p-4">
             <h3 class="text-xl font-bold mb-4">@_lightboxImageTitle</h3>
-            <img src="@_lightboxImageUrl" alt="@_lightboxImageTitle" class="max-w-full max-h-[80vh] mx-auto rounded-lg" />
+            <img src="@_lightboxImageUrl"
+                 data-fallback-src="@_lightboxFallbackUrl"
+                 alt="@_lightboxImageTitle"
+                 class="max-w-full max-h-[80vh] mx-auto rounded-lg"
+                 onerror="srImg(this)" />
         </div>
     </DialogContent>
     <DialogActions>
@@ -417,12 +523,15 @@ else
 
     private ProductDto? product;
     private List<ProductDto> relatedProducts = new();
+    private TenantLocationDto? _tenantLocation;
     private bool isLoading = true;
     private bool notFound;
+    private string? _loadError;
     private DateTime? startDate;
     private DateTime? endDate;
     private int selectedRentalType = 0; // 0 = Daily, 1 = Hourly
     private int selectedHours = 1;
+    private DateTime EarliestStartLocal => PolishRentalTime.EarliestStartLocal();
     
     // Mobile state
     private bool _isMobile = false;
@@ -430,9 +539,16 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        await LoadProductAsync();
+    }
+
+    private async Task LoadProductAsync()
+    {
         isLoading = true;
         notFound = false;
+        _loadError = null;
         product = null;
+        _tenantLocation = null;
         relatedProducts.Clear();
 
         try
@@ -444,15 +560,31 @@ else
                 return;
             }
 
-            startDate ??= DateTime.Today;
-            endDate ??= DateTime.Today.AddDays(1);
+            var todayInPoland = PolishRentalTime.TodayLocal;
+            startDate ??= todayInPoland.AddDays(1).AddHours(9);
+            endDate ??= todayInPoland.AddDays(2).AddHours(17);
 
+            // Products from one shop form one rental. If this shop is already in the
+            // cart, show its canonical terms instead of suggesting that this product
+            // can have a separate period or rental type.
+            var tenantTemplate = CartService.GetCart().Items
+                .FirstOrDefault(item => item.TenantId == product.TenantId);
+            if (tenantTemplate is not null)
+            {
+                startDate = tenantTemplate.StartDate;
+                endDate = tenantTemplate.EndDate;
+                selectedRentalType = (int)tenantTemplate.RentalType;
+                selectedHours = tenantTemplate.HoursRented ?? 1;
+            }
+
+            await LoadTenantLocationAsync(product.TenantId);
             await LoadRelatedProductsAsync(product);
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"Nie udało się wczytać produktu: {ex.Message}", Severity.Error);
-            notFound = true;
+            _loadError = "Sprawdź połączenie i ponów próbę.";
+            Snackbar.Add("Nie udało się wczytać produktu.", Severity.Error);
+            Console.Error.WriteLine($"Nie udało się wczytać produktu {Id}: {ex.Message}");
         }
         finally
         {
@@ -522,51 +654,167 @@ else
         }
     }
 
+    private async Task LoadTenantLocationAsync(Guid tenantId)
+    {
+        try
+        {
+            _tenantLocation = (await ApiService.GetTenantLocationsAsync())
+                .FirstOrDefault(location => location.TenantId == tenantId);
+        }
+        catch
+        {
+            // Dane punktu są pomocnicze; produkt nadal pozostaje możliwy do obejrzenia.
+        }
+    }
+
+    private static string RelatedPickupDisplay(ProductDto related) =>
+        !string.IsNullOrWhiteSpace(related.PickupAddress)
+            ? related.PickupAddress.Trim()
+            : related.GetPickupDisplayText();
+
+    private static string RelatedProductAriaLabel(ProductDto related)
+    {
+        var tenantName = string.IsNullOrWhiteSpace(related.TenantName)
+            ? "wypożyczalnia partnerska"
+            : related.TenantName.Trim();
+        return $"Zobacz polecany produkt {related.Name}, {tenantName}, odbiór: {RelatedPickupDisplay(related)}";
+    }
+
+    private string ProductPickupDisplay(ProductDto currentProduct)
+    {
+        var address = !string.IsNullOrWhiteSpace(currentProduct.PickupAddress)
+            ? currentProduct.PickupAddress
+            : _tenantLocation?.Address;
+        if (!string.IsNullOrWhiteSpace(address))
+            return address.Trim();
+
+        var city = !string.IsNullOrWhiteSpace(currentProduct.City)
+            ? currentProduct.City
+            : _tenantLocation?.City;
+        return !string.IsNullOrWhiteSpace(city)
+            ? city.Trim()
+            : currentProduct.GetPickupDisplayText();
+    }
+
     private async Task AddToCart()
     {
         if (product is null) return;
 
-        if (!startDate.HasValue || !endDate.HasValue || endDate <= startDate)
+        var tenantTemplate = product.TenantId == Guid.Empty
+            ? null
+            : CartService.GetCart().Items.FirstOrDefault(item => item.TenantId == product.TenantId);
+        var effectiveStartDate = tenantTemplate?.StartDate ?? startDate;
+        var requestedRentalType = (RentalTypeDto)selectedRentalType;
+        var rentalType = tenantTemplate?.RentalType ?? requestedRentalType;
+        var hours = rentalType == RentalTypeDto.Hourly
+            ? tenantTemplate?.HoursRented ?? selectedHours
+            : (int?)null;
+        var effectiveEndDate = tenantTemplate?.EndDate ??
+            (requestedRentalType == RentalTypeDto.Hourly && startDate.HasValue
+                ? startDate.Value.AddHours(Math.Clamp(selectedHours, 1, 24))
+                : endDate);
+
+        if (!effectiveStartDate.HasValue || !effectiveEndDate.HasValue || effectiveEndDate <= effectiveStartDate)
         {
             Snackbar.Add("Wybierz poprawny okres wypożyczenia.", Severity.Warning);
             return;
         }
 
-        await CartService.AddToCartAsync(product, 1, startDate, endDate);
-        
-        // Ustaw typ wynajmu i godziny
-        var rentalType = (RentalTypeDto)selectedRentalType;
-        var hours = selectedRentalType == 1 ? selectedHours : (int?)null;
-        await CartService.UpdateRentalTypeAsync(product.Id, rentalType, hours);
-        
-        var holdSecured = await CartService.EnsureHoldsAsync();
-        if (!holdSecured)
+        if (!PolishRentalTime.TryToUtc(effectiveStartDate.Value, out var startUtc) ||
+            !PolishRentalTime.TryToUtc(effectiveEndDate.Value, out _))
         {
-            Snackbar.Add("Nie udało się zarezerwować wybranego produktu. Zmień daty i spróbuj ponownie.", Severity.Warning);
+            Snackbar.Add("Wybrana godzina nie istnieje z powodu zmiany czasu. Wybierz inny termin.", Severity.Warning);
             return;
         }
 
-        Snackbar.Add($"Produkt {product.Name} dodany do koszyka.", Severity.Success);
+        if (!PolishRentalTime.IsStartSafelyInFuture(startUtc, DateTime.UtcNow))
+        {
+            Snackbar.Add("Data rozpoczęcia musi być co najmniej 2 minuty w przyszłości.", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            await CartService.AddToCartAsync(product, 1, effectiveStartDate, effectiveEndDate);
+
+            var tenantItems = CartService.GetCart().Items
+                .Where(item => item.TenantId == product.TenantId)
+                .ToList();
+            var addedItem = tenantItems.FirstOrDefault(item => item.ProductId == product.Id);
+            var reusedTenantTerms = tenantTemplate is not null ||
+                                    tenantItems.Count > 1 ||
+                                    addedItem?.Quantity > 1;
+
+            // For the first product the selected type initializes the tenant rental.
+            // Later products already inherit the complete canonical terms in CartService;
+            // overwriting only their type would split one tenant group into two contracts.
+            if (!reusedTenantTerms)
+                await CartService.UpdateRentalTypeAsync(product.Id, rentalType, hours);
+
+            if (reusedTenantTerms && addedItem is not null)
+            {
+                startDate = addedItem.StartDate;
+                endDate = addedItem.EndDate;
+                selectedRentalType = (int)addedItem.RentalType;
+                selectedHours = addedItem.HoursRented ?? 1;
+            }
+
+            var holdSecured = await CartService.EnsureHoldsAsync();
+            addedItem = CartService.GetCart().Items.FirstOrDefault(item => item.ProductId == product.Id);
+            if (!holdSecured || addedItem?.HoldId is null)
+            {
+                Snackbar.Add(
+                    CartService.LastHoldError
+                    ?? $"Nie udało się zarezerwować produktu {product.Name}. Produkt pozostał w koszyku bez aktywnej rezerwacji — zmień termin lub spróbuj ponownie.",
+                    Severity.Error);
+                return;
+            }
+
+            var tenantName = string.IsNullOrWhiteSpace(product.TenantName)
+                ? "wypożyczalni"
+                : product.TenantName;
+            Snackbar.Add(
+                reusedTenantTerms
+                    ? $"Produkt {product.Name} dodany do rezerwacji w {tenantName}. Obowiązuje wspólny termin i typ wynajmu tej wypożyczalni."
+                    : $"Produkt {product.Name} zarezerwowany w {tenantName} i dodany do koszyka.",
+                Severity.Success);
+        }
+        catch (Exception)
+        {
+            Snackbar.Add(
+                $"Nie udało się dodać produktu {product.Name} do koszyka. Spróbuj ponownie.",
+                Severity.Error);
+        }
     }
 
     private void GoBack()
     {
-        Navigation.NavigateTo("/products");
+        Navigation.NavigateTo("products");
     }
 
     private void NavigateToProduct(Guid id)
     {
-        Navigation.NavigateTo($"/products/{id}");
+        Navigation.NavigateTo($"products/{id}");
+    }
+
+    private void OpenRelatedProductFromKeyboard(KeyboardEventArgs args, Guid productId)
+    {
+        if (args.Key is "Enter" or " ")
+        {
+            NavigateToProduct(productId);
+        }
     }
 
     // Image Lightbox
     private bool _showLightbox = false;
     private string _lightboxImageUrl = string.Empty;
+    private string _lightboxFallbackUrl = string.Empty;
     private string _lightboxImageTitle = string.Empty;
 
-    private void ShowImageLightbox(string imageUrl, string title)
+    private void ShowImageLightbox(string imageUrl, string title, string? fallbackUrl)
     {
         _lightboxImageUrl = imageUrl;
+        _lightboxFallbackUrl = fallbackUrl?.Trim() ?? string.Empty;
         _lightboxImageTitle = title;
         _showLightbox = true;
     }

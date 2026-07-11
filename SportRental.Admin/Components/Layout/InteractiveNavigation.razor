@@ -37,13 +37,13 @@
                                  Placeholder="Klient, produkt, telefon, #wynajem…"
                                  Variant="Variant.Outlined"
                                  Dense="true"
-                                 Clearable="true"
                                  ShowProgressIndicator="true"
                                  DebounceInterval="200"
                                  MinCharacters="2"
                                  MaxItems="16"
                                  AdornmentIcon="@Icons.Material.Filled.Search"
                                  Adornment="Adornment.Start"
+                                 AdornmentAriaLabel="Szukaj w panelu"
                                  Class="rs-topbar-search-input">
                     <ItemTemplate Context="hit">
                         <div class="rs-search-hit">
@@ -97,7 +97,11 @@
     </AuthorizeView>
     <AuthorizeView Roles="Owner,SuperAdmin" Context="adminCtx">
         <Authorized>
-            <a href="/_client/" target="_blank" rel="noopener" class="rs-client-preview" title="Otwórz widok klienta w nowej karcie">
+            <a href="/api/auth/client-preview?returnUrl=%2F_client%2F"
+               target="_blank"
+               rel="noopener"
+               class="rs-client-preview"
+               title="Otwórz widok klienta w nowej karcie">
                 <MudIcon Icon="@Icons.Material.Filled.Visibility" Size="Size.Small" />
                 <span class="rs-client-preview-text">Widok klienta</span>
                 <MudIcon Icon="@Icons.Material.Filled.OpenInNew" Size="Size.Small" Class="rs-client-preview-ext" />

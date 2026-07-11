@@ -1,0 +1,51 @@
+/* RentSpot DS v2 — remap the off-brand Tailwind color utilities that survive in the
+   "modern" client pages (Login, Register, Contact, Checkout, ProductDetails, Home,
+   NotFound, SelectTenant). Blue / indigo / purple are ALL legacy here (never semantic),
+   so they map to coral; blue/indigo tints map to the coral surface tint.
+   Loaded LAST in index.html so it wins over the compiled tailwind.css. */
+
+/* ---- text ---- */
+.text-blue-600, .text-blue-500, .text-blue-700,
+.text-indigo-600, .text-indigo-500, .text-indigo-700,
+.text-purple-600, .text-purple-500, .text-purple-700 { color: #BC3138 !important; }
+
+.hover\:text-blue-700:hover, .hover\:text-blue-800:hover,
+.hover\:text-indigo-700:hover, .hover\:text-indigo-800:hover,
+.hover\:text-purple-700:hover, .hover\:text-purple-800:hover { color: #8F2429 !important; }
+
+/* ---- solid fills ---- */
+.bg-blue-600, .bg-blue-500, .bg-blue-700,
+.bg-indigo-600, .bg-indigo-500, .bg-indigo-700,
+.bg-purple-600, .bg-purple-500, .bg-purple-700 { background-color: #F96167 !important; }
+
+.hover\:bg-blue-700:hover, .hover\:bg-blue-800:hover,
+.hover\:bg-indigo-700:hover, .hover\:bg-indigo-800:hover,
+.hover\:bg-purple-700:hover, .hover\:bg-purple-800:hover { background-color: #E0454C !important; }
+
+/* ---- light tints (icon tiles, info boxes, hover surfaces) ---- */
+.bg-blue-50, .bg-blue-100, .bg-indigo-50, .bg-indigo-100,
+.bg-purple-50, .bg-purple-100 { background-color: var(--surface-brand-tint, #FEF2F2) !important; }
+
+/* ---- focus states (rings + borders) ---- */
+.focus\:ring-blue-500:focus, .focus\:ring-indigo-500:focus, .focus\:ring-purple-500:focus {
+    --tw-ring-color: rgba(249, 97, 103, .45) !important;
+    box-shadow: 0 0 0 3px rgba(249, 97, 103, .28) !important;
+}
+.focus\:border-blue-500:focus, .focus\:border-indigo-500:focus, .focus\:border-purple-500:focus {
+    border-color: #F96167 !important;
+}
+
+/* ---- gradient stops that leak blue/purple (auth buttons, hero utilities) ---- */
+.from-blue-600, .from-indigo-600, .from-purple-600,
+.from-blue-500, .from-indigo-500, .from-purple-500 { --tw-gradient-from: #F96167 var(--tw-gradient-from-position) !important; }
+.to-blue-600, .to-indigo-600, .to-purple-600,
+.to-blue-500, .to-indigo-500, .to-purple-500 { --tw-gradient-to: #E0454C var(--tw-gradient-to-position) !important; }
+
+/* ---- REGRESSION FIX: empty-state <Icon> svg is display:block (Tailwind preflight),
+   so in text-align:center containers it hugged the left edge. Center it. ---- */
+.cart-empty-icon, .products-empty-icon,
+.rentals-empty-icon, .rentals-mobile-empty .empty-icon,
+.cart-mobile-empty .empty-icon, .checkout-mobile-empty .empty-icon,
+.products-mobile-empty .empty-icon, .success-icon { display: flex; justify-content: center; }
+.cart-empty > svg, .products-empty > svg, .checkout-mobile-empty > svg,
+.empty-icon > svg { margin-left: auto; margin-right: auto; }

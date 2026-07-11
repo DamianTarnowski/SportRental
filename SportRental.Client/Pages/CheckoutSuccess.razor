@@ -1,10 +1,12 @@
 @page "/checkout/success"
+@using SportRental.Client.Helpers
 @using SportRental.Shared.Models
 @using SportRental.Shared.Services
 @using SportRental.Client.Services
 @inject NavigationManager NavigationManager
 @inject IApiService ApiService
 @inject ICustomerSessionService CustomerSession
+@inject ICartService CartService
 @inject ISnackbar Snackbar
 
 <PageTitle>Płatność zakończona sukcesem — RentSpot</PageTitle>
@@ -17,78 +19,111 @@
             <h2 class="text-2xl font-bold text-gray-800">Ładowanie szczegółów rezerwacji...</h2>
         </div>
     }
+    else if (!_isConfirmed)
+    {
+        <div class="success-card">
+            <h1 class="success-title">Nie udało się potwierdzić rezerwacji</h1>
+            <p class="success-subtitle">
+                @(_loadError ?? "Brakuje identyfikatora płatności. Nie potwierdzamy rezerwacji bez weryfikacji Stripe.")
+            </p>
+            <div class="success-actions">
+                @if (_canRetry)
+                {
+                    <button type="button"
+                            class="checkout-submit-btn"
+                            style="color:#fff;"
+                            disabled="@_isRetrying"
+                            @onclick="RetryConfirmationAsync">
+                        @(_isRetrying ? "Ponawiam potwierdzenie..." : "Ponów potwierdzenie płatności")
+                    </button>
+                }
+                <a href="contact" class="product-details-back-btn" style="text-decoration:none;">Kontakt</a>
+            </div>
+        </div>
+    }
     else
     {
         <div class="success-card">
-            <div class="success-icon"></div>
-            <h1 class="success-title">Płatność zakończona sukcesem! </h1>
+            <div class="success-icon"><Icon Name="check" Size="40" /></div>
+            <h1 class="success-title">Płatność zakończona sukcesem!</h1>
             <p class="success-subtitle">
-                Dziękujemy za wypożyczenie sprzętu. Twoja rezerwacja została potwierdzona.
+                @if (_rentals.Count > 1)
+                {
+                    <span>Jedna płatność została potwierdzona. Utworzyliśmy @PolishCount(_rentals.Count, "rezerwację", "osobne rezerwacje", "osobnych rezerwacji") w różnych wypożyczalniach.</span>
+                }
+                else
+                {
+                    <span>Twoja rezerwacja została potwierdzona.</span>
+                }
             </p>
 
-            @if (!string.IsNullOrEmpty(SessionId))
+            @if (!string.IsNullOrWhiteSpace(_orderNumber))
             {
                 <div class="inline-block px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm mb-6">
-                    ID płatności: <code class="font-mono">@SessionId[..Math.Min(20, SessionId.Length)]...</code>
+                    Numer zamówienia: <strong>@_orderNumber</strong>
                 </div>
             }
 
-            @if (_latestRental != null)
+            @if (_rentals.Count > 0)
             {
-                <div class="success-details">
-                    <div class="text-lg font-semibold text-gray-800 mb-4">Szczegóły rezerwacji</div>
-                    
-                    <div class="success-details-row">
-                        <span class="text-gray-600">Klient</span>
-                        <span class="font-medium">@_latestRental.CustomerName</span>
+                <div class="success-order-summary">
+                    <div>
+                        <span>Łączna wartość wynajmów</span>
+                        <strong>@_rentals.Sum(rental => rental.TotalAmount).Pln()</strong>
                     </div>
-                    
-                    <div class="success-details-row">
-                        <span class="text-gray-600">Od</span>
-                        <span class="font-medium">@_latestRental.StartDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                    <div>
+                        <span>Depozyt opłacony online</span>
+                        <strong>@_rentals.Sum(rental => rental.DepositAmount).Pln()</strong>
                     </div>
-                    
-                    <div class="success-details-row">
-                        <span class="text-gray-600">Do</span>
-                        <span class="font-medium">@_latestRental.EndDateUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
-                    </div>
-                    
-                    <div class="success-details-row">
-                        <span class="text-gray-600">Kwota</span>
-                        <span class="font-bold text-green-600">@_latestRental.TotalAmount.ToString("C")</span>
-                    </div>
-                    
-                    <div class="success-details-row">
-                        <span class="text-gray-600"> Status</span>
-                        <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                            @_latestRental.Status
-                        </span>
-                    </div>
+                </div>
 
-                    <div class="mt-4 pt-4 border-t border-gray-200">
-                        <div class="text-sm font-medium text-gray-700 mb-2">Wypożyczone produkty:</div>
-                        @foreach (var item in _latestRental.Items)
-                        {
-                            <div class="flex justify-between text-sm py-1">
-                                <span>@item.ProductName × @item.Quantity</span>
-                                <span class="text-gray-600">@item.TotalPrice.ToString("C")</span>
-                            </div>
-                        }
-                    </div>
-
-                    @if (!string.IsNullOrEmpty(_latestRental.ContractUrl))
+                <div class="success-rental-groups">
+                    @foreach (var rental in _rentals)
                     {
-                        <div class="mt-4 p-4 bg-green-50 rounded-xl">
-                            <div class="flex items-center gap-3">
-                                <span class="text-2xl"></span>
+                        <article class="success-rental-group">
+                            <header>
                                 <div>
-                                    <div class="font-medium text-green-800">Umowa jest gotowa!</div>
-                                    <a href="@_latestRental.ContractUrl" target="_blank" class="text-green-600 hover:underline text-sm">
-                                        Pobierz umowę (PDF)
-                                    </a>
+                                    <span class="success-rental-sequence">Rezerwacja @(rental.OrderSequence ?? (_rentals.IndexOf(rental) + 1)) z @_rentals.Count</span>
+                                    <h2>@TenantName(rental)</h2>
+                                    <p>@PickupLocation(rental)</p>
                                 </div>
+                                <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                                    Potwierdzona
+                                </span>
+                            </header>
+
+                            <div class="success-rental-period">
+                                <span>Od <strong>@FormatDate(rental.StartDateUtc)</strong></span>
+                                <span>Do <strong>@FormatDate(rental.EndDateUtc)</strong></span>
                             </div>
-                        </div>
+
+                            <div class="success-rental-products">
+                                @foreach (var item in rental.Items)
+                                {
+                                    <div>
+                                        <span>@item.ProductName × @item.Quantity</span>
+                                        <span>@item.TotalPrice.Pln()</span>
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="success-rental-amounts">
+                                <span>Wynajem: <strong>@rental.TotalAmount.Pln()</strong></span>
+                                <span>Depozyt: <strong>@rental.DepositAmount.Pln()</strong></span>
+                                <span>Do zapłaty w punkcie: <strong>@RentalPresentation.OutstandingAmount(rental).Pln()</strong></span>
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(rental.PublicContractUrl))
+                            {
+                                <a href="@rental.PublicContractUrl" target="_blank" rel="noopener" class="success-contract-link">
+                                    Otwórz umowę tej wypożyczalni
+                                </a>
+                            }
+                            else
+                            {
+                                <p class="success-contract-pending">Umowa jest generowana i pojawi się w historii wynajmów.</p>
+                            }
+                        </article>
                     }
                 </div>
             }
@@ -100,15 +135,14 @@
             }
 
             <p class="text-gray-500 text-sm mb-8">
-                Szczegóły rezerwacji zostały wysłane na Twój adres email.<br />
-                Możesz teraz odebrać sprzęt w naszym punkcie.
+                Rezerwacja jest zapisana. Powiadomienie i umowa pojawią się po zakończeniu ich generowania.
             </p>
 
             <div class="success-actions">
-                <a href="/my-rentals" class="checkout-submit-btn" style="text-decoration: none; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                <a href="my-rentals" class="checkout-submit-btn" style="text-decoration: none; background: linear-gradient(135deg, #F96167 0%, #FA8186 100%); color: #fff;">
                     Moje wypożyczenia
                 </a>
-                <a href="/" class="product-details-back-btn" style="text-decoration: none;">
+                <a href="./" class="product-details-back-btn" style="text-decoration: none;">
                     Strona główna
                 </a>
             </div>
@@ -122,20 +156,47 @@
     public string? SessionId { get; set; }
 
     private bool _isLoading = true;
-    private MyRentalDto? _latestRental;
+    private List<MyRentalDto> _rentals = new();
+    private string? _orderNumber;
+    private Guid? _marketplaceOrderId;
     private string? _loadError;
+    private bool _isConfirmed;
+    private bool _isRetrying;
+    private bool _canRetry;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => ConfirmReservationAsync();
+
+    private Task RetryConfirmationAsync() => ConfirmReservationAsync(isManualRetry: true);
+
+    private async Task ConfirmReservationAsync(bool isManualRetry = false)
     {
         _isLoading = true;
-        
+        _isRetrying = isManualRetry;
+        _loadError = null;
+        _canRetry = false;
+
         try
         {
-            // Najpierw spróbuj sfinalizować sesję (utworzyć rental jeśli webhook nie zadziałał)
-            if (!string.IsNullOrEmpty(SessionId))
+            if (string.IsNullOrWhiteSpace(SessionId))
             {
-                await FinalizeSessionAsync(SessionId);
+                _loadError = "Brakuje identyfikatora sesji Stripe.";
+                return;
             }
+
+            var finalization = await CheckoutFinalizationRetrier.FinalizeAsync(
+                _ => FinalizeSessionAsync(SessionId));
+            if (finalization is null || !finalization.Success)
+            {
+                _loadError = finalization?.Message
+                    ?? "Serwer nie potwierdził jeszcze płatności i utworzenia rezerwacji.";
+                _canRetry = finalization is null || finalization.Retryable;
+                return;
+            }
+
+            _isConfirmed = true;
+            _orderNumber = finalization.MarketplaceOrderNumber;
+            _marketplaceOrderId = finalization.MarketplaceOrderId;
+            await CartService.ClearCartAsync();
 
             // Pobierz customerId z sesji
             var customer = await CustomerSession.GetCustomerAsync();
@@ -146,23 +207,54 @@
             
             if (rentals != null && rentals.Any())
             {
-                _latestRental = rentals
-                    .OrderByDescending(r => r.StartDateUtc)
-                    .FirstOrDefault();
+                var expectedIds = finalization.RentalIds?.Count > 0
+                    ? finalization.RentalIds
+                    : finalization.RentalId.HasValue
+                        ? new[] { finalization.RentalId.Value }
+                        : Array.Empty<Guid>();
+                _rentals = rentals
+                    .Where(rental => expectedIds.Contains(rental.Id))
+                    .OrderBy(rental => rental.OrderSequence ?? int.MaxValue)
+                    .ToList();
+
+                if (_rentals.Count == 0 && _marketplaceOrderId.HasValue)
+                {
+                    _rentals = rentals
+                        .Where(rental => rental.MarketplaceOrderId == _marketplaceOrderId)
+                        .OrderBy(rental => rental.OrderSequence ?? int.MaxValue)
+                        .ToList();
+                }
+
+                // Zgodność ze starszą finalizacją, która zwracała tylko jeden RentalId.
+                if (_rentals.Count == 0 &&
+                    expectedIds.Count == 0 &&
+                    !_marketplaceOrderId.HasValue)
+                {
+                    var fallback = rentals.OrderByDescending(rental => rental.PaidAtUtc ?? rental.StartDateUtc)
+                        .FirstOrDefault();
+                    if (fallback is not null)
+                        _rentals.Add(fallback);
+                }
+
+                _orderNumber ??= _rentals.Select(rental => rental.MarketplaceOrderNumber)
+                    .FirstOrDefault(number => !string.IsNullOrWhiteSpace(number));
             }
         }
         catch (Exception ex)
         {
-            _loadError = ex.Message;
-            Snackbar.Add($"Nie udało się pobrać szczegółów rezerwacji: {ex.Message}", Severity.Warning);
+            _loadError = "Nie udało się potwierdzić rezerwacji. Spróbuj ponownie za chwilę.";
+            _canRetry = true;
+            Snackbar.Add("Płatność została przyjęta, ale szczegóły rezerwacji nie są jeszcze dostępne. Odśwież stronę za chwilę.", Severity.Warning);
+            Console.Error.WriteLine($"Checkout details load failed: {ex.GetType().Name}");
         }
         finally
         {
             _isLoading = false;
+            _isRetrying = false;
         }
     }
 
-    private async Task FinalizeSessionAsync(string sessionId)
+    private async Task<FinalizeSessionResponse?> FinalizeSessionAsync(string sessionId)
     {
         try
         {
@@ -175,11 +267,52 @@
             {
                 Console.WriteLine($"[CheckoutSuccess] Session not finalized: {response.Message}");
             }
+            return response;
         }
         catch (Exception ex)
         {
             // Nie pokazuj błędu - może webhook już zadziałał
             Console.WriteLine($"[CheckoutSuccess] Finalize error (may be OK if webhook worked): {ex.Message}");
+            return null;
         }
     }
+
+    private static string TenantName(MyRentalDto rental) =>
+        string.IsNullOrWhiteSpace(rental.TenantName) ? "Wypożyczalnia" : rental.TenantName;
+
+    private static string PickupLocation(MyRentalDto rental)
+    {
+        var address = rental.PickupAddress?.Trim();
+        var city = rental.PickupCity?.Trim();
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            return string.IsNullOrWhiteSpace(city)
+                ? "Adres odbioru znajdziesz w potwierdzeniu wypożyczalni."
+                : $"Odbiór: {city}";
+        }
+        if (string.IsNullOrWhiteSpace(city) ||
+            address.Contains(city, StringComparison.CurrentCultureIgnoreCase))
+        {
+            return $"Odbiór: {address}";
+        }
+
+        return $"Odbiór: {address}, {city}";
+    }
+
+    private static string PolishCount(int count, string singular, string paucal, string plural)
+    {
+        var absolute = Math.Abs(count);
+        var lastTwoDigits = absolute % 100;
+        var noun = absolute == 1
+            ? singular
+            : lastTwoDigits is >= 12 and <= 14
+                ? plural
+                : absolute % 10 is >= 2 and <= 4
+                    ? paucal
+                    : plural;
+        return $"{count} {noun}";
+    }
+
+    private static string FormatDate(DateTime value) =>
+        SportRental.Shared.Time.PolishRentalTime.FromUtc(value).ToString("dd.MM.yyyy, HH:mm");
 }

@@ -25,11 +25,14 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using Microsoft.OpenApi.Models;
 using SportRental.Admin.Services.Holds;
+using SportRental.Admin.Services.Identity;
+using SportRental.Admin.Routing;
 using SportRental.Shared.Identity;
 using SportRental.Admin.Data;
 using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
+using System.Security.Claims;
 
 // QuestPDF license - Community is free for revenue < $1M USD
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
@@ -39,7 +42,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Azure Key Vault Configuration
 // Automatically uses: az login (local), Managed Identity (Azure), Visual Studio, Environment Variables
 var keyVaultUrl = builder.Configuration["KeyVault:Url"];
-if (!string.IsNullOrWhiteSpace(keyVaultUrl))
+if (!builder.Environment.IsEnvironment("Testing") && !string.IsNullOrWhiteSpace(keyVaultUrl))
 {
     try
     {
@@ -55,8 +58,16 @@ if (!string.IsNullOrWhiteSpace(keyVaultUrl))
         // Key Vault not available (local development without Azure credentials)
         var logger = LoggerFactory.Create(b => b.AddConsole()).CreateLogger("Startup");
         logger.LogWarning("⚠️  Azure Key Vault not available: {Message}. Using local configuration only.", ex.Message);
-        logger.LogInformation("💡 For local development, secrets should be in appsettings.Development.json or user secrets");
+        logger.LogInformation("For local development, secrets should use user-secrets or environment variables");
     }
+}
+
+// Test hosts must never use real outbound providers, even when Key Vault is available.
+if (builder.Environment.IsEnvironment("Testing"))
+{
+    builder.Configuration["Email:Smtp:Enabled"] = "false";
+    builder.Configuration["Sms:Provider"] = "Console";
+    builder.Configuration["BackgroundServices:Enabled"] = "false";
 }
 
 // Add services to the container.
@@ -79,18 +90,13 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        // Po kwietniu 2026 Client WASM hostowany jest tylko bundled w Admin pod /_client/
-        // (same-origin → CORS niepotrzebny). Zewnętrzne hostingi (srclient-blazor App Service,
-        // kind-tree SWA) zostały wyłączone z deploy automation; jeśli ktoś tam wejdzie, dostanie
-        // ostatni deploy ale request do API z innego origin nadal go wpuszcza dla wstecznej
-        // kompatybilności.
+        // Produkcyjny Client jest bundled pod /_client (same-origin). CORS jest potrzebny
+        // wyłącznie dla samodzielnego WASM uruchamianego lokalnie podczas developmentu.
         policy.WithOrigins(
             "http://localhost:5002",   // WASM client dev
             "http://localhost:5014",
             "https://localhost:7083",
-            "http://localhost:5015",   // dodatkowy port dla backupu
-            "https://kind-tree-0efa2aa03.7.azurestaticapps.net",  // SWA — nieaktualizowany
-            "https://srclient-blazor.azurewebsites.net"           // App Service — nieaktualizowany
+            "http://localhost:5015"    // dodatkowy lokalny port
         )
         .AllowAnyMethod()
         .AllowAnyHeader()
@@ -138,6 +144,29 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+
+    // Odświeżenie istniejącej sesji i jawny hand-off Admin -> Client nie
+    // weryfikują hasła, więc nie mogą współdzielić budżetu 5/min z endpointami
+    // credentiali. Ograniczamy je osobno per zalogowany użytkownik; fallback IP
+    // obowiązuje tylko wtedy, gdy uwierzytelnienie nie dostarczy identyfikatora.
+    options.AddPolicy("session", context =>
+    {
+        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var partitionKey = !string.IsNullOrWhiteSpace(userId)
+            ? $"user:{userId}"
+            : $"ip:{context.Connection.RemoteIpAddress?.ToString() ?? "anonymous"}";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
 });
 
 // Persist DataProtection keys, żeby antiforgery cookies + Identity cookies przeżywały restart.
@@ -168,6 +197,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuth
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantProvider, SportRental.Admin.Services.Tenancy.BlazorTenantProvider>();
 builder.Services.AddScoped<IContractGenerator, QuestPdfContractGenerator>();
+builder.Services.AddSingleton<IContractAccessLinkService, ContractAccessLinkService>();
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient("MediaStorage");
 
@@ -187,7 +217,12 @@ builder.Services.AddScoped<ISmsSender>(sp => new SportRental.Admin.Services.Demo
     sp.GetRequiredService<SmsSenderRouter>(),
     sp.GetRequiredService<SportRental.Admin.Services.Demo.IDemoGuard>(),
     sp.GetRequiredService<ILogger<SportRental.Admin.Services.Demo.DemoAwareSmsSender>>()));
-builder.Services.AddScoped<ISmsConfirmationService, SmsConfirmationService>();
+if (builder.Configuration.GetValue<bool>(SmsRoutingSettings.LegacyReplyConfirmationEnabledKey))
+{
+#pragma warning disable CS0618 // Legacy flow is registered only when explicitly enabled.
+    builder.Services.AddScoped<ISmsConfirmationService, SmsConfirmationService>();
+#pragma warning restore CS0618
+}
 builder.Services.AddScoped<SportRental.Admin.Services.IRentalConfirmationService, SportRental.Admin.Services.RentalConfirmationService>();
 builder.Services.AddSingleton<SportRental.Admin.Services.IReviewSurveyTokenService, SportRental.Admin.Services.ReviewSurveyTokenService>();
 builder.Services.AddScoped<SportRental.Admin.Services.ICustomerTrustCalculator, SportRental.Admin.Services.CustomerTrustCalculator>();
@@ -199,20 +234,9 @@ builder.Services.AddScoped<SportRental.Admin.Services.ICustomerTrustCalculator, 
 //   dotnet user-secrets set "OpenAI:Endpoint" "https://foundrypolska.cognitiveservices.azure.com/"
 //   dotnet user-secrets set "OpenAI:ApiKey" "..."
 //   dotnet user-secrets set "OpenAI:TextDeployment" "gpt-5.5"
-builder.Services.AddSingleton(sp =>
-{
-    var config = sp.GetRequiredService<IConfiguration>();
-    var endpoint = config["OpenAI:Endpoint"];
-    var apiKey = config["OpenAI:ApiKey"];
-    if (string.IsNullOrWhiteSpace(endpoint) || string.IsNullOrWhiteSpace(apiKey))
-    {
-        // Returnuj null — DI dla OpenAiChatService rzuci sensownym błędem przy pierwszym użyciu
-        // zamiast crashować startup gdy KV/dev secrets jeszcze nieskonfigurowane.
-        throw new InvalidOperationException(
-            "OpenAI:Endpoint / OpenAI:ApiKey nie skonfigurowane (KV: srental2-kv lub user-secrets).");
-    }
-    return new Azure.AI.OpenAI.AzureOpenAIClient(new Uri(endpoint), new Azure.AzureKeyCredential(apiKey));
-});
+// Integracja jest opcjonalna: brak konfiguracji wyłącza elementy AI, ale nie może
+// przerwać obwodu Blazor na stronach niezwiązanych z asystentem.
+builder.Services.AddSingleton<SportRental.Admin.Services.Ai.AzureOpenAiClientProvider>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.FloatingChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.FeedbackService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ReadToolService>();
@@ -230,7 +254,6 @@ builder.Services.AddScoped<SportRental.Admin.Data.DemoTenantSeeder>();
 builder.Services.AddScoped<SportRental.Admin.Services.Dashboard.DashboardMetricsService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Search.SearchService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Ai.IProductAiAssistant, SportRental.Admin.Services.Ai.ProductAiAssistant>();
-builder.Services.AddHostedService<SportRental.Admin.Services.Demo.DemoTenantCleanupService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Demo.IDemoGuard, SportRental.Admin.Services.Demo.DemoGuard>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.OpenAiChatService>();
 builder.Services.AddScoped<SportRental.Admin.Services.Chat.ChatToolHandler>();
@@ -317,10 +340,15 @@ builder.Services.AddSingleton(new RegistrationFeatureFlags
     AllowOwnerSelfRegistration = builder.Configuration.GetValue<bool?>("Features:AllowOwnerSelfRegistration") ?? true
 });
 
-// Background services
-builder.Services.AddHostedService<SportRental.Admin.Services.Email.RentalReminderService>();
-builder.Services.AddHostedService<SportRental.Admin.Services.Email.ReviewRequestService>();
-builder.Services.AddHostedService<ExpiredHoldsCleaner>();
+// Background jobs can be disabled for local smoke tests against a shared database.
+// Production behavior stays enabled by default.
+if (builder.Configuration.GetValue("BackgroundServices:Enabled", true))
+{
+    builder.Services.AddHostedService<SportRental.Admin.Services.Demo.DemoTenantCleanupService>();
+    builder.Services.AddHostedService<SportRental.Admin.Services.Email.RentalReminderService>();
+    builder.Services.AddHostedService<SportRental.Admin.Services.Email.ReviewRequestService>();
+    builder.Services.AddHostedService<ExpiredHoldsCleaner>();
+}
 
 // JWT Bearer for WASM / cross-origin API clients (sits alongside Identity cookies for Blazor Server).
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
@@ -339,6 +367,9 @@ if (string.IsNullOrWhiteSpace(jwtSigningKey))
     throw new InvalidOperationException("Jwt:SigningKey is required in production. Configure it in Azure Key Vault as 'Jwt--SigningKey'.");
 }
 builder.Services.AddScoped<JwtTokenService>();
+builder.Services.AddScoped<CustomerIdentityService>();
+builder.Services.AddScoped<ExternalLoginProvisioningService>();
+builder.Services.AddScoped<AccidentalOwnerPromotionRepair>();
 
 var authBuilder = builder.Services.AddAuthentication(options =>
     {
@@ -346,8 +377,8 @@ var authBuilder = builder.Services.AddAuthentication(options =>
         options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
     });
 
-// Google OAuth — sekrety z Key Vault (GoogleOAuth--ClientId / GoogleOAuth--ClientSecret) albo
-// appsettings.Local.json w dev. Fallback: stara nazwa Google:* gdyby ktoś przywrócił.
+// Google OAuth — sekrety z Key Vault (GoogleOAuth--ClientId / GoogleOAuth--ClientSecret),
+// user-secrets albo zmiennych środowiskowych w dev. Fallback: stara nazwa Google:*.
 // Jeśli brak — przycisk "Zaloguj przez Google" się nie pokaże
 // (ExternalLoginPicker filtruje providery zarejestrowane w SignInManager).
 var googleClientId = builder.Configuration["GoogleOAuth:ClientId"]
@@ -362,7 +393,7 @@ if (!string.IsNullOrWhiteSpace(googleClientId) && !string.IsNullOrWhiteSpace(goo
         options.ClientSecret = googleClientSecret;
         options.SignInScheme = IdentityConstants.ExternalScheme;
         // Default callback path = /signin-google. Pamiętaj wpisać w Authorized redirect URIs:
-        //   https://srental2.azurewebsites.net/signin-google
+        //   https://app.example.com/signin-google
         //   https://app.rentspot.eu/signin-google (po podpięciu custom domain)
         //   http://localhost:<port>/signin-google (dev)
         options.SaveTokens = true;
@@ -411,8 +442,10 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
     ?? (builder.Environment.IsEnvironment("Testing")
         ? "Host=localhost;Database=__test_placeholder__;Username=na;Password=na"
         : throw new InvalidOperationException("Connection string 'DefaultConnection' not found."));
-// Pooled factory dla Blazor Server - tworzy instancje DbContext na żądanie
-builder.Services.AddPooledDbContextFactory<ApplicationDbContext>(options =>
+// Zwykła fabryka (bez poolingu): ApplicationDbContext przechowuje mutable tenant context.
+// Pooling mógłby przenieść `_tenantId` pomiędzy żądaniami, bo własne pola kontekstu nie
+// są częścią automatycznego resetu stanu EF.
+builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString, npg => npg.MigrationsAssembly("SportRental.Infrastructure")));
 // Scoped DbContext dla Identity (pobiera z factory)
 builder.Services.AddScoped<ApplicationDbContext>(sp => 
@@ -420,7 +453,9 @@ builder.Services.AddScoped<ApplicationDbContext>(sp =>
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options => {
-        options.SignIn.RequireConfirmedAccount = false; // wymaganie email confirm wyłączone (UX); MFA dla SuperAdmin osobno
+        // Publiczne konto Client nie może otrzymać sesji dla niezweryfikowanego adresu.
+        // Konta pracownicze tworzone z zaproszeń są potwierdzane przy provisioningu.
+        options.SignIn.RequireConfirmedAccount = true;
         // SEC-002: policy zgodna z ASVS L2 — min 12 znaków + 3 z 4 klas znaków.
         // Wcześniej było 6 znaków bez wymagań (DoS na słownik).
         options.Password.RequiredLength = 12;
@@ -451,7 +486,10 @@ builder.Services.AddScoped<SportRental.Admin.Services.Email.IEmailSender>(sp =>
         sp.GetRequiredService<SportRental.Admin.Services.Demo.IDemoGuard>(),
         sp.GetRequiredService<ILogger<SportRental.Admin.Services.Demo.DemoAwareEmailSender>>());
 });
-builder.Services.AddSingleton<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp =>
+// Adapter Identity musi mieć ten sam (scoped) lifetime co tenant-aware sender.
+// Singleton rozwiązywał scoped DemoAwareEmailSender z root providera i powodował
+// HTTP 500 przy publicznej rejestracji klienta, gdy walidacja scope'ów była włączona.
+builder.Services.AddScoped<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender>(sp =>
     sp.GetRequiredService<SportRental.Admin.Services.Email.IEmailSender>());
 builder.Services.AddScoped<IEmailSender<ApplicationUser>>(sp =>
 {
@@ -464,7 +502,6 @@ builder.Services.AddScoped<SportRental.Admin.Services.Logging.IAuditLogger, Spor
 builder.Services.AddScoped<SportRental.Admin.Services.QrCode.IQrCodeGenerator, SportRental.Admin.Services.QrCode.SimpleQrCodeGenerator>();
 builder.Services.AddScoped<SportRental.Admin.Services.QrCode.IBarcodeGenerator, SportRental.Admin.Services.QrCode.BarcodeGenerator>();
 builder.Services.AddScoped<SportRental.Admin.Services.IQrLabelGenerator, SportRental.Admin.Services.QrLabelGenerator>();
-builder.Services.AddScoped<SportRental.Admin.Services.Sms.ISmsConfirmationService, SportRental.Admin.Services.Sms.SmsConfirmationService>();
 
 // Stripe Payment Gateway
 builder.Services.Configure<SportRental.Admin.Payments.StripeOptions>(builder.Configuration.GetSection("Stripe"));
@@ -580,10 +617,11 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseRateLimiter();
-
 app.UseCors(); // Enable CORS before authentication
 app.UseAuthentication();
+// Rate limiter jest po Authentication, aby polityka `session` mogła partycjonować
+// żądania po NameIdentifier zamiast wrzucać wszystkich użytkowników do jednego IP.
+app.UseRateLimiter();
 app.UseAuthorization();
 app.UseAntiforgery();
 
@@ -638,14 +676,18 @@ app.MapHealthChecks("/health/ready");
 // Add additional endpoints required by the Identity /Account Razor components.
 app.MapAdditionalIdentityEndpoints();
 
-// User-friendly redirects — żeby srental2.azurewebsites.net/login działało (route `/login`
-// istnieje tylko w Client WASM pod `/_client/login`, a Admin używa `/Account/Login`).
+// User-friendly redirects — `/login` istnieje tylko w Client WASM pod
+// `/_client/login`, a Admin używa `/Account/Login`.
 app.MapGet("/login", () => Results.Redirect("/Account/Login", permanent: false))
    .AllowAnonymous();
 app.MapGet("/register", () => Results.Redirect("/Account/Register", permanent: false))
    .AllowAnonymous();
 app.MapGet("/logout", () => Results.Redirect("/Account/Logout", permanent: false))
    .AllowAnonymous();
+
+// Starszy WASM mógł pozostać otwarty podczas deployu i nadal emitować ścieżki
+// root-relative (np. /products). Nie pozwalamy takiej karcie wypaść z klienta.
+app.MapLegacyClientRouteRedirects();
 
 // REST API
 app.MapSportRentalApi();
@@ -658,24 +700,6 @@ app.MapHub<SportRental.Admin.Hubs.RentalNotificationHub>("/hubs/rentals");
 
 // (/_client/* obsługiwany przez MapWhen branch wcześniej — SPA fallback + static files
 // załatwione tam, endpoint routing dla _client nie potrzebny.)
-
-// Seed test data in development (from test-data.json)
-if (app.Environment.IsDevelopment())
-{
-    using var seedScope = app.Services.CreateScope();
-    var logger = seedScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var dbFactory = seedScope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
-    
-    try
-    {
-        var seeder = new TestDataSeeder(dbFactory, seedScope.ServiceProvider.GetRequiredService<ILogger<TestDataSeeder>>());
-        await seeder.SeedAsync();
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "❌ Error during test data seeding");
-    }
-}
 
 // Seed ról na starcie (SuperAdmin, Owner, Employee, Client) — pomijamy w środowisku testowym,
 // bo WebApplicationFactory<Program> recyklingowanego pomiędzy testami zamyka stdout writer
@@ -797,27 +821,14 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    // Uporządkuj użytkowników bez tenanta - ale tylko tych bez prawidłowego tenanta
+    // Globalni klienci marketplace celowo nie mają TenantId. Starszy kod startowy
+    // przypisywał takie konta do domyślnego tenanta i nadawał Owner. Naprawiamy
+    // wyłącznie konta rozpoznane po globalnym profilu Customer i braku członkostwa
+    // TenantUser Owner; nigdy nie nadajemy ról na podstawie braku TenantId.
     var existingTenantIds = await db.Tenants.Select(t => t.Id).ToListAsync();
-    var unassignedUsers = userManager.Users
-        .Where(u => u.TenantId == null || u.TenantId == Guid.Empty || !existingTenantIds.Contains(u.TenantId.Value))
-        .ToList();
-    
-    foreach (var user in unassignedUsers)
-    {
-        user.TenantId = tenantId;
-        await userManager.UpdateAsync(user);
-        Console.WriteLine($"📝 Przypisano {user.Email} do tenanta {tenantId}");
-
-        if (!await userManager.IsInRoleAsync(user, RoleNames.Owner))
-        {
-            await userManager.AddToRoleAsync(user, RoleNames.Owner);
-        }
-        if (!await userManager.IsInRoleAsync(user, RoleNames.Client))
-        {
-            await userManager.AddToRoleAsync(user, RoleNames.Client);
-        }
-    }
+    var accidentalOwnerRepair = scope.ServiceProvider
+        .GetRequiredService<AccidentalOwnerPromotionRepair>();
+    await accidentalOwnerRepair.RepairAsync();
 
     // Podnieś hdtdtr@gmail.com do SuperAdmin + Owner + Reset hasła.
     // Hasło deweloperskie czytane z konfiguracji (user-secrets / env Admin__DevPassword) —
@@ -895,6 +906,26 @@ using (var scope = app.Services.CreateScope())
                 await userManager.AddToRoleAsync(testOwner, RoleNames.Client);
             }
         }
+    }
+}
+
+// Seed danych developerskich dopiero po migracjach i utworzeniu domyślnego tenanta.
+if (app.Environment.IsDevelopment())
+{
+    using var seedScope = app.Services.CreateScope();
+    var logger = seedScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var dbFactory = seedScope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+
+    try
+    {
+        var seeder = new TestDataSeeder(
+            dbFactory,
+            seedScope.ServiceProvider.GetRequiredService<ILogger<TestDataSeeder>>());
+        await seeder.SeedAsync();
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "❌ Error during test data seeding");
     }
 }
 

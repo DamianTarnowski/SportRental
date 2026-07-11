@@ -8,6 +8,7 @@
 @inject ISnackbar Snackbar
 @inject IDialogService DialogService
 @inject SportRental.Admin.Services.Email.IEmailSender EmailSender
+@inject SportRental.Admin.Services.Contracts.IContractAccessLinkService ContractLinks
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
@@ -85,15 +86,18 @@
                     <MudTd Style="text-align: right;">
                         <MudTooltip Text="Otwórz / pobierz PDF">
                             <MudIconButton Icon="@Icons.Material.Filled.OpenInNew" Color="Color.Primary"
-                                           OnClick="() => OpenPdf(row)" Size="Size.Small" />
+                                           OnClick="() => OpenPdf(row)" aria-label="Otwórz / pobierz PDF"
+                                           Size="Size.Small" />
                         </MudTooltip>
                         <MudTooltip Text="Wyślij e-mailem">
                             <MudIconButton Icon="@Icons.Material.Filled.Email" Color="Color.Info"
-                                           OnClick="() => EmailContract(row)" Size="Size.Small" />
+                                           OnClick="() => EmailContract(row)" aria-label="Wyślij e-mailem"
+                                           Size="Size.Small" />
                         </MudTooltip>
                         <MudTooltip Text="Drukuj">
                             <MudIconButton Icon="@Icons.Material.Filled.Print" Color="Color.Default"
-                                           OnClick="() => PrintPdf(row)" Size="Size.Small" />
+                                           OnClick="() => PrintPdf(row)" aria-label="Drukuj"
+                                           Size="Size.Small" />
                         </MudTooltip>
                     </MudTd>
                 </RowTemplate>
@@ -107,6 +111,7 @@
     private string _search = string.Empty;
     private DateRange? _dateRange = new DateRange(DateTime.Today.AddMonths(-3), DateTime.Today);
     private List<ContractRow> _rows = new();
+    private string _companyName = "RentSpot";
 
     private record ContractRow(
         Guid RentalId, string ContractUrl, string CustomerName, string? CustomerEmail,
@@ -122,6 +127,11 @@
         var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
         await using var db = await DbFactory.CreateDbContextAsync();
         db.SetTenant(tenantId);
+
+        _companyName = await db.CompanyInfos.AsNoTracking()
+            .Where(c => c.TenantId == tenantId)
+            .Select(c => c.Name)
+            .FirstOrDefaultAsync() ?? "RentSpot";
 
         var rentals = await db.Rentals
             .Include(r => r.Customer)
@@ -147,9 +157,9 @@
                 ContractUrl: r.ContractUrl!,
                 CustomerName: r.Customer?.FullName ?? "—",
                 CustomerEmail: r.Customer?.Email,
-                CreatedAtLocal: r.CreatedAtUtc.ToLocalTime(),
-                StartLocal: r.StartDateUtc.ToLocalTime(),
-                EndLocal: r.EndDateUtc.ToLocalTime(),
+                CreatedAtLocal: SportRental.Admin.Services.Time.PolishTimeZone.FromUtc(r.CreatedAtUtc),
+                StartLocal: SportRental.Admin.Services.Time.PolishTimeZone.FromUtc(r.StartDateUtc),
+                EndLocal: SportRental.Admin.Services.Time.PolishTimeZone.FromUtc(r.EndDateUtc),
                 Amount: r.TotalAmount,
                 Status: r.Status,
                 SequenceShort: r.Id.ToString()[..6].ToUpper(),
@@ -197,17 +207,17 @@
         }
         try
         {
-            // Feedback #7: link dla KLIENTA idzie przez publiczny /c/{shortId} (AllowAnonymous,
-            // SAS-redirect) — /api/contracts/{id} wymaga cookie admina, którego klient nie ma.
+            // Link dla klienta idzie przez publiczny /c/{chroniony-token} (SAS-redirect),
+            // bo /api/contracts/{id} wymaga cookie admina, którego klient nie ma.
             // Musi być absolutny (BaseUri), bo trafia do maila.
-            var shortId = row.RentalId.ToString()[..8].ToLowerInvariant();
-            var contractLink = $"{Nav.BaseUri.TrimEnd('/')}/c/{shortId}";
+            var contractLink = $"{Nav.BaseUri.TrimEnd('/')}{ContractLinks.CreatePath(row.RentalId)}";
             var subject = $"Umowa wynajmu UM/{row.CreatedAtLocal.Year}/{row.SequenceShort}";
+            var encodedCompanyName = System.Net.WebUtility.HtmlEncode(_companyName);
             var html = $@"
                 <p>Dzień dobry, {System.Net.WebUtility.HtmlEncode(row.CustomerName)},</p>
                 <p>Pod poniższym linkiem przekazujemy umowę wynajmu sprzętu:</p>
                 <p><a href=""{contractLink}"">Pobierz umowę PDF</a></p>
-                <p>Pozdrawiamy,<br/>RentSpot</p>";
+                <p>Pozdrawiamy,<br/>{encodedCompanyName}</p>";
             await EmailSender.SendEmailAsync(row.CustomerEmail, subject, html);
             Snackbar.Add($"Umowa wysłana na {row.CustomerEmail}.", MudBlazor.Severity.Success);
         }

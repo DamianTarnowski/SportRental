@@ -1,18 +1,12 @@
 @page "/Account/ExternalLogin"
 
-@using System.ComponentModel.DataAnnotations
-@using System.Security.Claims
-@using System.Text
-@using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity
-@using Microsoft.AspNetCore.WebUtilities
 @using SportRental.Admin.Data
+@using SportRental.Admin.Services.Auth
+@using SportRental.Shared.Legal
 
 @inject SignInManager<ApplicationUser> SignInManager
-@inject UserManager<ApplicationUser> UserManager
-@inject IUserStore<ApplicationUser> UserStore
-@inject IEmailSender<ApplicationUser> EmailSender
-@inject NavigationManager NavigationManager
+@inject ExternalLoginProvisioningService ExternalLoginProvisioner
 @inject IdentityRedirectManager RedirectManager
 @inject ILogger<ExternalLogin> Logger
 
@@ -50,6 +44,12 @@
     [SupplyParameterFromQuery]
     private string? Action { get; set; }
 
+    [SupplyParameterFromQuery]
+    private string? TermsVersion { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? PrivacyVersion { get; set; }
+
     private string ProviderDisplayName => _externalLoginInfo?.ProviderDisplayName ?? "Google";
 
     protected override async Task OnInitializedAsync()
@@ -85,6 +85,34 @@
     {
         if (_externalLoginInfo is null) return;
 
+        var hasCurrentLegalAcknowledgement =
+            string.Equals(TermsVersion, LegalDocumentVersions.Terms, StringComparison.Ordinal) &&
+            string.Equals(PrivacyVersion, LegalDocumentVersions.Privacy, StringComparison.Ordinal);
+
+        // Dla logowania uruchomionego z aplikacji klienckiej wersje dokumentów są
+        // chronione w OAuth state. Zapisujemy oświadczenie przed utworzeniem sesji.
+        if (hasCurrentLegalAcknowledgement)
+        {
+            var existingUser = await SignInManager.UserManager.FindByLoginAsync(
+                _externalLoginInfo.LoginProvider,
+                _externalLoginInfo.ProviderKey);
+            if (existingUser is not null &&
+                (!string.Equals(existingUser.AcceptedTermsVersion, LegalDocumentVersions.Terms, StringComparison.Ordinal) ||
+                 !string.Equals(existingUser.AcknowledgedPrivacyVersion, LegalDocumentVersions.Privacy, StringComparison.Ordinal) ||
+                 existingUser.LegalAcceptedAtUtc is null))
+            {
+                existingUser.AcceptedTermsVersion = LegalDocumentVersions.Terms;
+                existingUser.AcknowledgedPrivacyVersion = LegalDocumentVersions.Privacy;
+                existingUser.LegalAcceptedAtUtc = DateTime.UtcNow;
+                var updateResult = await SignInManager.UserManager.UpdateAsync(existingUser);
+                if (!updateResult.Succeeded)
+                {
+                    _message = "Nie udało się zapisać akceptacji dokumentów. Spróbuj ponownie.";
+                    return;
+                }
+            }
+        }
+
         // Krok 1: jeśli Google login jest już powiązany — zaloguj od razu.
         var signInResult = await SignInManager.ExternalLoginSignInAsync(
             _externalLoginInfo.LoginProvider,
@@ -96,7 +124,7 @@
         {
             Logger.LogInformation("{Name} zalogowany przez {Provider}.",
                 _externalLoginInfo.Principal.Identity?.Name, _externalLoginInfo.LoginProvider);
-            RedirectManager.RedirectTo(ReturnUrl);
+            RedirectAfterSignIn();
         }
 
         if (signInResult.IsLockedOut)
@@ -104,85 +132,36 @@
             RedirectManager.RedirectTo("Account/Lockout");
         }
 
-        // Krok 2: brak powiązania — sprawdź czy konto z tym emailem już istnieje (auto-link merge).
-        var email = _externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email);
-        if (string.IsNullOrWhiteSpace(email))
+        // Brak powiązania: można utworzyć nowe konto, ale nie wolno automatycznie
+        // dołączać providera do istniejącego konta wyłącznie po zgodnym emailu.
+        var provisioning = await ExternalLoginProvisioner.ProvisionAsync(
+            _externalLoginInfo,
+            TermsVersion,
+            PrivacyVersion);
+        if (provisioning.Status != ExternalLoginProvisioningStatus.Created || provisioning.User is null)
         {
-            _message = "Konto Google nie udostępnia adresu email. Skontaktuj się z administratorem.";
+            // Taki sam komunikat dla kolizji i błędu provisioningu — bez ujawniania,
+            // czy pod adresem zwróconym przez providera istnieje konto lokalne.
+            _message = "Nie można dokończyć logowania tą metodą. Użyj dotychczasowej metody logowania lub skontaktuj się z obsługą.";
             return;
         }
 
-        var existingUser = await UserManager.FindByEmailAsync(email);
-        if (existingUser is not null)
-        {
-            // Auto-merge: dołóż Google login do istniejącego konta i zaloguj.
-            // Email z Google jest zweryfikowany (claim email_verified=true), więc to bezpieczne.
-            var addLoginResult = await UserManager.AddLoginAsync(existingUser, _externalLoginInfo);
-            if (addLoginResult.Succeeded)
-            {
-                Logger.LogInformation(
-                    "Połączono konto Google z istniejącym kontem {Email}.", email);
-                await SignInManager.SignInAsync(existingUser, isPersistent: false, _externalLoginInfo.LoginProvider);
-                RedirectManager.RedirectTo(ReturnUrl);
-            }
-            else
-            {
-                _message = "Nie udało się połączyć konta Google z istniejącym kontem: "
-                          + string.Join(", ", addLoginResult.Errors.Select(e => e.Description));
-            }
-            return;
-        }
-
-        // Krok 3: brak konta — utwórz nowe automatycznie z emaila Google.
-        var user = CreateUser();
-        var emailStore = GetEmailStore();
-        await UserStore.SetUserNameAsync(user, email, CancellationToken.None);
-        await emailStore.SetEmailAsync(user, email, CancellationToken.None);
-        user.EmailConfirmed = true; // email zweryfikowany przez Google
-
-        var createResult = await UserManager.CreateAsync(user);
-        if (!createResult.Succeeded)
-        {
-            _message = "Nie udało się utworzyć konta: "
-                      + string.Join(", ", createResult.Errors.Select(e => e.Description));
-            return;
-        }
-
-        var addLog = await UserManager.AddLoginAsync(user, _externalLoginInfo);
-        if (!addLog.Succeeded)
-        {
-            _message = "Nie udało się dodać logowania zewnętrznego: "
-                      + string.Join(", ", addLog.Errors.Select(e => e.Description));
-            return;
-        }
-
-        Logger.LogInformation("Utworzono nowe konto z {Provider} (email {Email}).",
-            _externalLoginInfo.LoginProvider, email);
-
+        var user = provisioning.User;
+        Logger.LogInformation("Utworzono nowe konto z providera {Provider}.",
+            _externalLoginInfo.LoginProvider);
         await SignInManager.SignInAsync(user, isPersistent: false, _externalLoginInfo.LoginProvider);
-        RedirectManager.RedirectTo(ReturnUrl);
+        RedirectAfterSignIn();
     }
 
-    private ApplicationUser CreateUser()
+    private void RedirectAfterSignIn()
     {
-        try
+        var returnUrl = SafeReturnUrl.ResolveLocal(ReturnUrl);
+        if (SafeReturnUrl.IsClientPath(returnUrl))
         {
-            return Activator.CreateInstance<ApplicationUser>();
+            RedirectManager.RedirectTo(
+                $"api/auth/external-complete?returnUrl={Uri.EscapeDataString(returnUrl)}");
         }
-        catch
-        {
-            throw new InvalidOperationException(
-                $"Nie można utworzyć instancji '{nameof(ApplicationUser)}'. " +
-                "Sprawdź czy klasa nie jest abstract i ma bezparametrowy konstruktor.");
-        }
-    }
 
-    private IUserEmailStore<ApplicationUser> GetEmailStore()
-    {
-        if (!UserManager.SupportsUserEmail)
-        {
-            throw new NotSupportedException("UserStore musi wspierać email.");
-        }
-        return (IUserEmailStore<ApplicationUser>)UserStore;
+        RedirectManager.RedirectTo(returnUrl);
     }
 }

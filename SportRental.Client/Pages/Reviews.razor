@@ -18,6 +18,15 @@
             <MudProgressCircular Indeterminate="true" Size="Size.Large" />
         </MudPaper>
     }
+    else if (_loadError is not null)
+    {
+        <MudAlert Severity="Severity.Error" Class="mb-4">
+            @_loadError
+            <MudButton Variant="Variant.Text" Color="Color.Error" OnClick="RetryLoadAsync" Class="ml-2">
+                Spróbuj ponownie
+            </MudButton>
+        </MudAlert>
+    }
     else
     {
         <MudPaper Class="pa-4 mb-4" Elevation="2">
@@ -52,7 +61,7 @@
                         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
                             <MudText Typo="Typo.subtitle1" Class="fw-bold">@r.CustomerName</MudText>
                             <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                @r.CreatedAtUtc.ToLocalTime().ToString("dd.MM.yyyy")
+                                @PolishRentalTime.FromUtc(r.CreatedAtUtc).ToString("dd.MM.yyyy")
                             </MudText>
                         </MudStack>
                         <MudStack Row="true" Spacing="2" Class="mb-2" Wrap="Wrap.Wrap">
@@ -69,7 +78,7 @@
                 }
             </MudStack>
 
-            @if (_reviews.Count == _pageSize)
+            @if (_hasMore)
             {
                 <div class="d-flex justify-center mt-4">
                     <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="LoadMoreAsync" Disabled="_isLoadingMore">
@@ -84,15 +93,45 @@
 @code {
     private bool _isLoading = true;
     private bool _isLoadingMore;
+    private bool _hasMore;
     private int _page = 1;
     private const int _pageSize = 20;
     private ReviewSummaryDto _summary = new();
     private readonly List<RentalReviewDto> _reviews = new();
+    private string? _loadError;
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadFirstPageAsync();
-        _isLoading = false;
+        try
+        {
+            await LoadFirstPageAsync();
+        }
+        catch
+        {
+            _loadError = "Nie udało się pobrać opinii. Sprawdź połączenie i spróbuj ponownie.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task RetryLoadAsync()
+    {
+        _isLoading = true;
+        _loadError = null;
+        try
+        {
+            await LoadFirstPageAsync();
+        }
+        catch
+        {
+            _loadError = "Nie udało się pobrać opinii. Sprawdź połączenie i spróbuj ponownie.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
     }
 
     private async Task LoadFirstPageAsync()
@@ -102,6 +141,7 @@
         _reviews.Clear();
         _reviews.AddRange(first);
         _page = 1;
+        _hasMore = first.Count == _pageSize && _reviews.Count < _summary.Count;
     }
 
     private async Task LoadMoreAsync()
@@ -115,6 +155,12 @@
                 _reviews.AddRange(next);
                 _page++;
             }
+
+            _hasMore = next.Count == _pageSize && _reviews.Count < _summary.Count;
+        }
+        catch
+        {
+            _loadError = "Nie udało się pobrać kolejnych opinii. Spróbuj ponownie.";
         }
         finally
         {
@@ -138,4 +184,3 @@
         return many;
     }
 }
-

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RentSpot</title>
     <base href="/" />
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
@@ -37,13 +38,15 @@
             } catch (e) { /* prywatność / starsze przeglądarki */ }
         })();
     </script>
-    <HeadOutlet />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-    <MudPopoverProvider @rendermode="InteractiveServer" />
-    <MudDialogProvider @rendermode="InteractiveServer" />
-    <MudSnackbarProvider @rendermode="InteractiveServer" />
+    <div role="region" aria-label="Menu, komunikaty i okna dialogowe">
+        <MudPopoverProvider @rendermode="InteractiveServer" />
+        <MudDialogProvider @rendermode="InteractiveServer" />
+        <MudSnackbarProvider @rendermode="InteractiveServer" />
+    </div>
     <Routes />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>

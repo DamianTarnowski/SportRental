@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -16,6 +17,8 @@ using Microsoft.Extensions.Options;
 using SportRental.Infrastructure.Data;
 using SportRental.Infrastructure.Domain;
 using SportRental.Infrastructure.Tenancy;
+using SportRental.Admin.Services.Auth;
+using SportRental.Shared.Identity;
 
 namespace SportRental.Admin.Tests.Api;
 
@@ -105,6 +108,20 @@ public sealed class SecurityIntegrationTests : IClassFixture<WebApplicationFacto
     }
 
     [Fact]
+    public async Task GetAuthState_RepeatedAnonymousChecks_DoNotConsumeCredentialLimit()
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var responses = new List<HttpResponseMessage>();
+        for (var i = 0; i < 6; i++)
+        {
+            responses.Add(await client.GetAsync("/api/auth/me"));
+        }
+
+        Assert.All(responses, response => Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode));
+    }
+
+    [Fact]
     public async Task PostRentals_AnonymousRequest_Returns401()
     {
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
@@ -118,6 +135,53 @@ public sealed class SecurityIntegrationTests : IClassFixture<WebApplicationFacto
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         var response = await client.PostAsJsonAsync("/api/reviews", new { });
         AssertUnauthorizedOrForbidden(response, "POST /api/reviews");
+    }
+
+    [Theory]
+    [InlineData(RentalStatus.Draft)]
+    [InlineData(RentalStatus.Pending)]
+    [InlineData(RentalStatus.Confirmed)]
+    [InlineData(RentalStatus.Active)]
+    [InlineData(RentalStatus.Cancelled)]
+    public async Task PostReviews_RentalNotCompleted_ReturnsBadRequest(RentalStatus status)
+    {
+        var (rentalId, customerId) = await SeedReviewRentalAsync(status);
+        using var client = await CreateGuestCustomerClientAsync(customerId);
+
+        var response = await client.PostAsJsonAsync("/api/reviews", new
+        {
+            rentalId,
+            qualityScore = 8,
+            priceScore = 7,
+            serviceScore = 9,
+            comment = "Test"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.False(await db.RentalReviews.IgnoreQueryFilters().AnyAsync(r => r.RentalId == rentalId));
+    }
+
+    [Fact]
+    public async Task PostReviews_CompletedRental_ReturnsCreated()
+    {
+        var (rentalId, customerId) = await SeedReviewRentalAsync(RentalStatus.Completed);
+        using var client = await CreateGuestCustomerClientAsync(customerId);
+
+        var response = await client.PostAsJsonAsync("/api/reviews", new
+        {
+            rentalId,
+            qualityScore = 8,
+            priceScore = 7,
+            serviceScore = 9,
+            comment = "Test"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.True(await db.RentalReviews.IgnoreQueryFilters().AnyAsync(r => r.RentalId == rentalId));
     }
 
     [Fact]
@@ -192,11 +256,18 @@ public sealed class SecurityIntegrationTests : IClassFixture<WebApplicationFacto
         }
 
         var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-        client.DefaultRequestHeaders.Add(AuthHeaderName, "true");
-        client.DefaultRequestHeaders.Add(TenantHeaderName, TestTenantId.ToString()); // ja jestem A
-        client.DefaultRequestHeaders.Add(RolesHeaderName, "Owner,SuperAdmin");
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var tokenService = scope.ServiceProvider.GetRequiredService<JwtTokenService>();
+            var token = tokenService.CreateUserToken(
+                new ApplicationUser { Id = Guid.NewGuid(), Email = "owner-a@example.test" },
+                TestTenantId,
+                [RoleNames.Owner]);
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        }
 
-        // DELETE bo to jeden z prostszych endpointów authorized — właściciel powinien
+        // DELETE bo to jeden z prostszych endpointów authorized — właściciel tenant-a A powinien
         // dostać 404 (nie ma takiego rentalu w tenant A), nie 200/204.
         var response = await client.DeleteAsync($"/api/rentals/{otherTenantRentalId}");
 
@@ -218,6 +289,71 @@ public sealed class SecurityIntegrationTests : IClassFixture<WebApplicationFacto
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    [Fact]
+    public async Task ClientRole_CannotCreateRentalDirectlyWithoutCheckout()
+    {
+        await ResetDbAsync();
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add(AuthHeaderName, "true");
+        client.DefaultRequestHeaders.Add(RolesHeaderName, "Client");
+        client.DefaultRequestHeaders.Add(TenantHeaderName, TestTenantId.ToString());
+
+        var response = await client.PostAsJsonAsync("/api/rentals", new { });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TenantOwner_CannotRefreshOrDeleteOtherTenantHold()
+    {
+        await ResetDbAsync();
+        var productId = Guid.NewGuid();
+        var holdId = Guid.NewGuid();
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.Tenants.Add(new Tenant { Id = OtherTenantId, Name = "Tenant B" });
+            db.Products.Add(new Product
+            {
+                Id = productId,
+                TenantId = OtherTenantId,
+                Name = "Sprzęt tenant B",
+                Sku = $"B-{Guid.NewGuid():N}",
+                DailyPrice = 50m,
+                AvailableQuantity = 5,
+                Available = true,
+                IsActive = true
+            });
+            db.ReservationHolds.Add(new ReservationHold
+            {
+                Id = holdId,
+                TenantId = OtherTenantId,
+                ProductId = productId,
+                Quantity = 1,
+                StartDateUtc = DateTime.UtcNow.AddDays(2),
+                EndDateUtc = DateTime.UtcNow.AddDays(3),
+                CreatedAtUtc = DateTime.UtcNow,
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+                SessionId = "other-tenant-session-id-1234567890"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add(AuthHeaderName, "true");
+        client.DefaultRequestHeaders.Add(RolesHeaderName, RoleNames.Owner);
+        client.DefaultRequestHeaders.Add(TenantHeaderName, TestTenantId.ToString());
+
+        var refresh = await client.PostAsync($"/api/holds/{holdId}/refresh?ttlMinutes=10", null);
+        var delete = await client.DeleteAsync($"/api/holds/{holdId}");
+
+        Assert.Equal(HttpStatusCode.NotFound, refresh.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, delete.StatusCode);
+        await using var verificationScope = _factory.Services.CreateAsyncScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.True(await verificationDb.ReservationHolds.IgnoreQueryFilters().AnyAsync(h => h.Id == holdId));
+    }
+
     private async Task ResetDbAsync()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
@@ -231,6 +367,49 @@ public sealed class SecurityIntegrationTests : IClassFixture<WebApplicationFacto
         }
     }
 
+    private async Task<(Guid RentalId, Guid CustomerId)> SeedReviewRentalAsync(RentalStatus status)
+    {
+        await ResetDbAsync();
+        var customerId = Guid.NewGuid();
+        var rentalId = Guid.NewGuid();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Customers.Add(new Customer
+        {
+            Id = customerId,
+            TenantId = TestTenantId,
+            FullName = "Klient opinii",
+            Email = "reviewer@example.test"
+        });
+        db.Rentals.Add(new Rental
+        {
+            Id = rentalId,
+            TenantId = TestTenantId,
+            CustomerId = customerId,
+            StartDateUtc = DateTime.UtcNow.AddDays(-2),
+            EndDateUtc = DateTime.UtcNow.AddDays(-1),
+            ReturnedAtUtc = status == RentalStatus.Completed ? DateTime.UtcNow.AddDays(-1) : null,
+            Status = status,
+            TotalAmount = 100m,
+            CreatedAtUtc = DateTime.UtcNow.AddDays(-3)
+        });
+        await db.SaveChangesAsync();
+
+        return (rentalId, customerId);
+    }
+
+    private async Task<HttpClient> CreateGuestCustomerClientAsync(Guid customerId)
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var tokenService = scope.ServiceProvider.GetRequiredService<JwtTokenService>();
+        var token = tokenService.CreateGuestToken(customerId, TestTenantId, "reviewer@example.test");
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token.AccessToken);
+        return client;
+    }
+
     private sealed class TestTenantProvider : ITenantProvider
     {
         private readonly Guid _tenantId;
@@ -240,9 +419,13 @@ public sealed class SecurityIntegrationTests : IClassFixture<WebApplicationFacto
 
     private sealed class ScopedDbContextFactory : IDbContextFactory<ApplicationDbContext>
     {
-        private readonly IServiceProvider _sp;
-        public ScopedDbContextFactory(IServiceProvider sp) => _sp = sp;
-        public ApplicationDbContext CreateDbContext() => _sp.GetRequiredService<ApplicationDbContext>();
+        private readonly DbContextOptions<ApplicationDbContext> _options;
+
+        public ScopedDbContextFactory(DbContextOptions<ApplicationDbContext> options) =>
+            _options = options;
+
+        public ApplicationDbContext CreateDbContext() => new(_options);
+
         public ValueTask<ApplicationDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default)
             => new(CreateDbContext());
     }

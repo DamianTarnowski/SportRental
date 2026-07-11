@@ -17,6 +17,32 @@ public class PaymentQuoteRequest
     // Typ wynajmu (godzinowy/dzienny)
     public RentalTypeDto RentalType { get; set; } = RentalTypeDto.Daily;
     public int? HoursRented { get; set; }
+
+    /// <summary>
+    /// Docelowy kontrakt marketplace: jedna grupa na wypożyczalnię, każda z
+    /// własnym terminem. Gdy lista jest pusta, API obsługuje starszy płaski
+    /// kontrakt powyżej dla kompatybilności wdrożeń w toku.
+    /// </summary>
+    public List<RentalGroupQuoteRequest> RentalGroups { get; set; } = new();
+}
+
+public class RentalGroupQuoteRequest
+{
+    [Required]
+    public Guid TenantId { get; set; }
+
+    [Required]
+    public DateTime StartDateUtc { get; set; }
+
+    [Required]
+    public DateTime EndDateUtc { get; set; }
+
+    [Required]
+    [MinLength(1)]
+    public List<CreateRentalItem> Items { get; set; } = new();
+
+    public RentalTypeDto RentalType { get; set; } = RentalTypeDto.Daily;
+    public int? HoursRented { get; set; }
 }
 
 public class PaymentQuoteResponse
@@ -25,14 +51,43 @@ public class PaymentQuoteResponse
     public decimal DepositAmount { get; set; }
     public string Currency { get; set; } = "PLN";
     public int RentalDays { get; set; }
+    public int RentalCount { get; set; }
     public List<TenantQuoteBreakdown> Tenants { get; set; } = new();
+    public List<PaymentQuoteItemBreakdown> Items { get; set; } = new();
+}
+
+public class PaymentQuoteItemBreakdown
+{
+    public Guid ProductId { get; set; }
+    public decimal Subtotal { get; set; }
 }
 
 public class TenantQuoteBreakdown
 {
     public Guid TenantId { get; set; }
+    public string TenantName { get; set; } = string.Empty;
+    public string? PickupAddress { get; set; }
+    public string? PickupCity { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string? Email { get; set; }
+    public string? OpeningHours { get; set; }
+    public DateTime StartDateUtc { get; set; }
+    public DateTime EndDateUtc { get; set; }
+    public RentalTypeDto RentalType { get; set; } = RentalTypeDto.Daily;
+    public int? HoursRented { get; set; }
+    public int RentalDays { get; set; }
     public decimal TotalAmount { get; set; }
     public decimal DepositAmount { get; set; }
+    public RentalTermsSummary RentalTerms { get; set; } = new();
+}
+
+public class RentalTermsSummary
+{
+    public string Title { get; set; } = "Standardowy regulamin wypożyczalni RentSpot";
+    public string Version { get; set; } = string.Empty;
+    public string ContentHash { get; set; } = string.Empty;
+    public string? Content { get; set; }
+    public bool UsesPlatformDefault { get; set; } = true;
 }
 
 public class CreatePaymentIntentRequest

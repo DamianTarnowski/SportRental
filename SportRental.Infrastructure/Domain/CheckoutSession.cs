@@ -9,4 +9,9 @@ public class CheckoutSession
     public DateTime CreatedAtUtc { get; set; }
     public DateTime ExpiresAtUtc { get; set; }
     public bool IsProcessed { get; set; }
+    public string? FailureReason { get; set; }
+    public DateTime? RefundedAtUtc { get; set; }
+    public string? AcceptedTermsVersion { get; set; }
+    public string? AcknowledgedPrivacyVersion { get; set; }
+    public DateTime? LegalAcceptedAtUtc { get; set; }
 }

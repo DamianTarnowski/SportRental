@@ -56,14 +56,6 @@ public class TestDataSeeder
 
             await using var db = await _dbFactory.CreateDbContextAsync();
 
-            // Log connection info — guard relational-only API. W testach DbContext jest InMemory
-            // i GetConnectionString() rzuca InvalidOperationException, co wywala 50 testów ApiTests.
-            if (db.Database.IsRelational())
-            {
-                var connectionString = db.Database.GetConnectionString();
-                _logger.LogInformation($"🔗 Connection: {connectionString}");
-            }
-
             // Check if already seeded by looking for products (ignore query filters to check actual DB state)
             // We check Products instead of Tenants because Program.cs may create a default tenant
             var productCount = await db.Products.IgnoreQueryFilters().CountAsync();

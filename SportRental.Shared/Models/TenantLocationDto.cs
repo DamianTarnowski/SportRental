@@ -13,5 +13,6 @@ public class TenantLocationDto
     public string? Email { get; set; }
     public string? OpeningHours { get; set; }
     public string? LogoUrl { get; set; }
+    public int ProductCount { get; set; }
     public double? Distance { get; set; }
 }

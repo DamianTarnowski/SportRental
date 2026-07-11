@@ -18,15 +18,8 @@ public class TenantService
 
     public async Task<List<TenantInfo>> GetAvailableTenantsAsync()
     {
-        try
-        {
-            var response = await _httpClient.GetFromJsonAsync<List<TenantInfo>>("/api/tenants");
-            return response ?? new List<TenantInfo>();
-        }
-        catch (Exception)
-        {
-            return new List<TenantInfo>();
-        }
+        var response = await _httpClient.GetFromJsonAsync<List<TenantInfo>>("/api/tenants");
+        return response ?? new List<TenantInfo>();
     }
 
     public async Task<string?> GetSelectedTenantIdAsync()

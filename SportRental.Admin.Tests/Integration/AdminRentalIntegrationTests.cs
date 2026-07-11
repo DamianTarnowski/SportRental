@@ -76,12 +76,18 @@ public class AdminRentalIntegrationTests : IAsyncLifetime
         }
         _testCustomerId = customer.Id;
 
-        // Get available product
-        var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.TenantId == _testTenantId && p.AvailableQuantity > 0);
-        if (product is null)
+        // Każdy test dostaje własny produkt, więc wynik nie zależy od pre-seeda bazy.
+        var product = new Product
         {
-            throw new InvalidOperationException("No available product found in database for this tenant.");
-        }
+            Id = Guid.NewGuid(),
+            TenantId = _testTenantId,
+            Name = "Admin Integration Product",
+            Sku = $"ADMIN-{Guid.NewGuid():N}",
+            DailyPrice = 50,
+            AvailableQuantity = 100
+        };
+        _dbContext.Products.Add(product);
+        await _dbContext.SaveChangesAsync();
         _testProductId = product.Id;
         _testProductName = product.Name;
         _testProductPrice = product.DailyPrice;
@@ -109,6 +115,13 @@ public class AdminRentalIntegrationTests : IAsyncLifetime
                 }
             }
             
+            await _dbContext.SaveChangesAsync();
+        }
+
+        var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == _testProductId);
+        if (product is not null)
+        {
+            _dbContext.Products.Remove(product);
             await _dbContext.SaveChangesAsync();
         }
 

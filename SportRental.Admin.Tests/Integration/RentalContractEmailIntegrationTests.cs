@@ -83,9 +83,19 @@ public class RentalContractEmailIntegrationTests : IAsyncLifetime
         _testCustomerEmail = customer.Email;
         _output.WriteLine($"[Contract Test] Created customer: {customer.FullName} ({customer.Email})");
 
-        // Get product
-        var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.TenantId == _testTenantId && p.AvailableQuantity > 0);
-        _testProductId = product!.Id;
+        // Własny produkt zapewnia powtarzalność na świeżej bazie testowej.
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = _testTenantId,
+            Name = "Contract Integration Product",
+            Sku = $"CONTRACT-{Guid.NewGuid():N}",
+            DailyPrice = 80,
+            AvailableQuantity = 100
+        };
+        _dbContext.Products.Add(product);
+        await _dbContext.SaveChangesAsync();
+        _testProductId = product.Id;
         _testProductName = product.Name;
         _testProductPrice = product.DailyPrice;
         _output.WriteLine($"[Contract Test] Product: {_testProductName} ({_testProductPrice}/day)");
@@ -112,6 +122,12 @@ public class RentalContractEmailIntegrationTests : IAsyncLifetime
         if (customer is not null)
         {
             _dbContext.Customers.Remove(customer);
+        }
+
+        var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == _testProductId);
+        if (product is not null)
+        {
+            _dbContext.Products.Remove(product);
         }
 
         await _dbContext.SaveChangesAsync();

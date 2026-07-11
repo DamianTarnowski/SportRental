@@ -82,10 +82,8 @@ public class TenantServiceTests
     }
 
     [Fact]
-    public async Task GetAvailableTenants_OnHttpFailure_ReturnsEmptyList()
+    public async Task GetAvailableTenants_OnHttpFailure_PropagatesFailureToCallingPage()
     {
-        // ApiService rzuca HttpClient bez setupowanego handlera = każde wywołanie throwuje.
-        // TenantService swallowuje exception i zwraca pustą listę żeby UI nie crashował.
         var localStorage = new Mock<ILocalStorageService>();
         var failingHttp = new HttpClient(new ThrowingHandler())
         {
@@ -93,10 +91,10 @@ public class TenantServiceTests
         };
         var sut = new TenantService(failingHttp, localStorage.Object);
 
-        var result = await sut.GetAvailableTenantsAsync();
+        var action = () => sut.GetAvailableTenantsAsync();
 
-        result.Should().NotBeNull();
-        result.Should().BeEmpty();
+        await action.Should().ThrowAsync<HttpRequestException>()
+            .WithMessage("network down");
     }
 
     private sealed class ThrowingHandler : HttpMessageHandler

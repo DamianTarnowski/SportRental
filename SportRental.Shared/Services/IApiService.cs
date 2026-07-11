@@ -1,31 +1,38 @@
 using SportRental.Shared.Models;
+using SportRental.Shared.Legal;
 
 namespace SportRental.Shared.Services;
 
 public interface IApiService
 {
+    string? LastHoldError { get; }
+
     // Konfiguracja API
     void SetBaseUrl(string baseUrl);
     void SetTenantId(Guid? tenantId);
 
+    // Dokumenty prawne i publiczne dane operatora platformy
+    Task<LegalInfoDto> GetLegalInfoAsync();
+
     // Lokalizacje wypożyczalni
     Task<List<TenantLocationDto>> GetTenantLocationsAsync();
+
+    // Kontakt z wybraną wypożyczalnią
+    Task SendContactMessageAsync(ContactMessageRequest request);
 
     // Produkty
     Task<List<ProductDto>> GetProductsAsync(int page = 1, int pageSize = 50);
     Task<ProductsPagedResponse> GetProductsPagedAsync(ProductFilterRequest filter);
+    Task<ProductCatalogFacetsDto> GetProductCatalogFacetsAsync();
     Task<ProductDto?> GetProductAsync(Guid id);
 
     // Klienci
-    Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request);
     Task<CustomerDto?> UpdateCustomerAsync(Guid id, CreateCustomerRequest request);
     Task<CustomerDto?> FindCustomerByEmailAsync(string email);
     Task<CustomerDto?> GetCustomerAsync(Guid id);
 
     // Platnosci
     Task<PaymentQuoteResponse> GetPaymentQuoteAsync(PaymentQuoteRequest request);
-    Task<PaymentIntentDto> CreatePaymentIntentAsync(CreatePaymentIntentRequest request);
-    Task<PaymentIntentDto?> GetPaymentIntentAsync(string id);
     Task<CheckoutSessionResponse> CreateCheckoutSessionAsync(CreateCheckoutSessionRequest request);
     Task<FinalizeSessionResponse?> FinalizeCheckoutSessionAsync(string sessionId);
 
@@ -37,10 +44,13 @@ public interface IApiService
 
     // Holds (tymczasowe rezerwacje)
     Task<CreateHoldResponse?> CreateHoldAsync(CreateHoldRequest request);
+    Task<CreateHoldResponse?> RefreshHoldAsync(Guid holdId, string sessionId, int ttlMinutes = 10);
     Task<bool> DeleteHoldAsync(Guid holdId, string? sessionId = null);
 
     // Guest session (bez rejestracji konta)
     Task<GuestSessionResult?> CreateGuestSessionAsync(GuestSessionPayload payload);
+    Task<bool> RequestGuestOrderAccessAsync(GuestOrderAccessRequest request);
+    Task<GuestSessionResult?> RedeemGuestOrderAccessAsync(string token);
 
     // Opinie
     Task<RentalReviewDto?> PostRentalReviewAsync(CreateRentalReviewRequest request);
@@ -68,4 +78,10 @@ public sealed class GuestSessionResult
     public required Guid CustomerId { get; init; }
     public required string Email { get; init; }
     public required string FullName { get; init; }
+}
+
+public sealed class GuestOrderAccessRequest
+{
+    public required string Email { get; init; }
+    public required string OrderNumber { get; init; }
 }

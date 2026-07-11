@@ -1,12 +1,14 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using SportRental.Shared.Legal;
 using SportRental.Shared.Models;
 
 namespace SportRental.Shared.Services;
 
 public class ApiService : IApiService
 {
+    public string? LastHoldError { get; private set; }
     private readonly HttpClient _httpClient;
     private string _baseUrl = string.Empty;
     private Guid? _tenantId;
@@ -39,63 +41,54 @@ public class ApiService : IApiService
 
     public async Task<List<TenantLocationDto>> GetTenantLocationsAsync()
     {
-        try
-        {
-            var url = $"{_baseUrl}/api/tenants/locations";
-            return await _httpClient.GetFromJsonAsync<List<TenantLocationDto>>(url, _jsonOptions) ?? new List<TenantLocationDto>();
-        }
-        catch (Exception)
-        {
-            return new List<TenantLocationDto>();
-        }
+        var url = $"{_baseUrl}/api/tenants/locations";
+        return await _httpClient.GetFromJsonAsync<List<TenantLocationDto>>(url, _jsonOptions)
+            ?? new List<TenantLocationDto>();
+    }
+
+    public async Task<LegalInfoDto> GetLegalInfoAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<LegalInfoDto>(
+                   $"{_baseUrl}/api/legal/info",
+                   _jsonOptions)
+               ?? new LegalInfoDto();
+    }
+
+    public async Task SendContactMessageAsync(ContactMessageRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/contact", request);
+        await EnsureApiSuccessAsync(response);
     }
 
     public async Task<List<ProductDto>> GetProductsAsync(int page = 1, int pageSize = 50)
     {
-        try
-        {
-            var url = $"{_baseUrl}/api/products?page={page}&pageSize={pageSize}";
-            var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url, _jsonOptions);
-            return response?.Items ?? new List<ProductDto>();
-        }
-        catch (Exception)
-        {
-            return new List<ProductDto>();
-        }
+        var url = $"{_baseUrl}/api/products?page={page}&pageSize={pageSize}";
+        var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url, _jsonOptions);
+        return response?.Items ?? new List<ProductDto>();
     }
 
     public async Task<ProductsPagedResponse> GetProductsPagedAsync(ProductFilterRequest filter)
     {
-        try
-        {
-            var url = $"{_baseUrl}/api/products?{filter.ToQueryString()}";
-            var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url, _jsonOptions);
-            return response ?? new ProductsPagedResponse();
-        }
-        catch (Exception)
-        {
-            return new ProductsPagedResponse();
-        }
+        var url = $"{_baseUrl}/api/products?{filter.ToQueryString()}";
+        var response = await _httpClient.GetFromJsonAsync<ProductsPagedResponse>(url, _jsonOptions);
+        return response ?? new ProductsPagedResponse();
+    }
+
+    public async Task<ProductCatalogFacetsDto> GetProductCatalogFacetsAsync()
+    {
+        return await _httpClient.GetFromJsonAsync<ProductCatalogFacetsDto>(
+                   $"{_baseUrl}/api/products/facets",
+                   _jsonOptions)
+               ?? new ProductCatalogFacetsDto();
     }
 
     public async Task<ProductDto?> GetProductAsync(Guid id)
     {
-        try
-        {
-            return await _httpClient.GetFromJsonAsync<ProductDto>($"{_baseUrl}/api/products/{id}", _jsonOptions);
-        }
-        catch (Exception)
-        {
+        var response = await _httpClient.GetAsync($"{_baseUrl}/api/products/{id}");
+        if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
-        }
-    }
-
-    public async Task<CustomerDto> CreateCustomerAsync(CreateCustomerRequest request)
-    {
-        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/customers", request);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<CustomerDto>()
-            ?? throw new InvalidOperationException("Failed to create customer");
+        await EnsureApiSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<ProductDto>(_jsonOptions);
     }
 
     public async Task<CustomerDto?> UpdateCustomerAsync(Guid id, CreateCustomerRequest request)
@@ -106,7 +99,7 @@ public class ApiService : IApiService
             return null;
         }
 
-        response.EnsureSuccessStatusCode();
+        await EnsureApiSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<CustomerDto>()
             ?? throw new InvalidOperationException("Failed to update customer");
     }
@@ -127,7 +120,7 @@ public class ApiService : IApiService
                 return null;
             }
 
-            response.EnsureSuccessStatusCode();
+            await EnsureApiSuccessAsync(response);
             return await response.Content.ReadFromJsonAsync<CustomerDto>();
         }
         catch (Exception)
@@ -138,60 +131,25 @@ public class ApiService : IApiService
 
     public async Task<CustomerDto?> GetCustomerAsync(Guid id)
     {
-        try
-        {
-            return await _httpClient.GetFromJsonAsync<CustomerDto>($"{_baseUrl}/api/customers/{id}", _jsonOptions);
-        }
-        catch (Exception)
-        {
+        var response = await _httpClient.GetAsync($"{_baseUrl}/api/customers/{id}");
+        if (response.StatusCode == HttpStatusCode.NotFound)
             return null;
-        }
+        await EnsureApiSuccessAsync(response);
+        return await response.Content.ReadFromJsonAsync<CustomerDto>(_jsonOptions);
     }
 
     public async Task<PaymentQuoteResponse> GetPaymentQuoteAsync(PaymentQuoteRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/payments/quote", request);
-        response.EnsureSuccessStatusCode();
+        await EnsureApiSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<PaymentQuoteResponse>()
             ?? throw new InvalidOperationException("Failed to retrieve payment quote");
-    }
-
-    public async Task<PaymentIntentDto> CreatePaymentIntentAsync(CreatePaymentIntentRequest request)
-    {
-        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/payments/intents", request);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<PaymentIntentDto>()
-            ?? throw new InvalidOperationException("Failed to create payment intent");
-    }
-
-    public async Task<PaymentIntentDto?> GetPaymentIntentAsync(string id)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                return null;
-            }
-
-            var response = await _httpClient.GetAsync($"{_baseUrl}/api/payments/intents/{id}");
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                return null;
-            }
-
-            response.EnsureSuccessStatusCode();
-            return await response.Content.ReadFromJsonAsync<PaymentIntentDto>();
-        }
-        catch (Exception)
-        {
-            return null;
-        }
     }
 
     public async Task<CheckoutSessionResponse> CreateCheckoutSessionAsync(CreateCheckoutSessionRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/checkout/create-session", request);
-        response.EnsureSuccessStatusCode();
+        await EnsureApiSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<CheckoutSessionResponse>()
             ?? throw new InvalidOperationException("Failed to create checkout session");
     }
@@ -201,10 +159,10 @@ public class ApiService : IApiService
         try
         {
             var response = await _httpClient.PostAsync($"{_baseUrl}/api/checkout/finalize-session/{sessionId}", null);
-            if (response.IsSuccessStatusCode)
-            {
-                return await response.Content.ReadFromJsonAsync<FinalizeSessionResponse>();
-            }
+            var result = await response.Content.ReadFromJsonAsync<FinalizeSessionResponse>(_jsonOptions);
+            if (result is not null)
+                return result;
+            await EnsureApiSuccessAsync(response);
             return null;
         }
         catch (Exception)
@@ -216,22 +174,16 @@ public class ApiService : IApiService
     public async Task<RentalResponse> CreateRentalAsync(CreateRentalRequest request)
     {
         var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/rentals", request);
-        response.EnsureSuccessStatusCode();
+        await EnsureApiSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<RentalResponse>()
             ?? throw new InvalidOperationException("Failed to create rental");
     }
 
     public async Task<bool> CancelRentalAsync(Guid rentalId)
     {
-        try
-        {
-            var response = await _httpClient.DeleteAsync($"{_baseUrl}/api/rentals/{rentalId}");
-            return response.IsSuccessStatusCode;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
+        var response = await _httpClient.DeleteAsync($"{_baseUrl}/api/rentals/{rentalId}");
+        await EnsureApiSuccessAsync(response);
+        return true;
     }
 
     public async Task<string?> GetContractUrlAsync(Guid rentalId)
@@ -254,32 +206,27 @@ public class ApiService : IApiService
 
     public async Task<List<MyRentalDto>> GetMyRentalsAsync(string? status = null, DateTime? from = null, DateTime? to = null, Guid? customerId = null)
     {
-        try
-        {
-            var qp = new List<string>();
-            if (!string.IsNullOrWhiteSpace(status)) qp.Add($"status={Uri.EscapeDataString(status)}");
-            if (from.HasValue) qp.Add($"from={Uri.EscapeDataString(from.Value.ToString("o"))}");
-            if (to.HasValue) qp.Add($"to={Uri.EscapeDataString(to.Value.ToString("o"))}");
-            if (customerId.HasValue) qp.Add($"customerId={customerId.Value}");
-            var url = $"{_baseUrl}/api/my-rentals" + (qp.Count > 0 ? "?" + string.Join("&", qp) : string.Empty);
-            var list = await _httpClient.GetFromJsonAsync<List<MyRentalDto>>(url, _jsonOptions);
-            return list ?? new List<MyRentalDto>();
-        }
-        catch (Exception)
-        {
-            return new List<MyRentalDto>();
-        }
+        var qp = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status)) qp.Add($"status={Uri.EscapeDataString(status)}");
+        if (from.HasValue) qp.Add($"from={Uri.EscapeDataString(from.Value.ToString("o"))}");
+        if (to.HasValue) qp.Add($"to={Uri.EscapeDataString(to.Value.ToString("o"))}");
+        var url = $"{_baseUrl}/api/my-rentals" + (qp.Count > 0 ? "?" + string.Join("&", qp) : string.Empty);
+        var list = await _httpClient.GetFromJsonAsync<List<MyRentalDto>>(url, _jsonOptions);
+        return list ?? new List<MyRentalDto>();
     }
 
     public async Task<CreateHoldResponse?> CreateHoldAsync(CreateHoldRequest request)
     {
+        LastHoldError = null;
         try
         {
             var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/holds", request);
             if (!response.IsSuccessStatusCode)
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"❌ CreateHold failed ({response.StatusCode}): {errorBody}");
+                LastHoldError = ReadSafeError(errorBody)
+                    ?? "Nie udało się zarezerwować produktu dla wybranego terminu.";
+                Console.WriteLine($"CreateHold failed ({response.StatusCode}): {LastHoldError}");
                 return null;
             }
 
@@ -287,9 +234,37 @@ public class ApiService : IApiService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ CreateHold exception: {ex.Message}");
+            LastHoldError = "Nie udało się połączyć z serwerem rezerwacji.";
+            Console.WriteLine($"CreateHold exception: {ex.GetType().Name}");
             return null;
         }
+    }
+
+    private static string? ReadSafeError(string body)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+            return null;
+
+        try
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(body);
+            foreach (var propertyName in new[] { "error", "message" })
+            {
+                if (json.RootElement.TryGetProperty(propertyName, out var value) &&
+                    value.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var message = value.GetString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(message) && message.Length <= 300)
+                        return message;
+                }
+            }
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // Nie pokazujemy klientowi surowego HTML ani treści błędu infrastruktury.
+        }
+
+        return null;
     }
 
     public async Task<bool> DeleteHoldAsync(Guid holdId, string? sessionId = null)
@@ -307,6 +282,23 @@ public class ApiService : IApiService
         catch (Exception)
         {
             return false;
+        }
+    }
+
+    public async Task<CreateHoldResponse?> RefreshHoldAsync(Guid holdId, string sessionId, int ttlMinutes = 10)
+    {
+        try
+        {
+            var url = $"{_baseUrl}/api/holds/{holdId}/refresh?sessionId={Uri.EscapeDataString(sessionId)}&ttlMinutes={ttlMinutes}";
+            var response = await _httpClient.PostAsync(url, content: null);
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            return await response.Content.ReadFromJsonAsync<CreateHoldResponse>(_jsonOptions);
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 
@@ -335,69 +327,98 @@ public class ApiService : IApiService
         }
     }
 
-    public async Task<RentalReviewDto?> PostRentalReviewAsync(CreateRentalReviewRequest request)
+    public async Task<bool> RequestGuestOrderAccessAsync(GuestOrderAccessRequest request)
     {
-        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/reviews", request);
-        if (!response.IsSuccessStatusCode)
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync(
+                $"{_baseUrl}/api/auth/guest-order-access/request",
+                request);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    public async Task<GuestSessionResult?> RedeemGuestOrderAccessAsync(string token)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync(
+                $"{_baseUrl}/api/auth/guest-order-access/redeem",
+                new { Token = token });
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            return await response.Content.ReadFromJsonAsync<GuestSessionResult>(_jsonOptions);
+        }
+        catch (Exception)
         {
             return null;
         }
+    }
+
+    public async Task<RentalReviewDto?> PostRentalReviewAsync(CreateRentalReviewRequest request)
+    {
+        var response = await _httpClient.PostAsJsonAsync($"{_baseUrl}/api/reviews", request);
+        await EnsureApiSuccessAsync(response);
         return await response.Content.ReadFromJsonAsync<RentalReviewDto>(_jsonOptions);
     }
 
     public async Task<List<RentalReviewDto>> GetTenantReviewsAsync(Guid tenantId, int page = 1, int pageSize = 20)
     {
-        try
-        {
-            var url = $"{_baseUrl}/api/tenants/{tenantId}/reviews?page={page}&pageSize={pageSize}";
-            var list = await _httpClient.GetFromJsonAsync<List<RentalReviewDto>>(url, _jsonOptions);
-            return list ?? new List<RentalReviewDto>();
-        }
-        catch (Exception)
-        {
-            return new List<RentalReviewDto>();
-        }
+        var url = $"{_baseUrl}/api/tenants/{tenantId}/reviews?page={page}&pageSize={pageSize}";
+        var list = await _httpClient.GetFromJsonAsync<List<RentalReviewDto>>(url, _jsonOptions);
+        return list ?? new List<RentalReviewDto>();
     }
 
     public async Task<ReviewSummaryDto> GetTenantReviewSummaryAsync(Guid tenantId)
     {
-        try
-        {
-            var url = $"{_baseUrl}/api/tenants/{tenantId}/reviews/summary";
-            var summary = await _httpClient.GetFromJsonAsync<ReviewSummaryDto>(url, _jsonOptions);
-            return summary ?? new ReviewSummaryDto();
-        }
-        catch (Exception)
-        {
-            return new ReviewSummaryDto();
-        }
+        var url = $"{_baseUrl}/api/tenants/{tenantId}/reviews/summary";
+        var summary = await _httpClient.GetFromJsonAsync<ReviewSummaryDto>(url, _jsonOptions);
+        return summary ?? new ReviewSummaryDto();
     }
 
     public async Task<List<RentalReviewDto>> GetReviewsAsync(int page = 1, int pageSize = 20)
     {
-        try
-        {
-            var url = $"{_baseUrl}/api/reviews?page={page}&pageSize={pageSize}";
-            var list = await _httpClient.GetFromJsonAsync<List<RentalReviewDto>>(url, _jsonOptions);
-            return list ?? new List<RentalReviewDto>();
-        }
-        catch (Exception)
-        {
-            return new List<RentalReviewDto>();
-        }
+        var url = $"{_baseUrl}/api/reviews?page={page}&pageSize={pageSize}";
+        var list = await _httpClient.GetFromJsonAsync<List<RentalReviewDto>>(url, _jsonOptions);
+        return list ?? new List<RentalReviewDto>();
     }
 
     public async Task<ReviewSummaryDto> GetReviewSummaryAsync()
     {
+        var url = $"{_baseUrl}/api/reviews/summary";
+        var summary = await _httpClient.GetFromJsonAsync<ReviewSummaryDto>(url, _jsonOptions);
+        return summary ?? new ReviewSummaryDto();
+    }
+
+    private static async Task EnsureApiSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var message = $"API zwróciło {(int)response.StatusCode} {response.ReasonPhrase}.";
         try
         {
-            var url = $"{_baseUrl}/api/reviews/summary";
-            var summary = await _httpClient.GetFromJsonAsync<ReviewSummaryDto>(url, _jsonOptions);
-            return summary ?? new ReviewSummaryDto();
+            var body = await response.Content.ReadAsStringAsync();
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                using var json = JsonDocument.Parse(body);
+                if (json.RootElement.TryGetProperty("error", out var error) ||
+                    json.RootElement.TryGetProperty("message", out error))
+                {
+                    message = error.GetString() ?? message;
+                }
+            }
         }
-        catch (Exception)
+        catch (JsonException)
         {
-            return new ReviewSummaryDto();
+            // Keep the status-based fallback for non-JSON responses.
         }
+
+        throw new HttpRequestException(message, inner: null, response.StatusCode);
     }
 }

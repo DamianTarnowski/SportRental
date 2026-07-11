@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Components;
+using SportRental.Admin.Services.Auth;
 
 namespace SportRental.Admin.Components.Account
 {
@@ -18,18 +19,39 @@ namespace SportRental.Admin.Components.Account
         [DoesNotReturn]
         public void RedirectTo(string? uri)
         {
-            uri ??= "";
-
-            // Prevent open redirects.
-            if (!Uri.IsWellFormedUriString(uri, UriKind.Relative))
-            {
-                uri = navigationManager.ToBaseRelativePath(uri);
-            }
+            var localUri = ResolveLocalUri(uri);
 
             // During static rendering, NavigateTo throws a NavigationException which is handled by the framework as a redirect.
             // So as long as this is called from a statically rendered Identity component, the InvalidOperationException is never thrown.
-            navigationManager.NavigateTo(uri);
+            navigationManager.NavigateTo(localUri);
             throw new InvalidOperationException($"{nameof(IdentityRedirectManager)} can only be used during static rendering.");
+        }
+
+        private string ResolveLocalUri(string? uri)
+        {
+            if (string.IsNullOrWhiteSpace(uri))
+                return "/";
+
+            if (!Uri.TryCreate(uri, UriKind.Absolute, out var absoluteUri))
+                return SafeReturnUrl.ResolveLocal(uri);
+
+            var baseUri = new Uri(navigationManager.BaseUri);
+            if (!string.Equals(absoluteUri.Scheme, baseUri.Scheme, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(absoluteUri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase) ||
+                absoluteUri.Port != baseUri.Port)
+            {
+                return "/";
+            }
+
+            try
+            {
+                var relative = navigationManager.ToBaseRelativePath(absoluteUri.ToString());
+                return SafeReturnUrl.ResolveLocal(relative);
+            }
+            catch (ArgumentException)
+            {
+                return "/";
+            }
         }
 
         [DoesNotReturn]

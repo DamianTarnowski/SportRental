@@ -1,5 +1,4 @@
 using System.Text.Json;
-using Azure.AI.OpenAI;
 using OpenAI.Chat;
 
 namespace SportRental.Admin.Services.Ai;
@@ -31,13 +30,16 @@ public record ProductSuggestion(
 
 public class ProductAiAssistant : IProductAiAssistant
 {
-    private readonly AzureOpenAIClient _client;
+    private readonly AzureOpenAiClientProvider _clientProvider;
     private readonly string _deployment;
     private readonly ILogger<ProductAiAssistant> _logger;
 
-    public ProductAiAssistant(AzureOpenAIClient client, IConfiguration config, ILogger<ProductAiAssistant> logger)
+    public ProductAiAssistant(
+        AzureOpenAiClientProvider clientProvider,
+        IConfiguration config,
+        ILogger<ProductAiAssistant> logger)
     {
-        _client = client;
+        _clientProvider = clientProvider;
         _deployment = config["OpenAI:TextDeployment"] ?? "gpt-5.5";
         _logger = logger;
     }
@@ -52,7 +54,9 @@ public class ProductAiAssistant : IProductAiAssistant
         if (images.Count > 6)
             images = images.Take(6).ToList(); // limit kosztu
 
-        var chat = _client.GetChatClient(_deployment);
+        var client = _clientProvider.Client
+            ?? throw new InvalidOperationException("Asystent AI nie jest skonfigurowany dla tego środowiska.");
+        var chat = client.GetChatClient(_deployment);
 
         var systemPrompt = """
             Jesteś asystentem właściciela wypożyczalni sprzętu sportowego w Polsce.

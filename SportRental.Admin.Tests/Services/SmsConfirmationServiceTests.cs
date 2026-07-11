@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Moq;
 
+#pragma warning disable CS0618 // Legacy implementation remains covered while disabled in the application.
+
 namespace SportRental.Admin.Tests.Services;
 
 public class SmsConfirmationServiceTests : IDisposable
@@ -80,11 +82,12 @@ public class SmsConfirmationServiceTests : IDisposable
 
         code.Should().NotBeNullOrEmpty();
         code.Should().HaveLength(6);
+        code.Should().MatchRegex("^[0-9]{6}$");
 
         await using var assertContext = CreateContext();
         var confirmation = await assertContext.SmsConfirmations.SingleAsync();
         confirmation.RentalId.Should().Be(rentalId);
-        confirmation.Code.Should().Be(code);
+        confirmation.Code.Should().NotBe(code, "confirmation codes must never be stored as plaintext");
         confirmation.PhoneNumber.Should().Be("+48123456789");
         confirmation.TenantId.Should().Be(tenantId);
         confirmation.IsConfirmed.Should().BeFalse();
@@ -156,11 +159,15 @@ public class SmsConfirmationServiceTests : IDisposable
 
         var newCode = await _smsConfirmationService.GenerateConfirmationCodeAsync(rentalId);
 
-        await using var assertContext = CreateContext();
-        var confirmations = await assertContext.SmsConfirmations.ToListAsync();
-        confirmations.Should().HaveCount(1);
-        confirmations[0].Code.Should().Be(newCode);
-        confirmations[0].Id.Should().NotBe(existingConfirmation.Id);
+        await using (var assertContext = CreateContext())
+        {
+            var confirmations = await assertContext.SmsConfirmations.ToListAsync();
+            confirmations.Should().HaveCount(1);
+            confirmations[0].Code.Should().NotBe(newCode, "confirmation codes must never be stored as plaintext");
+            confirmations[0].Id.Should().NotBe(existingConfirmation.Id);
+        }
+
+        (await _smsConfirmationService.ValidateConfirmationCodeAsync(rentalId, newCode)).Should().BeTrue();
     }
 
     [Fact]
@@ -168,26 +175,10 @@ public class SmsConfirmationServiceTests : IDisposable
     {
         var tenantId = Guid.NewGuid();
         var rentalId = Guid.NewGuid();
-        var code = "654321";
         _tenantProviderMock.Setup(x => x.GetCurrentTenantId()).Returns(tenantId);
 
-        await using (var context = CreateContext())
-        {
-            context.SmsConfirmations.Add(new SmsConfirmation
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                RentalId = rentalId,
-                Code = code,
-                PhoneNumber = "+48111222333",
-                IsConfirmed = false,
-                CreatedAt = DateTime.UtcNow.AddMinutes(-5),
-                ExpiresAt = DateTime.UtcNow.AddHours(23),
-                AttemptsCount = 0
-            });
-
-            await context.SaveChangesAsync();
-        }
+        await SeedRentalAsync(tenantId, rentalId, "+48111222333");
+        var code = await _smsConfirmationService.GenerateConfirmationCodeAsync(rentalId);
 
         var result = await _smsConfirmationService.ValidateConfirmationCodeAsync(rentalId, code);
 
@@ -207,20 +198,8 @@ public class SmsConfirmationServiceTests : IDisposable
         var rentalId = Guid.NewGuid();
         _tenantProviderMock.Setup(x => x.GetCurrentTenantId()).Returns(tenantId);
 
-        await using (var context = CreateContext())
-        {
-            context.SmsConfirmations.Add(new SmsConfirmation
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                RentalId = rentalId,
-                Code = "999999",
-                PhoneNumber = "+48444555666",
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddHours(1)
-            });
-            await context.SaveChangesAsync();
-        }
+        await SeedRentalAsync(tenantId, rentalId, "+48444555666");
+        await _smsConfirmationService.GenerateConfirmationCodeAsync(rentalId);
 
         var result = await _smsConfirmationService.ValidateConfirmationCodeAsync(rentalId, "111111");
 
@@ -228,7 +207,8 @@ public class SmsConfirmationServiceTests : IDisposable
 
         await using var assertContext = CreateContext();
         var confirmation = await assertContext.SmsConfirmations.SingleAsync();
-        confirmation.AttemptsCount.Should().Be(0);
+        confirmation.AttemptsCount.Should().Be(1);
+        confirmation.LastAttemptAt.Should().NotBeNull();
         confirmation.IsConfirmed.Should().BeFalse();
     }
 
@@ -239,22 +219,17 @@ public class SmsConfirmationServiceTests : IDisposable
         var rentalId = Guid.NewGuid();
         _tenantProviderMock.Setup(x => x.GetCurrentTenantId()).Returns(tenantId);
 
+        await SeedRentalAsync(tenantId, rentalId, "+48777888999");
+        var code = await _smsConfirmationService.GenerateConfirmationCodeAsync(rentalId);
+
         await using (var context = CreateContext())
         {
-            context.SmsConfirmations.Add(new SmsConfirmation
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                RentalId = rentalId,
-                Code = "999999",
-                PhoneNumber = "+48777888999",
-                CreatedAt = DateTime.UtcNow.AddHours(-2),
-                ExpiresAt = DateTime.UtcNow.AddMinutes(-10)
-            });
+            var confirmation = await context.SmsConfirmations.SingleAsync();
+            confirmation.ExpiresAt = DateTime.UtcNow.AddMinutes(-10);
             await context.SaveChangesAsync();
         }
 
-        var result = await _smsConfirmationService.ValidateConfirmationCodeAsync(rentalId, "999999");
+        var result = await _smsConfirmationService.ValidateConfirmationCodeAsync(rentalId, code);
 
         result.Should().BeFalse();
     }
@@ -266,23 +241,17 @@ public class SmsConfirmationServiceTests : IDisposable
         var rentalId = Guid.NewGuid();
         _tenantProviderMock.Setup(x => x.GetCurrentTenantId()).Returns(tenantId);
 
+        await SeedRentalAsync(tenantId, rentalId, "+48700112233");
+        var code = await _smsConfirmationService.GenerateConfirmationCodeAsync(rentalId);
+
         await using (var context = CreateContext())
         {
-            context.SmsConfirmations.Add(new SmsConfirmation
-            {
-                Id = Guid.NewGuid(),
-                TenantId = tenantId,
-                RentalId = rentalId,
-                Code = "111222",
-                PhoneNumber = "+48700112233",
-                AttemptsCount = 4,
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddHours(1)
-            });
+            var seededConfirmation = await context.SmsConfirmations.SingleAsync();
+            seededConfirmation.AttemptsCount = 4;
             await context.SaveChangesAsync();
         }
 
-        var result = await _smsConfirmationService.ValidateConfirmationCodeAsync(rentalId, "111222");
+        var result = await _smsConfirmationService.ValidateConfirmationCodeAsync(rentalId, code);
 
         result.Should().BeFalse();
 
@@ -386,7 +355,32 @@ public class SmsConfirmationServiceTests : IDisposable
     }
 
     private ApplicationDbContext CreateContext() => new ApplicationDbContext(_options);
+
+    private async Task SeedRentalAsync(Guid tenantId, Guid rentalId, string phoneNumber)
+    {
+        var customerId = Guid.NewGuid();
+        await using var context = CreateContext();
+        context.Customers.Add(new Customer
+        {
+            Id = customerId,
+            TenantId = tenantId,
+            FullName = "Test Customer",
+            PhoneNumber = phoneNumber
+        });
+        context.Rentals.Add(new Rental
+        {
+            Id = rentalId,
+            TenantId = tenantId,
+            CustomerId = customerId,
+            StartDateUtc = DateTime.UtcNow.Date,
+            EndDateUtc = DateTime.UtcNow.Date.AddDays(1),
+            Status = RentalStatus.Pending
+        });
+        await context.SaveChangesAsync();
+    }
 }
+
+#pragma warning restore CS0618
 
 
 

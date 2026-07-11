@@ -30,5 +30,10 @@ public interface IPaymentGateway
     /// <summary>
     /// Creates a refund for a captured payment
     /// </summary>
-    Task<bool> RefundPaymentAsync(Guid tenantId, string id, decimal? amount = null, string? reason = null);
+    Task<bool> RefundPaymentAsync(
+        Guid tenantId,
+        string id,
+        decimal? amount = null,
+        string? reason = null,
+        string? idempotencyKey = null);
 }

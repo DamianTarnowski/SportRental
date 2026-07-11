@@ -908,6 +908,9 @@ else
             HourlyPrice = p.HourlyPrice,
             IsActive = p.IsActive,
             ImageUrl = p.ImageUrl,
+            ImageBasePath = p.ImageBasePath,
+            ImageVariantWidths = p.ImageVariantWidths?.ToArray(),
+            HasOriginalImage = p.HasOriginalImage,
             AvailableQuantity = p.AvailableQuantity,
             Description = p.Description,
             SerialNumber = p.SerialNumber,
@@ -976,8 +979,28 @@ else
                 existing.DailyPrice = model.DailyPrice;
                 existing.HourlyPrice = model.HourlyPrice;
                 existing.IsActive = model.IsActive;
+                var imageUrlChanged = !string.Equals(
+                    existing.ImageUrl?.Trim(),
+                    model.ImageUrl?.Trim(),
+                    StringComparison.Ordinal);
                 existing.ImageUrl = model.ImageUrl;
-                existing.ImageBasePath = model.ImageBasePath;
+                if (imageUrlChanged)
+                {
+                    // URL wpisany ręcznie nie niesie gwarancji, że obok niego istnieją
+                    // warianty w400/w800/w1280 ani plik original.
+                    existing.ImageBasePath = null;
+                    existing.ImageVariantWidths = null;
+                    existing.HasOriginalImage = null;
+                    model.ImageBasePath = null;
+                    model.ImageVariantWidths = null;
+                    model.HasOriginalImage = null;
+                }
+                else
+                {
+                    existing.ImageBasePath = model.ImageBasePath;
+                    existing.ImageVariantWidths = model.ImageVariantWidths?.ToArray();
+                    existing.HasOriginalImage = model.HasOriginalImage;
+                }
                 existing.AvailableQuantity = model.AvailableQuantity;
                 existing.Description = model.Description;
                 existing.SerialNumber = model.SerialNumber;
@@ -1002,11 +1025,15 @@ else
                     
                     model.ImageBasePath = basePath;
                     model.ImageUrl = defaultUrl;
+                    model.ImageVariantWidths = variants.Keys.OrderBy(width => width).ToArray();
+                    model.HasOriginalImage = true;
                     // ExecuteUpdate zamiast Db.Update(model) — nie powoduje tracking konfliktu.
                     await Db.Products.Where(p => p.Id == model.Id)
                         .ExecuteUpdateAsync(s => s
                             .SetProperty(p => p.ImageUrl, defaultUrl)
                             .SetProperty(p => p.ImageBasePath, basePath)
+                            .SetProperty(p => p.ImageVariantWidths, model.ImageVariantWidths)
+                            .SetProperty(p => p.HasOriginalImage, true)
                             .SetProperty(p => p.UpdatedAtUtc, DateTime.UtcNow));
 
                     Snackbar.Add("Zdjęcie zapisane!", Severity.Success);
@@ -1156,7 +1183,10 @@ else
             try
             {
                 var url = model.ImageUrl;
-                if (url.StartsWith("/")) url = new Uri(new Uri("https://srental2.azurewebsites.net"), url).ToString();
+                if (url.StartsWith("/"))
+                {
+                    url = new Uri(new Uri(Navigation.BaseUri), url).ToString();
+                }
                 bytes = await Http.GetByteArrayAsync(url);
                 contentType = url.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png"
                             : url.EndsWith(".webp", StringComparison.OrdinalIgnoreCase) ? "image/webp"

@@ -72,22 +72,9 @@ namespace SportRental.Admin.Services.Sms
             if (string.IsNullOrWhiteSpace(message))
                 return message;
 
-            var sanitized = message;
-
-            // Remove URLs
-            sanitized = Regex.Replace(sanitized, @"\bhttps?://\S+\b", "", RegexOptions.IgnoreCase);
-            sanitized = Regex.Replace(sanitized, @"\bwww\.\S+\b", "", RegexOptions.IgnoreCase);
-
-            // Remove emails
-            sanitized = Regex.Replace(sanitized, @"\b[\w.\-+%]+@[\w.\-]+\.[A-Za-z]{2,}\b", "", RegexOptions.IgnoreCase);
-
-            // Some providers also flag domain-like patterns; remove bare domains like example.com
-            sanitized = Regex.Replace(sanitized, @"\b[\w\-]+\.(pl|com|net|org|io|dev|eu|info)\b", "", RegexOptions.IgnoreCase);
-
-            // Normalize whitespace
-            sanitized = Regex.Replace(sanitized, @"\s{2,}", " ").Trim();
-
-            return sanitized;
+            // Preserve URLs and email addresses. Confirmation SMS messages rely on clickable
+            // links, and stripping them leaves customers without an actionable instruction.
+            return Regex.Replace(message, @"\s{2,}", " ").Trim();
         }
 
         private async Task SendSmsInternalAsync(string phoneNumber, string message)

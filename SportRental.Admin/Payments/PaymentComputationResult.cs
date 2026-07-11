@@ -12,6 +12,18 @@ internal record PaymentComputationResult(
 
 internal record TenantPaymentBreakdown(
     Guid TenantId,
+    DateTime StartDateUtc,
+    DateTime EndDateUtc,
+    RentalTypeDto RentalType,
+    int? HoursRented,
+    int RentalDays,
     decimal TotalAmount,
     decimal DepositAmount,
-    IReadOnlyList<CreateRentalItem> Items);
+    IReadOnlyList<ComputedRentalItem> Items);
+
+internal record ComputedRentalItem(
+    Guid ProductId,
+    int Quantity,
+    decimal PricePerDay,
+    decimal? PricePerHour,
+    decimal Subtotal);

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using SportRental.Shared.Time;
 
 namespace SportRental.Shared.Models;
 
@@ -6,12 +7,16 @@ public class CartItem
 {
     public required Guid ProductId { get; set; }
     public required string ProductName { get; set; }
+    public Guid TenantId { get; set; }
+    public string TenantName { get; set; } = string.Empty;
+    public string? PickupAddress { get; set; }
+    public string? PickupCity { get; set; }
     public string? ProductImageUrl { get; set; }
     public decimal DailyPrice { get; set; }
     public decimal? HourlyPrice { get; set; }
     public int Quantity { get; set; } = 1;
-    public DateTime StartDate { get; set; } = DateTime.Today.AddDays(1);
-    public DateTime EndDate { get; set; } = DateTime.Today.AddDays(2);
+    public DateTime StartDate { get; set; } = PolishRentalTime.TodayLocal.AddDays(1);
+    public DateTime EndDate { get; set; } = PolishRentalTime.TodayLocal.AddDays(2);
 
     // Typ wynajmu (godzinowy/dzienny)
     public RentalTypeDto RentalType { get; set; } = RentalTypeDto.Daily;
@@ -21,7 +26,7 @@ public class CartItem
     public Guid? HoldId { get; set; }
     public DateTime? HoldExpiresAtUtc { get; set; }
 
-    public int TotalDays => Math.Max(1, (EndDate - StartDate).Days);
+    public int TotalDays => Math.Max(1, (int)Math.Ceiling((EndDate - StartDate).TotalDays));
     public decimal TotalPrice => RentalType == RentalTypeDto.Hourly && HourlyPrice.HasValue && HoursRented.HasValue
         ? HourlyPrice.Value * Quantity * HoursRented.Value
         : DailyPrice * Quantity * TotalDays;
@@ -43,6 +48,10 @@ public class Cart
             {
                 existingItem.ProductImageUrl = product.FullImageUrl ?? product.ImageUrl;
             }
+            existingItem.TenantId = product.TenantId;
+            existingItem.TenantName = product.TenantName ?? existingItem.TenantName;
+            existingItem.PickupAddress = product.PickupAddress ?? existingItem.PickupAddress;
+            existingItem.PickupCity = product.City ?? existingItem.PickupCity;
             if (startDate.HasValue && endDate.HasValue && endDate > startDate)
             {
                 existingItem.StartDate = startDate.Value;
@@ -55,12 +64,16 @@ public class Cart
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
+                TenantId = product.TenantId,
+                TenantName = product.TenantName ?? "Wypożyczalnia",
+                PickupAddress = product.PickupAddress,
+                PickupCity = product.City,
                 ProductImageUrl = product.FullImageUrl ?? product.ImageUrl,
                 DailyPrice = product.DailyPrice,
                 HourlyPrice = product.HourlyPrice,
                 Quantity = quantity,
-                StartDate = startDate ?? DateTime.Today.AddDays(1),
-                EndDate = endDate ?? DateTime.Today.AddDays(2)
+                StartDate = startDate ?? PolishRentalTime.TodayLocal.AddDays(1),
+                EndDate = endDate ?? PolishRentalTime.TodayLocal.AddDays(2)
             });
         }
     }

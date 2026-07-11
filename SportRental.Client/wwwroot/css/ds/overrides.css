@@ -61,12 +61,12 @@
 
 /* Buttons w hero — Coral primary, transparent secondary */
 .sr-btn-primary {
-    background: var(--coral-500, #F96167) !important;
+    background: var(--coral-700, #BC3138) !important;
     color: #FFFFFF !important;
     box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
 }
 .sr-btn-primary:hover {
-    background: var(--coral-600, #E0454C) !important;
+    background: var(--coral-800, #8F2429) !important;
     transform: translateY(-2px);
     box-shadow: var(--shadow-md) !important;
 }
@@ -227,37 +227,13 @@
    FOOTER — navy900 flat, czysty
    ============================================ */
 .sr-footer { background: var(--navy-950, #0F1530) !important; color: rgba(232, 235, 245, 0.7) !important; }
-.sr-footer h4 { color: #FFFFFF !important; }
+.sr-footer h2 { color: #FFFFFF !important; }
 .sr-footer-links a { color: rgba(232, 235, 245, 0.7) !important; }
 .sr-footer-links a:hover { color: var(--coral-400, #FA8186) !important; }
 .sr-footer-tagline { color: rgba(232, 235, 245, 0.6) !important; }
 .sr-footer-bottom { border-top: 1px solid rgba(255, 255, 255, 0.08) !important; }
 
-/* ============================================
-   UNIVERSAL: pobij WSZYSTKIE inline linear-gradient w stronach klienta
-   (Account, Cart, Checkout, CheckoutSuccess, Map, MyRentals, Register, SelectTenant,
-   RentalDetails) — flat coral tint zamiast pink/teal/etc. gradient
-   ============================================ */
-[style*="linear-gradient"]:not(.sr-hero):not(.sr-cta):not(.sr-footer) {
-    background: var(--surface-card, #FFFFFF) !important;
-    border: 1px solid var(--line, #DDE2EC) !important;
-    border-radius: 16px !important;
-    box-shadow: var(--shadow-xs, 0 1px 2px rgba(24,31,69,0.06)) !important;
-}
-
-/* Bannery hero typu: <div style="background: linear-gradient(...); color: white"> */
-.mud-paper[style*="linear-gradient"] {
-    color: var(--coral-900, #671A1E) !important;
-}
-.mud-paper[style*="linear-gradient"] .mud-typography,
-.mud-paper[style*="linear-gradient"] h1,
-.mud-paper[style*="linear-gradient"] h2,
-.mud-paper[style*="linear-gradient"] h3 {
-    color: var(--coral-900, #671A1E) !important;
-    text-shadow: none !important;
-}
-.mud-paper[style*="linear-gradient"] .mud-icon-root {
-    color: var(--coral-700, #BC3138) !important;
-}
-
-
+/* NOTE: the old [style*="linear-gradient"] flatten-hack was REMOVED — it rewrote every
+   inline-gradient element to a white card, which turned real controls white-on-white
+   (CheckoutSuccess "Moje wypożyczenia" CTA, the Map legend swatches). Inner-page heroes,
+   CTAs and legend markers are now recolored to DS navy/coral at their source instead. */

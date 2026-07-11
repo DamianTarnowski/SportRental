@@ -14,7 +14,7 @@
     --sr-gradient-end: #0f766e;
     
     /* Typography */
-    --font-display: 'Playfair Display', Georgia, serif;
+    --font-display: var(--font-sans);
     --font-body: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -1029,7 +1029,7 @@ html {
     }
 }
 
-.sr-footer-column h4 {
+.sr-footer-column h2 {
     font-family: var(--font-body);
     font-size: 0.875rem;
     font-weight: 600;

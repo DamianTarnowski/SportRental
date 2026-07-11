@@ -507,3 +507,21 @@ body:has(.mud-dialog-container) .floating-chat-container,
 body:has(.mud-overlay-dialog) .floating-chat-container {
     display: none !important;
 }
+
+/* MudBlazor success snackbar default is too light for 15px text (WCAG AA). */
+.mud-snackbar.mud-alert-filled-success {
+    background-color: #176B43 !important;
+    color: #FFFFFF !important;
+}
+.customer-card,
+.customer-card .mud-card-content,
+.customer-card .mud-stack,
+.customer-card-header-copy,
+.customer-contact-row,
+.customer-card-text {
+    min-width: 0;
+}
+
+.customer-card-text {
+    overflow-wrap: anywhere;
+}

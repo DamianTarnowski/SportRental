@@ -1,0 +1,170 @@
+@using SportRental.Shared.Legal
+@using SportRental.Shared.Services
+@inject IApiService Api
+
+<div class="legal-page">
+    <header class="legal-hero">
+        <div class="legal-eyebrow">@Eyebrow</div>
+        <h1>@Title</h1>
+        <p class="legal-lead">@Lead</p>
+        <div class="legal-meta" aria-label="Informacje o wersji dokumentu">
+            <span>Wersja: @DocumentVersion</span>
+            <span>Obowiązuje od: @EffectiveDate</span>
+        </div>
+    </header>
+
+    <nav class="legal-tabs" aria-label="Dokumenty prawne">
+        <NavLink href="terms" ActiveClass="active">Regulamin platformy</NavLink>
+        <NavLink href="privacy" ActiveClass="active">Polityka prywatności</NavLink>
+    </nav>
+
+    <section class="operator-card" aria-labelledby="operator-heading">
+        <div>
+            <div class="operator-kicker">Dane usługodawcy</div>
+            <h2 id="operator-heading">Operator platformy @ServiceName</h2>
+        </div>
+
+        @if (_isLoading)
+        {
+            <p class="operator-status" aria-live="polite">Pobieranie aktualnych danych operatora…</p>
+        }
+        else
+        {
+            @if (_loadFailed)
+            {
+                <div class="legal-alert" role="alert">
+                    Nie udało się pobrać aktualnych danych operatora. Treść dokumentu pozostaje dostępna,
+                    ale nie należy traktować tej kopii jako kompletnej do czasu ponownego wczytania danych identyfikacyjnych.
+                </div>
+            }
+            else if (_legalInfo?.IsOperatorDataComplete != true)
+            {
+                <div class="legal-alert" role="alert">
+                    To jest wersja robocza: publiczne dane operatora platformy nie zostały jeszcze skonfigurowane
+                    w komplecie. Nie są to dane wybranej wypożyczalni. Przed uruchomieniem produkcyjnym Operator musi
+                    uzupełnić co najmniej nazwę, adres, dane rejestrowe i bezpośrednie kanały kontaktu.
+                </div>
+            }
+
+            @if (HasAnyOperatorData)
+            {
+                <dl class="operator-details">
+                    @if (!string.IsNullOrWhiteSpace(_legalInfo?.OperatorName))
+                    {
+                        <div><dt>Nazwa</dt><dd>@_legalInfo.OperatorName</dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_legalInfo?.OperatorAddress))
+                    {
+                        <div><dt>Adres</dt><dd>@_legalInfo.OperatorAddress</dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_legalInfo?.OperatorNip))
+                    {
+                        <div><dt>NIP</dt><dd>@_legalInfo.OperatorNip</dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_legalInfo?.OperatorKrs))
+                    {
+                        <div><dt>KRS</dt><dd>@_legalInfo.OperatorKrs</dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_legalInfo?.OperatorEmail))
+                    {
+                        <div><dt>E-mail</dt><dd><a href="@MailTo(_legalInfo.OperatorEmail)">@_legalInfo.OperatorEmail</a></dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_legalInfo?.OperatorPhone))
+                    {
+                        <div><dt>Telefon</dt><dd><a href="@PhoneTo(_legalInfo.OperatorPhone)">@_legalInfo.OperatorPhone</a></dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_legalInfo?.ComplaintsEmail))
+                    {
+                        <div><dt>Reklamacje platformy</dt><dd><a href="@MailTo(_legalInfo.ComplaintsEmail)">@_legalInfo.ComplaintsEmail</a></dd></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_legalInfo?.PrivacyEmail))
+                    {
+                        <div><dt>Sprawy prywatności</dt><dd><a href="@MailTo(_legalInfo.PrivacyEmail)">@_legalInfo.PrivacyEmail</a></dd></div>
+                    }
+                </dl>
+            }
+        }
+    </section>
+
+    <article class="legal-content">
+        @ChildContent
+    </article>
+
+    <aside class="legal-help">
+        <strong>Masz pytanie dotyczące tego dokumentu?</strong>
+        @if (DocumentContactEmail is { } contactEmail)
+        {
+            <span>
+                Napisz do Operatora: <a href="@MailTo(contactEmail)">@contactEmail</a>.
+                W sprawie konkretnego sprzętu lub wynajmu skontaktuj się bezpośrednio z wypożyczalnią.
+            </span>
+        }
+        else
+        {
+            <span>
+                Kanał kontaktu z Operatorem wymaga uzupełnienia w konfiguracji. W sprawie konkretnego sprzętu
+                lub wynajmu skorzystaj ze strony <a href="contact">Kontakt z wypożyczalnią</a>.
+            </span>
+        }
+    </aside>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Eyebrow { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Lead { get; set; } = string.Empty;
+    [Parameter] public bool IsPrivacyDocument { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private LegalInfoDto? _legalInfo;
+    private bool _isLoading = true;
+    private bool _loadFailed;
+
+    private string ServiceName => string.IsNullOrWhiteSpace(_legalInfo?.ServiceName)
+        ? "RentSpot"
+        : _legalInfo.ServiceName;
+
+    private string DocumentVersion => IsPrivacyDocument
+        ? _legalInfo?.PrivacyVersion ?? LegalDocumentVersions.Privacy
+        : _legalInfo?.TermsVersion ?? LegalDocumentVersions.Terms;
+
+    private DateTime EffectiveFromUtc => _legalInfo?.EffectiveFromUtc
+        ?? LegalDocumentVersions.EffectiveFromUtc;
+
+    private string? DocumentContactEmail => IsPrivacyDocument
+        ? _legalInfo?.PrivacyEmail ?? _legalInfo?.OperatorEmail
+        : _legalInfo?.ComplaintsEmail ?? _legalInfo?.OperatorEmail;
+
+    private string EffectiveDate => EffectiveFromUtc.ToString("dd.MM.yyyy");
+
+    private bool HasAnyOperatorData => _legalInfo is not null &&
+        (!string.IsNullOrWhiteSpace(_legalInfo.OperatorName) ||
+         !string.IsNullOrWhiteSpace(_legalInfo.OperatorAddress) ||
+         !string.IsNullOrWhiteSpace(_legalInfo.OperatorNip) ||
+         !string.IsNullOrWhiteSpace(_legalInfo.OperatorKrs) ||
+         !string.IsNullOrWhiteSpace(_legalInfo.OperatorEmail) ||
+         !string.IsNullOrWhiteSpace(_legalInfo.OperatorPhone) ||
+         !string.IsNullOrWhiteSpace(_legalInfo.ComplaintsEmail) ||
+         !string.IsNullOrWhiteSpace(_legalInfo.PrivacyEmail));
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _legalInfo = await Api.GetLegalInfoAsync();
+        }
+        catch (Exception)
+        {
+            _loadFailed = true;
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private static string MailTo(string value) => $"mailto:{value.Trim()}";
+
+    private static string PhoneTo(string value) =>
+        $"tel:{new string(value.Where(c => char.IsDigit(c) || c == '+').ToArray())}";
+}

@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.Core" Version="4.0.3.3" />
     <PackageReference Include="AWSSDK.S3" Version="4.0.7.7" />
     <PackageReference Include="Azure.AI.OpenAI" Version="2.1.0" />
     <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.4.0" />
@@ -16,7 +17,7 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="12.25.1" />
     <PackageReference Include="Markdig" Version="0.42.0" />
     <PackageReference Include="BarcodeLib" Version="3.0.2" />
-    <PackageReference Include="MailKit" Version="4.14.0" />
+    <PackageReference Include="MailKit" Version="4.16.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.1" />
@@ -34,7 +35,7 @@
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="QuestPDF" Version="2025.7.2" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
-    <PackageReference Include="SMSAPI.pl" Version="2.2.0" />
+    <PackageReference Include="SMSAPI.pl" Version="2.2.1" />
     <PackageReference Include="Stripe.net" Version="49.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
   </ItemGroup>
@@ -46,9 +47,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="test-data.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <Compile Remove="Build/StripClientEndpoints.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Lokalne fixture'y i stare artefakty publikacji nigdy nie mogą trafić do
+         paczki App Service. TestDataSeeder czyta test-data.json bezpośrednio z
+         katalogu roboczego podczas lokalnego developmentu. -->
+    <Content Remove="test-data.json" />
+    <None Include="test-data.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
     </None>
+    <Content Remove="publish\**\*;publish-swa\**\*;admin.zip;sradmin.zip;build.log" />
+    <None Remove="publish\**\*;publish-swa\**\*;admin.zip;sradmin.zip;build.log" />
   </ItemGroup>
 
   <!--
@@ -115,10 +127,18 @@
       z manifestu (mimo fizycznej obecności pliku). Po usunięciu tych wpisów, requests dla
       /_client/* trafiają do app.Map("/_client") branchu który czyta z dysku.
     -->
-    <!-- PowerShell (Newtonsoft.Json nie jest dostępny w tym MSBuild; System.Text.Json też nie
-         w RoslynCodeTaskFactory bez explicit ref). PowerShell ConvertFrom-Json działa stabilnie. -->
-    <Exec Condition=" '$(PublishDir)' != '' " Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\strip-client-endpoints.ps1&quot; -ManifestFile &quot;$(PublishDir)SportRental.staticwebassets.endpoints.json&quot;" />
+    <!-- File-based C# app działa tak samo na Windows i Linux, a SDK .NET 10 jest już
+         wymagane do publikacji. Nie zależymy od powershell/pwsh na hoście budującym. -->
+    <Exec Condition=" '$(PublishDir)' != '' " Command="dotnet run --file &quot;$(MSBuildProjectDirectory)/Build/StripClientEndpoints.cs&quot; -- &quot;$(PublishDir)SportRental.staticwebassets.endpoints.json&quot;" />
     <Message Importance="high" Text="[admin publish] Wyczyszczono _client/* entries z manifestu" />
+  </Target>
+
+  <Target Name="ValidatePublishedArtifactSafety" AfterTargets="Publish" Condition=" '$(PublishDir)' != '' ">
+    <ItemGroup>
+      <ForbiddenPublishedArtifacts Include="$(PublishDir)**\test-data.json;$(PublishDir)**\secrets*.json;$(PublishDir)**\*.pfx;$(PublishDir)**\*.key;$(PublishDir)publish\**\*;$(PublishDir)publish-swa\**\*" />
+    </ItemGroup>
+    <Error Condition=" '@(ForbiddenPublishedArtifacts)' != '' "
+           Text="[admin publish] Zatrzymano publikację: artefakt zawiera lokalne fixture, sekret lub zagnieżdżony katalog starego publish." />
   </Target>
 
   <!-- Inline task do podmiany tekstu w pliku (cross-platform, bez zewnętrznego shell). -->
@@ -146,6 +166,5 @@
       </Code>
     </Task>
   </UsingTask>
-
 
 </Project>

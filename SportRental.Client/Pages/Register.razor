@@ -1,6 +1,7 @@
 @page "/register"
 @layout HomeLayout
 @using SportRental.Client.Services
+@using System.ComponentModel.DataAnnotations
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
@@ -26,26 +27,26 @@
                     </svg>
                     <span class="register-logo-text">RentSpot<span style="color:#F96167">.</span></span>
                 </div>
-                <h1 class="register-branding-title">Dołącz do nas!</h1>
+                <div class="register-branding-title">Dołącz do nas!</div>
                 <p class="register-branding-subtitle">
                     Załóż konto i wypożyczaj sprzęt sportowy z dowolnej wypożyczalni.
                 </p>
                 
                 <div class="register-features">
                     <div class="register-feature">
-                        <span class="register-feature-icon">🎿</span>
+                        <span class="register-feature-icon"><Icon Name="register" Size="20" /></span>
                         <span>Tysiące produktów do wyboru</span>
                     </div>
                     <div class="register-feature">
-                        <span class="register-feature-icon">💳</span>
+                        <span class="register-feature-icon"><Icon Name="cart" Size="20" /></span>
                         <span>Bezpieczne płatności online</span>
                     </div>
                     <div class="register-feature">
-                        <span class="register-feature-icon">📱</span>
+                        <span class="register-feature-icon"><Icon Name="phone" Size="20" /></span>
                         <span>Rezerwuj z telefonu 24/7</span>
                     </div>
                     <div class="register-feature">
-                        <span class="register-feature-icon">🏆</span>
+                        <span class="register-feature-icon"><Icon Name="star" Size="20" /></span>
                         <span>Najwyższa jakość sprzętu</span>
                     </div>
                 </div>
@@ -56,74 +57,111 @@
         <div class="register-form-wrapper">
             <div class="register-card">
                 <div class="register-card-header">
-                    <h2 class="register-card-title">Załóż konto</h2>
+                    <h1 class="register-card-title">Załóż konto</h1>
                     <p class="register-card-subtitle">Wypełnij formularz, aby utworzyć konto</p>
                 </div>
                 
                 @if (!string.IsNullOrEmpty(_errorMessage))
                 {
                     <div class="register-alert register-alert-error">
-                        <span class="register-alert-icon">⚠️</span>
+                        <svg class="register-alert-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
                         <span>@_errorMessage</span>
                     </div>
                 }
                 
+                @if (_confirmationPending)
+                {
+                    <div class="register-alert" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:#dcfce7;">
+                        <span>
+                            Konto zostało utworzone. Otwórz link wysłany na podany adres e-mail,
+                            a następnie zaloguj się.
+                        </span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(_resendMessage))
+                    {
+                        <div class="register-password-hint">@_resendMessage</div>
+                    }
+                    <button type="button"
+                            class="register-button"
+                            disabled="@_isProcessing"
+                            @onclick="ResendConfirmationAsync">
+                        Wyślij link potwierdzający ponownie
+                    </button>
+                }
+                else
+                {
                 <EditForm Model="@_model" OnValidSubmit="HandleRegisterAsync" class="register-form">
                     <DataAnnotationsValidator />
                     
                     <div class="register-field">
-                        <label class="register-label">
-                            <span class="register-label-icon">👤</span>
+                        <label class="register-label" for="register-full-name">
                             Imię i nazwisko
                         </label>
-                        <InputText @bind-Value="_model.FullName" 
-                                   class="register-input" 
+                        <InputText id="register-full-name"
+                                   @bind-Value="_model.FullName"
+                                   class="register-input"
+                                   autocomplete="name"
                                    placeholder="Jan Kowalski" />
+                        <ValidationMessage For="@(() => _model.FullName)" />
                     </div>
                     
                     <div class="register-field">
-                        <label class="register-label">
-                            <span class="register-label-icon">📧</span>
+                        <label class="register-label" for="register-email">
                             Email <span class="text-red-400">*</span>
                         </label>
-                        <InputText @bind-Value="_model.Email" 
-                                   class="register-input" 
+                        <InputText id="register-email"
+                                   @bind-Value="_model.Email"
+                                   class="register-input"
                                    type="email"
+                                   autocomplete="email"
                                    placeholder="twoj@email.pl" />
+                        <ValidationMessage For="@(() => _model.Email)" />
                     </div>
                     
                     <div class="register-row">
                         <div class="register-field">
-                            <label class="register-label">
-                                <span class="register-label-icon">🔒</span>
+                            <label class="register-label" for="register-password">
                                 Hasło <span class="text-red-400">*</span>
                             </label>
-                            <InputText @bind-Value="_model.Password" 
-                                       class="register-input" 
+                            <InputText id="register-password"
+                                       @bind-Value="_model.Password"
+                                       class="register-input"
                                        type="password"
+                                       autocomplete="new-password"
                                        placeholder="••••••••" />
+                            <ValidationMessage For="@(() => _model.Password)" />
                         </div>
                         
                         <div class="register-field">
-                            <label class="register-label">
-                                <span class="register-label-icon">🔒</span>
+                            <label class="register-label" for="register-password-confirmation">
                                 Potwierdź <span class="text-red-400">*</span>
                             </label>
-                            <InputText @bind-Value="_model.ConfirmPassword" 
-                                       class="register-input" 
+                            <InputText id="register-password-confirmation"
+                                       @bind-Value="_model.ConfirmPassword"
+                                       class="register-input"
                                        type="password"
+                                       autocomplete="new-password"
                                        placeholder="••••••••" />
+                            <ValidationMessage For="@(() => _model.ConfirmPassword)" />
                         </div>
                     </div>
                     
                     <p class="register-password-hint">
-                        Min. 8 znaków, wielka litera, mała litera, cyfra i znak specjalny
+                        Min. 12 znaków, wielka litera, mała litera i cyfra
                     </p>
                     
                     <div class="register-terms">
                         <label class="register-checkbox-label">
                             <input type="checkbox" @bind="_acceptTerms" class="register-checkbox" />
-                            <span>Akceptuję <a href="/terms" class="register-link">regulamin</a> i <a href="/privacy" class="register-link">politykę prywatności</a></span>
+                            <span>
+                                Akceptuję <a href="terms" class="register-link">regulamin</a>
+                                i potwierdzam zapoznanie się z
+                                <a href="privacy" class="register-link">polityką prywatności</a>
+                            </span>
                         </label>
                     </div>
                     
@@ -139,6 +177,7 @@
                         }
                     </button>
                 </EditForm>
+                }
                 
                 <div class="register-divider">
                     <span>lub</span>
@@ -146,8 +185,8 @@
                 
                 <div class="register-footer">
                     <p>Masz już konto?</p>
-                    <a href="/login" class="register-login-link">
-                        🔑 Zaloguj się
+                    <a href="login" class="register-login-link">
+                        Zaloguj się
                     </a>
                 </div>
             </div>
@@ -183,7 +222,7 @@
     .register-bg-circle {
         position: absolute;
         border-radius: 50%;
-        background: rgba(16, 185, 129, 0.1);
+        background: rgba(249, 97, 103, 0.1);
         filter: blur(60px);
     }
     
@@ -192,7 +231,7 @@
         height: 600px;
         top: -200px;
         left: -100px;
-        background: rgba(59, 130, 246, 0.1);
+        background: rgba(249, 97, 103, 0.1);
     }
     
     .register-bg-circle-2 {
@@ -200,7 +239,7 @@
         height: 400px;
         bottom: -100px;
         right: -100px;
-        background: rgba(16, 185, 129, 0.15);
+        background: rgba(249, 97, 103, 0.15);
     }
     
     .register-bg-circle-3 {
@@ -208,7 +247,7 @@
         height: 300px;
         top: 40%;
         right: 20%;
-        background: rgba(139, 92, 246, 0.1);
+        background: rgba(224, 69, 76, 0.1);
     }
     
     /* Main container */
@@ -231,7 +270,7 @@
         flex: 1;
         padding: 3rem;
         display: none;
-        background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+        background: linear-gradient(135deg, rgba(249, 97, 103, 0.1) 0%, rgba(249, 97, 103, 0.1) 100%);
         border-right: 1px solid rgba(255, 255, 255, 0.05);
     }
     
@@ -257,12 +296,12 @@
         width: 56px;
         height: 56px;
         border-radius: 16px;
-        background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+        background: linear-gradient(135deg, #F96167 0%, #E0454C 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 2rem;
-        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+        box-shadow: 0 8px 20px rgba(249, 97, 103, 0.4);
     }
     
     .register-logo-text {
@@ -272,14 +311,14 @@
     }
     
     .register-logo-text span {
-        background: linear-gradient(135deg, #34d399 0%, #60a5fa 100%);
+        background: linear-gradient(135deg, #FA8186 0%, #FCA0A4 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
     
     .register-branding-title {
-        font-family: 'Playfair Display', serif;
+        font-family: var(--font-sans);
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 1rem;
@@ -343,7 +382,7 @@
     }
     
     .register-card-title {
-        font-family: 'Playfair Display', serif;
+        font-family: var(--font-sans);
         font-size: 1.875rem;
         font-weight: 700;
         color: #fff;
@@ -435,9 +474,9 @@
     }
     
     .register-input:focus {
-        border-color: #10b981;
+        border-color: #F96167;
         background: rgba(255, 255, 255, 0.08);
-        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+        box-shadow: 0 0 0 4px rgba(249, 97, 103, 0.1);
     }
     
     .register-password-hint {
@@ -465,19 +504,19 @@
     .register-checkbox {
         width: 18px;
         height: 18px;
-        accent-color: #10b981;
+        accent-color: #F96167;
         margin-top: 2px;
         flex-shrink: 0;
     }
     
     .register-link {
-        color: #34d399;
+        color: #FA8186;
         text-decoration: none;
         transition: color 0.3s ease;
     }
     
     .register-link:hover {
-        color: #6ee7b7;
+        color: #F96167;
         text-decoration: underline;
     }
     
@@ -487,7 +526,7 @@
         padding: 0.875rem;
         border-radius: 10px;
         border: none;
-        background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+        background: linear-gradient(135deg, #F96167 0%, #E0454C 100%);
         color: #fff;
         font-family: 'Outfit', sans-serif;
         font-size: 1rem;
@@ -498,13 +537,13 @@
         justify-content: center;
         gap: 0.75rem;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+        box-shadow: 0 4px 20px rgba(249, 97, 103, 0.4);
         margin-top: 0.5rem;
     }
     
     .register-button:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(16, 185, 129, 0.5);
+        box-shadow: 0 8px 30px rgba(249, 97, 103, 0.5);
     }
     
     .register-button:disabled {
@@ -531,7 +570,7 @@
         align-items: center;
         gap: 1rem;
         margin: 1.5rem 0;
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(255, 255, 255, 0.75);
         font-family: 'Outfit', sans-serif;
         font-size: 0.8rem;
     }
@@ -580,8 +619,10 @@
 @code {
     private RegisterModel _model = new();
     private string? _errorMessage;
+    private string? _resendMessage;
     private bool _isProcessing;
     private bool _acceptTerms = false;
+    private bool _confirmationPending;
 
     private async Task HandleRegisterAsync()
     {
@@ -590,7 +631,7 @@
 
         if (!_acceptTerms)
         {
-            _errorMessage = "Musisz zaakceptować regulamin";
+            _errorMessage = "Zaakceptuj regulamin i potwierdź zapoznanie się z polityką prywatności.";
             _isProcessing = false;
             return;
         }
@@ -602,9 +643,18 @@
             return;
         }
 
-        if (_model.Password.Length < 8)
+        if (_model.Password.Length < 12)
         {
-            _errorMessage = "Hasło musi mieć minimum 8 znaków";
+            _errorMessage = "Hasło musi mieć minimum 12 znaków";
+            _isProcessing = false;
+            return;
+        }
+
+        if (!_model.Password.Any(char.IsUpper) ||
+            !_model.Password.Any(char.IsLower) ||
+            !_model.Password.Any(char.IsDigit))
+        {
+            _errorMessage = "Hasło musi zawierać małą i wielką literę oraz cyfrę";
             _isProcessing = false;
             return;
         }
@@ -615,8 +665,16 @@
 
             if (result.Succeeded)
             {
-                Snackbar.Add("✅ Konto utworzono pomyślnie!", Severity.Success);
-                NavigationManager.NavigateTo("/");
+                if (result.EmailConfirmationRequired)
+                {
+                    _confirmationPending = true;
+                    Snackbar.Add("Sprawdź skrzynkę i potwierdź adres e-mail.", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add("Konto utworzono pomyślnie!", Severity.Success);
+                    NavigationManager.NavigateTo("./");
+                }
             }
             else
             {
@@ -629,11 +687,41 @@
         }
     }
 
+    private async Task ResendConfirmationAsync()
+    {
+        _isProcessing = true;
+        _resendMessage = null;
+        try
+        {
+            var result = await AuthService.ResendEmailConfirmationAsync(_model.Email);
+            _resendMessage = result.Succeeded
+                ? "Jeśli konto oczekuje na potwierdzenie, wysłaliśmy nowy link."
+                : result.ErrorMessage;
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
     private class RegisterModel
     {
+        [MaxLength(120, ErrorMessage = "Imię i nazwisko może mieć maksymalnie 120 znaków.")]
         public string FullName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Podaj adres e-mail.")]
+        [EmailAddress(ErrorMessage = "Podaj poprawny adres e-mail.")]
+        [MaxLength(320, ErrorMessage = "Adres e-mail jest zbyt długi.")]
         public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Podaj hasło.")]
+        [RegularExpression(
+            @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{12,}$",
+            ErrorMessage = "Hasło musi mieć min. 12 znaków, wielką literę, małą literę i cyfrę.")]
         public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Powtórz hasło.")]
+        [Compare(nameof(Password), ErrorMessage = "Hasła nie są takie same.")]
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 }

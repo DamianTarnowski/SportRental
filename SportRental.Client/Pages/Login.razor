@@ -1,9 +1,12 @@
 @page "/login"
 @layout HomeLayout
 @using SportRental.Client.Services
+@using SportRental.Shared.Legal
+@using System.ComponentModel.DataAnnotations
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ISnackbar Snackbar
+@inject IConfiguration Configuration
 
 <PageTitle>RentSpot — Logowanie</PageTitle>
 
@@ -26,7 +29,7 @@
                     </svg>
                     <span class="login-logo-text">RentSpot<span style="color:#F96167">.</span></span>
                 </div>
-                <h1 class="login-branding-title">Witaj ponownie!</h1>
+                <div class="login-branding-title">Witaj ponownie!</div>
                 <p class="login-branding-subtitle">
                     Zaloguj się do swojego konta i kontynuuj sportową przygodę.
                 </p>
@@ -62,7 +65,7 @@
         <div class="login-form-wrapper">
             <div class="login-card">
                 <div class="login-card-header">
-                    <h2 class="login-card-title">Logowanie</h2>
+                    <h1 class="login-card-title">Logowanie</h1>
                     <p class="login-card-subtitle">Wprowadź swoje dane dostępowe</p>
                 </div>
                 
@@ -76,33 +79,52 @@
                         </svg>
                         <span>@_errorMessage</span>
                     </div>
+                    @if (_showResendConfirmation)
+                    {
+                        <button type="button"
+                                class="login-forgot"
+                                disabled="@_isProcessing"
+                                @onclick="ResendConfirmationAsync">
+                            Wyślij link potwierdzający ponownie
+                        </button>
+                    }
+                }
+
+                @if (!string.IsNullOrWhiteSpace(_infoMessage))
+                {
+                    <div class="login-alert" style="background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.35);color:#dcfce7;">
+                        <span>@_infoMessage</span>
+                    </div>
                 }
 
                 <EditForm Model="@_model" OnValidSubmit="HandleLoginAsync" class="login-form">
                     <DataAnnotationsValidator />
 
                     <div class="login-field">
-                        <label class="login-label">Email</label>
-                        <InputText @bind-Value="_model.Email"
+                        <label class="login-label" for="login-email">Email</label>
+                        <InputText id="login-email"
+                                   @bind-Value="_model.Email"
                                    class="login-input"
                                    type="email"
+                                   autocomplete="email"
                                    placeholder="twoj@email.pl" />
+                        <ValidationMessage For="@(() => _model.Email)" />
                     </div>
 
                     <div class="login-field">
-                        <label class="login-label">Hasło</label>
-                        <InputText @bind-Value="_model.Password"
+                        <label class="login-label" for="login-password">Hasło</label>
+                        <InputText id="login-password"
+                                   @bind-Value="_model.Password"
                                    class="login-input"
                                    type="password"
+                                   autocomplete="current-password"
                                    placeholder="••••••••" />
+                        <ValidationMessage For="@(() => _model.Password)" />
                     </div>
                     
                     <div class="login-options">
-                        <label class="login-remember">
-                            <input type="checkbox" class="login-checkbox" />
-                            <span>Zapamiętaj mnie</span>
-                        </label>
-                        <a href="/forgot-password" class="login-forgot">Zapomniałeś hasła?</a>
+                        <span></span>
+                        <a href="@ForgotPasswordUrl" class="login-forgot" rel="external">Zapomniałeś hasła?</a>
                     </div>
                     
                     <button type="submit" class="login-button" disabled="@_isProcessing">
@@ -118,24 +140,43 @@
                     </button>
                 </EditForm>
 
-                <div class="login-divider">
-                    <span>lub</span>
-                </div>
+                @if (_googleLoginAvailable)
+                {
+                    <div class="login-divider">
+                        <span>lub</span>
+                    </div>
 
-                <a href="/Account/StartExternalLogin?provider=Google&returnUrl=/" class="login-google-btn" rel="external">
+                    <label class="login-google-legal">
+                        <input type="checkbox" @bind="_acceptGoogleLegal" />
+                        <span>
+                            Akceptuję <a href="terms">regulamin</a> i potwierdzam zapoznanie się z
+                            <a href="privacy">polityką prywatności</a>.
+                        </span>
+                    </label>
+
+                    <a href="@GoogleLoginUrl"
+                       class="login-google-btn @(!_acceptGoogleLegal ? "login-google-btn-disabled" : null)"
+                       aria-disabled="@(!_acceptGoogleLegal)"
+                       @onclick:preventDefault="@(!_acceptGoogleLegal)"
+                       rel="external">
                     <svg width="20" height="20" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                         <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
                         <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
                         <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.6 39.5 16.2 44 24 44z"/>
                         <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C41 35.5 44 30.2 44 24c0-1.3-.1-2.4-.4-3.5z"/>
                     </svg>
-                    <span>Kontynuuj z Google</span>
-                </a>
+                        <span>Kontynuuj z Google</span>
+                    </a>
+                }
 
                 <div class="login-footer">
                     <p>Nie masz jeszcze konta?</p>
-                    <a href="/register" class="login-register-link">
+                    <a href="register" class="login-register-link">
                         Zarejestruj się za darmo
+                    </a>
+                    <p style="margin-top:1rem;">Rezerwowałeś bez konta?</p>
+                    <a href="guest-access" class="login-register-link">
+                        Odzyskaj dostęp do zamówienia
                     </a>
                 </div>
             </div>
@@ -171,7 +212,7 @@
     .login-bg-circle {
         position: absolute;
         border-radius: 50%;
-        background: rgba(59, 130, 246, 0.1);
+        background: rgba(249, 97, 103, 0.1);
         filter: blur(60px);
     }
     
@@ -187,7 +228,7 @@
         height: 400px;
         bottom: -100px;
         left: -100px;
-        background: rgba(139, 92, 246, 0.1);
+        background: rgba(224, 69, 76, 0.1);
     }
     
     .login-bg-circle-3 {
@@ -195,7 +236,7 @@
         height: 300px;
         top: 50%;
         left: 30%;
-        background: rgba(16, 185, 129, 0.1);
+        background: rgba(249, 97, 103, 0.1);
     }
     
     /* Main container */
@@ -218,7 +259,7 @@
         flex: 1;
         padding: 3rem;
         display: none;
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        background: linear-gradient(135deg, rgba(249, 97, 103, 0.1) 0%, rgba(224, 69, 76, 0.1) 100%);
         border-right: 1px solid rgba(255, 255, 255, 0.05);
     }
     
@@ -244,12 +285,12 @@
         width: 56px;
         height: 56px;
         border-radius: 16px;
-        background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%);
+        background: #F96167;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 2rem;
-        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+        box-shadow: 0 8px 20px rgba(249, 97, 103, 0.4);
     }
     
     .login-logo-text {
@@ -259,14 +300,11 @@
     }
     
     .login-logo-text span {
-        background: linear-gradient(135deg, #4D5BA0 0%, #FCA0A4 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        color: #F96167;
     }
     
     .login-branding-title {
-        font-family: 'Playfair Display', serif;
+        font-family: var(--font-sans);
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 1rem;
@@ -330,7 +368,7 @@
     }
     
     .login-card-title {
-        font-family: 'Playfair Display', serif;
+        font-family: var(--font-sans);
         font-size: 2rem;
         font-weight: 700;
         color: #fff;
@@ -409,9 +447,9 @@
     }
     
     .login-input:focus {
-        border-color: #3b82f6;
+        border-color: #E0454C;
         background: rgba(255, 255, 255, 0.08);
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+        box-shadow: 0 0 0 4px rgba(249, 97, 103, 0.1);
     }
     
     /* Options row */
@@ -434,17 +472,17 @@
     .login-checkbox {
         width: 18px;
         height: 18px;
-        accent-color: #3b82f6;
+        accent-color: #E0454C;
     }
     
     .login-forgot {
-        color: #60a5fa;
+        color: #FCA0A4;
         text-decoration: none;
         transition: color 0.3s ease;
     }
     
     .login-forgot:hover {
-        color: #93c5fd;
+        color: #F96167;
     }
     
     /* Submit button */
@@ -453,7 +491,7 @@
         padding: 1rem;
         border-radius: 12px;
         border: none;
-        background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%);
+        background: #BC3138;
         color: #fff;
         font-family: 'Outfit', sans-serif;
         font-size: 1.1rem;
@@ -464,13 +502,13 @@
         justify-content: center;
         gap: 0.75rem;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+        box-shadow: 0 4px 20px rgba(249, 97, 103, 0.4);
         margin-top: 0.5rem;
     }
     
     .login-button:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(59, 130, 246, 0.5);
+        box-shadow: 0 8px 30px rgba(249, 97, 103, 0.5);
     }
     
     .login-button:disabled {
@@ -497,7 +535,7 @@
         align-items: center;
         gap: 1rem;
         margin: 2rem 0;
-        color: rgba(255, 255, 255, 0.4);
+        color: rgba(255, 255, 255, 0.75);
         font-family: 'Outfit', sans-serif;
         font-size: 0.85rem;
     }
@@ -537,6 +575,33 @@
     }
     .login-google-btn:active { transform: translateY(0); }
 
+    .login-google-btn-disabled,
+    .login-google-btn-disabled:hover {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .login-google-legal {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        margin: 0 0 0.9rem;
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 0.8rem;
+        line-height: 1.45;
+    }
+
+    .login-google-legal input {
+        margin-top: 0.2rem;
+        accent-color: #F96167;
+    }
+
+    .login-google-legal a {
+        color: #FCA0A4;
+    }
+
     /* Footer */
     .login-footer {
         text-align: center;
@@ -571,16 +636,51 @@
 @code {
     private LoginModel _model = new();
     private string? _errorMessage;
+    private string? _infoMessage;
     private bool _isProcessing;
+    private bool _googleLoginAvailable;
+    private bool _acceptGoogleLegal;
+    private bool _showResendConfirmation;
 
     [Parameter]
     [SupplyParameterFromQuery]
     public string? ReturnUrl { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "emailConfirmed")]
+    public bool EmailConfirmed { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _googleLoginAvailable = await AuthService.IsGoogleLoginAvailableAsync();
+        if (EmailConfirmed)
+            _infoMessage = "Adres e-mail został potwierdzony. Możesz się teraz zalogować.";
+    }
+
+    private string GoogleLoginUrl
+    {
+        get
+        {
+            var returnPath = SafeClientNavigation.ToBundledClientPath(ReturnUrl);
+            return $"{ApiBaseUrl}/Account/StartExternalLogin?provider=Google" +
+                   $"&returnUrl={Uri.EscapeDataString(returnPath)}" +
+                   $"&termsVersion={Uri.EscapeDataString(LegalDocumentVersions.Terms)}" +
+                   $"&privacyVersion={Uri.EscapeDataString(LegalDocumentVersions.Privacy)}";
+        }
+    }
+
+    private string ApiBaseUrl =>
+        (Configuration["Api:BaseUrl"] ?? new Uri(NavigationManager.BaseUri).GetLeftPart(UriPartial.Authority))
+        .TrimEnd('/');
+
+    private string ForgotPasswordUrl => $"{ApiBaseUrl}/Account/ForgotPassword";
+
     private async Task HandleLoginAsync()
     {
         _isProcessing = true;
         _errorMessage = null;
+        _infoMessage = null;
+        _showResendConfirmation = false;
 
         try
         {
@@ -588,8 +688,35 @@
 
             if (result.Succeeded)
             {
-                Snackbar.Add("✅ Zalogowano pomyślnie!", Severity.Success);
-                NavigationManager.NavigateTo(ReturnUrl ?? "/");
+                Snackbar.Add("Zalogowano pomyślnie!", Severity.Success);
+                NavigationManager.NavigateTo(SafeClientNavigation.NormalizeRelativeReturnUrl(ReturnUrl));
+            }
+            else
+            {
+                _errorMessage = result.ErrorMessage;
+                _showResendConfirmation = string.Equals(
+                    result.ErrorCode,
+                    "email_confirmation_required",
+                    StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private async Task ResendConfirmationAsync()
+    {
+        _isProcessing = true;
+        try
+        {
+            var result = await AuthService.ResendEmailConfirmationAsync(_model.Email);
+            if (result.Succeeded)
+            {
+                _infoMessage = "Jeśli konto oczekuje na potwierdzenie, wysłaliśmy nowy link.";
+                _errorMessage = null;
+                _showResendConfirmation = false;
             }
             else
             {
@@ -604,7 +731,11 @@
 
     private class LoginModel
     {
+        [Required(ErrorMessage = "Podaj adres e-mail.")]
+        [EmailAddress(ErrorMessage = "Podaj poprawny adres e-mail.")]
         public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Podaj hasło.")]
         public string Password { get; set; } = string.Empty;
     }
 }

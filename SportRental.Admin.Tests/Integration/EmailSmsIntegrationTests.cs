@@ -72,8 +72,17 @@ public class EmailSmsIntegrationTests : IAsyncLifetime
         await _dbContext.SaveChangesAsync();
         _createdCustomerIds.Add(_customer.Id);
 
-        _product = (await _dbContext.Products
-            .FirstOrDefaultAsync(p => p.TenantId == _tenantId && p.AvailableQuantity > 0))!;
+        _product = new Product
+        {
+            Id = Guid.NewGuid(),
+            TenantId = _tenantId,
+            Name = "Email SMS Integration Product",
+            Sku = $"EMAILSMS-{Guid.NewGuid():N}",
+            DailyPrice = 70,
+            AvailableQuantity = 100
+        };
+        _dbContext.Products.Add(_product);
+        await _dbContext.SaveChangesAsync();
 
         _output.WriteLine($"[Setup] Tenant: {tenant.Name}");
         _output.WriteLine($"[Setup] Customer: {_customer.FullName} ({_customer.Email}, {_customer.PhoneNumber})");
@@ -96,6 +105,8 @@ public class EmailSmsIntegrationTests : IAsyncLifetime
             var c = await _dbContext.Customers.FindAsync(id);
             if (c != null) _dbContext.Customers.Remove(c);
         }
+        var product = await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == _product.Id);
+        if (product != null) _dbContext.Products.Remove(product);
         await _dbContext.SaveChangesAsync();
         await _dbContext.DisposeAsync();
         _output.WriteLine("[Cleanup] Done");

@@ -1,14 +1,18 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.WebAssembly.Services
 @using SportRental.Client.Pages
+@using MudBlazor
+@inject LazyAssemblyLoader AssemblyLoader
 
-<MudThemeProvider />
+<MudThemeProvider Theme="_theme" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
 
 <CustomErrorBoundary>
 <CascadingAuthenticationState>
-    <Router AppAssembly="@typeof(App).Assembly">
+    <Router AppAssembly="@typeof(App).Assembly" OnNavigateAsync="LoadRouteAssembliesAsync">
         <Found Context="routeData">
             <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
                 <NotAuthorized>
@@ -43,3 +47,43 @@
     </Router>
 </CascadingAuthenticationState>
 </CustomErrorBoundary>
+
+@code {
+    private async Task LoadRouteAssembliesAsync(
+        Microsoft.AspNetCore.Components.Routing.NavigationContext context)
+    {
+        if (!string.Equals(context.Path.Trim('/'), "checkout", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        context.CancellationToken.ThrowIfCancellationRequested();
+        await AssemblyLoader.LoadAssembliesAsync(["PhoneNumbers.wasm"]);
+        context.CancellationToken.ThrowIfCancellationRequested();
+    }
+
+    // RentSpot Coral Energy v2 — retints every MudBlazor component (buttons, chips,
+    // pagination, selects, dialogs, progress) to the coral/navy brand so the MudBlazor
+    // pages (Products filters, Reviews, Map, Account, ProductDetailsDialog) stop rendering
+    // the default purple/blue.
+    private readonly MudTheme _theme = new()
+    {
+        PaletteLight = new PaletteLight
+        {
+            Primary = "#F96167",
+            PrimaryDarken = "#E0454C",
+            PrimaryLighten = "#FA8186",
+            Secondary = "#2F3C7E",
+            Tertiary = "#F9E795",
+            AppbarBackground = "#1B2350",
+            Background = "#F4F6FA",
+            Success = "#1F9D61",
+            Error = "#C8362B",
+            Warning = "#DD8413",
+            Info = "#2E66C8",
+            TextPrimary = "#1C2438",
+            TextSecondary = "#5B6B82",
+            ActionDefault = "#5B6B82",
+        },
+    };
+}

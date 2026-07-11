@@ -5,32 +5,43 @@
 
 <PageTitle>Wybierz wypożyczalnię</PageTitle>
 
-<div class="min-h-screen bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center p-4">
+<div class="min-h-screen flex items-center justify-center p-4" style="background:linear-gradient(135deg,#1B2350 0%,#2F3C7E 100%);">
     <div class="max-w-4xl w-full">
         <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-white mb-2 inline-flex items-center gap-3">
+            <h1 class="text-4xl font-bold mb-2 inline-flex items-center gap-3" style="color:#FFFFFF">
                 <svg viewBox="0 0 100 100" width="44" height="44" aria-hidden="true">
                     <circle cx="50" cy="50" r="48" fill="#F96167" />
                     <text x="50" y="72" font-family="Inter, system-ui, sans-serif" font-size="64" font-weight="900" text-anchor="middle" fill="#FFFFFF">R</text>
                 </svg>
                 <span>RentSpot<span style="color:#F96167">.</span></span>
             </h1>
-            <p class="text-xl text-white/90">Wybierz wypożyczalnię</p>
+            <p class="text-xl" style="color:#D3D8EC">Wybierz wypożyczalnię</p>
         </div>
 
         @if (isLoading)
         {
             <div class="bg-white rounded-lg shadow-xl p-8 text-center">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style="border-bottom-color:#F96167;"></div>
                 <p class="text-gray-600">Ładowanie wypożyczalni...</p>
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(loadError))
+        {
+            <div class="bg-white rounded-lg shadow-xl p-8 text-center">
+                <div class="text-6xl mb-4"><Icon Name="map" Size="48" /></div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Nie udało się pobrać wypożyczalni</h2>
+                <p class="text-gray-600">@loadError</p>
+                <button class="mt-4 text-white font-semibold py-2 px-4 rounded" style="background:#F96167" @onclick="LoadTenantsAsync">
+                    Spróbuj ponownie
+                </button>
             </div>
         }
         else if (tenants.Count == 0)
         {
             <div class="bg-white rounded-lg shadow-xl p-8 text-center">
-                <div class="text-6xl mb-4"></div>
+                <div class="text-6xl mb-4"><Icon Name="map" Size="48" /></div>
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">Brak dostępnych wypożyczalni</h2>
-                <p class="text-gray-600">Sprawdź połączenie z serwerem API.</p>
+                <p class="text-gray-600">W tej chwili żadna wypożyczalnia nie publikuje oferty.</p>
             </div>
         }
         else
@@ -40,22 +51,22 @@
                 {
                     <div class="bg-white rounded-lg shadow-xl overflow-hidden transform transition hover:scale-105 cursor-pointer"
                          @onclick="@(() => SelectTenantAsync(tenant))">
-                        <div class="h-32 bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center"
+                        <div class="h-32 flex items-center justify-center"
                              style="@GetTenantGradient(tenant)">
                             @if (!string.IsNullOrEmpty(tenant.LogoUrl))
                             {
-                                <img src="@tenant.LogoUrl" alt="@tenant.Name" class="h-20 w-20 object-contain" />
+                                <img src="@tenant.LogoUrl" alt="@tenant.Name" class="h-20 w-20 object-contain" onerror="srImg(this)" />
                             }
                             else
                             {
-                                <div class="text-white text-5xl"></div>
+                                <div class="text-white text-5xl"><Icon Name="home" Size="48" /></div>
                             }
                         </div>
                         
                         <div class="p-6">
                             <h3 class="text-xl font-bold text-gray-800 mb-2">@tenant.Name</h3>
-                            <button class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded transition">
-                                Wybierz →
+                            <button class="w-full hover:opacity-90 text-white font-semibold py-2 px-4 rounded transition inline-flex items-center justify-center gap-1" style="background:#F96167;">
+                                Wybierz <Icon Name="chevron-right" Size="20" />
                             </button>
                         </div>
                     </div>
@@ -68,19 +79,33 @@
 @code {
     private List<TenantInfo> tenants = new();
     private bool isLoading = true;
+    private string? loadError;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadTenantsAsync();
+
+    private async Task LoadTenantsAsync()
     {
-        // Załaduj dostępne wypożyczalnie
-        // Nie przekierowuj jeśli tenant już wybrany - pozwól użytkownikowi zmienić wybór
-        tenants = await TenantService.GetAvailableTenantsAsync();
-        isLoading = false;
+        isLoading = true;
+        loadError = null;
+        try
+        {
+            tenants = await TenantService.GetAvailableTenantsAsync();
+        }
+        catch
+        {
+            tenants = new();
+            loadError = "Sprawdź połączenie i ponów próbę.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
     }
 
     private async Task SelectTenantAsync(TenantInfo tenant)
     {
         await TenantService.SetSelectedTenantAsync(tenant.Id.ToString(), tenant.Name);
-        Navigation.NavigateTo("/", forceLoad: true);
+        Navigation.NavigateTo($"products?tenantId={tenant.Id:D}");
     }
 
     private string GetTenantGradient(TenantInfo tenant)
@@ -89,6 +114,6 @@
         {
             return $"background: linear-gradient(135deg, {tenant.PrimaryColor} 0%, {tenant.SecondaryColor} 100%);";
         }
-        return "";
+        return "background: linear-gradient(135deg, #1B2350 0%, #2F3C7E 100%);";
     }
 }

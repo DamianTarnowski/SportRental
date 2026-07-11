@@ -42,7 +42,8 @@ public class CustomerSessionService : ICustomerSessionService
         await EnsureLoadedAsync();
         _cached = customer;
         var json = JsonSerializer.Serialize(customer, _serializerOptions);
-        await _jsRuntime.InvokeVoidAsync("localStorage.setItem", SessionStorageKey, json);
+        await _jsRuntime.InvokeVoidAsync("sessionStorage.setItem", SessionStorageKey, json);
+        await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", SessionStorageKey);
         SessionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -50,6 +51,7 @@ public class CustomerSessionService : ICustomerSessionService
     {
         await EnsureLoadedAsync();
         _cached = null;
+        await _jsRuntime.InvokeVoidAsync("sessionStorage.removeItem", SessionStorageKey);
         await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", SessionStorageKey);
         SessionChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -63,7 +65,9 @@ public class CustomerSessionService : ICustomerSessionService
 
         try
         {
-            var json = await _jsRuntime.InvokeAsync<string?>("localStorage.getItem", SessionStorageKey);
+            // Usuń legacy PII zapisane przez starsze wersje w trwałym localStorage.
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", SessionStorageKey);
+            var json = await _jsRuntime.InvokeAsync<string?>("sessionStorage.getItem", SessionStorageKey);
             if (!string.IsNullOrWhiteSpace(json))
             {
                 var sanitized = json.TrimStart('\ufeff', '\u200b');

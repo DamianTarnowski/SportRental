@@ -56,27 +56,19 @@
 *@
 
 @code {
-    private string? currentTenantName;
-
-    protected override async Task OnInitializedAsync()
-    {
-        // WYŁĄCZONE - nie ładujemy tenanta z localStorage
-        // currentTenantName = await TenantService.GetSelectedTenantNameAsync();
-    }
-
     private void SelectTenant()
     {
-        Navigation.NavigateTo("/select-tenant");
+        Navigation.NavigateTo("select-tenant");
     }
 
-    private async Task ChangeTenant()
+    private void ChangeTenant()
     {
-        Navigation.NavigateTo("/select-tenant");
+        Navigation.NavigateTo("select-tenant");
     }
 
     private async Task ClearFilter()
     {
         await TenantService.ClearSelectedTenantAsync();
-        Navigation.NavigateTo("/", forceLoad: true);
+        Navigation.NavigateTo("./", forceLoad: true);
     }
 }

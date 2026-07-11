@@ -7,21 +7,23 @@
 
 <PageTitle>Mapa wypożyczalni — RentSpot</PageTitle>
 
+<section class="map-page" aria-labelledby="map-page-title">
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
     @* Header *@
-    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%); border-radius: 16px;">
+    <MudPaper Elevation="0" Class="pa-4 mb-4" Style="background:#1B2350; border-radius:16px;">
         <MudGrid>
             <MudItem xs="12" md="8">
-                <MudText Typo="Typo.h4" Style="color: white; font-weight: 700;">Mapa wypożyczalni</MudText>
+                <h1 id="map-page-title" class="map-page-title">Mapa wypożyczalni</h1>
                 <MudText Typo="Typo.body1" Style="color: rgba(255,255,255,0.85);" Class="mt-1">
                     Kliknij na mapie aby ustawić swoją lokalizację, a następnie wybierz promień wyszukiwania
                 </MudText>
             </MudItem>
             <MudItem xs="12" md="4" Class="d-flex align-center justify-end">
-                <MudButton Variant="Variant.Filled" 
-                           Color="Color.Surface" 
+                <MudButton Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           Class="map-primary-action"
                            StartIcon="@Icons.Material.Filled.List"
-                           Href="/products"
+                           Href="products"
                            Size="Size.Large">
                     Lista produktów
                 </MudButton>
@@ -35,7 +37,7 @@
             <MudStack Spacing="3">
                 @* Location controls *@
                 <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
-                    <MudText Typo="Typo.h6" Class="mb-3">Twoja lokalizacja</MudText>
+                    <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Twoja lokalizacja</MudText>
                     
                     @if (userLat.HasValue && userLon.HasValue)
                     {
@@ -61,6 +63,7 @@
                             <MudButtonGroup OverrideStyles="false" Class="d-flex">
                                 <MudButton Variant="Variant.Outlined" 
                                            Color="Color.Primary" 
+                                           Class="map-primary-outline"
                                            StartIcon="@Icons.Material.Filled.MyLocation"
                                            OnClick="CenterOnUser"
                                            Style="flex: 1;">
@@ -83,6 +86,7 @@
                         
                         <MudButton Variant="Variant.Filled" 
                                    Color="Color.Primary" 
+                                   Class="map-primary-action"
                                    FullWidth="true"
                                    StartIcon="@Icons.Material.Filled.GpsFixed"
                                    OnClick="RequestGeolocation">
@@ -94,8 +98,8 @@
                 @* Rental shops list *@
                 <MudPaper Elevation="2" Class="pa-4" Style="border-radius: 12px;">
                     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
-                        <MudText Typo="Typo.h6">Wypożyczalnie</MudText>
-                        <MudChip T="string" Size="Size.Small" Color="Color.Primary">@filteredLocations.Count</MudChip>
+                        <MudText Typo="Typo.h6" HtmlTag="h2">Wypożyczalnie</MudText>
+                        <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="map-primary-chip">@filteredLocations.Count</MudChip>
                     </MudStack>
                     
                     @if (isLoading)
@@ -121,13 +125,13 @@
                         <div style="max-height: 450px; overflow-y: auto;">
                             @foreach (var loc in filteredLocations)
                             {
-                                <MudCard Elevation="1" Class="mb-2 pa-3" Style="cursor: pointer; transition: all 0.2s;" @onclick="() => SelectLocation(loc)">
+                                <MudCard Elevation="1" Class="mb-2 pa-3">
                                     <MudStack Spacing="1">
                                         <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Start">
                                             <MudText Typo="Typo.subtitle2" Style="font-weight: 600;">@loc.TenantName</MudText>
                                             @if (loc.Distance.HasValue)
                                             {
-                                                <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Filled">
+                                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Class="map-primary-chip">
                                                     @FormatDistance(loc.Distance.Value)
                                                 </MudChip>
                                             }
@@ -138,12 +142,29 @@
                                                 @TruncateAddress(loc.Address, 50)
                                             </MudText>
                                         }
-                                        @if (!string.IsNullOrEmpty(loc.City) || !string.IsNullOrEmpty(loc.Voivodeship))
-                                        {
+                                         @if (!string.IsNullOrEmpty(loc.City) || !string.IsNullOrEmpty(loc.Voivodeship))
+                                         {
                                             <MudText Typo="Typo.caption" Color="Color.Secondary">
                                                 @loc.City@((!string.IsNullOrEmpty(loc.City) && !string.IsNullOrEmpty(loc.Voivodeship)) ? ", " : "")@loc.Voivodeship
-                                            </MudText>
-                                        }
+                                             </MudText>
+                                         }
+                                         <MudText Typo="Typo.caption" Style="color:#8f2429; font-weight:700;">
+                                             @FormatProductCount(loc.ProductCount) w katalogu
+                                         </MudText>
+                                         <MudStack Row="true" Spacing="1" Class="mt-1">
+                                             <MudButton Variant="Variant.Outlined"
+                                                        Size="Size.Small"
+                                                        OnClick="@(() => SelectLocation(loc))">
+                                                 Pokaż na mapie
+                                             </MudButton>
+                                             <MudButton Variant="Variant.Filled"
+                                                        Color="Color.Primary"
+                                                        Class="map-primary-action"
+                                                        Size="Size.Small"
+                                                        Href="@($"products?tenantId={loc.TenantId:D}")">
+                                                 Zobacz ofertę
+                                             </MudButton>
+                                         </MudStack>
                                     </MudStack>
                                 </MudCard>
                             }
@@ -155,15 +176,27 @@
 
         @* Map *@
         <MudItem xs="12" md="8" lg="9">
-            <MudPaper Elevation="3" Style="border-radius: 12px; overflow: hidden; position: relative;">
-                <div id="rental-map" style="height: 650px; width: 100%;"></div>
+             <MudPaper Elevation="3" Style="border-radius: 12px; overflow: hidden; position: relative;">
+                 <div id="rental-map" style="height: 650px; width: 100%;"></div>
+
+                 @if (!string.IsNullOrWhiteSpace(_mapLoadError))
+                 {
+                     <div style="position:absolute;inset:1rem;z-index:1100;display:flex;align-items:flex-start;justify-content:center;pointer-events:none;">
+                         <MudAlert Severity="Severity.Warning" Style="max-width:560px;pointer-events:auto;">
+                             <div>@_mapLoadError Lista wypożyczalni pozostaje dostępna.</div>
+                             <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="RetryMapAsync" Class="mt-2 map-primary-outline">
+                                 Spróbuj ponownie
+                             </MudButton>
+                         </MudAlert>
+                     </div>
+                 }
                 
                 @* Map legend *@
                 <div style="position: absolute; bottom: 20px; left: 20px; background: white; padding: 12px 16px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000;">
                     <MudText Typo="Typo.caption" Style="font-weight: 600; margin-bottom: 8px;">Legenda</MudText>
                     <MudStack Spacing="1">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <div style="width: 20px; height: 20px; background: linear-gradient(135deg, #2F3C7E 0%, #F96167 100%); border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center;"></div>
+                            <div style="width: 20px; height: 20px; background:#F96167; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center;"></div>
                             <MudText Typo="Typo.caption">Wypożyczalnia</MudText>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
@@ -176,6 +209,7 @@
         </MudItem>
     </MudGrid>
 </MudContainer>
+</section>
 
 @code {
     private List<TenantLocationDto> allLocations = new();
@@ -186,6 +220,18 @@
     private double? userLon;
     private DotNetObjectReference<Map>? _objRef;
     private bool _mapInitialized = false;
+    private string? _mapLoadError;
+
+    private static string FormatProductCount(int count)
+    {
+        var lastTwoDigits = count % 100;
+        var noun = count == 1
+            ? "produkt"
+            : count % 10 is >= 2 and <= 4 && lastTwoDigits is not (>= 12 and <= 14)
+                ? "produkty"
+                : "produktów";
+        return $"{count} {noun}";
+    }
 
     private int selectedRadius
     {
@@ -222,14 +268,20 @@
             var response = await ApiService.GetTenantLocationsAsync();
             if (response != null)
             {
-                allLocations = response.Where(l => l.Lat.HasValue && l.Lon.HasValue && l.Lat != 0 && l.Lon != 0).ToList();
+                allLocations = response
+                    .Where(location => location.ProductCount > 0 &&
+                                       location.Lat.HasValue &&
+                                       location.Lon.HasValue &&
+                                       location.Lat != 0 &&
+                                       location.Lon != 0)
+                    .ToList();
                 filteredLocations = allLocations.ToList();
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error loading locations: {ex.Message}");
-            Snackbar.Add($"Błąd ładowania lokalizacji: {ex.Message}", Severity.Error);
+            Snackbar.Add("Nie udało się pobrać lokalizacji. Spróbuj ponownie.", Severity.Error);
         }
         finally
         {
@@ -241,6 +293,7 @@
     {
         try
         {
+            _mapLoadError = null;
             // Default center: Poland
             await JS.InvokeVoidAsync("leafletMap.initMap", "rental-map", 52.0, 19.0, 6, _objRef);
             _mapInitialized = true;
@@ -252,8 +305,14 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Map init error: {ex.Message}");
+            _mapInitialized = false;
+            _mapLoadError = "Nie udało się uruchomić interaktywnej mapy.";
+            Snackbar.Add(_mapLoadError, Severity.Warning);
+            StateHasChanged();
         }
     }
+
+    private async Task RetryMapAsync() => await InitializeMap();
 
     private async Task UpdateMapDisplay()
     {
@@ -270,6 +329,7 @@
                 lon = l.Lon,
                 address = l.Address,
                 phoneNumber = l.PhoneNumber,
+                productCount = l.ProductCount,
                 distance = l.Distance.HasValue ? FormatDistance(l.Distance.Value) : null
             }).ToList();
 
@@ -299,7 +359,7 @@
             {
                 await JS.InvokeVoidAsync("leafletMap.requestGeolocation", "rental-map");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 Snackbar.Add("Nie udało się pobrać lokalizacji", Severity.Warning);
             }
@@ -354,7 +414,13 @@
     {
         if (loc.Lat.HasValue && loc.Lon.HasValue && _mapInitialized)
         {
-            await JS.InvokeVoidAsync("leafletMap.centerMap", "rental-map", loc.Lat.Value, loc.Lon.Value, 14);
+            await JS.InvokeVoidAsync(
+                "leafletMap.focusShopMarker",
+                "rental-map",
+                loc.TenantId,
+                loc.Lat.Value,
+                loc.Lon.Value,
+                14);
         }
     }
 
@@ -371,6 +437,11 @@
         userLat = null;
         userLon = null;
         _selectedRadius = 0;
+
+        // Stan lokalizacji jest współdzielony z katalogiem przez localStorage.
+        // Samo wyzerowanie pól komponentu sprawiało, że po powrocie do katalogu
+        // stara lokalizacja pojawiała się ponownie.
+        await JS.InvokeVoidAsync("leafletMap.clearUserLocation");
         
         // Reset distances
         foreach (var loc in allLocations)

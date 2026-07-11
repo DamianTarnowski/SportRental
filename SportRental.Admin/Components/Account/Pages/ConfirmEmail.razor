@@ -7,10 +7,11 @@
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IdentityRedirectManager RedirectManager
+@inject NavigationManager NavigationManager
 
-<PageTitle>Confirm email</PageTitle>
+<PageTitle>Potwierdzenie adresu e-mail — RentSpot</PageTitle>
 
-<h1>Confirm email</h1>
+<h1>Potwierdzenie adresu e-mail</h1>
 <StatusMessage Message="@statusMessage" />
 
 @code {
@@ -25,6 +26,9 @@
     [SupplyParameterFromQuery]
     private string? Code { get; set; }
 
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         if (UserId is null || Code is null)
@@ -36,13 +40,19 @@
         if (user is null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            statusMessage = $"Error loading user with ID {UserId}";
+            statusMessage = "Błąd: link potwierdzający jest nieprawidłowy.";
         }
         else
         {
             var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
             var result = await UserManager.ConfirmEmailAsync(user, code);
-            statusMessage = result.Succeeded ? "Thank you for confirming your email." : "Error confirming your email.";
+            statusMessage = result.Succeeded
+                ? "Adres e-mail został potwierdzony."
+                : "Błąd: link potwierdzający jest nieprawidłowy lub wygasł.";
+
+            var safeReturnUrl = SafeReturnUrl.ResolveLocal(ReturnUrl, string.Empty);
+            if (result.Succeeded && !string.IsNullOrEmpty(safeReturnUrl))
+                NavigationManager.NavigateTo(safeReturnUrl, forceLoad: true);
         }
     }
 }

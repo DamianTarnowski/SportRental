@@ -43,11 +43,14 @@
     {
         _breadcrumbs.Clear();
 
-        var uri = new Uri(Navigation.Uri);
-        var path = uri.AbsolutePath.ToLower().Trim('/');
+        // Navigation.Uri contains the hosting prefix (for production: /_client/).
+        // Route matching and links must stay relative to Navigation.BaseUri so the
+        // component works both in standalone development and in the bundled client.
+        var currentRoute = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var path = currentRoute.Split(['?', '#'], 2)[0].ToLowerInvariant().Trim('/');
 
         // Zawsze dodaj Home
-        _breadcrumbs.Add(new BreadcrumbItem { Label = "Strona główna", Url = "/" });
+        _breadcrumbs.Add(new BreadcrumbItem { Label = "Strona główna", Url = "./" });
 
         if (string.IsNullOrEmpty(path))
         {
@@ -57,52 +60,52 @@
         // Mapowanie ścieżek na breadcrumbs
         if (path == "products")
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Katalog produktów", Url = "/products" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Katalog produktów", Url = "products" });
         }
         else if (path.StartsWith("products/"))
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Katalog produktów", Url = "/products" });
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Szczegóły produktu", Url = uri.AbsolutePath });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Katalog produktów", Url = "products" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Szczegóły produktu", Url = currentRoute });
         }
         else if (path == "cart")
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "/cart" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "cart" });
         }
         else if (path == "checkout")
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "/cart" });
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Płatność", Url = "/checkout" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "cart" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Płatność", Url = "checkout" });
         }
         else if (path.StartsWith("checkout/"))
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "/cart" });
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Płatność", Url = "/checkout" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Koszyk", Url = "cart" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Płatność", Url = "checkout" });
             
             if (path.Contains("success"))
             {
-                _breadcrumbs.Add(new BreadcrumbItem { Label = "Potwierdzenie", Url = uri.AbsolutePath });
+                _breadcrumbs.Add(new BreadcrumbItem { Label = "Potwierdzenie", Url = currentRoute });
             }
         }
         else if (path == "my-rentals")
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Moje wypożyczenia", Url = "/my-rentals" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Moje wypożyczenia", Url = "my-rentals" });
         }
         else if (path.StartsWith("my-rentals/"))
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Moje wypożyczenia", Url = "/my-rentals" });
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Szczegóły", Url = uri.AbsolutePath });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Moje wypożyczenia", Url = "my-rentals" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Szczegóły", Url = currentRoute });
         }
         else if (path == "contact")
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Kontakt", Url = "/contact" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Kontakt", Url = "contact" });
         }
         else if (path == "login")
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Logowanie", Url = "/login" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Logowanie", Url = "login" });
         }
         else if (path == "register")
         {
-            _breadcrumbs.Add(new BreadcrumbItem { Label = "Rejestracja", Url = "/register" });
+            _breadcrumbs.Add(new BreadcrumbItem { Label = "Rejestracja", Url = "register" });
         }
     }
 

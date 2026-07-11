@@ -18,6 +18,7 @@ namespace SportRental.Admin.Services.Sms
         Task SendContractConfirmationRequestAsync(string phoneNumber, string customerName, Guid rentalId, string? customerEmail, CancellationToken ct = default);
     }
 
+    [Obsolete("Legacy SMS reply confirmation flow. Use IRentalConfirmationService link confirmation instead.")]
     public interface ISmsConfirmationService
     {
         Task<string> GenerateConfirmationCodeAsync(Guid rentalId, CancellationToken ct = default);

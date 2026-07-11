@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Azure.AI.OpenAI;
 using OpenAI.Chat;
+using SportRental.Admin.Services.Ai;
 
 namespace SportRental.Admin.Services.Chat;
 
@@ -11,7 +11,7 @@ namespace SportRental.Admin.Services.Chat;
 /// </summary>
 public sealed class OpenAiChatService
 {
-    private readonly AzureOpenAIClient _client;
+    private readonly AzureOpenAiClientProvider _clientProvider;
     private readonly string _defaultDeployment;
     private readonly ILogger<OpenAiChatService> _logger;
 
@@ -22,14 +22,19 @@ public sealed class OpenAiChatService
         "gpt-5.4-mini"
     };
 
-    public OpenAiChatService(AzureOpenAIClient client, IConfiguration config, ILogger<OpenAiChatService> logger)
+    public OpenAiChatService(
+        AzureOpenAiClientProvider clientProvider,
+        IConfiguration config,
+        ILogger<OpenAiChatService> logger)
     {
-        _client = client;
+        _clientProvider = clientProvider;
         _defaultDeployment = config["OpenAI:TextDeployment"] ?? "gpt-5.5";
         _logger = logger;
     }
 
     public string DefaultDeployment => _defaultDeployment;
+
+    public bool IsAvailable => _clientProvider.IsConfigured;
 
     public async Task<ChatCompletionResult> ChatAsync(
         string systemPrompt,
@@ -39,6 +44,16 @@ public sealed class OpenAiChatService
         string? overrideDeployment = null,
         CancellationToken ct = default)
     {
+        var client = _clientProvider.Client;
+        if (client is null)
+        {
+            return new ChatCompletionResult
+            {
+                Content = "Asystent AI nie jest skonfigurowany dla tego środowiska.",
+                Error = "openai_not_configured"
+            };
+        }
+
         // Hard cap całego flow chat (3 rundy + tool dispatch). Po 60s dla całego ChatAsync
         // zwracamy błąd zamiast utrzymywać blokujące _isThinking w UI w nieskończoność.
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -49,7 +64,7 @@ public sealed class OpenAiChatService
         var deployment = !string.IsNullOrWhiteSpace(overrideDeployment) && AllowedDeployments.Contains(overrideDeployment)
             ? overrideDeployment
             : _defaultDeployment;
-        var chat = _client.GetChatClient(deployment);
+        var chat = client.GetChatClient(deployment);
 
         // Buildujemy listę wiadomości — DeveloperChatMessage (nowy odpowiednik System dla
         // gpt-5+) plus historia user/assistant. ToolChatMessage jest dodawany w pętli niżej.

@@ -1,13 +1,15 @@
 @page "/not-found"
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>404 - Nie znaleziono — RentSpot</PageTitle>
 
 <div class="min-h-[70vh] flex items-center justify-center px-4">
     <div class="max-w-2xl mx-auto text-center">
-        <!-- Emoji Icon -->
-        <div class="mb-8 text-8xl sm:text-9xl">
-            ‍</div>
+        <!-- Not-found icon -->
+        <div class="mb-8 flex justify-center">
+            <Icon Name="search" Size="96" />
+        </div>
 
         <!-- Error Code -->
         <h1 class="text-4xl sm:text-6xl font-bold text-gray-900 mb-4">
@@ -27,7 +29,8 @@
         <!-- Action Buttons -->
         <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button @onclick="GoHome"
-                    class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-md">
+                    style="background:#BC3138;color:#fff"
+                    class="inline-flex items-center gap-2 px-6 py-3 text-white font-medium rounded-lg transition-colors shadow-md">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                 </svg>
@@ -45,21 +48,21 @@
 
         <!-- Popular Links -->
         <div class="mt-12 pt-8 border-t border-gray-200">
-            <p class="text-sm text-gray-500 mb-4">Popularne strony:</p>
+            <p class="text-sm text-gray-600 mb-4">Popularne strony:</p>
             <div class="flex flex-wrap justify-center gap-3">
-                <a href="/products" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                <a href="products" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
                     Katalog produktów
                 </a>
                 <span class="text-gray-300">|</span>
-                <a href="/cart" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                <a href="cart" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
                     Koszyk
                 </a>
                 <span class="text-gray-300">|</span>
-                <a href="/my-rentals" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                <a href="my-rentals" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
                     Moje wypożyczenia
                 </a>
                 <span class="text-gray-300">|</span>
-                <a href="/contact" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
+                <a href="contact" class="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium">
                     Kontakt
                 </a>
             </div>
@@ -70,12 +73,11 @@
 @code {
     private void GoHome()
     {
-        Navigation.NavigateTo("/");
+        Navigation.NavigateTo("./");
     }
 
-    private void GoBack()
+    private async Task GoBack()
     {
-        Navigation.NavigateTo("/", forceLoad: false);
+        await JS.InvokeVoidAsync("history.back");
     }
 }
-

@@ -4,6 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="RentSpot pozwala znaleźć i zarezerwować sprzęt sportowy w lokalnych wypożyczalniach." />
     <title>RentSpot — wypożyczalnia sprzętu sportowego</title>
     <base href="/" />
     
@@ -21,7 +22,8 @@
     <link rel="stylesheet" href="css/pages.css" />
     <!-- DS v2 overrides — MUSI być po pages/home/products/layout żeby pobiło legacy gradients -->
     <link rel="stylesheet" href="css/ds/overrides.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Remaps off-brand Tailwind color utilities (blue/indigo/purple) → coral/navy; loaded last -->
+    <link rel="stylesheet" href="css/ds/client-tailwind-brand.css" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="alternate icon" type="image/png" href="favicon.png" />
     <link href="SportRental.Client.styles.css" rel="stylesheet" />
@@ -41,10 +43,43 @@
         <a href="." class="reload">Reload</a>
         <span class="dismiss">🗙</span>
     </div>
+    <script>
+        // A responsive variant can be unavailable even when the URL stored by the API still works.
+        // Try that known source once, then finish with a neutral local placeholder.
+        window.srImg = function (img) {
+            var fallback = img.dataset.fallbackSrc;
+            var fallbackAlreadyTried = img.dataset.fallbackAttempted === "true";
+
+            if (!fallbackAlreadyTried && fallback) {
+                img.dataset.fallbackAttempted = "true";
+                img.removeAttribute("srcset");
+                img.removeAttribute("sizes");
+
+                var currentUrl = img.currentSrc || img.src;
+                var fallbackUrl = fallback;
+                try {
+                    currentUrl = new URL(currentUrl, document.baseURI).href;
+                    fallbackUrl = new URL(fallback, document.baseURI).href;
+                } catch (_) {
+                    // Let the browser resolve a non-standard but usable relative URL below.
+                }
+                if (currentUrl !== fallbackUrl) {
+                    img.src = fallback;
+                    return;
+                }
+            }
+
+            img.onerror = null;
+            img.removeAttribute("srcset");
+            img.removeAttribute("sizes");
+            img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23EBEEF5'/%3E%3Cg fill='none' stroke='%239AA4B8' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='148' y='112' width='104' height='80' rx='8'/%3E%3Ccircle cx='176' cy='140' r='9'/%3E%3Cpath d='M156 188l34-32 22 22 18-18 22 22'/%3E%3C/g%3E%3C/svg%3E";
+            img.style.objectFit = "cover";
+        };
+    </script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="js/leaflet-map.js"></script>
     <script src="js/mobile-detection.js"></script>
+    <script src="js/home-layout.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 

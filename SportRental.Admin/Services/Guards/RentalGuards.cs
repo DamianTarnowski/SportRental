@@ -14,7 +14,12 @@ public static class RentalGuards
         if (string.IsNullOrEmpty(rental.ContractUrl))
             return "Brak wygenerowanej umowy — wygeneruj umowę przed wydaniem.";
         if (!IsRentalPaid(rental))
-            return $"Brak płatności — status: {(string.IsNullOrEmpty(rental.PaymentStatus) ? "nie pobrano" : rental.PaymentStatus)}.";
+        {
+            var paidAmount = GetPaidAmount(rental);
+            return paidAmount > 0m
+                ? $"Pozostało do zapłaty {GetOutstandingAmount(rental):0.00} zł."
+                : $"Brak płatności — status: {(string.IsNullOrEmpty(rental.PaymentStatus) ? "nie pobrano" : rental.PaymentStatus)}.";
+        }
         if (rental.Status == RentalStatus.Cancelled)
             return "Wynajem jest anulowany.";
         if (rental.Status == RentalStatus.Completed || rental.IssuedAtUtc.HasValue)
@@ -24,13 +29,58 @@ public static class RentalGuards
 
     public static bool CanIssue(Rental rental) => GetIssueBlockReason(rental) is null;
 
-    /// PaymentStatus pochodzi z kilku źródeł (Stripe, demo, manualny), więc whitelista
-    /// wartości potwierdzających płatność. Pusty string lub negatywne wartości = NOT PAID.
+    /// Zwraca faktycznie zaksięgowaną kwotę. PaidAmount jest źródłem prawdy dla nowych
+    /// rekordów; fallback utrzymuje poprawny odczyt danych sprzed migracji.
     public static bool IsRentalPaid(Rental rental)
     {
-        var status = rental.PaymentStatus?.Trim() ?? string.Empty;
-        return status is "DepositPaid" or "succeeded" or "paid" or "Paid";
+        return rental.TotalAmount > 0m && GetPaidAmount(rental) >= rental.TotalAmount;
     }
+
+    public static bool HasAnyPayment(Rental rental) => GetPaidAmount(rental) > 0m;
+
+    public static decimal GetOutstandingAmount(Rental rental)
+    {
+        var rentalFeeOutstanding = Math.Max(0m, rental.TotalAmount - GetPaidAmount(rental));
+        var damageOutstanding = Math.Max(
+            0m,
+            Math.Max(0m, rental.DamageCharge ?? 0m) - GetRetainedDeposit(rental));
+        return rentalFeeOutstanding + damageOutstanding;
+    }
+
+    private static decimal GetRetainedDeposit(Rental rental)
+    {
+        if (!rental.ReturnDepositRefund.HasValue)
+            return 0m;
+
+        var status = rental.PaymentStatus?.Trim() ?? string.Empty;
+        var wasCollected = rental.DepositPaidAtUtc.HasValue ||
+                           string.Equals(status, "DepositPaid", StringComparison.OrdinalIgnoreCase) ||
+                           rental.ReturnDepositRefund.Value > 0m;
+        return wasCollected
+            ? Math.Max(0m, rental.DepositAmount - Math.Max(0m, rental.ReturnDepositRefund.Value))
+            : 0m;
+    }
+
+    public static decimal GetPaidAmount(Rental rental)
+    {
+        var status = rental.PaymentStatus?.Trim() ?? string.Empty;
+        if (status is "Refunded" or "refunded" or "DepositRefunded" or "depositrefunded")
+            return 0m;
+
+        if (rental.PaidAmount > 0m)
+            return Math.Min(Math.Max(0m, rental.TotalAmount), rental.PaidAmount);
+
+        return status is "succeeded" or "Succeeded" or "paid" or "Paid"
+            ? Math.Max(0m, rental.TotalAmount)
+            : 0m;
+    }
+
+    public static bool IsDepositCollected(Rental rental) =>
+        rental.DepositAmount > 0m &&
+        !rental.ReturnDepositRefund.HasValue &&
+        !string.Equals(rental.PaymentStatus?.Trim(), "DepositRefunded", StringComparison.OrdinalIgnoreCase) &&
+        (rental.DepositPaidAtUtc.HasValue ||
+         string.Equals(rental.PaymentStatus?.Trim(), "DepositPaid", StringComparison.OrdinalIgnoreCase));
 
     /// Sprawdza overlap dla pary (productId, [start,end]) wśród aktywnych wynajmów tego tenantu.
     /// Zwraca null gdy nie ma kolizji, lub powód z numerem konfliktowego wynajmu.

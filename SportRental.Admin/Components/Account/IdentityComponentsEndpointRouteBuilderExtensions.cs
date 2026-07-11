@@ -11,11 +11,23 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Primitives;
+using SportRental.Admin.Services.Auth;
+using SportRental.Shared.Legal;
 
 namespace Microsoft.AspNetCore.Routing
 {
     internal static class IdentityComponentsEndpointRouteBuilderExtensions
     {
+        private const string LogoutFallbackUrl = "/Account/Login";
+
+        private static string ResolveLogoutReturnUrl(string? returnUrl)
+        {
+            var candidate = SafeReturnUrl.ResolveLocal(returnUrl, LogoutFallbackUrl);
+            return candidate.StartsWith("/Account/Logout", StringComparison.OrdinalIgnoreCase)
+                ? LogoutFallbackUrl
+                : candidate;
+        }
+
         // These endpoints are required by the Identity Razor components defined in the /Components/Account/Pages directory of this project.
         public static IEndpointConventionBuilder MapAdditionalIdentityEndpoints(this IEndpointRouteBuilder endpoints)
         {
@@ -29,8 +41,9 @@ namespace Microsoft.AspNetCore.Routing
                 [FromForm] string provider,
                 [FromForm] string returnUrl) =>
             {
+                var safeReturnUrl = SafeReturnUrl.ResolveLocal(returnUrl);
                 IEnumerable<KeyValuePair<string, StringValues>> query = [
-                    new("ReturnUrl", returnUrl),
+                    new("ReturnUrl", safeReturnUrl),
                     new("Action", ExternalLogin.LoginCallbackAction)];
 
                 var redirectUrl = UriHelper.BuildRelative(
@@ -48,12 +61,25 @@ namespace Microsoft.AspNetCore.Routing
                 HttpContext context,
                 [FromServices] SignInManager<ApplicationUser> signInManager,
                 [FromQuery] string provider,
-                [FromQuery] string? returnUrl) =>
+                [FromQuery] string? returnUrl,
+                [FromQuery] string? termsVersion,
+                [FromQuery] string? privacyVersion) =>
             {
-                returnUrl ??= "/";
+                if (!string.Equals(termsVersion, LegalDocumentVersions.Terms, StringComparison.Ordinal) ||
+                    !string.Equals(privacyVersion, LegalDocumentVersions.Privacy, StringComparison.Ordinal))
+                {
+                    return Results.BadRequest(new
+                    {
+                        error = "Przed utworzeniem konta zaakceptuj aktualne dokumenty prawne."
+                    });
+                }
+
+                var safeReturnUrl = SafeReturnUrl.ResolveClient(returnUrl);
                 IEnumerable<KeyValuePair<string, StringValues>> query = [
-                    new("ReturnUrl", returnUrl),
-                    new("Action", ExternalLogin.LoginCallbackAction)];
+                    new("ReturnUrl", safeReturnUrl),
+                    new("Action", ExternalLogin.LoginCallbackAction),
+                    new("TermsVersion", LegalDocumentVersions.Terms),
+                    new("PrivacyVersion", LegalDocumentVersions.Privacy)];
 
                 var redirectUrl = UriHelper.BuildRelative(
                     context.Request.PathBase,
@@ -61,16 +87,17 @@ namespace Microsoft.AspNetCore.Routing
                     QueryString.Create(query));
 
                 var properties = signInManager.ConfigureExternalAuthenticationProperties(provider, redirectUrl);
-                return TypedResults.Challenge(properties, [provider]);
+                return Results.Challenge(properties, [provider]);
             });
 
             accountGroup.MapPost("/Logout", async (
-                ClaimsPrincipal user,
+                HttpContext context,
                 [FromServices] SignInManager<ApplicationUser> signInManager,
-                [FromForm] string returnUrl) =>
+                [FromForm] string? returnUrl) =>
             {
+                SportRental.Admin.Api.Endpoints.DeleteAccessTokenCookie(context);
                 await signInManager.SignOutAsync();
-                return TypedResults.LocalRedirect($"~/{returnUrl}");
+                return TypedResults.LocalRedirect(ResolveLogoutReturnUrl(returnUrl));
             });
 
             // One-click demo sign-in. Idempotentnie tworzy demo tenant + użytkownika

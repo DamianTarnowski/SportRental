@@ -65,9 +65,10 @@ namespace SportRental.Admin.Services.Email
                 var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
                 var surveyTokenService = scope.ServiceProvider.GetRequiredService<IReviewSurveyTokenService>();
 
-                // Admin URL — dla survey linku; ClientApp URL — dla opt-out. Fallback do Admin jeśli nie ma client.
+                // Admin URL — dla survey linku; ClientApp URL — dla opt-out. Produkcyjny
+                // fallback wskazuje na WASM bundlowany w Admin pod /_client.
                 var adminBaseUrl = config["Admin:PublicBaseUrl"]?.TrimEnd('/') ?? string.Empty;
-                var clientBaseUrl = config["ClientApp:PublicBaseUrl"]?.TrimEnd('/') ?? adminBaseUrl;
+                var clientBaseUrl = ClientAppUrlResolver.Resolve(config, adminBaseUrl);
 
                 await using var db = await dbFactory.CreateDbContextAsync();
                 await ProcessAsync(db, emailSender, protectorProvider, surveyTokenService, adminBaseUrl, clientBaseUrl);

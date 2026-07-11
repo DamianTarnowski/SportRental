@@ -279,6 +279,7 @@ dotnet test
 - ☁️ [**Azure Blob Storage**](doc/setup/AZURE_BLOB_STORAGE_SETUP.md) - Cloud storage
 - 📧 [**Email Setup**](doc/setup/ONET_EMAIL_SETUP.md) - SMTP configuration
 - 💳 [**Stripe Sandbox**](doc/setup/STRIPE_SANDBOX_GUIDE.md) - Payment testing
+- ⚖️ [**Legal Documents**](doc/setup/LEGAL_DOCUMENTS.md) - Operator data and document versioning
 
 ### 🧪 **Testing**
 - 🧪 [**Testing Guide**](doc/TESTING_GUIDE.md) - Complete testing docs

@@ -15,32 +15,35 @@
 <header class="sr-header">
     <div class="sr-header-content">
         <!-- Mobile Menu Button -->
-        <button type="button" class="sr-menu-btn" @onclick="ToggleDrawer" aria-label="Menu">
+        <button type="button" class="sr-menu-btn" @onclick="ToggleDrawer"
+                aria-label="Otwórz menu"
+                aria-expanded="@(_drawerOpen ? "true" : "false")"
+                aria-controls="client-mobile-drawer">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 24px; height: 24px;">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
         </button>
         
         <!-- Logo -->
-        <a href="/" class="sr-logo">
-            <div class="sr-logo-icon">🏂</div>
-            <div class="sr-logo-text">Sport<span>Rental</span></div>
+        <a href="./" class="sr-logo">
+            <div class="sr-logo-icon" style="color:#fff;font-weight:800;">R</div>
+            <div class="sr-logo-text">RentSpot<span>.</span></div>
         </a>
         
         <!-- Header Nav Links -->
-        <nav class="sr-header-nav">
-            <NavLink href="/products" class="sr-header-link" ActiveClass="active">
-                📦 Katalog
+        <nav class="sr-header-nav" aria-label="Nawigacja skrótowa">
+            <NavLink href="products" class="sr-header-link" ActiveClass="active">
+                <Icon Name="catalog" Size="18" /> Katalog
             </NavLink>
-            <NavLink href="/contact" class="sr-header-link" ActiveClass="active">
-                ✉️ Kontakt
+            <NavLink href="contact" class="sr-header-link" ActiveClass="active">
+                <Icon Name="mail" Size="18" /> Kontakt
             </NavLink>
         </nav>
         
         <!-- Header Actions -->
         <div class="sr-header-actions">
             <!-- Cart Button -->
-            <a href="/cart" class="sr-header-btn" aria-label="Koszyk">
+            <a href="cart" class="sr-header-btn" aria-label="Koszyk">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M2.25 3a.75.75 0 0 0 0 1.5h1.386c.2 0 .374.133.428.326l2.201 7.705A2.25 2.25 0 0 0 8.45 13.5H17.25a2.25 2.25 0 0 0 2.154-1.59l1.563-5.26A.75.75 0 0 0 20.25 5.25H6.654l-.36-1.26A1.875 1.875 0 0 0 3.636 3H2.25Z" />
                     <path d="M9 21a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm9 0a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z" />
@@ -67,13 +70,13 @@
                     @if (_userMenuOpen)
                     {
                         <div class="sr-user-dropdown">
-                            <a href="/profile" class="sr-dropdown-item">
+                            <a href="profile" class="sr-dropdown-item">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 18px; height: 18px;">
                                     <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
                                 </svg>
                                 Mój profil
                             </a>
-                            <a href="/my-rentals" class="sr-dropdown-item">
+                            <a href="my-rentals" class="sr-dropdown-item">
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width: 18px; height: 18px;">
                                     <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2a1 1 0 000 2h6a1 1 0 100-2H7zm6 7a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1zm-3 3a1 1 0 100 2h.01a1 1 0 100-2H10zm-4 1a1 1 0 011-1h.01a1 1 0 110 2H7a1 1 0 01-1-1zm1-4a1 1 0 100 2h.01a1 1 0 100-2H7zm2 1a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zm4-4a1 1 0 100 2h.01a1 1 0 100-2H13zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zM7 8a1 1 0 000 2h.01a1 1 0 000-2H7z" clip-rule="evenodd" />
                                 </svg>
@@ -93,7 +96,7 @@
             }
             else
             {
-                <a href="/login" class="sr-header-login">
+                <a href="login" class="sr-header-login">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 18px; height: 18px;">
                         <path fill-rule="evenodd" d="M12 2.25a4.5 4.5 0 0 0-4.5 4.5v.75a4.5 4.5 0 0 0 9 0v-.75A4.5 4.5 0 0 0 12 2.25ZM4.5 20.25a7.5 7.5 0 0 1 15 0v.75H4.5v-.75Z" clip-rule="evenodd" />
                     </svg>
@@ -112,7 +115,7 @@
         <!-- Main Navigation -->
         <div class="sr-sidebar-section">
             <div class="sr-sidebar-title">Menu</div>
-            <NavMenu />
+            <NavMenu AriaLabel="Nawigacja boczna" />
         </div>
     </div>
 </aside>
@@ -120,25 +123,28 @@
 <!-- =============================================
      MOBILE DRAWER
      ============================================= -->
-<div class="sr-drawer-overlay @(_drawerOpen ? "open" : "")" @onclick="ToggleDrawer"></div>
-<div class="sr-drawer @(_drawerOpen ? "open" : "")">
-    <div class="sr-drawer-header">
-        <a href="/" class="sr-logo" @onclick="ToggleDrawer">
-            <div class="sr-logo-icon">🏂</div>
-            <div class="sr-logo-text">Sport<span>Rental</span></div>
-        </a>
-        <button class="sr-drawer-close" @onclick="ToggleDrawer" aria-label="Zamknij">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 24px; height: 24px;">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
-        </button>
-    </div>
-    <div class="sr-sidebar-content">
-        <div class="sr-sidebar-section">
-            <NavMenu OnNavigate="ToggleDrawer" />
+@if (_drawerOpen)
+{
+    <div class="sr-drawer-overlay open" @onclick="ToggleDrawer"></div>
+    <aside id="client-mobile-drawer" class="sr-drawer open" aria-label="Menu mobilne">
+        <div class="sr-drawer-header">
+            <a href="./" class="sr-logo" @onclick="ToggleDrawer">
+                <div class="sr-logo-icon" style="color:#fff;font-weight:800;">R</div>
+                <div class="sr-logo-text">RentSpot<span>.</span></div>
+            </a>
+            <button class="sr-drawer-close" @onclick="ToggleDrawer" aria-label="Zamknij menu">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" style="width: 24px; height: 24px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
-    </div>
-</div>
+        <div class="sr-sidebar-content">
+            <div class="sr-sidebar-section">
+                <NavMenu AriaLabel="Nawigacja mobilna" OnNavigate="ToggleDrawer" />
+            </div>
+        </div>
+    </aside>
+}
 
 <!-- =============================================
      MAIN CONTENT
@@ -206,7 +212,7 @@
     {
         _userMenuOpen = false;
         await AuthService.LogoutAsync();
-        Navigation.NavigateTo("/", forceLoad: true);
+        Navigation.NavigateTo("./", forceLoad: true);
     }
 
     public void Dispose()

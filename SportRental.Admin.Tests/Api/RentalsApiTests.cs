@@ -325,11 +325,11 @@ public class RentalsApiTests : IClassFixture<WebApplicationFactory<Program>>
             => Task.FromResult(System.Text.Encoding.UTF8.GetBytes("PDF"));
         public Task<byte[]> GenerateRentalContractAsync(string templateContent, Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
             => Task.FromResult(System.Text.Encoding.UTF8.GetBytes("PDF"));
-        public Task<string> GenerateAndSaveRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
+        public Task<string> GenerateAndSaveRentalContractAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, string? templateContent = null, CancellationToken ct = default)
             => Task.FromResult($"https://test/contracts/{rental.TenantId}/contract_{rental.Id}.pdf");
         public Task SendRentalContractByEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
             => Task.CompletedTask;
-        public Task SendRentalConfirmationEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, CancellationToken ct = default)
+        public Task SendRentalConfirmationEmailAsync(Rental rental, IEnumerable<RentalItem> items, Customer customer, IEnumerable<Product> products, CompanyInfo? companyInfo = null, string? templateContent = null, CancellationToken ct = default)
             => Task.CompletedTask;
     }
 

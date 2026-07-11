@@ -8,27 +8,28 @@
 @inject ISnackbar Snackbar
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IApiService Api
+@inject AuthService AuthService
 @implements IDisposable
 
-<nav>
+<nav aria-label="@AriaLabel">
     <!-- Main Navigation -->
-    <NavLink href="/" Match="NavLinkMatch.All" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-        <span class="sr-sidebar-link-icon">🏠</span>
+    <NavLink href="./" Match="NavLinkMatch.All" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon"><Icon Name="home" /></span>
         <span>Strona główna</span>
     </NavLink>
 
-    <NavLink href="/products" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-        <span class="sr-sidebar-link-icon">📦</span>
+    <NavLink href="products" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon"><Icon Name="catalog" /></span>
         <span>Katalog produktów</span>
     </NavLink>
 
-    <NavLink href="/map" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-        <span class="sr-sidebar-link-icon">🗺️</span>
+    <NavLink href="map" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon"><Icon Name="map" /></span>
         <span>Mapa wypożyczalni</span>
     </NavLink>
 
-    <NavLink href="/cart" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-        <span class="sr-sidebar-link-icon">🛒</span>
+    <NavLink href="cart" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon"><Icon Name="cart" /></span>
         <span>Koszyk</span>
         @if (_cart.TotalItems > 0)
         {
@@ -36,35 +37,49 @@
         }
     </NavLink>
 
-    <NavLink href="/reviews" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-        <span class="sr-sidebar-link-icon">⭐</span>
+    <NavLink href="reviews" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon"><Icon Name="star" /></span>
         <span>Opinie</span>
     </NavLink>
 
-    <NavLink href="/contact" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-        <span class="sr-sidebar-link-icon">✉️</span>
+    <NavLink href="contact" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon"><Icon Name="mail" /></span>
         <span>Kontakt</span>
+    </NavLink>
+
+    <div class="sr-sidebar-divider"></div>
+
+    <div class="sr-sidebar-title">Dokumenty</div>
+
+    <NavLink href="terms" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon"><Icon Name="rentals" /></span>
+        <span>Regulamin platformy</span>
+    </NavLink>
+
+    <NavLink href="privacy" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+        <span class="sr-sidebar-link-icon"><Icon Name="eye" /></span>
+        <span>Polityka prywatności</span>
     </NavLink>
 
     <div class="sr-sidebar-divider"></div>
 
     <!-- Account Section -->
     <div class="sr-sidebar-title">Konto</div>
-    
-    @if (_customer is null)
+
+    @if (!_isAuthenticated)
     {
-        <NavLink href="/login" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-            <span class="sr-sidebar-link-icon">🔑</span>
+        <NavLink href="login" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon"><Icon Name="login" /></span>
             <span>Zaloguj się</span>
         </NavLink>
-        
-        <NavLink href="/register" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-            <span class="sr-sidebar-link-icon">✨</span>
+
+        <NavLink href="register" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon"><Icon Name="register" /></span>
             <span>Zarejestruj się</span>
         </NavLink>
-        
-        <NavLink href="/my-rentals" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-            <span class="sr-sidebar-link-icon">📋</span>
+
+        <NavLink href="my-rentals" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon"><Icon Name="rentals" /></span>
             <span>Moje wynajmy</span>
         </NavLink>
     }
@@ -72,22 +87,22 @@
     {
         <!-- User Info Card -->
         <div class="sr-sidebar-user">
-            <div class="sr-sidebar-user-name">👤 @_customer!.FullName</div>
-            <div class="sr-sidebar-user-email">@_customer!.Email</div>
+            <div class="sr-sidebar-user-name">@(_customer?.FullName ?? "Konto klienta")</div>
+            <div class="sr-sidebar-user-email">@(_customer?.Email ?? _authenticatedEmail)</div>
         </div>
-        
-        <NavLink href="/profile" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-            <span class="sr-sidebar-link-icon">⚙️</span>
+
+        <NavLink href="profile" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon"><Icon Name="settings" /></span>
             <span>Moje dane</span>
         </NavLink>
-        
-        <NavLink href="/my-rentals" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
-            <span class="sr-sidebar-link-icon">📋</span>
+
+        <NavLink href="my-rentals" class="sr-sidebar-link" ActiveClass="active" @onclick="HandleNavigation">
+            <span class="sr-sidebar-link-icon"><Icon Name="rentals" /></span>
             <span>Moje wynajmy</span>
         </NavLink>
-        
+
         <button type="button" class="sr-sidebar-logout" disabled="@_isLoggingOut" @onclick="LogoutAsync">
-            <span class="sr-sidebar-link-icon">🚪</span>
+            <span class="sr-sidebar-link-icon"><Icon Name="logout" /></span>
             <span>@(_isLoggingOut ? "Wylogowywanie..." : "Wyloguj się")</span>
         </button>
     }
@@ -96,9 +111,14 @@
 @code {
     [Parameter]
     public EventCallback OnNavigate { get; set; }
+
+    [Parameter]
+    public string AriaLabel { get; set; } = "Nawigacja główna";
     
     private Cart _cart = new();
     private CustomerDto? _customer;
+    private bool _isAuthenticated;
+    private string? _authenticatedEmail;
     private bool _isLoggingOut;
 
     protected override async Task OnInitializedAsync()
@@ -123,55 +143,35 @@
 
     private async Task LoadSessionAsync()
     {
-        // First try session
-        _customer = await Session.GetCustomerAsync();
-        
-        // If no session, check if user is authenticated via JWT
-        if (_customer is null)
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isAuthenticated = user.Identity?.IsAuthenticated == true;
+        _authenticatedEmail = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                           ?? user.FindFirst("email")?.Value;
+
+        if (!_isAuthenticated)
         {
-            try
-            {
-                var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-                var user = authState.User;
-                if (user.Identity?.IsAuthenticated == true)
-                {
-                    var email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value 
-                             ?? user.FindFirst("email")?.Value;
-                    
-                    if (!string.IsNullOrWhiteSpace(email))
-                    {
-                        // Try to find existing customer by email
-                        var customer = await Api.FindCustomerByEmailAsync(email);
-                        
-                        // If no customer exists, create one from JWT data
-                        if (customer is null)
-                        {
-                            var name = user.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value 
-                                    ?? user.FindFirst("name")?.Value 
-                                    ?? email.Split('@')[0];
-                            
-                            var request = new CreateCustomerRequest
-                            {
-                                Email = email,
-                                FullName = name,
-                                PhoneNumber = "" // Will need to be filled later
-                            };
-                            
-                            customer = await Api.CreateCustomerAsync(request);
-                        }
-                        
-                        if (customer is not null)
-                        {
-                            _customer = customer;
-                            await Session.SetCustomerAsync(customer);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine("[NavMenu] Failed to load auth state: {0}", ex);
-            }
+            _customer = null;
+            return;
+        }
+
+        try
+        {
+            var customerIdValue = user.FindFirst("customer-id")?.Value;
+            _customer = Guid.TryParse(customerIdValue, out var customerId)
+                ? await Api.GetCustomerAsync(customerId)
+                : null;
+
+            if (_customer is null && !string.IsNullOrWhiteSpace(_authenticatedEmail))
+                _customer = await Api.FindCustomerByEmailAsync(_authenticatedEmail);
+
+            _customer ??= await Session.GetCustomerAsync();
+            if (_customer is not null)
+                await Session.SetCustomerAsync(_customer);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("[NavMenu] Failed to load customer session: {0}", ex);
         }
     }
 
@@ -209,18 +209,12 @@
         _isLoggingOut = true;
         try
         {
-            // Clear customer session
-            await Session.ClearAsync();
-            
-            // Also logout from JWT auth
-            if (AuthStateProvider is ApiAuthenticationStateProvider apiAuth)
-            {
-                await apiAuth.MarkUserAsLoggedOut();
-            }
+            await AuthService.LogoutAsync();
             
             _customer = null;
+            _isAuthenticated = false;
             Snackbar.Add("Wylogowano.", Severity.Info);
-            Navigation.NavigateTo("/", true);
+            Navigation.NavigateTo("./", true);
         }
         finally
         {

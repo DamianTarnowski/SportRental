@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using SportRental.Shared.Identity;
 
 namespace SportRental.Admin.Services.Auth;
 
@@ -20,5 +21,10 @@ public static class AuthClaims
     }
 
     public static bool IsAdmin(this ClaimsPrincipal user) =>
-        user.IsInRole("Admin") || user.IsInRole("OwnerAdmin") || user.IsInRole("SuperAdmin");
+        user.IsInRole(RoleNames.Owner) ||
+        user.IsInRole(RoleNames.Employee) ||
+        user.IsInRole(RoleNames.SuperAdmin) ||
+        // Legacy role names retained for accounts created by older deployments.
+        user.IsInRole("Admin") ||
+        user.IsInRole("OwnerAdmin");
 }

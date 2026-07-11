@@ -99,7 +99,7 @@
                 <HeaderContent>
                     <MudTh>Wynajem</MudTh>
                     <MudTh>Klient</MudTh>
-                    <MudTh>Kwota</MudTh>
+                    <MudTh>Rozliczenie</MudTh>
                     <MudTh>Termin</MudTh>
                     <MudTh>Status</MudTh>
                     <MudTh>Metoda</MudTh>
@@ -110,7 +110,21 @@
                         <a href="/admin/rentals" class="rs-pay-link">#@row.RentalId.ToString()[..8].ToUpper()</a>
                     </MudTd>
                     <MudTd>@row.CustomerName</MudTd>
-                    <MudTd Style="font-weight: 600;">@row.Amount.Pln()</MudTd>
+                    <MudTd Style="font-weight: 600;">
+                        @row.PaidAmount.Pln() / @row.TotalAmount.Pln()
+                        @if (row.OutstandingAmount > 0m)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Warning">
+                                Pozostało @row.OutstandingAmount.Pln()
+                            </MudText>
+                        }
+                        @if (row.HasDeposit && row.DepositAmount > 0m)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Info">
+                                Depozyt pobrany: @row.DepositAmount.Pln()
+                            </MudText>
+                        }
+                    </MudTd>
                     <MudTd>@row.DueDate.ToString("dd.MM.yyyy")</MudTd>
                     <MudTd>
                         <MudChip T="string" Size="Size.Small" Color="@row.StatusColor" Variant="Variant.Filled">
@@ -119,7 +133,7 @@
                     </MudTd>
                     <MudTd>@(string.IsNullOrEmpty(row.Method) ? "—" : row.Method)</MudTd>
                     <MudTd Style="text-align: right;">
-                        @if (!row.IsPaid && row.Status != RentalStatus.Cancelled)
+                        @if (!row.IsFullyPaid && row.Status != RentalStatus.Cancelled)
                         {
                             <MudTooltip Text="Oznacz jako opłacone">
                                 <MudIconButton Icon="@Icons.Material.Filled.Paid" Color="Color.Success"
@@ -130,7 +144,7 @@
                                                OnClick="() => SendPaymentReminder(row)" Size="Size.Small" />
                             </MudTooltip>
                         }
-                        else if (row.IsPaid)
+                        else if (row.IsFullyPaid)
                         {
                             <MudTooltip Text="Zwrot płatności">
                                 <MudIconButton Icon="@Icons.Material.Filled.Undo" Color="Color.Error"
@@ -197,8 +211,10 @@
     private List<PaymentRow> _rows = new();
 
     private record PaymentRow(
-        Guid RentalId, string CustomerName, decimal Amount, DateTime DueDate,
-        RentalStatus Status, bool IsPaid, bool IsOverdue, string? Method,
+        Guid RentalId, string CustomerName, decimal TotalAmount, decimal DepositAmount,
+        decimal PaidAmount, decimal OutstandingAmount, DateTime DueDate,
+        DateTime? PaidAtUtc, DateTime? DepositPaidAtUtc,
+        RentalStatus Status, bool IsFullyPaid, bool HasPayment, bool HasDeposit, bool IsOverdue, string? Method,
         string StatusText, Color StatusColor);
 
     protected override async Task OnInitializedAsync()
@@ -223,23 +239,36 @@
 
         _rows = rentals.Select(r =>
         {
-            var paid = RentalGuards.IsRentalPaid(r);
-            var overdue = !paid && r.Status != RentalStatus.Cancelled && r.Status != RentalStatus.Completed
+            var paidAmount = RentalGuards.GetPaidAmount(r);
+            var outstandingAmount = RentalGuards.GetOutstandingAmount(r);
+            var fullyPaid = RentalGuards.IsRentalPaid(r);
+            var hasPayment = paidAmount > 0m;
+            var hasDeposit = RentalGuards.IsDepositCollected(r);
+            var overdue = !fullyPaid && r.Status != RentalStatus.Cancelled && r.Status != RentalStatus.Completed
                           && r.StartDateUtc < today;
-            var (txt, col) = (paid, r.Status, overdue) switch
+            var (txt, col) = (fullyPaid, hasPayment, hasDeposit, r.Status, overdue) switch
             {
-                (_, RentalStatus.Cancelled, _) => ("Anulowane", Color.Default),
-                (true, _, _)                    => ("Opłacone", Color.Success),
-                (_, _, true)                    => ("Zaległe", Color.Error),
-                _                               => ("Oczekuje", Color.Warning)
+                (_, _, _, RentalStatus.Cancelled, _) => ("Anulowane", Color.Default),
+                (true, _, _, _, _)                   => ("Opłacone", Color.Success),
+                (_, true, _, _, _)                   => ("Częściowo opłacone", Color.Warning),
+                (_, _, true, _, _)                   => ("Depozyt pobrany", Color.Info),
+                (_, _, _, _, true)                   => ("Zaległe", Color.Error),
+                _                                    => ("Oczekuje", Color.Warning)
             };
             return new PaymentRow(
                 RentalId: r.Id,
                 CustomerName: r.Customer?.FullName ?? "—",
-                Amount: r.TotalAmount,
+                TotalAmount: r.TotalAmount,
+                DepositAmount: r.DepositAmount,
+                PaidAmount: paidAmount,
+                OutstandingAmount: outstandingAmount,
                 DueDate: r.StartDateUtc.ToLocalTime(),
+                PaidAtUtc: r.PaidAtUtc,
+                DepositPaidAtUtc: r.DepositPaidAtUtc,
                 Status: r.Status,
-                IsPaid: paid,
+                IsFullyPaid: fullyPaid,
+                HasPayment: hasPayment,
+                HasDeposit: hasDeposit,
                 IsOverdue: overdue,
                 Method: r.PaymentMethod,
                 StatusText: txt,
@@ -258,9 +287,9 @@
             IEnumerable<PaymentRow> q = _rows;
             q = _filter switch
             {
-                Filter.Pending   => q.Where(r => !r.IsPaid && !r.IsOverdue && r.Status != RentalStatus.Cancelled),
+                Filter.Pending   => q.Where(r => !r.IsFullyPaid && !r.IsOverdue && r.Status != RentalStatus.Cancelled),
                 Filter.Overdue   => q.Where(r => r.IsOverdue),
-                Filter.Paid      => q.Where(r => r.IsPaid),
+                Filter.Paid      => q.Where(r => r.IsFullyPaid),
                 Filter.Cancelled => q.Where(r => r.Status == RentalStatus.Cancelled),
                 _                => q
             };
@@ -275,34 +304,66 @@
     }
 
     private int AllCount => _rows.Count;
-    private int PendingCount => _rows.Count(r => !r.IsPaid && !r.IsOverdue && r.Status != RentalStatus.Cancelled);
+    private int PendingCount => _rows.Count(r => !r.IsFullyPaid && !r.IsOverdue && r.Status != RentalStatus.Cancelled);
     private int OverdueCount => _rows.Count(r => r.IsOverdue);
-    private int PaidCount => _rows.Count(r => r.IsPaid);
+    private int PaidCount => _rows.Count(r => r.IsFullyPaid);
     private int CancelledCount => _rows.Count(r => r.Status == RentalStatus.Cancelled);
 
     private decimal DueTodayAmount => _rows
-        .Where(r => !r.IsPaid && r.Status != RentalStatus.Cancelled && r.DueDate.Date == DateTime.Today)
-        .Sum(r => r.Amount);
-    private int DueTodayCount => _rows.Count(r => !r.IsPaid && r.Status != RentalStatus.Cancelled && r.DueDate.Date == DateTime.Today);
-    private decimal OverdueAmount => _rows.Where(r => r.IsOverdue).Sum(r => r.Amount);
-    private decimal PaidTodayAmount => _rows
-        .Where(r => r.IsPaid && r.DueDate.Date == DateTime.Today)
-        .Sum(r => r.Amount);
-    private int PaidTodayCount => _rows.Count(r => r.IsPaid && r.DueDate.Date == DateTime.Today);
+        .Where(r => !r.IsFullyPaid && r.Status != RentalStatus.Cancelled && r.DueDate.Date == DateTime.Today)
+        .Sum(r => r.OutstandingAmount);
+    private int DueTodayCount => _rows.Count(r => !r.IsFullyPaid && r.Status != RentalStatus.Cancelled && r.DueDate.Date == DateTime.Today);
+    private decimal OverdueAmount => _rows.Where(r => r.IsOverdue).Sum(r => r.OutstandingAmount);
+    private decimal PaidTodayAmount => _rows.Sum(r => ReceivedInRange(r, DateTime.Today, DateTime.Today.AddDays(1)));
+    private int PaidTodayCount => _rows.Sum(r => ReceiptCountInRange(r, DateTime.Today, DateTime.Today.AddDays(1)));
     private decimal MonthRevenueAmount
     {
         get
         {
             var firstOfMonth = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
-            return _rows.Where(r => r.IsPaid && r.DueDate >= firstOfMonth).Sum(r => r.Amount);
+            return _rows.Sum(r => ReceivedInRange(r, firstOfMonth, firstOfMonth.AddMonths(1)));
         }
+    }
+
+    private static decimal ReceivedInRange(PaymentRow row, DateTime fromLocal, DateTime toLocal)
+    {
+        if (row.PaidAmount <= 0m) return 0m;
+
+        if (!row.DepositPaidAtUtc.HasValue)
+            return IsInLocalRange(row.PaidAtUtc, fromLocal, toLocal) ? row.PaidAmount : 0m;
+
+        var depositPart = Math.Min(row.PaidAmount, Math.Max(0m, row.DepositAmount));
+        var balancePart = Math.Max(0m, row.PaidAmount - depositPart);
+        var total = IsInLocalRange(row.DepositPaidAtUtc, fromLocal, toLocal) ? depositPart : 0m;
+        if (balancePart > 0m && IsInLocalRange(row.PaidAtUtc, fromLocal, toLocal))
+            total += balancePart;
+        return total;
+    }
+
+    private static int ReceiptCountInRange(PaymentRow row, DateTime fromLocal, DateTime toLocal)
+    {
+        if (row.PaidAmount <= 0m) return 0;
+        if (!row.DepositPaidAtUtc.HasValue)
+            return IsInLocalRange(row.PaidAtUtc, fromLocal, toLocal) ? 1 : 0;
+
+        var count = IsInLocalRange(row.DepositPaidAtUtc, fromLocal, toLocal) ? 1 : 0;
+        if (row.PaidAmount > row.DepositAmount && IsInLocalRange(row.PaidAtUtc, fromLocal, toLocal))
+            count++;
+        return count;
+    }
+
+    private static bool IsInLocalRange(DateTime? utc, DateTime fromLocal, DateTime toLocal)
+    {
+        if (!utc.HasValue) return false;
+        var local = utc.Value.ToLocalTime();
+        return local >= fromLocal && local < toLocal;
     }
 
     private async Task MarkPaid(PaymentRow row)
     {
         var parameters = new DialogParameters<SportRental.Admin.Components.Dialogs.MarkAsPaidDialog>();
         // Rebuild Rental stub for the dialog (only TotalAmount + Id matter for display)
-        parameters.Add(x => x.Rental, new Rental { Id = row.RentalId, TotalAmount = row.Amount });
+        parameters.Add(x => x.Rental, new Rental { Id = row.RentalId, TotalAmount = row.OutstandingAmount });
         var dialog = await DialogService.ShowAsync<SportRental.Admin.Components.Dialogs.MarkAsPaidDialog>("Płatność", parameters,
             new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
         var result = await dialog.Result;
@@ -315,7 +376,8 @@
             var now = DateTime.UtcNow;
             await db.Rentals.Where(r => r.Id == row.RentalId)
                 .ExecuteUpdateAsync(s => s
-                    .SetProperty(r => r.PaymentStatus, "DepositPaid")
+                    .SetProperty(r => r.PaymentStatus, "Paid")
+                    .SetProperty(r => r.PaidAmount, r => r.TotalAmount)
                     .SetProperty(r => r.PaymentMethod, method)
                     .SetProperty(r => r.PaidAtUtc, now));
             Snackbar.Add($"Wynajem #{row.RentalId.ToString()[..8].ToUpper()} oznaczony jako opłacony ({method}).",
@@ -341,7 +403,7 @@
                 return;
             }
             await SmsSender.SendAsync(customer.PhoneNumber,
-                $"RentSpot: przypominamy o płatności {row.Amount:0.00} zł za wynajem #{row.RentalId.ToString()[..8].ToUpper()}.");
+                $"RentSpot: przypominamy o płatności {row.OutstandingAmount:0.00} zł za wynajem #{row.RentalId.ToString()[..8].ToUpper()}.");
             Snackbar.Add("Przypomnienie wysłane.", MudBlazor.Severity.Success);
         }
         catch (Exception ex)
@@ -363,6 +425,7 @@
             await db.Rentals.Where(r => r.Id == row.RentalId)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(r => r.PaymentStatus, "Refunded")
+                    .SetProperty(r => r.PaidAmount, 0m)
                     .SetProperty(r => r.PaidAtUtc, (DateTime?)null));
             Snackbar.Add("Płatność oznaczona jako zwrócona.", MudBlazor.Severity.Info);
             await Load();

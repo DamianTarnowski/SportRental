@@ -7,6 +7,9 @@ namespace SportRental.Shared.Models
         public int Page { get; set; }
         public int PageSize { get; set; }
         public int TotalPages { get; set; }
+        public int AvailableCount { get; set; }
+        public decimal AveragePrice { get; set; }
+        public decimal MinimumPrice { get; set; }
     }
 
     public class ProductFilterRequest
@@ -18,6 +21,7 @@ namespace SportRental.Shared.Models
         public string? City { get; set; }
         public string? Voivodeship { get; set; }
         public string? Tenant { get; set; }
+        public Guid? TenantId { get; set; }
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }
         public bool? Available { get; set; }
@@ -38,8 +42,9 @@ namespace SportRental.Shared.Models
             if (!string.IsNullOrWhiteSpace(City)) parts.Add($"city={Uri.EscapeDataString(City)}");
             if (!string.IsNullOrWhiteSpace(Voivodeship)) parts.Add($"voivodeship={Uri.EscapeDataString(Voivodeship)}");
             if (!string.IsNullOrWhiteSpace(Tenant)) parts.Add($"tenant={Uri.EscapeDataString(Tenant)}");
-            if (MinPrice.HasValue) parts.Add($"minPrice={MinPrice.Value}");
-            if (MaxPrice.HasValue) parts.Add($"maxPrice={MaxPrice.Value}");
+            if (TenantId.HasValue) parts.Add($"tenantId={TenantId.Value:D}");
+            if (MinPrice.HasValue) parts.Add($"minPrice={MinPrice.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
+            if (MaxPrice.HasValue) parts.Add($"maxPrice={MaxPrice.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
             if (Available.HasValue) parts.Add($"available={Available.Value}");
             if (!string.IsNullOrWhiteSpace(Sort)) parts.Add($"sort={Uri.EscapeDataString(Sort)}");
             if (UserLat.HasValue) parts.Add($"userLat={UserLat.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
@@ -58,6 +63,8 @@ namespace SportRental.Shared.Models
         public string? Category { get; set; }
         public string? ImageUrl { get; set; }
         public string? ImageBasePath { get; set; } // For responsive images
+        public int[]? ImageVariantWidths { get; set; }
+        public bool? HasOriginalImage { get; set; }
         public decimal DailyPrice { get; set; }
         public decimal? HourlyPrice { get; set; }  // Cena za godzinę (opcjonalna)
         
@@ -68,6 +75,7 @@ namespace SportRental.Shared.Models
         public int AvailableQuantity { get; set; }
         
         // Location
+        public string? PickupAddress { get; set; }
         public string? City { get; set; }
         public string? Voivodeship { get; set; }
         public double? Lat { get; set; }
@@ -80,20 +88,21 @@ namespace SportRental.Shared.Models
         public string GetImageUrl(int width = 800)
         {
             if (string.IsNullOrWhiteSpace(ImageUrl))
-                return GetPlaceholderImage(width);
+                return string.Empty;
 
-            // Check if ImageUrl is a full URL (Azure Blob, CDN, etc.)
-            if (ImageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
-                ImageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                // Replace filename with requested width variant
-                var ext = System.IO.Path.GetExtension(ImageUrl);
-                var urlWithoutFilename = ImageUrl.Substring(0, ImageUrl.LastIndexOf('/') + 1);
-                return $"{urlWithoutFilename}w{width}{ext}";
-            }
+            var imageUrl = ImageUrl.Trim();
+            var declaredWidths = GetDeclaredVariantWidths();
+            if (declaredWidths.Length == 0)
+                return imageUrl;
 
-            // Fallback to ImageUrl
-            return ImageUrl;
+            var requestedWidth = Math.Max(1, width);
+            var selectedWidth = declaredWidths.FirstOrDefault(candidate => candidate >= requestedWidth);
+            if (selectedWidth == 0)
+                selectedWidth = declaredWidths[^1];
+
+            return TryReplaceKnownVariant(imageUrl, $"w{selectedWidth}", out var variantUrl)
+                ? variantUrl
+                : imageUrl;
         }
 
         // Get original full-size image URL
@@ -102,18 +111,11 @@ namespace SportRental.Shared.Models
             if (string.IsNullOrWhiteSpace(ImageUrl))
                 return string.Empty;
 
-            // Check if ImageUrl is a full URL (Azure Blob, CDN, etc.)
-            if (ImageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
-                ImageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            {
-                // Replace w800/w400/w1280 with original
-                var ext = System.IO.Path.GetExtension(ImageUrl);
-                var urlWithoutFilename = ImageUrl.Substring(0, ImageUrl.LastIndexOf('/') + 1);
-                return $"{urlWithoutFilename}original{ext}";
-            }
-
-            // Fallback to ImageUrl
-            return ImageUrl;
+            var imageUrl = ImageUrl.Trim();
+            return HasOriginalImage == true &&
+                   TryReplaceKnownVariant(imageUrl, "original", out var originalUrl)
+                ? originalUrl
+                : imageUrl;
         }
 
         public string GetImageSrcSet()
@@ -121,53 +123,80 @@ namespace SportRental.Shared.Models
             if (string.IsNullOrWhiteSpace(ImageUrl))
                 return string.Empty;
 
-            var ext = System.IO.Path.GetExtension(ImageUrl);
-            
-            // Check if ImageUrl is a full URL (Azure Blob, CDN, etc.)
-            if (!string.IsNullOrEmpty(ImageUrl) &&
-                (ImageUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || 
-                ImageUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+            var imageUrl = ImageUrl.Trim();
+            var declaredWidths = GetDeclaredVariantWidths();
+            if (declaredWidths.Length < 2)
+                return string.Empty;
+
+            var candidates = new List<string>(declaredWidths.Length);
+            foreach (var width in declaredWidths)
             {
-                // Build srcset with full URLs
-                var lastSlashIndex = ImageUrl.LastIndexOf('/');
-                if (lastSlashIndex > 0)
-                {
-                    var urlWithoutFilename = ImageUrl.Substring(0, lastSlashIndex + 1);
-                    return $"{urlWithoutFilename}w400{ext} 400w, {urlWithoutFilename}w800{ext} 800w, {urlWithoutFilename}w1280{ext} 1280w";
-                }
+                if (!TryReplaceKnownVariant(imageUrl, $"w{width}", out var variantUrl))
+                    return string.Empty;
+
+                candidates.Add($"{variantUrl} {width}w");
             }
 
-            return string.Empty;
+            return string.Join(", ", candidates);
         }
 
-        private string GetPlaceholderImage(int width = 800)
+        public string GetPickupDisplayText()
         {
-            // Placeholder images based on category from Unsplash
-            var categoryPlaceholders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Narty"] = $"https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Snowboard"] = $"https://images.unsplash.com/photo-1519315901367-224f0c3e6c01?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Rowery miejskie"] = $"https://images.unsplash.com/photo-1571068316344-75bc76f77890?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Rowery elektryczne"] = $"https://images.unsplash.com/photo-1591227080018-acef3b3651e7?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["MTB"] = $"https://images.unsplash.com/photo-1576435728678-68d0fbf94e91?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["SUP"] = $"https://images.unsplash.com/photo-1595433707802-6b2626ef1c91?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Windsurfing"] = $"https://images.unsplash.com/photo-1537519646099-335112e5f70f?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Kitesurfing"] = $"https://images.unsplash.com/photo-1559827260-dc66d52bef19?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Buty"] = $"https://images.unsplash.com/photo-1542291026-7eec264c27ff?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Kaski"] = $"https://images.unsplash.com/photo-1590546637310-6f8f5b5cd1e7?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Gogle"] = $"https://images.unsplash.com/photo-1588731247985-c952b0e9b9db?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Pianki"] = $"https://images.unsplash.com/photo-1559827260-dc66d52bef19?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Akcesoria"] = $"https://images.unsplash.com/photo-1523275335684-37898b6baf30?w={width}&h={width * 3 / 4}&fit=crop&q=80",
-                ["Bezpieczeństwo"] = $"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w={width}&h={width * 3 / 4}&fit=crop&q=80"
-            };
+            if (!string.IsNullOrWhiteSpace(PickupAddress))
+                return PickupAddress.Trim();
 
-            if (!string.IsNullOrEmpty(Category) && categoryPlaceholders.TryGetValue(Category, out var placeholder))
-            {
-                return placeholder;
-            }
+            if (!string.IsNullOrWhiteSpace(City))
+                return City.Trim();
 
-            // Default sports placeholder
-            return $"https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w={width}&h={width * 3 / 4}&fit=crop&q=80";
+            return "Adres odbioru do potwierdzenia";
         }
+
+        private static bool TryReplaceKnownVariant(
+            string imageUrl,
+            string targetStem,
+            out string rewrittenUrl)
+        {
+            rewrittenUrl = imageUrl;
+            if (!IsAbsoluteHttpUrl(imageUrl))
+                return false;
+
+            var suffixIndex = imageUrl.IndexOfAny('?', '#');
+            var path = suffixIndex >= 0 ? imageUrl[..suffixIndex] : imageUrl;
+            var suffix = suffixIndex >= 0 ? imageUrl[suffixIndex..] : string.Empty;
+            var lastSlashIndex = path.LastIndexOf('/');
+            if (lastSlashIndex < 0 || lastSlashIndex == path.Length - 1)
+                return false;
+
+            var fileName = path[(lastSlashIndex + 1)..];
+            var extension = System.IO.Path.GetExtension(fileName);
+            if (string.IsNullOrWhiteSpace(extension))
+                return false;
+
+            var stem = System.IO.Path.GetFileNameWithoutExtension(fileName);
+            if (!IsKnownVariantStem(stem))
+                return false;
+
+            rewrittenUrl = $"{path[..(lastSlashIndex + 1)]}{targetStem}{extension}{suffix}";
+            return true;
+        }
+
+        private static bool IsAbsoluteHttpUrl(string value) =>
+            value.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            value.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+
+        private int[] GetDeclaredVariantWidths() =>
+            ImageVariantWidths?
+                .Where(width => width is 400 or 800 or 1280)
+                .Distinct()
+                .OrderBy(width => width)
+                .ToArray()
+            ?? [];
+
+        private static bool IsKnownVariantStem(string stem) =>
+            stem.Equals("w400", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("w800", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("w1280", StringComparison.OrdinalIgnoreCase) ||
+            stem.Equals("original", StringComparison.OrdinalIgnoreCase);
+
     }
 }

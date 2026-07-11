@@ -3,18 +3,22 @@
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
 @inject SportRental.Admin.Services.UI.ThemeService Theme
+@inject SportRental.Admin.Services.Ai.AzureOpenAiClientProvider OpenAiClient
 
 <InteractiveThemeProvider />
 
 <MudLayout>
     <InteractiveNavigation />
 
-    <MudMainContent Class="pt-16 px-2 px-sm-4">
+    <MudMainContent Class="pt-16 px-2 px-sm-4" role="main" id="main-content">
         @Body
     </MudMainContent>
 </MudLayout>
 
-<FloatingChat />
+@if (OpenAiClient.IsConfigured)
+{
+    <FloatingChat />
+}
 
 @code {
     protected override void OnInitialized()
