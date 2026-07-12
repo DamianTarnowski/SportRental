@@ -91,7 +91,14 @@ public class ContractGeneratorIntegrationTests
             PhoneNumber = "+48 18 123 45 67",
             OpeningHours = "Pn-Pt: 8:00-18:00, Sb-Nd: 9:00-17:00",
             Description = "Profesjonalna wypożyczalnia sprzętu narciarskiego",
-            CreatedAtUtc = DateTime.UtcNow
+            CreatedAtUtc = DateTime.UtcNow,
+            Tenant = new Tenant
+            {
+                Id = tenantId,
+                Name = "Narty & Snowboard Zakopane",
+                PrimaryColorHex = "#123456",
+                SecondaryColorHex = "#E06B65"
+            }
         };
     }
 
@@ -212,6 +219,31 @@ public class ContractGeneratorIntegrationTests
     }
 
     [Fact]
+    public async Task GenerateRentalContractAsync_WithSvgLogo_ShouldUseSafeTextFallback()
+    {
+        var tenantId = Guid.NewGuid();
+        var customer = CreateTestCustomer(tenantId);
+        var companyInfo = CreateTestCompanyInfo(tenantId);
+        companyInfo.Tenant!.LogoUrl = $"/images/tenants/{tenantId}/logo.svg";
+        var products = CreateTestProducts(tenantId);
+        var rental = CreateTestRental(tenantId, customer.Id);
+        var items = CreateTestRentalItems(rental.Id, products);
+
+        var pdfBytes = await _generator.GenerateRentalContractAsync(
+            rental,
+            items,
+            customer,
+            products,
+            companyInfo);
+
+        pdfBytes.Should().NotBeNullOrEmpty();
+        _fileStorageMock.Verify(
+            storage => storage.ReadAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never,
+            "SVG nie może trafiać bezpośrednio do QuestPDF, bo psuje kolejne rendery Popplera");
+    }
+
+    [Fact]
     public async Task GenerateAndSaveRentalContractAsync_ShouldSaveToStorage()
     {
         // Arrange
@@ -284,9 +316,13 @@ public class ContractGeneratorIntegrationTests
         // Sprawdź zawartość HTML
         capturedHtmlBody.Should().NotBeNullOrEmpty();
         capturedHtmlBody.Should().Contain(customer.FullName, "Email powinien zawierać imię klienta");
-        capturedHtmlBody.Should().Contain(companyInfo.Name, "Email powinien zawierać nazwę firmy");
+        capturedHtmlBody.Should().Contain(
+            System.Net.WebUtility.HtmlEncode(companyInfo.Name),
+            "Email powinien zawierać bezpiecznie zakodowaną nazwę firmy");
         capturedHtmlBody.Should().Contain("Rezerwacja potwierdzona", "Email powinien zawierać potwierdzenie");
         capturedHtmlBody.Should().Contain(rental.TotalAmount.ToString("0.00"), "Email powinien zawierać kwotę");
+        capturedHtmlBody.Should().Contain("background-color: #123456", "Email powinien używać koloru głównego tenanta");
+        capturedHtmlBody.Should().Contain("border-bottom: 6px solid #E06B65", "Email powinien używać koloru dodatkowego tenanta");
         
         // Sprawdź załącznik PDF
         capturedAttachmentPath.Should().NotBeNullOrEmpty("Powinien być załącznik PDF");

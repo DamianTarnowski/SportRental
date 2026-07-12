@@ -18,6 +18,143 @@ namespace SportRental.Admin.Tests.Payments;
 public sealed class CheckoutFinalizationServiceTests
 {
     [Fact]
+    public async Task PersistRentalsAsync_CompletedRentalKeepsHistoryButDoesNotReserveStock()
+    {
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase($"checkout-completed-stock-{Guid.NewGuid():N}")
+            .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+        var factory = new TestDbContextFactory(options);
+        var checkoutId = Guid.NewGuid();
+        var tenantId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var completedRentalId = Guid.NewGuid();
+        var startUtc = new DateTime(2026, 8, 10, 8, 0, 0, DateTimeKind.Utc);
+        var endUtc = startUtc.AddDays(1);
+        var payload = new CheckoutRentalPayload
+        {
+            SchemaVersion = 2,
+            Customer = new CheckoutCustomerSnapshot
+            {
+                CustomerId = customerId,
+                FullName = "Jan Klient",
+                Email = "jan@example.test"
+            },
+            StartDateUtc = startUtc,
+            EndDateUtc = endUtc,
+            IdempotencyKey = $"completed-stock-{checkoutId:N}",
+            TotalAmount = 100m,
+            DepositAmount = 30m,
+            AcceptedTermsVersion = LegalDocumentVersions.Terms,
+            AcknowledgedPrivacyVersion = LegalDocumentVersions.Privacy,
+            Tenants =
+            [
+                new CheckoutTenantPayload
+                {
+                    Sequence = 1,
+                    TenantId = tenantId,
+                    TenantName = "Rowerowa Przystań",
+                    StartDateUtc = startUtc,
+                    EndDateUtc = endUtc,
+                    RentalType = RentalTypeDto.Daily,
+                    TotalAmount = 100m,
+                    DepositAmount = 30m,
+                    RegulationsTextSnapshot = "Regulamin testowy",
+                    RegulationsHash = "hash-testowy",
+                    RegulationsVersion = "tenant-v1",
+                    RegulationsSource = "TenantCustom",
+                    Items =
+                    [
+                        new CheckoutRentalItemPayload
+                        {
+                            ProductId = productId,
+                            Quantity = 5,
+                            PricePerDay = 20m,
+                            Subtotal = 100m
+                        }
+                    ]
+                }
+            ]
+        };
+
+        await using (var db = new ApplicationDbContext(options))
+        {
+            db.Tenants.Add(new Tenant { Id = tenantId, Name = "Rowerowa Przystań" });
+            db.Customers.Add(new Customer
+            {
+                Id = customerId,
+                TenantId = tenantId,
+                FullName = "Jan Klient",
+                Email = "jan@example.test"
+            });
+            db.Products.Add(Product(productId, tenantId, "Czarny rower", 20m, null));
+            db.Rentals.Add(new Rental
+            {
+                Id = completedRentalId,
+                TenantId = tenantId,
+                CustomerId = customerId,
+                StartDateUtc = startUtc,
+                EndDateUtc = endUtc,
+                Status = RentalStatus.Completed,
+                ReturnedAtUtc = startUtc.AddHours(12),
+                ContractUrl = "contracts/historyczna-umowa.pdf",
+                CreatedAtUtc = startUtc.AddDays(-2)
+            });
+            db.RentalItems.Add(new RentalItem
+            {
+                Id = Guid.NewGuid(),
+                RentalId = completedRentalId,
+                ProductId = productId,
+                Quantity = 5,
+                PricePerDay = 20m,
+                Subtotal = 100m
+            });
+            db.CheckoutSessions.Add(new CheckoutSession
+            {
+                Id = checkoutId,
+                IdempotencyKey = payload.IdempotencyKey,
+                PayloadJson = JsonSerializer.Serialize(payload),
+                CreatedAtUtc = DateTime.UtcNow,
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(30),
+                AcceptedTermsVersion = LegalDocumentVersions.Terms,
+                AcknowledgedPrivacyVersion = LegalDocumentVersions.Privacy,
+                LegalAcceptedAtUtc = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var service = new CheckoutFinalizationService(
+            factory,
+            Mock.Of<IContractGenerator>(),
+            Mock.Of<IRentalConfirmationService>(),
+            Mock.Of<IPaymentGateway>(),
+            Options.Create(new StripeOptions()),
+            NullLogger<CheckoutFinalizationService>.Instance);
+
+        var result = await service.PersistRentalsAsync(
+            checkoutId,
+            "cs_test_completed_stock",
+            "pi_test_completed_stock",
+            3_000,
+            "pln",
+            CancellationToken.None);
+
+        result.Success.Should().BeTrue();
+        result.AlreadyExisted.Should().BeFalse();
+        result.RentalIds.Should().ContainSingle();
+
+        await using var verification = new ApplicationDbContext(options);
+        var historicalRental = await verification.Rentals
+            .Include(rental => rental.Items)
+            .SingleAsync(rental => rental.Id == completedRentalId);
+        historicalRental.Status.Should().Be(RentalStatus.Completed);
+        historicalRental.ContractUrl.Should().Be("contracts/historyczna-umowa.pdf");
+        historicalRental.Items.Should().ContainSingle(item => item.Quantity == 5);
+        (await verification.Rentals.CountAsync()).Should().Be(2);
+    }
+
+    [Fact]
     public async Task PersistRentalsAsync_CreatesOneOrderAndIndependentRentalPerTenant()
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

@@ -23,6 +23,7 @@ using Microsoft.AspNetCore.WebUtilities;
 using SportRental.Shared.Legal;
 using SportRental.Shared.Identity;
 using SportRental.Shared.Time;
+using SportRental.Shared.Branding;
 using SharedModels = SportRental.Shared.Models;
 
 namespace SportRental.Admin.Api
@@ -670,7 +671,9 @@ namespace SportRental.Admin.Api
                     {
                         Id = t.Id,
                         Name = t.Name,
-                        LogoUrl = t.LogoUrl
+                        LogoUrl = t.LogoUrl,
+                        t.PrimaryColorHex,
+                        t.SecondaryColorHex
                     })
                     .ToListAsync(ct);
 
@@ -693,6 +696,8 @@ namespace SportRental.Admin.Api
                     t.Id,
                     Name = companyInfos.TryGetValue(t.Id, out var ci) && !string.IsNullOrEmpty(ci.Name) ? ci.Name : t.Name,
                     t.LogoUrl,
+                    PrimaryColor = BrandColor.NormalizeHex(t.PrimaryColorHex),
+                    SecondaryColor = BrandColor.NormalizeHex(t.SecondaryColorHex),
                     ProductCount = productCounts.GetValueOrDefault(t.Id, 0),
                     City = companyInfos.TryGetValue(t.Id, out var ci2) ? ci2.City : null
                 }).ToList();
@@ -1070,9 +1075,8 @@ namespace SportRental.Admin.Api
                         // Ponowna walidacja dostępności w transakcji
                         var overlappingReservedQty = await db.RentalItems
                             .Where(ri => ri.ProductId == it.ProductId)
-                            .Join(db.Rentals, ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
+                            .Join(db.Rentals.WhereInventoryBlocking(), ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
                             .Where(x => x.r.TenantId == tid
-                                        && x.r.Status != RentalStatus.Cancelled
                                         && x.r.EndDateUtc > req.StartDateUtc
                                         && x.r.StartDateUtc < req.EndDateUtc)
                             .SumAsync(x => (int?)x.ri.Quantity) ?? 0;
@@ -1114,7 +1118,9 @@ namespace SportRental.Admin.Api
 
                     // Po commit: generowanie PDF i aktualizacja URL umowy (poza transakcją)
                     var customer = await db.Customers.FirstAsync(c => c.Id == rental.CustomerId);
-                    var companyInfo = await db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == rental.TenantId);
+                    var companyInfo = await db.CompanyInfos
+                        .Include(ci => ci.Tenant)
+                        .FirstOrDefaultAsync(ci => ci.TenantId == rental.TenantId);
                     var template = await db.ContractTemplates.FirstOrDefaultAsync(ct => ct.TenantId == rental.TenantId);
                     
                     byte[] pdf = template == null
@@ -1362,7 +1368,7 @@ namespace SportRental.Admin.Api
                 var file = form.Files.FirstOrDefault();
                 if (file == null || file.Length == 0) return Results.BadRequest("Brak pliku");
                 var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-                var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
+                var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp" };
                 if (!allowed.Contains(ext)) return Results.BadRequest("Nieobsługiwane rozszerzenie pliku");
                 var maxMb = config.GetValue<int?>("Storage:MaxUploadMB") ?? 5;
                 if (file.Length > maxMb * 1024L * 1024L) return Results.BadRequest($"Plik jest zbyt duży. Maks: {maxMb} MB");
@@ -1713,9 +1719,8 @@ namespace SportRental.Admin.Api
                 var overlappingReservedQty = await db.RentalItems
                     .IgnoreQueryFilters()
                     .Where(ri => ri.ProductId == req.ProductId)
-                    .Join(db.Rentals.IgnoreQueryFilters(), ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
+                    .Join(db.Rentals.IgnoreQueryFilters().WhereInventoryBlocking(), ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
                     .Where(x => x.r.TenantId == tid
-                                && x.r.Status != RentalStatus.Cancelled
                                 && x.r.EndDateUtc > req.StartDateUtc
                                 && x.r.StartDateUtc < req.EndDateUtc)
                     .SumAsync(x => (int?)x.ri.Quantity) ?? 0;
@@ -1801,9 +1806,8 @@ namespace SportRental.Admin.Api
                     return Results.Conflict(new { error = "Termin wynajmu już się rozpoczął. Wybierz nowy termin." });
                 var reservedQty = await db.RentalItems.IgnoreQueryFilters()
                     .Where(ri => ri.ProductId == hold.ProductId)
-                    .Join(db.Rentals.IgnoreQueryFilters(), ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
-                    .Where(x => x.r.Status != RentalStatus.Cancelled &&
-                                x.r.EndDateUtc > hold.StartDateUtc &&
+                    .Join(db.Rentals.IgnoreQueryFilters().WhereInventoryBlocking(), ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
+                    .Where(x => x.r.EndDateUtc > hold.StartDateUtc &&
                                 x.r.StartDateUtc < hold.EndDateUtc)
                     .SumAsync(x => (int?)x.ri.Quantity) ?? 0;
                 var otherHoldsQty = await db.ReservationHolds.IgnoreQueryFilters()

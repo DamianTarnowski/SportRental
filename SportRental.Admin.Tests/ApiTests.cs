@@ -121,6 +121,33 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task GetTenants_ReturnsNormalizedColorsAndNeverLeaksUnsafeCssValue()
+    {
+        var client = await CreateClientAsync(authenticated: false);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var tenant = await db.Tenants.SingleAsync(t => t.Id == TestTenantId);
+            tenant.PrimaryColorHex = "#123456;url(x)";
+            tenant.SecondaryColorHex = "#f96167";
+            await db.SaveChangesAsync();
+        }
+        await SeedQuoteProductAsync(TestTenantId, dailyPrice: 50m);
+
+        var response = await client.GetAsync("/api/tenants");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.DoesNotContain("url(x)", body, StringComparison.OrdinalIgnoreCase);
+        using var document = JsonDocument.Parse(body);
+        var tenants = document.RootElement;
+        var tenantRow = tenants.EnumerateArray()
+            .Single(row => ReadGuid(row, "id") == TestTenantId);
+        Assert.Equal(JsonValueKind.Null, ReadProperty(tenantRow, "primaryColor").ValueKind);
+        Assert.Equal("#F96167", ReadProperty(tenantRow, "secondaryColor").GetString());
+    }
+
+    [Fact]
     public async Task LegalInfo_IsPublicAndReturnsCurrentDocumentVersions()
     {
         var client = await CreateClientAsync(authenticated: false);
@@ -2016,6 +2043,134 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
     }
 
+    [Theory]
+    [InlineData(RentalStatus.Draft, HttpStatusCode.Conflict)]
+    [InlineData(RentalStatus.Pending, HttpStatusCode.Conflict)]
+    [InlineData(RentalStatus.Confirmed, HttpStatusCode.Conflict)]
+    [InlineData(RentalStatus.Active, HttpStatusCode.Conflict)]
+    [InlineData(RentalStatus.Completed, HttpStatusCode.Created)]
+    [InlineData(RentalStatus.Cancelled, HttpStatusCode.Created)]
+    public async Task Rentals_Post_OnlyOpenLifecycleStatusesReserveInventory(
+        RentalStatus existingStatus,
+        HttpStatusCode expectedStatusCode)
+    {
+        var client = await CreateClientAsync();
+        var startUtc = DateTime.UtcNow.Date.AddDays(1);
+        var endUtc = startUtc.AddDays(2);
+        var seeded = await SeedInventoryRentalAsync(
+            existingStatus,
+            startUtc,
+            endUtc,
+            availableQuantity: 20,
+            rentedQuantity: 5);
+
+        var response = await client.PostAsJsonAsync("/api/rentals", new
+        {
+            CustomerId = seeded.CustomerId,
+            StartDateUtc = startUtc,
+            EndDateUtc = endUtc,
+            Items = new[] { new { seeded.ProductId, Quantity = 20 } }
+        });
+
+        Assert.Equal(expectedStatusCode, response.StatusCode);
+        using var verificationScope = _factory.Services.CreateScope();
+        var db = verificationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        Assert.True(await db.Rentals.IgnoreQueryFilters().AnyAsync(rental => rental.Id == seeded.RentalId));
+        Assert.True(await db.RentalItems.IgnoreQueryFilters().AnyAsync(item => item.RentalId == seeded.RentalId));
+    }
+
+    [Fact]
+    public async Task Rentals_Post_PhysicallyReturnedRentalDoesNotReserveInventoryBeforeStatusSync()
+    {
+        var client = await CreateClientAsync();
+        var startUtc = DateTime.UtcNow.Date.AddDays(1);
+        var endUtc = startUtc.AddDays(2);
+        var seeded = await SeedInventoryRentalAsync(
+            RentalStatus.Active,
+            startUtc,
+            endUtc,
+            availableQuantity: 20,
+            rentedQuantity: 5,
+            returnedAtUtc: DateTime.UtcNow);
+
+        var response = await client.PostAsJsonAsync("/api/rentals", new
+        {
+            CustomerId = seeded.CustomerId,
+            StartDateUtc = startUtc,
+            EndDateUtc = endUtc,
+            Items = new[] { new { seeded.ProductId, Quantity = 20 } }
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Holds_CompletedRentalDoesNotReserveInventory()
+    {
+        var client = await CreateClientAsync(authenticated: false);
+        var startLocal = PolishRentalTime.TodayLocal.AddDays(7).Date.AddHours(10);
+        var startUtc = PolishRentalTime.ToUtc(startLocal);
+        var endUtc = PolishRentalTime.ToUtc(startLocal.AddDays(1));
+        var seeded = await SeedInventoryRentalAsync(
+            RentalStatus.Completed,
+            startUtc,
+            endUtc,
+            availableQuantity: 20,
+            rentedQuantity: 5);
+
+        var response = await client.PostAsJsonAsync("/api/holds", new CreateHoldRequest
+        {
+            ProductId = seeded.ProductId,
+            Quantity = 20,
+            StartDateUtc = startUtc,
+            EndDateUtc = endUtc,
+            SessionId = Guid.NewGuid().ToString("N")
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Holds_Refresh_CompletedRentalDoesNotReserveInventory()
+    {
+        var client = await CreateClientAsync(authenticated: false);
+        var startLocal = PolishRentalTime.TodayLocal.AddDays(7).Date.AddHours(10);
+        var startUtc = PolishRentalTime.ToUtc(startLocal);
+        var endUtc = PolishRentalTime.ToUtc(startLocal.AddDays(1));
+        var seeded = await SeedInventoryRentalAsync(
+            RentalStatus.Completed,
+            startUtc,
+            endUtc,
+            availableQuantity: 20,
+            rentedQuantity: 5);
+        var holdId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid().ToString("N");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            db.ReservationHolds.Add(new ReservationHold
+            {
+                Id = holdId,
+                TenantId = TestTenantId,
+                ProductId = seeded.ProductId,
+                Quantity = 20,
+                StartDateUtc = startUtc,
+                EndDateUtc = endUtc,
+                CreatedAtUtc = DateTime.UtcNow,
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(10),
+                SessionId = sessionId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await client.PostAsync(
+            $"/api/holds/{holdId:D}/refresh?sessionId={sessionId}&ttlMinutes=10",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
     [Fact]
     public async Task Rentals_Post_BadRequest_OnInvalidDatesAndDuplicates()
     {
@@ -2310,6 +2465,61 @@ public sealed class ApiTests : IClassFixture<WebApplicationFactory<Program>>
         });
         await db.SaveChangesAsync();
         return productId;
+    }
+
+    private async Task<(Guid RentalId, Guid ProductId, Guid CustomerId)> SeedInventoryRentalAsync(
+        RentalStatus status,
+        DateTime startDateUtc,
+        DateTime endDateUtc,
+        int availableQuantity,
+        int rentedQuantity,
+        DateTime? returnedAtUtc = null)
+    {
+        var rentalId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Products.Add(new Product
+        {
+            Id = productId,
+            TenantId = TestTenantId,
+            Name = "Rower magazynowy",
+            Sku = $"STOCK-{productId:N}",
+            DailyPrice = 50m,
+            AvailableQuantity = availableQuantity,
+            Available = true,
+            IsActive = true,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        db.Customers.Add(new Customer
+        {
+            Id = customerId,
+            TenantId = TestTenantId,
+            FullName = "Klient magazynu"
+        });
+        db.Rentals.Add(new Rental
+        {
+            Id = rentalId,
+            TenantId = TestTenantId,
+            CustomerId = customerId,
+            StartDateUtc = startDateUtc,
+            EndDateUtc = endDateUtc,
+            Status = status,
+            ReturnedAtUtc = returnedAtUtc,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+        db.RentalItems.Add(new RentalItem
+        {
+            Id = Guid.NewGuid(),
+            RentalId = rentalId,
+            ProductId = productId,
+            Quantity = rentedQuantity,
+            PricePerDay = 50m,
+            Subtotal = rentedQuantity * 50m
+        });
+        await db.SaveChangesAsync();
+        return (rentalId, productId, customerId);
     }
 
     private async Task<Guid> SeedTenantAsync(string name, bool isDemo = false)

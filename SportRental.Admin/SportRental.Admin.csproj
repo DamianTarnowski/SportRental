@@ -48,6 +48,16 @@
 
   <ItemGroup>
     <Compile Remove="Build/StripClientEndpoints.cs" />
+    <!-- Deterministyczne, statyczne odmiany fontu umów. Nie używamy tu
+         variable TTF: QuestPDF 2025.7.2 błędnie mapuje jego wagi na Thin. -->
+    <EmbeddedResource Include="Assets\Fonts\Outfit-Regular.ttf"
+                      LogicalName="SportRental.Assets.Outfit-Regular.ttf" />
+    <EmbeddedResource Include="Assets\Fonts\Outfit-SemiBold.ttf"
+                      LogicalName="SportRental.Assets.Outfit-SemiBold.ttf" />
+    <EmbeddedResource Include="Assets\Fonts\Outfit-Bold.ttf"
+                      LogicalName="SportRental.Assets.Outfit-Bold.ttf" />
+    <EmbeddedResource Include="Assets\Fonts\OFL.txt"
+                      LogicalName="SportRental.Assets.Outfit-OFL.txt" />
   </ItemGroup>
 
   <ItemGroup>

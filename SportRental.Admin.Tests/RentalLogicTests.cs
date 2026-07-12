@@ -59,9 +59,8 @@ public sealed class RentalLogicTests
         var reqEnd = reqStart.AddDays(2);
         var overlappingReservedQty = await db.RentalItems
             .Where(ri => ri.ProductId == productId)
-            .Join(db.Rentals, ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
+            .Join(db.Rentals.WhereInventoryBlocking(), ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
             .Where(x => x.r.TenantId == tenantId
-                        && x.r.Status != RentalStatus.Cancelled
                         && x.r.EndDateUtc > reqStart
                         && x.r.StartDateUtc < reqEnd)
             .SumAsync(x => (int?)x.ri.Quantity) ?? 0;

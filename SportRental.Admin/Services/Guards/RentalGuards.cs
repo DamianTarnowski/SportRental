@@ -82,49 +82,61 @@ public static class RentalGuards
         (rental.DepositPaidAtUtc.HasValue ||
          string.Equals(rental.PaymentStatus?.Trim(), "DepositPaid", StringComparison.OrdinalIgnoreCase));
 
-    /// Sprawdza overlap dla pary (productId, [start,end]) wśród aktywnych wynajmów tego tenantu.
-    /// Zwraca null gdy nie ma kolizji, lub powód z numerem konfliktowego wynajmu.
+    /// Sprawdza ilościową dostępność produktu w zadanym terminie.
+    /// Zwraca null, gdy żądana ilość mieści się w stanie po odjęciu rezerwacji,
+    /// albo czytelny powód blokady. Przy edycji można wykluczyć bieżący wynajem.
     public static async Task<string?> GetReservationConflictAsync(
         ApplicationDbContext db,
         Guid tenantId,
         Guid productId,
+        int requestedQuantity,
         DateTime startUtc,
         DateTime endUtc,
         Guid? excludeRentalId = null,
         CancellationToken ct = default)
     {
         if (endUtc <= startUtc) return "Data końca musi być po dacie początku.";
+        if (requestedQuantity <= 0) return "Ilość sprzętu musi być większa od zera.";
 
-        // Aktywne wynajmy = wszystko poza Cancelled/Completed.
-        // UWAGA: NIE używamy `new[]{...}.Contains(x)` — w .NET 9/10 rezolwuje to do
-        // `MemoryExtensions.Contains(ReadOnlySpan<T>, T)`, a EF interpreter próbuje
-        // skompilować ReadOnlySpan<T> jako generic argument (ref struct) → runtime
-        // TypeLoadException. Rzutujemy więc na konkretne sprawdzenie OR per status.
-        var excludeId = excludeRentalId ?? Guid.Empty;
-
-        var query = db.Rentals
+        var product = await db.Products
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(r => r.TenantId == tenantId
-                && (r.Status == RentalStatus.Draft
-                    || r.Status == RentalStatus.Pending
-                    || r.Status == RentalStatus.Confirmed
-                    || r.Status == RentalStatus.Active)
-                && r.Items.Any(i => i.ProductId == productId)
-                && r.StartDateUtc < endUtc
-                && r.EndDateUtc > startUtc);
+            .Where(candidate => candidate.Id == productId && candidate.TenantId == tenantId)
+            .Select(candidate => new { candidate.Name, candidate.AvailableQuantity })
+            .SingleOrDefaultAsync(ct);
+
+        if (product is null)
+            return "Produkt nie istnieje albo nie należy do tej wypożyczalni.";
+
+        var excludeId = excludeRentalId ?? Guid.Empty;
+
+        var blockingRentals = db.Rentals
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .WhereInventoryBlocking()
+            .Where(rental => rental.TenantId == tenantId
+                && rental.StartDateUtc < endUtc
+                && rental.EndDateUtc > startUtc);
 
         if (excludeId != Guid.Empty)
-            query = query.Where(r => r.Id != excludeId);
+            blockingRentals = blockingRentals.Where(rental => rental.Id != excludeId);
 
-        var conflicting = await query
-            .Select(r => new { r.Id, r.StartDateUtc, r.EndDateUtc })
-            .FirstOrDefaultAsync(ct);
+        var reservedQuantity = await db.RentalItems
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(item => item.ProductId == productId)
+            .Join(
+                blockingRentals,
+                item => item.RentalId,
+                rental => rental.Id,
+                (item, rental) => item.Quantity)
+            .SumAsync(quantity => (int?)quantity, ct) ?? 0;
 
-        if (conflicting == null) return null;
+        var availableQuantity = Math.Max(0, product.AvailableQuantity - reservedQuantity);
+        if (requestedQuantity <= availableQuantity)
+            return null;
 
-        var shortId = conflicting.Id.ToString()[..8].ToUpper();
-        return $"Egzemplarz jest zarezerwowany przez wynajem #{shortId} " +
-               $"({conflicting.StartDateUtc.ToLocalTime():dd.MM HH:mm} – {conflicting.EndDateUtc.ToLocalTime():dd.MM HH:mm}).";
+        return $"Brak wystarczającej liczby sztuk produktu „{product.Name}”. " +
+               $"Dostępne: {availableQuantity}, wybrano: {requestedQuantity}.";
     }
 }

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Owner,SuperAdmin")]
 @using SportRental.Shared.Legal
+@using SportRental.Shared.Branding
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
 @inject SportRental.Admin.Services.Cache.IAppCache AppCache
@@ -10,6 +11,7 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject UserManager<ApplicationUser> UserManager
 @inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
+@inject ILogger<CompanySettings> Logger
 
 <PageTitle>Ustawienia firmy — RentSpot</PageTitle>
 
@@ -51,10 +53,15 @@
                     
                     <MudExpansionPanel Text="Personalizacja" Style="border-radius: 10px;">
                         <MudStack Spacing="2">
-                            <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny" Dense="true" Variant="Variant.Outlined" />
-                            <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy" Dense="true" Variant="Variant.Outlined" />
-                            <MudText Typo="Typo.caption">Logo firmy</MudText>
-                            <InputFile OnChange="OnLogoSelected" accept="image/*" aria-label="Logo firmy" />
+                            <MudAlert Severity="Severity.Info" Dense="true">
+                                Logo i kolory są używane na wizytówce wypożyczalni w aplikacji klienta,
+                                w umowach PDF i e-mailach potwierdzających rezerwację.
+                                SMS pozostaje wiadomością tekstową i korzysta z osobnych szablonów.
+                            </MudAlert>
+                            <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny (#RRGGBB)" HelperText="Np. #2F3C7E" Dense="true" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy (#RRGGBB)" HelperText="Np. #F96167" Dense="true" Variant="Variant.Outlined" />
+                            <MudText Typo="Typo.caption">Logo firmy (PNG/JPG/WebP)</MudText>
+                            <InputFile OnChange="OnLogoSelected" accept="image/png,image/jpeg,image/webp" aria-label="Logo firmy" />
                             @if (!string.IsNullOrWhiteSpace(tenant.LogoUrl))
                             {
                                 <img src="@tenant.LogoUrl" alt="Logo" style="max-height: 60px; max-width: 150px;" />
@@ -193,10 +200,15 @@ else
                     <MudPaper Class="pa-4" Elevation="3" Style="border-radius: 16px;">
                         <MudText Typo="Typo.h6" HtmlTag="h2" Class="mb-3">Personalizacja</MudText>
                         <MudStack Spacing="3">
-                            <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny (#RRGGBB)" Variant="Variant.Outlined" />
-                            <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy (#RRGGBB)" Variant="Variant.Outlined" />
-                            <MudText Typo="Typo.caption">Logo firmy (PNG/SVG)</MudText>
-                            <InputFile OnChange="OnLogoSelected" accept="image/*" aria-label="Logo firmy" />
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                                Logo oraz kolory pojawią się na wizytówce wypożyczalni w aplikacji klienta,
+                                w umowach PDF i e-mailach potwierdzających rezerwację.
+                                SMS nie obsługuje grafiki ani kolorów — jego treść ustawisz w sekcji „Ustawienia SMS”.
+                            </MudAlert>
+                            <MudTextField @bind-Value="tenant.PrimaryColorHex" Label="Kolor główny (#RRGGBB)" HelperText="Np. #2F3C7E" Variant="Variant.Outlined" />
+                            <MudTextField @bind-Value="tenant.SecondaryColorHex" Label="Kolor dodatkowy (#RRGGBB)" HelperText="Np. #F96167" Variant="Variant.Outlined" />
+                            <MudText Typo="Typo.caption">Logo firmy (PNG/JPG/WebP)</MudText>
+                            <InputFile OnChange="OnLogoSelected" accept="image/png,image/jpeg,image/webp" aria-label="Logo firmy" />
                             @if (!string.IsNullOrWhiteSpace(tenant.LogoUrl))
                             {
                                 <div>
@@ -595,6 +607,29 @@ else
     {
         if (tenant == null) return;
 
+        var normalizedPrimary = BrandColor.NormalizeHex(tenant.PrimaryColorHex);
+        if (!string.IsNullOrWhiteSpace(tenant.PrimaryColorHex) && normalizedPrimary is null)
+        {
+            Snackbar.Add("Kolor główny musi mieć format #RRGGBB, np. #2F3C7E.", Severity.Warning);
+            return;
+        }
+
+        var normalizedSecondary = BrandColor.NormalizeHex(tenant.SecondaryColorHex);
+        if (!string.IsNullOrWhiteSpace(tenant.SecondaryColorHex) && normalizedSecondary is null)
+        {
+            Snackbar.Add("Kolor dodatkowy musi mieć format #RRGGBB, np. #F96167.", Severity.Warning);
+            return;
+        }
+
+        tenant.PrimaryColorHex = normalizedPrimary;
+        tenant.SecondaryColorHex = normalizedSecondary;
+
+        if (selectedLogoFile is not null && GetLogoValidationError(selectedLogoFile) is { } logoError)
+        {
+            Snackbar.Add(logoError, Severity.Error);
+            return;
+        }
+
         // NXRE QA #7: blokada zapisu bez Miasto/Województwo
         if (companyInfo != null)
         {
@@ -623,27 +658,17 @@ else
                 try
                 {
                     var ext = Path.GetExtension(selectedLogoFile.Name).ToLowerInvariant();
-                    var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
-                    if (!allowed.Contains(ext))
-                    {
-                        Snackbar.Add("Nieobsługiwane rozszerzenie pliku", Severity.Error);
-                    }
-                    else if (selectedLogoFile.Size > 5 * 1024 * 1024)
-                    {
-                        Snackbar.Add("Plik jest zbyt duży. Maks: 5 MB", Severity.Error);
-                    }
-                    else
-                    {
-                        var rel = $"images/tenants/{_tenantId}/{_tenantId}{ext}";
-                        await using var stream = selectedLogoFile.OpenReadStream(5 * 1024 * 1024);
-                        var url = await FileStorage.SaveAsync(rel, stream);
-                        tenant.LogoUrl = url;
-                        Snackbar.Add("Logo zapisane!", Severity.Success);
-                    }
+                    var rel = $"images/tenants/{_tenantId}/{_tenantId}{ext}";
+                    await using var stream = selectedLogoFile.OpenReadStream(MaxLogoBytes);
+                    var url = await FileStorage.SaveAsync(rel, stream);
+                    tenant.LogoUrl = url;
+                    Snackbar.Add("Logo zapisane!", Severity.Success);
                 }
                 catch (Exception ex)
                 {
-                    Snackbar.Add($"Błąd zapisu logo: {ex.Message}", Severity.Error);
+                    Logger.LogError(ex, "Nie udało się zapisać logo tenanta {TenantId}", _tenantId);
+                    Snackbar.Add("Nie udało się zapisać logo. Sprawdź plik i spróbuj ponownie.", Severity.Error);
+                    return;
                 }
             }
             
@@ -727,6 +752,7 @@ else
 
             // Cache invalidation — tenant.Name + CompanyInfo mogły się zmienić, kolejne strony muszą odświeżyć.
             AppCache.InvalidateTenant(_tenantId);
+            selectedLogoFile = null;
 
             Snackbar.Add("Ustawienia zostały zapisane", Severity.Success);
         }
@@ -738,6 +764,23 @@ else
         {
             isSaving = false;
         }
+    }
+
+    private const long MaxLogoBytes = 5 * 1024 * 1024;
+
+    private static string? GetLogoValidationError(IBrowserFile file)
+    {
+        if (file.Size <= 0)
+            return "Wybrany plik logo jest pusty.";
+
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp"))
+            return "Logo musi być plikiem PNG, JPG lub WebP.";
+
+        if (file.Size > MaxLogoBytes)
+            return "Logo jest za duże. Maksymalny rozmiar to 5 MB.";
+
+        return null;
     }
 
     private class CompanyInfoDto

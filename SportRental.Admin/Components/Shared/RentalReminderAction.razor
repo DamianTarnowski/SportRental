@@ -1,0 +1,31 @@
+<MudTooltip Text="@Tooltip">
+    <MudIconButton Icon="@Icons.Material.Filled.NotificationsActive"
+                   Color="@(WasSent ? Color.Success : Color.Warning)"
+                   Variant="@(WasSent ? Variant.Filled : Variant.Outlined)"
+                   Class="@ButtonClass"
+                   Style="@ButtonStyle"
+                   OnClick="OnClick"
+                   aria-label="@Tooltip"
+                   data-testid="return-reminder-action"
+                   Size="Size.Medium" />
+</MudTooltip>
+
+@code {
+    private const string SentButtonStyle =
+        "background-color: #1B5E20 !important; color: #FFFFFF !important; border-color: #1B5E20 !important;";
+
+    [Parameter]
+    public bool WasSent { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Tooltip { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    private string ButtonClass => WasSent
+        ? "rs-return-reminder-action rs-return-reminder-action-sent"
+        : "rs-return-reminder-action";
+
+    private string? ButtonStyle => WasSent ? SentButtonStyle : null;
+}

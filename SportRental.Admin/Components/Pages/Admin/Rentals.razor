@@ -586,14 +586,10 @@ else
                                                Wcześniej pokazywało się dla Confirmed (przed wydaniem) — błąd logiki. *@
                                             @if (CanSendReturnReminder(rental))
                                             {
-                                                <MudTooltip Text="@ReturnReminderTooltip(rental)">
-                                                    <MudIconButton Icon="@Icons.Material.Filled.NotificationsActive"
-                                                                   Color="@(rental.ReminderSmsSentAtUtc.HasValue ? Color.Success : Color.Warning)"
-                                                                   Variant="@(rental.ReminderSmsSentAtUtc.HasValue ? Variant.Filled : Variant.Outlined)"
-                                                                   OnClick="() => SendReminderSms(rental)"
-                                                                   aria-label="@ReturnReminderTooltip(rental)"
-                                                                   Size="Size.Medium" />
-                                                </MudTooltip>
+                                                <SportRental.Admin.Components.Shared.RentalReminderAction
+                                                    WasSent="@rental.ReminderSmsSentAtUtc.HasValue"
+                                                    Tooltip="@ReturnReminderTooltip(rental)"
+                                                    OnClick="@(_ => SendReminderSms(rental))" />
                                             }
                                         </div>
                                         @if (IsOverdue(rental))
@@ -795,7 +791,10 @@ else
             </MudPaper>
 
             @* SEKCJA: DODAWANIE PRODUKTÓW *@
-            <MudPaper Elevation="0" Class="pa-4" Style="border-radius: 16px; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);">
+            <MudPaper Elevation="0"
+                      Class="pa-4 rs-rental-equipment-picker"
+                      Style="border-radius: 16px; background: var(--rs-equipment-panel-bg) !important; border: 1px solid var(--rs-equipment-panel-border) !important; color: var(--rs-equipment-panel-fg) !important;"
+                      data-testid="rental-equipment-picker">
                 <MudStack Spacing="3">
                     <MudStack Row="true" Class="mud-align-center mud-justify-space-between">
                         <MudStack Row="true" Class="mud-align-center" Spacing="2">
@@ -1173,6 +1172,52 @@ else
         background: rgba(255,255,255,0.06) !important;
     }
 
+    /* Panel wyboru sprzętu ma własną powierzchnię. W dark mode nie może zachować
+       jasnego, pastelowego tła, bo MudBlazor przełącza wtedy tekst na jasny. */
+    .rs-rental-equipment-picker {
+        --rs-equipment-panel-bg: linear-gradient(135deg, #F2FBF3 0%, #D9F0DD 100%);
+        --rs-equipment-panel-border: #8FBE99;
+        --rs-equipment-panel-fg: #17351F;
+    }
+
+    [data-theme="dark"] .rs-rental-equipment-picker,
+    .mud-theme-dark .rs-rental-equipment-picker {
+        --rs-equipment-panel-bg: linear-gradient(135deg, #10261A 0%, #183424 100%);
+        --rs-equipment-panel-border: #8DB99A;
+        --rs-equipment-panel-fg: #F4FFF6;
+    }
+
+    [data-theme="dark"] .rs-rental-equipment-picker .mud-typography,
+    .mud-theme-dark .rs-rental-equipment-picker .mud-typography,
+    [data-theme="dark"] .rs-rental-equipment-picker .mud-input-label,
+    .mud-theme-dark .rs-rental-equipment-picker .mud-input-label,
+    [data-theme="dark"] .rs-rental-equipment-picker .mud-input-root,
+    .mud-theme-dark .rs-rental-equipment-picker .mud-input-root,
+    [data-theme="dark"] .rs-rental-equipment-picker .mud-input-adornment,
+    .mud-theme-dark .rs-rental-equipment-picker .mud-input-adornment,
+    [data-theme="dark"] .rs-rental-equipment-picker .mud-input-helper-text,
+    .mud-theme-dark .rs-rental-equipment-picker .mud-input-helper-text {
+        color: var(--rs-equipment-panel-fg) !important;
+    }
+
+    [data-theme="dark"] .rs-rental-equipment-picker .mud-input-outlined-border,
+    .mud-theme-dark .rs-rental-equipment-picker .mud-input-outlined-border {
+        border-color: #8DB99A !important;
+    }
+
+    [data-theme="dark"] .rs-rental-equipment-picker .mud-input:hover .mud-input-outlined-border,
+    .mud-theme-dark .rs-rental-equipment-picker .mud-input:hover .mud-input-outlined-border,
+    [data-theme="dark"] .rs-rental-equipment-picker .mud-input.mud-focused .mud-input-outlined-border,
+    .mud-theme-dark .rs-rental-equipment-picker .mud-input.mud-focused .mud-input-outlined-border {
+        border-color: #C0E3C8 !important;
+    }
+
+    [data-theme="dark"] .rs-rental-equipment-picker input::placeholder,
+    .mud-theme-dark .rs-rental-equipment-picker input::placeholder {
+        color: #C0D4C4 !important;
+        opacity: 1;
+    }
+
     /* Bug fix: MudDatePicker popup nie powinien wystawać poza dialog */
     .mud-picker-popover-paper {
         max-width: 320px !important;
@@ -1417,6 +1462,17 @@ else
         var product = products.FirstOrDefault(p => string.Equals(p.Sku, skuInput, StringComparison.OrdinalIgnoreCase));
         if (product == null) return;
         var qty = Math.Max(1, skuQty);
+        var available = GetAvail(product.Id);
+        if (available <= 0)
+        {
+            Snackbar.Add($"Produkt „{product.Name}” nie ma wolnych sztuk w wybranym terminie.", Severity.Warning);
+            return;
+        }
+        if (qty > available)
+        {
+            Snackbar.Add($"Dostępnych jest {available} szt. Dodano maksymalną dostępną ilość.", Severity.Warning);
+            qty = available;
+        }
         var days = Math.Max(1, (int)Math.Ceiling(((endDate ?? DateTime.Today.AddDays(1)) - (startDate ?? DateTime.Today)).TotalDays));
         var subtotal = product.DailyPrice * qty * days;
         editItems.Add(new RentalItem
@@ -1516,6 +1572,13 @@ else
         
         if (product != null)
         {
+            var available = GetAvail(product.Id);
+            if (available <= 0)
+            {
+                Snackbar.Add($"Produkt „{product.Name}” nie ma wolnych sztuk w wybranym terminie.", Severity.Warning);
+                return;
+            }
+
             var existingItem = editItems.FirstOrDefault(i => i.ProductId == product.Id);
             if (existingItem != null)
             {
@@ -1661,10 +1724,13 @@ else
             sUtc = DateTime.SpecifyKind(sUtc, DateTimeKind.Local).ToUniversalTime();
             eUtc = DateTime.SpecifyKind(eUtc, DateTimeKind.Local).ToUniversalTime();
 
+            var blockingRentals = Db.Rentals.WhereInventoryBlocking();
+            if (editModel.Id != Guid.Empty)
+                blockingRentals = blockingRentals.Where(rental => rental.Id != editModel.Id);
+
             var query = await Db.RentalItems
-                .Join(Db.Rentals, ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
-                .Where(x => x.r.Status != RentalStatus.Cancelled
-                            && x.r.EndDateUtc > sUtc
+                .Join(blockingRentals, ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
+                .Where(x => x.r.EndDateUtc > sUtc
                             && x.r.StartDateUtc < eUtc)
                 .GroupBy(x => x.ri.ProductId)
                 .Select(g => new { ProductId = g.Key, Qty = g.Sum(x => x.ri.Quantity) })
@@ -1711,12 +1777,22 @@ else
 
             // Blokady (Maciej): nie zarezerwujesz egzemplarza, który jest zajęty.
             // Sprawdzaj overlap dla każdego produktu w nowym/edytowanym wynajmie.
-            foreach (var item in editItems)
+            var requestedProducts = editItems
+                .GroupBy(item => item.ProductId)
+                .Select(group => new
+                {
+                    ProductId = group.Key,
+                    Quantity = group.Sum(item => item.Quantity)
+                })
+                .ToList();
+
+            foreach (var item in requestedProducts)
             {
                 var conflict = await RentalGuards.GetReservationConflictAsync(
                     Db,
                     CurrentTenantId(),
                     item.ProductId,
+                    item.Quantity,
                     editModel.StartDateUtc,
                     editModel.EndDateUtc,
                     editModel.Id == Guid.Empty ? null : editModel.Id);
@@ -1788,7 +1864,9 @@ else
             var customer = await Db.Customers.FindAsync(rentalToSave.CustomerId);
             var productIds = editItems.Select(i => i.ProductId).ToList();
             var productsForContract = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
-            var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+            var companyInfo = await Db.CompanyInfos
+                .Include(ci => ci.Tenant)
+                .FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             var contractTemplate = await Db.ContractTemplates.AsNoTracking()
                 .FirstOrDefaultAsync(t => t.TenantId == CurrentTenantId());
             
@@ -2249,7 +2327,9 @@ else
             var customer = await Db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == rental.CustomerId);
             var productIds = items.Select(i => i.ProductId).ToList();
             var products = await Db.Products.AsNoTracking().Where(p => productIds.Contains(p.Id)).ToListAsync();
-            var companyInfo = await Db.CompanyInfos.AsNoTracking().FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+            var companyInfo = await Db.CompanyInfos.AsNoTracking()
+                .Include(ci => ci.Tenant)
+                .FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             var contractTemplate = await Db.ContractTemplates.AsNoTracking()
                 .FirstOrDefaultAsync(t => t.TenantId == CurrentTenantId());
 
@@ -2295,7 +2375,9 @@ else
             var customer = await Db.Customers.FindAsync(rental.CustomerId);
             var productIds = items.Select(i => i.ProductId).ToList();
             var products = await Db.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
-            var companyInfo = await Db.CompanyInfos.FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
+            var companyInfo = await Db.CompanyInfos
+                .Include(ci => ci.Tenant)
+                .FirstOrDefaultAsync(ci => ci.TenantId == CurrentTenantId());
             var contractTemplate = await Db.ContractTemplates.AsNoTracking()
                 .FirstOrDefaultAsync(t => t.TenantId == CurrentTenantId());
             

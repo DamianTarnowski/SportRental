@@ -364,9 +364,8 @@ public sealed class CheckoutFinalizationService
 
                 var reservedQty = await db.RentalItems.IgnoreQueryFilters()
                     .Where(ri => ri.ProductId == item.ProductId)
-                    .Join(db.Rentals.IgnoreQueryFilters(), ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
-                    .Where(x => x.r.Status != RentalStatus.Cancelled &&
-                                x.r.IdempotencyKey != payload.IdempotencyKey &&
+                    .Join(db.Rentals.IgnoreQueryFilters().WhereInventoryBlocking(), ri => ri.RentalId, r => r.Id, (ri, r) => new { ri, r })
+                    .Where(x => x.r.IdempotencyKey != payload.IdempotencyKey &&
                                 x.r.EndDateUtc > groupStartDateUtc &&
                                 x.r.StartDateUtc < groupEndDateUtc)
                     .SumAsync(x => (int?)x.ri.Quantity, ct) ?? 0;
@@ -467,6 +466,7 @@ public sealed class CheckoutFinalizationService
             .Where(p => productIds.Contains(p.Id))
             .ToListAsync(ct);
         var companyInfo = await db.CompanyInfos.IgnoreQueryFilters()
+            .Include(ci => ci.Tenant)
             .FirstOrDefaultAsync(ci => ci.TenantId == rental.TenantId, ct);
         var contractTemplate = await db.ContractTemplates.IgnoreQueryFilters()
             .FirstOrDefaultAsync(t => t.TenantId == rental.TenantId, ct);

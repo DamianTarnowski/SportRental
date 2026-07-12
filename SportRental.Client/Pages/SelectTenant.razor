@@ -1,5 +1,6 @@
 @page "/select-tenant"
 @using SportRental.Client.Services
+@using SportRental.Shared.Branding
 @inject TenantService TenantService
 @inject NavigationManager Navigation
 
@@ -110,10 +111,10 @@
 
     private string GetTenantGradient(TenantInfo tenant)
     {
-        if (!string.IsNullOrEmpty(tenant.PrimaryColor) && !string.IsNullOrEmpty(tenant.SecondaryColor))
-        {
-            return $"background: linear-gradient(135deg, {tenant.PrimaryColor} 0%, {tenant.SecondaryColor} 100%);";
-        }
-        return "background: linear-gradient(135deg, #1B2350 0%, #2F3C7E 100%);";
+        // Obrona w głąb: nawet historyczna, błędna wartość z API nie może zostać
+        // wstrzyknięta jako surowy fragment atrybutu style.
+        var primary = BrandColor.NormalizeOrDefault(tenant.PrimaryColor, BrandColor.DefaultPrimary);
+        var secondary = BrandColor.NormalizeOrDefault(tenant.SecondaryColor, BrandColor.DefaultSecondary);
+        return $"background: linear-gradient(135deg, {primary} 0%, {secondary} 100%);";
     }
 }

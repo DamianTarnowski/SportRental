@@ -1,7 +1,10 @@
 @page "/admin/owner"
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@using SportRental.Shared.Branding
 @inject SportRental.Admin.Services.Storage.IFileStorage FileStorage
+@inject ISnackbar Snackbar
+@inject ILogger<Owner> Logger
 
 <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="mt-4">
     <MudPaper Class="rs-page-banner pa-6 mb-4" Elevation="0">
@@ -45,10 +48,10 @@
                     <MudStack Spacing="3">
                         <div Class="d-flex align-center">
                             <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" Class="mr-3" />
-                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Szablon umowy</MudText>
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Postanowienia umowy</MudText>
                         </div>
                         <MudText Typo="Typo.body1" Style="opacity: 0.9;">
-                            Dostosuj szablon umów wypożyczenia do potrzeb swojej firmy
+                            Dostosuj warunki umowy; układ PDF jest tworzony automatycznie
                         </MudText>
                         <MudButton Href="/admin/contract-template" 
                                    Variant="Variant.Filled" 
@@ -56,7 +59,7 @@
                                    StartIcon="@Icons.Material.Filled.Article"
                                    FullWidth="true"
                                    Class="rounded-pill">
-                            Edytuj szablon
+                            Edytuj warunki
                         </MudButton>
                     </MudStack>
                 </MudCardContent>
@@ -72,7 +75,7 @@
                             <MudText Typo="Typo.h6" Style="font-weight: 600;">Branding</MudText>
                         </div>
                         <MudText Typo="Typo.body1" Style="opacity: 0.9;">
-                            Ustaw kolory i logo swojej wypożyczalni
+                            Ustaw wygląd wizytówki klienta, umów PDF i e-maili potwierdzających
                         </MudText>
                         <MudButton Variant="Variant.Filled" 
                                    Color="Color.Surface"
@@ -164,10 +167,15 @@
         <DialogContent>
             <MudStack Spacing="2">
                 <MudText Typo="Typo.h6">Branding</MudText>
-                <MudTextField @bind-Value="primaryHex" Label="Primary color (#RRGGBB)" />
-                <MudTextField @bind-Value="secondaryHex" Label="Secondary color (#RRGGBB)" />
-                <MudText Typo="Typo.caption">Logo (PNG/SVG)</MudText>
-                <InputFile OnChange="OnLogoSelected" accept="image/*" />
+                <MudAlert Severity="Severity.Info" Dense="true">
+                    Kolory i logo są używane na wizytówce wypożyczalni w aplikacji klienta,
+                    w umowach PDF oraz e-mailach potwierdzających rezerwację.
+                    Wiadomości SMS są tekstowe i mają osobne szablony.
+                </MudAlert>
+                <MudTextField @bind-Value="primaryHex" Label="Kolor główny (#RRGGBB)" HelperText="Np. #2F3C7E" />
+                <MudTextField @bind-Value="secondaryHex" Label="Kolor dodatkowy (#RRGGBB)" HelperText="Np. #F96167" />
+                <MudText Typo="Typo.caption">Logo firmy (PNG/JPG/WebP)</MudText>
+                <InputFile OnChange="OnLogoSelected" accept="image/png,image/jpeg,image/webp" aria-label="Logo firmy" />
             </MudStack>
         </DialogContent>
         <DialogActions>
@@ -180,7 +188,7 @@
     {
         <MudPaper Class="p-3 mt-3">
             <MudText Typo="Typo.subtitle2">Podgląd</MudText>
-            <img src="@currentLogo" style="height:48px" />
+            <img src="@currentLogo" alt="Logo wypożyczalni" style="height:48px" />
         </MudPaper>
     }
 </MudContainer>
@@ -214,30 +222,87 @@
     {
         var tenantId = TenantProvider.GetCurrentTenantId() ?? Guid.Empty;
         var t = await Db.Tenants.FirstOrDefaultAsync(x => x.Id == tenantId);
-        if (t == null) return;
-        t.PrimaryColorHex = primaryHex;
-        t.SecondaryColorHex = secondaryHex;
+        if (t == null)
+        {
+            Snackbar.Add("Nie znaleziono wypożyczalni do zapisania brandingu.", Severity.Error);
+            return;
+        }
+
+        var normalizedPrimary = BrandColor.NormalizeHex(primaryHex);
+        if (!string.IsNullOrWhiteSpace(primaryHex) && normalizedPrimary is null)
+        {
+            Snackbar.Add("Kolor główny musi mieć format #RRGGBB, np. #2F3C7E.", Severity.Warning);
+            return;
+        }
+
+        var normalizedSecondary = BrandColor.NormalizeHex(secondaryHex);
+        if (!string.IsNullOrWhiteSpace(secondaryHex) && normalizedSecondary is null)
+        {
+            Snackbar.Add("Kolor dodatkowy musi mieć format #RRGGBB, np. #F96167.", Severity.Warning);
+            return;
+        }
+
+        if (_logoFile is not null && GetLogoValidationError(_logoFile) is { } logoError)
+        {
+            Snackbar.Add(logoError, Severity.Error);
+            return;
+        }
+
+        var logoUrl = t.LogoUrl;
         if (_logoFile is not null)
         {
             try
             {
                 var ext = Path.GetExtension(_logoFile.Name).ToLowerInvariant();
-                var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".svg" };
-                if (allowed.Contains(ext) && _logoFile.Size <= 5 * 1024 * 1024)
-                {
-                    var rel = $"images/tenants/{tenantId}/{tenantId}{ext}";
-                    await using var stream = _logoFile.OpenReadStream(5 * 1024 * 1024);
-                    var url = await FileStorage.SaveAsync(rel, stream);
-                    t.LogoUrl = url;
-                }
+                var rel = $"images/tenants/{tenantId}/{tenantId}{ext}";
+                await using var stream = _logoFile.OpenReadStream(MaxLogoBytes);
+                logoUrl = await FileStorage.SaveAsync(rel, stream);
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Nie udało się zapisać logo tenanta {TenantId}", tenantId);
+                Snackbar.Add("Nie udało się zapisać logo. Sprawdź plik i spróbuj ponownie.", Severity.Error);
+                return;
+            }
         }
-        Db.Tenants.Update(t);
-        await Db.SaveChangesAsync();
-        currentLogo = t.LogoUrl;
-        brandingDialog = false;
-        StateHasChanged();
+
+        try
+        {
+            t.PrimaryColorHex = normalizedPrimary;
+            t.SecondaryColorHex = normalizedSecondary;
+            t.LogoUrl = logoUrl;
+            Db.Tenants.Update(t);
+            await Db.SaveChangesAsync();
+            primaryHex = normalizedPrimary;
+            secondaryHex = normalizedSecondary;
+            currentLogo = logoUrl;
+            _logoFile = null;
+            brandingDialog = false;
+            Snackbar.Add("Branding został zapisany.", Severity.Success);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Nie udało się zapisać brandingu tenanta {TenantId}", tenantId);
+            Snackbar.Add("Nie udało się zapisać brandingu. Spróbuj ponownie.", Severity.Error);
+        }
+    }
+
+    private const long MaxLogoBytes = 5 * 1024 * 1024;
+
+    private static string? GetLogoValidationError(IBrowserFile file)
+    {
+        if (file.Size <= 0)
+            return "Wybrany plik logo jest pusty.";
+
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+        if (extension is not (".jpg" or ".jpeg" or ".png" or ".webp"))
+            return "Logo musi być plikiem PNG, JPG lub WebP.";
+
+        if (file.Size > MaxLogoBytes)
+            return "Logo jest za duże. Maksymalny rozmiar to 5 MB.";
+
+        return null;
     }
 
     private class LogoResponse { public string? logoUrl { get; set; } }

@@ -1,6 +1,7 @@
 @page "/admin/contract-template"
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Owner,SuperAdmin")]
+@using SportRental.Admin.Services.Contracts
 @inject IDbContextFactory<ApplicationDbContext> DbFactory
 @inject SportRental.Infrastructure.Tenancy.ITenantProvider TenantProvider
 @inject ISnackbar Snackbar
@@ -12,8 +13,8 @@
                 <MudIcon Icon="@Icons.Material.Filled.Description" Size="Size.Large" />
             </MudAvatar>
             <div>
-                <MudText Typo="Typo.h4" Style="font-weight: 700;">Szablon umowy</MudText>
-                <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Dostosuj treść umowy wypożyczenia</MudText>
+                <MudText Typo="Typo.h4" Style="font-weight: 700;">Postanowienia umowy</MudText>
+                <MudText Typo="Typo.subtitle1" Style="opacity: 0.9;">Dostosuj warunki, a RentSpot zadba o profesjonalny układ PDF</MudText>
             </div>
         </MudStack>
     </MudPaper>
@@ -25,13 +26,18 @@
                     <MudStack Spacing="4">
                         <MudStack Row="true" Class="mud-align-center" Spacing="2">
                             <MudIcon Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" />
-                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Edytor szablonu</MudText>
+                            <MudText Typo="Typo.h6" Style="font-weight: 600;">Warunki i dodatkowe postanowienia</MudText>
                         </MudStack>
+
+                        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">
+                            Nagłówek, dane stron, okres najmu, tabela sprzętu, podsumowanie, podpisy,
+                            logo i kolory są składane automatycznie. Tutaj edytujesz tylko treść warunków umowy.
+                        </MudAlert>
 
                         <MudTextField @bind-Value="content" 
                                       Lines="20" 
                                       FullWidth="true" 
-                                      Label="Treść szablonu umowy"
+                                      Label="Treść warunków umowy"
                                       Variant="Variant.Outlined"
                                       Class="rounded-lg"
                                       Style="font-family: 'Consolas', 'Monaco', monospace; font-size: 14px;" />
@@ -101,9 +107,9 @@
                             </MudStack>
                             <MudText Typo="Typo.body2" Color="Color.Default">
                                 • Zmienne w formacie <code>@("{{Zmienna}}")</code> zostaną automatycznie zastąpione danymi<br/>
-                                • Szablon jest używany przy generowaniu PDF umowy<br/>
-                                • Możesz użyć znaczników HTML dla formatowania<br/>
-                                • Dane firmy są pobierane z ustawień
+                                • Każdy numerowany punkt zostanie sformatowany jako osobne postanowienie<br/>
+                                • Nie używaj HTML — wygląd dokumentu jest nadawany automatycznie<br/>
+                                • Dane firmy, logo i kolory są pobierane z ustawień
                             </MudText>
                         </MudStack>
                     </MudCardContent>
@@ -146,7 +152,9 @@
         { "{{StartDate}}", "Data rozpoczęcia wynajmu" },
         { "{{EndDate}}", "Data zakończenia wynajmu" },
         { "{{RentalDays}}", "Liczba dni wynajmu" },
-        { "{{ItemsTable}}", "Tabela z produktami" },
+        { "{{RentalHours}}", "Liczba godzin (wynajem godzinowy)" },
+        { "{{RentalDuration}}", "Czas najmu z jednostką" },
+        { "{{PriceUnit}}", "Jednostka ceny: dzień lub godz." },
         { "{{Total}}", "Suma do zapłaty" },
         { "{{Deposit}}", "Kwota kaucji" },
         { "{{CompanyName}}", "Nazwa wypożyczalni" },
@@ -211,75 +219,5 @@
         Snackbar.Add($"Skopiowano: {variable}", MudBlazor.Severity.Success);
     }
 
-    private static string DefaultTemplate() => @"
-═══════════════════════════════════════════════════════════════
-                    UMOWA WYPOŻYCZENIA SPRZĘTU SPORTOWEGO
-═══════════════════════════════════════════════════════════════
-
-Nr rezerwacji: {{RentalId}}
-Data zawarcia: {{CurrentDate}}
-
-───────────────────────────────────────────────────────────────
-                         STRONY UMOWY
-───────────────────────────────────────────────────────────────
-
-WYPOŻYCZAJĄCY:
-  {{CompanyName}}
-  {{CompanyAddress}}
-  NIP: {{CompanyNIP}}
-  Tel: {{CompanyPhone}}
-
-NAJEMCA:
-  {{CustomerName}}
-  Dokument tożsamości: {{CustomerDocument}}
-  Adres: {{CustomerAddress}}
-  Telefon: {{CustomerPhone}}
-  Email: {{CustomerEmail}}
-
-───────────────────────────────────────────────────────────────
-                      OKRES WYPOŻYCZENIA
-───────────────────────────────────────────────────────────────
-
-  Data wydania sprzętu:    {{StartDate}}
-  Data zwrotu sprzętu:     {{EndDate}}
-  Liczba dni wypożyczenia: {{RentalDays}}
-
-───────────────────────────────────────────────────────────────
-                     WYPOŻYCZONY SPRZĘT
-───────────────────────────────────────────────────────────────
-
-{{ItemsTable}}
-
-───────────────────────────────────────────────────────────────
-                      PŁATNOŚCI
-───────────────────────────────────────────────────────────────
-
-  Całkowita wartość wypożyczenia:  {{Total}} zł
-  Kaucja zwrotna:                  {{Deposit}} zł
-
-───────────────────────────────────────────────────────────────
-                      WARUNKI UMOWY
-───────────────────────────────────────────────────────────────
-
-1. Najemca zobowiązuje się do zwrotu sprzętu w stanie niepogorszonym.
-2. W przypadku uszkodzenia lub zagubienia sprzętu, Najemca ponosi 
-   pełną odpowiedzialność finansową.
-3. Kaucja zostanie zwrócona po pozytywnej weryfikacji stanu sprzętu.
-4. Przedłużenie okresu wypożyczenia wymaga wcześniejszego uzgodnienia.
-5. Najemca oświadcza, że posiada umiejętności do bezpiecznego 
-   użytkowania wypożyczonego sprzętu.
-
-───────────────────────────────────────────────────────────────
-                         PODPISY
-───────────────────────────────────────────────────────────────
-
-
-_________________________          _________________________
-       Wypożyczający                        Najemca
-       ({{CompanyName}})                    ({{CustomerName}})
-
-
-Dziękujemy za skorzystanie z naszych usług!
-Życzymy udanego wypoczynku! 🎿⛷️🏂
-";
+    private static string DefaultTemplate() => ContractTemplateDefaults.StandardTerms;
 }
